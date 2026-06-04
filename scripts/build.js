@@ -1,11 +1,18 @@
 const fs = require("fs");
 const path = require("path");
 const babel = require("@babel/core");
+const { execSync } = require("child_process");
 
 const root = path.join(__dirname, "..");
 const jsxPath = path.join(root, "okozukai-v9.jsx");
 const htmlPath = path.join(root, "index.html");
 const appJsPath = path.join(root, "app.js");
+
+// コミットハッシュを取得（git未初期化でも fallback）
+let commitHash = "local";
+try {
+  commitHash = execSync("git rev-parse --short HEAD", { cwd: root }).toString().trim();
+} catch(e) {}
 
 const jsx = fs.readFileSync(jsxPath, "utf8");
 const code = jsx
@@ -34,5 +41,17 @@ if (si === -1 || ei === -1) {
   process.exit(1);
 }
 const newHtml = html.slice(0, si + START.length) + js + html.slice(ei);
-fs.writeFileSync(htmlPath, newHtml);
-console.log("index.html updated:", newHtml.length, "bytes");
+
+// コミットハッシュをmetaタグとして埋め込む
+const metaTag = `<meta name="tane-version" content="${commitHash}">`;
+const withVersion = newHtml.replace(
+  /<meta name="tane-version"[^>]*>/,
+  metaTag
+).replace(
+  /(<\/head>)/,
+  (match, p) => newHtml.includes('name="tane-version"') ? match : `${metaTag}\n${match}`
+);
+
+fs.writeFileSync(htmlPath, withVersion.includes('name="tane-version"') ? withVersion : newHtml);
+console.log("index.html updated:", (withVersion || newHtml).length, "bytes");
+console.log("Version:", commitHash);
