@@ -1495,7 +1495,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   // 5-tab grouped nav
   const MAIN_TABS = isJunior
-    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"],["more","📋 きろく"]]
+    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"]]
     : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
@@ -1664,6 +1664,39 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
         <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
         <DailyTasks child={child} data={data} update={update}/>
+        {isJunior && <>
+          {/* やることへのショートカット */}
+          <div style={{padding:"8px 16px 4px"}}>
+            <button onClick={()=>setTab("tasks")}
+              style={{width:"100%",background:`linear-gradient(135deg,${GS},#fff)`,border:`2px solid ${G}`,borderRadius:20,padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,fontFamily:F,textAlign:"left",boxShadow:SHADOW}}>
+              <span style={{fontSize:36}}>✅</span>
+              <div>
+                <div style={{fontWeight:900,fontSize:16,color:GP}}>きょうのやること</div>
+                <div style={{fontSize:12,color:TEXTS,marginTop:2}}>タップしてポイントをもらおう！</div>
+              </div>
+              <span style={{marginLeft:"auto",fontSize:24,color:G}}>›</span>
+            </button>
+          </div>
+          {/* さいきんのきろく */}
+          {myLogs.length>0&&(
+            <div style={{padding:"8px 16px 16px"}}>
+              <div style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}>📋 さいきんのきろく</div>
+              {[...myLogs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).map(l=>{
+                const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="transfer_in"?"💌":l.type==="transfer_out"?"💸":"⭐";
+                return(
+                  <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:22}}>{emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{l.label}</div>
+                      <div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div>
+                    </div>
+                    <Pt v={l.pts}/>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>}
       </>}
 
       {/* ── ACTIVITY サブナビ ── */}
@@ -1691,7 +1724,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#e8faf0":CARD,border:`2.5px solid ${on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#e8faf0":CARD,border:`2.5px solid ${on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
