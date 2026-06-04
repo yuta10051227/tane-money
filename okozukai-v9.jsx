@@ -458,6 +458,13 @@ function migrate(d) {
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
   if(!d.stocks||d.stocks.length===0) d.stocks=INIT.stocks;
   if(d.stocks&&d.stocks[0]&&!d.stocks[0].ticker) d.stocks=INIT.stocks;
+  if(!d.forex||Object.keys(d.forex).length===0) d.forex={
+    "USDJPY=X":{code:"USD",flag:"🇺🇸",name:"アメリカ ドル",price:155,prev:155,history:[152,153,154,155,155],changePct:0,realData:false},
+    "EURJPY=X":{code:"EUR",flag:"🇪🇺",name:"ユーロ",price:168,prev:168,history:[165,166,167,168,168],changePct:0,realData:false},
+    "GBPJPY=X":{code:"GBP",flag:"🇬🇧",name:"イギリス ポンド",price:196,prev:196,history:[193,194,195,196,196],changePct:0,realData:false},
+    "CNYJPY=X":{code:"CNY",flag:"🇨🇳",name:"中国 人民元",price:21.4,prev:21.4,history:[21.0,21.1,21.2,21.4,21.4],changePct:0,realData:false},
+    "KRWJPY=X":{code:"KRW",flag:"🇰🇷",name:"韓国 ウォン",price:0.112,prev:0.112,history:[0.110,0.111,0.112,0.112,0.112],changePct:0,realData:false},
+  };
   if(!d.holdings)      d.holdings={};
   if(!d.stockLastUpdate) d.stockLastUpdate="";
   if(!d.stockFetchStatus) d.stockFetchStatus="idle";
