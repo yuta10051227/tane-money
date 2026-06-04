@@ -1546,19 +1546,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── 学ぶ（Teenモード） ── */}
       {effectiveTab==="learn" && !isJunior && (
-        <div>
-          <TipsSection ageMode={child.ageMode||"middle"} child={child} data={data} update={update}/>
-          <div style={{padding:"0 16px 16px",display:"flex",flexDirection:"column",gap:8}}>
-            <p style={{fontWeight:800,fontSize:13,color:MUTED,margin:"4px 0 8px"}}>📈 投資・為替シミュレーション</p>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px"}}>
-              <p style={{fontSize:12,color:B,fontWeight:600,margin:"0 0 10px"}}>📊 実際のお金を使わないシミュレーションです</p>
-              <button onClick={()=>{setTab("activity");setActTab("invest");}} style={{width:"100%",padding:"10px",background:GP,border:"none",borderRadius:12,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>📈 株式シミュレーションを見る</button>
-            </div>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px"}}>
-              <button onClick={()=>{setTab("money");setMonTab("kakeibo");}} style={{width:"100%",padding:"10px",background:B,border:"none",borderRadius:12,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>💱 為替シミュレーションを見る（家計簿→為替欄）</button>
-            </div>
-          </div>
-        </div>
+        <TipsSection ageMode={child.ageMode||"middle"} child={child} data={data} update={update}/>
       )}
 
       {/* ── 家族ミッション導線（ホームタブ内の小カード） ── */}
@@ -1660,6 +1648,18 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
+      {/* ── ACTIVITY サブナビ ── */}
+      {effectiveTab==="activity"&&!isJunior&&!young&&(
+        <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`}}>
+          {[["tasks","✅ お手伝い"],["invest","📈 投資/為替"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setActTab(v)}
+              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:actTab===v?GP:MUTED,fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── ACTIVITY ── */}
       {effectiveTab==="activity"&&(actTab==="tasks"||young)&&(()=>{
         return(<div style={{padding:16}}>
@@ -1677,21 +1677,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
-            <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>❌ わるいこと（マイナス）</p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"18px 0 10px"}}>
+              <div style={{flex:1,height:1,background:RS}}/>
+              <span style={{fontSize:11,fontWeight:700,color:R,padding:"3px 10px",background:RS,borderRadius:999}}>❌ わるいこと（マイナス）</span>
+              <div style={{flex:1,height:1,background:RS}}/>
+            </div>
+            <div style={{background:`${R}08`,border:`1.5px dashed ${RS}`,borderRadius:14,padding:"10px 10px 4px",marginBottom:4}}>
+              <p style={{margin:"0 0 8px",fontSize:11,color:R,fontWeight:600}}>やってしまったら正直に記録しよう</p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
+            </div>
           </>}
           {filtGood.length===0&&filtBad.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:MUTED}}>タスクが選択されていないよ</p><button onClick={()=>setShowCustomizer(true)} style={{marginTop:8,background:G,border:"none",borderRadius:12,padding:"10px 20px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>リストを編集する</button></div>}
         </div>);
       })()}
-      {effectiveTab==="activity"&&actTab==="bad"&&!young&&<div style={{padding:16}}>
-        <div style={{background:"#fef0ef",border:`1.5px solid ${R}`,borderRadius:14,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:18}}>⚠</span>
-          <p style={{margin:0,fontSize:12,color:R,fontWeight:700}}>やってしまったら自分で記録しよう。正直に記録することが大切だよ。</p>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:11,fontWeight:700,color:TEXT,textAlign:"center",lineHeight:1.3}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
-      </div>}
       {effectiveTab==="activity"&&actTab==="invest"&&!young&&<InvestTab child={child} data={data} update={update}/>}
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
@@ -1937,7 +1936,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             {onFamily&&(
               <button onClick={onFamily} style={{width:"100%",marginTop:12,padding:"11px",background:GP,border:"none",borderRadius:12,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
-                👨‍👩‍👧 ファミリー詳細を見る
+                👨👩👧 ファミリー詳細を見る
               </button>
             )}
           </div>

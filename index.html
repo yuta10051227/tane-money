@@ -3682,81 +3682,12 @@ function ChildScreen({
       minWidth: 56,
       transition: "all .15s"
     }
-  }, l))), effectiveTab === "learn" && !isJunior && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(TipsSection, {
+  }, l))), effectiveTab === "learn" && !isJunior && /*#__PURE__*/React.createElement(TipsSection, {
     ageMode: child.ageMode || "middle",
     child: child,
     data: data,
     update: update
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "0 16px 16px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontWeight: 800,
-      fontSize: 13,
-      color: MUTED,
-      margin: "4px 0 8px"
-    }
-  }, "\uD83D\uDCC8 \u6295\u8CC7\u30FB\u70BA\u66FF\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: CARD,
-      border: `1.5px solid ${BORDER}`,
-      borderRadius: 14,
-      padding: "14px"
-    }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12,
-      color: B,
-      fontWeight: 600,
-      margin: "0 0 10px"
-    }
-  }, "\uD83D\uDCCA \u5B9F\u969B\u306E\u304A\u91D1\u3092\u4F7F\u308F\u306A\u3044\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u3067\u3059"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setTab("activity");
-      setActTab("invest");
-    },
-    style: {
-      width: "100%",
-      padding: "10px",
-      background: GP,
-      border: "none",
-      borderRadius: 12,
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 13,
-      cursor: "pointer",
-      fontFamily: F
-    }
-  }, "\uD83D\uDCC8 \u682A\u5F0F\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u3092\u898B\u308B")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: CARD,
-      border: `1.5px solid ${BORDER}`,
-      borderRadius: 14,
-      padding: "14px"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setTab("money");
-      setMonTab("kakeibo");
-    },
-    style: {
-      width: "100%",
-      padding: "10px",
-      background: B,
-      border: "none",
-      borderRadius: 12,
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 13,
-      cursor: "pointer",
-      fontFamily: F
-    }
-  }, "\uD83D\uDCB1 \u70BA\u66FF\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u3092\u898B\u308B\uFF08\u5BB6\u8A08\u7C3F\u2192\u70BA\u66FF\u6B04\uFF09")))), effectiveTab === "daily" && (() => {
+  }), effectiveTab === "daily" && (() => {
     const fs = data.familySettings || INIT.familySettings;
     if (!fs.familyMission?.enabled) return null;
     const missionPts = (data.logs || []).filter(l => ["daily", "good", "bad"].includes(l.type) && l.pts > 0).reduce((s, l) => s + l.pts, 0);
@@ -4052,7 +3983,28 @@ function ChildScreen({
       padding: "1px 7px",
       borderRadius: 20
     }
-  }, g.rate, "%")))), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 8px 40px #f5c84250,0 0 0 10px #f5c84225}50%{box-shadow:0 8px 60px #f5c84280,0 0 0 18px #f5c84240}}@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`)), effectiveTab === "activity" && (actTab === "tasks" || young) && (() => {
+  }, g.rate, "%")))), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 8px 40px #f5c84250,0 0 0 10px #f5c84225}50%{box-shadow:0 8px 60px #f5c84280,0 0 0 18px #f5c84240}}@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`)), effectiveTab === "activity" && !isJunior && !young && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      background: CARD,
+      borderBottom: `1px solid ${BORDER}`
+    }
+  }, [["tasks", "✅ お手伝い"], ["invest", "📈 投資/為替"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    onClick: () => setActTab(v),
+    style: {
+      flex: 1,
+      padding: "10px 0",
+      border: "none",
+      borderBottom: actTab === v ? `2.5px solid ${GP}` : "2.5px solid transparent",
+      background: "none",
+      color: actTab === v ? GP : MUTED,
+      fontWeight: actTab === v ? 700 : 500,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, l))), effectiveTab === "activity" && (actTab === "tasks" || young) && (() => {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         padding: 16
@@ -4141,14 +4093,50 @@ function ChildScreen({
         v: pts,
         sz: 12
       }));
-    }))), !young && filtBad.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+    }))), !young && filtBad.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
-        color: MUTED,
-        fontSize: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        margin: "18px 0 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 1,
+        background: RS
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
         fontWeight: 700,
-        marginBottom: 10
+        color: R,
+        padding: "3px 10px",
+        background: RS,
+        borderRadius: 999
       }
     }, "\u274C \u308F\u308B\u3044\u3053\u3068\uFF08\u30DE\u30A4\u30CA\u30B9\uFF09"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 1,
+        background: RS
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `${R}08`,
+        border: `1.5px dashed ${RS}`,
+        borderRadius: 14,
+        padding: "10px 10px 4px",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        margin: "0 0 8px",
+        fontSize: 11,
+        color: R,
+        fontWeight: 600
+      }
+    }, "\u3084\u3063\u3066\u3057\u307E\u3063\u305F\u3089\u6B63\u76F4\u306B\u8A18\u9332\u3057\u3088\u3046"), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -4188,7 +4176,7 @@ function ChildScreen({
         v: taskPts(t, child.id),
         sz: 12
       }));
-    }))), filtGood.length === 0 && filtBad.length === 0 && /*#__PURE__*/React.createElement("div", {
+    })))), filtGood.length === 0 && filtBad.length === 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         padding: "32px 0"
@@ -4212,74 +4200,7 @@ function ChildScreen({
         fontFamily: F
       }
     }, "\u30EA\u30B9\u30C8\u3092\u7DE8\u96C6\u3059\u308B")));
-  })(), effectiveTab === "activity" && actTab === "bad" && !young && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fef0ef",
-      border: `1.5px solid ${R}`,
-      borderRadius: 14,
-      padding: "10px 14px",
-      marginBottom: 14,
-      display: "flex",
-      alignItems: "center",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18
-    }
-  }, "\u26A0"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      margin: 0,
-      fontSize: 12,
-      color: R,
-      fontWeight: 700
-    }
-  }, "\u3084\u3063\u3066\u3057\u307E\u3063\u305F\u3089\u81EA\u5206\u3067\u8A18\u9332\u3057\u3088\u3046\u3002\u6B63\u76F4\u306B\u8A18\u9332\u3059\u308B\u3053\u3068\u304C\u5927\u5207\u3060\u3088\u3002")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10
-    }
-  }, [...filtBad].sort(sortTaskFn).map(t => {
-    const on = !!pressed[t.id];
-    return /*#__PURE__*/React.createElement("button", {
-      key: t.id,
-      onClick: () => doTask(t),
-      style: {
-        background: on ? "#fef0ef" : CARD,
-        border: `2.5px solid ${on ? R : BORDER}`,
-        borderRadius: 18,
-        padding: "13px 10px",
-        cursor: "pointer",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-        transform: on ? "scale(.92)" : "scale(1)",
-        transition: "all .2s",
-        fontFamily: F
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 26
-      }
-    }, t.emoji), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: TEXT,
-        textAlign: "center",
-        lineHeight: 1.3
-      }
-    }, t.label), /*#__PURE__*/React.createElement(Pt, {
-      v: taskPts(t, child.id),
-      sz: 12
-    }));
-  }))), effectiveTab === "activity" && actTab === "invest" && !young && /*#__PURE__*/React.createElement(InvestTab, {
+  })(), effectiveTab === "activity" && actTab === "invest" && !young && /*#__PURE__*/React.createElement(InvestTab, {
     child: child,
     data: data,
     update: update
@@ -5180,7 +5101,7 @@ function ChildScreen({
         cursor: "pointer",
         fontFamily: F
       }
-    }, "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 \u30D5\u30A1\u30DF\u30EA\u30FC\u8A73\u7D30\u3092\u898B\u308B"));
+    }, "\uD83D\uDC68\uD83D\uDC69\uD83D\uDC67 \u30D5\u30A1\u30DF\u30EA\u30FC\u8A73\u7D30\u3092\u898B\u308B"));
   })(), false && (() => {
     const month = monthKey();
     const allMembers = [...data.children, ...(data.parents || [])];
