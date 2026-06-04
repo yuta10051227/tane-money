@@ -3902,27 +3902,52 @@ function ForexSection({data, update, child}){
   // 外貨保有合計（円・pt換算）
   const totalForexJpy=pairs.reduce((s,fx)=>s+(myForex[fx.code]||0)*(fx.price||0),0);
   const totalForexPts=Math.round(totalForexJpy/100);
+  const heldPairs=pairs.filter(fx=>(myForex[fx.code]||0)>0);
 
   return(
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+      {/* 外貨ポートフォリオカード（常時表示） */}
+      <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:20,padding:18,marginBottom:14,color:"#fff"}}>
+        <p style={{color:"#aaa",fontSize:12,fontWeight:700,margin:"0 0 4px"}}>💱 外貨ポートフォリオ</p>
+        <div style={{fontSize:28,fontWeight:900,marginBottom:4,color:"#f5c842"}}>
+          {Math.round(totalForexJpy).toLocaleString()}円
+        </div>
+        <div style={{display:"flex",gap:16,marginBottom:heldPairs.length>0?10:0}}>
+          <div>
+            <span style={{color:"#aaa",fontSize:11}}>pt換算 </span>
+            <span style={{fontWeight:700,fontSize:13,color:"#4ade80"}}>{totalForexPts.toLocaleString()}pt</span>
+          </div>
+        </div>
+        {heldPairs.length>0&&(
+          <div style={{display:"flex",flexWrap:"wrap",gap:"4px 12px",marginBottom:8}}>
+            {heldPairs.map(fx=>{
+              const h=myForex[fx.code]||0;
+              const jpy=Math.round(h*(fx.price||0));
+              return(
+                <div key={fx.code} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}>
+                  <span>{fx.flag}</span>
+                  <span style={{color:"#ccc"}}>{fx.code} {h}</span>
+                  <span style={{color:"#f5c842",fontWeight:700}}>¥{jpy.toLocaleString()}</span>
+                  <span style={{color:"#4ade80",fontWeight:700}}>{Math.round(jpy/100)}pt</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {heldPairs.length===0&&(
+          <div style={{fontSize:11,color:"#555",marginBottom:4}}>保有なし — 下の通貨をタップして購入できます</div>
+        )}
+        <div style={{marginTop:6,color:"#aaa",fontSize:11}}>💰 残高: <span style={{color:"#fff",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
+        <div style={{fontSize:10,color:"#444",marginTop:4}}>※ 100円 = 1pt換算・手数料除く</div>
+      </div>
+
+      {/* レートヘッダー */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:0,flex:1}}>💱 為替レート（対円）</p>
         <span style={{fontSize:10,color:pairs[0]?.realData?"#4ade80":"#f87171",fontWeight:700}}>
           {pairs[0]?.realData?"● LIVE":"● シミュ"}
         </span>
       </div>
-
-      {/* 外貨資産サマリー */}
-      {totalForexPts>0&&(
-        <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:16,padding:"12px 16px",marginBottom:14,color:"#fff"}}>
-          <p style={{color:"#aaa",fontSize:11,fontWeight:700,margin:"0 0 6px"}}>💱 外貨資産（合計）</p>
-          <div style={{fontSize:22,fontWeight:900,color:"#f5c842"}}>{Math.round(totalForexJpy).toLocaleString()}円</div>
-          <div style={{fontSize:12,color:"#aaa",marginTop:2}}>
-            ポイントに換えると <span style={{color:"#4ade80",fontWeight:800,fontSize:14}}>{totalForexPts.toLocaleString()}pt</span>
-          </div>
-          <div style={{fontSize:10,color:"#666",marginTop:4}}>※ 100円 = 1pt換算・手数料除く</div>
-        </div>
-      )}
 
       {pairs.map(fx=>{
         const isUp=(fx.changePct||0)>=0;
@@ -3952,10 +3977,14 @@ function ForexSection({data, update, child}){
                   <div style={{fontSize:13,fontWeight:700,color:isUp?"#4ade80":"#f87171"}}>
                     {isUp?"▲":"▼"}{Math.abs(fx.changePct||0).toFixed(2)}%
                   </div>
-                  {held>0&&<>
-                    <div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>
-                    <div style={{fontSize:10,color:"#4ade80",fontWeight:700}}>≈¥{Math.round(held*(fx.price||0)).toLocaleString()} / {Math.round(held*(fx.price||0)/100)}pt</div>
-                  </>}
+                  {held>0?(
+                    <>
+                      <div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>
+                      <div style={{fontSize:10,color:"#4ade80",fontWeight:700}}>≈¥{Math.round(held*(fx.price||0)).toLocaleString()} / {Math.round(held*(fx.price||0)/100)}pt</div>
+                    </>
+                  ):(
+                    <div style={{fontSize:10,color:"#555",fontWeight:700}}>未保有</div>
+                  )}
                 </div>
               </div>
             </button>
