@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="2875f12">
+<meta name="tane-version" content="ba0dbab">
 </head>
 <body>
   <div id="root"></div>
@@ -974,8 +974,10 @@ const INIT = {
       label: "みんなの活動で 3,000 pt を育てよう",
       target: 3000,
       reward: "週末に家族でアイスを選ぶ"
-    }
-  }
+    },
+    requireApproval: false
+  },
+  pendingApprovals: []
 };
 function migrate(d) {
   if (!d) return {
@@ -993,9 +995,11 @@ function migrate(d) {
   if (!d.forexHoldings) d.forexHoldings = {};
   if (!d.claimedBadges) d.claimedBadges = {};
   if (!d.noPinIds) d.noPinIds = {};
+  if (!d.pendingApprovals) d.pendingApprovals = [];
   if (!d.familySettings) d.familySettings = {
     ...INIT.familySettings
   };
+  if (d.familySettings.requireApproval === undefined) d.familySettings.requireApproval = false;
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms = {
     investment: "trade",
@@ -1695,9 +1699,27 @@ function GachaAnim({
   const theme = result.theme || getMonthTheme();
   const isSuper = result.rate <= 3;
   const isSR = result.rate <= 12;
+  const hasSuspense = isSR; // SR以上はタメ演出
+
   useEffect(() => {
-    const t = setTimeout(() => setPhase("show"), 1600);
-    return () => clearTimeout(t);
+    const spinMs = 1100;
+    const suspenseMs = isSuper ? 2200 : 1400;
+    if (hasSuspense) {
+      const t1 = setTimeout(() => {
+        setPhase("suspense");
+        try {
+          if (isSuper) navigator.vibrate([150, 80, 150, 80, 300, 80, 500]);else navigator.vibrate([100, 60, 180]);
+        } catch (e) {}
+      }, spinMs);
+      const t2 = setTimeout(() => setPhase("show"), spinMs + suspenseMs);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    } else {
+      const t = setTimeout(() => setPhase("show"), spinMs);
+      return () => clearTimeout(t);
+    }
   }, []);
   const starCount = isSuper ? 30 : isSR ? 15 : 0;
   return /*#__PURE__*/React.createElement("div", {
@@ -1711,7 +1733,7 @@ function GachaAnim({
       justifyContent: "center",
       fontFamily: F
     }
-  }, phase === "spin" ? /*#__PURE__*/React.createElement("div", {
+  }, phase === "spin" && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }
@@ -1734,7 +1756,37 @@ function GachaAnim({
       fontSize: 18,
       marginTop: 12
     }
-  }, "\u30AC\u30C1\u30E3\u4E2D\u2026")) : /*#__PURE__*/React.createElement("div", {
+  }, "\u30AC\u30C1\u30E3\u4E2D\u2026")), phase === "suspense" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 130,
+      height: 130,
+      borderRadius: "50%",
+      margin: "0 auto",
+      background: `radial-gradient(circle at 40% 35%,${result.color}ff,${result.color}88)`,
+      animation: "heartbeat .65s ease-in-out infinite",
+      boxShadow: `0 0 0 20px ${result.color}22,0 0 60px ${result.color}66`
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: isSuper ? 24 : 18,
+      fontWeight: 900,
+      marginTop: 22,
+      animation: "fadePulse .65s ease-in-out infinite"
+    }
+  }, isSuper ? "‼ もしかして…" : "あれ…？"), isSuper && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: result.color,
+      fontSize: 13,
+      fontWeight: 700,
+      marginTop: 8,
+      animation: "fadePulse .65s ease-in-out infinite .3s"
+    }
+  }, "\u306A\u306B\u304B\u6765\u308B\u304B\u3082\u2026\uFF01")), phase === "show" && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       animation: "pop .35s cubic-bezier(.2,.8,.3,1.3)",
@@ -1827,7 +1879,13 @@ function GachaAnim({
       fontFamily: F,
       width: "100%"
     }
-  }, isSuper ? "🎊 すごい！" : "やったー🎉"))), /*#__PURE__*/React.createElement("style", null, `@keyframes sp{to{transform:rotate(360deg)}}@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}@keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}`));
+  }, isSuper ? "🎊 すごい！" : "やったー🎉"))), /*#__PURE__*/React.createElement("style", null, `
+        @keyframes sp{to{transform:rotate(360deg)}}
+        @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+        @keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}
+        @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
+        @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.25}}
+      `));
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2446,6 +2504,7 @@ function SettingsModal({
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
+  const [copied, setCopied] = useState(false);
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G = "#34c77b",
     Y = "#f5c842",
@@ -2487,7 +2546,7 @@ function SettingsModal({
       }
     }
   };
-  const SETTING_TABS = [["grant", "🎁 pt付与"], ["tasks", "📋 タスク"], ["assign", "👤 個別割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "👨 メンバー"]];
+  const SETTING_TABS = [["grant", "🎁 pt付与"], ["approval", "✅ 承認"], ["tasks", "📋 タスク"], ["assign", "👤 個別割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "👨 メンバー"], ["transfer", "🔄 引き継ぎ"]];
   if (!authed) return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -3407,7 +3466,306 @@ function SettingsModal({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), ")}")));
+  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), ")}", settingsTab === "approval" && (() => {
+    const fs = data.familySettings || INIT.familySettings;
+    const pending = data.pendingApprovals || [];
+    const approve = entry => {
+      const log = {
+        id: uid(),
+        cid: entry.cid,
+        type: "good",
+        label: entry.taskLabel,
+        pts: entry.pts,
+        date: new Date().toISOString(),
+        rid: entry.taskId
+      };
+      addLogToFirestore(log);
+      update(d => ({
+        ...d,
+        logs: [log, ...d.logs],
+        pendingApprovals: (d.pendingApprovals || []).filter(p => p.id !== entry.id)
+      }));
+    };
+    const reject = entry => {
+      update(d => ({
+        ...d,
+        pendingApprovals: (d.pendingApprovals || []).filter(p => p.id !== entry.id)
+      }));
+    };
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, "\u30BF\u30B9\u30AF\u627F\u8A8D\u304C\u5FC5\u8981"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: MUTED,
+        fontSize: 11,
+        marginTop: 2
+      }
+    }, "ON\u306B\u3059\u308B\u3068\u3001\u5B50\u3069\u3082\u306E\u304A\u624B\u4F1D\u3044\u8A18\u9332\u3092\u89AA\u304C\u627F\u8A8D")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => update(d => ({
+        ...d,
+        familySettings: {
+          ...(d.familySettings || {}),
+          requireApproval: !fs.requireApproval
+        }
+      })),
+      style: {
+        position: "relative",
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        background: fs.requireApproval ? G : BORDER,
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: fs.requireApproval ? 24 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s"
+      }
+    }))), /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12,
+        fontWeight: 800,
+        margin: "0 0 10px"
+      }
+    }, "\u627F\u8A8D\u5F85\u3061\uFF08", pending.length, "\u4EF6\uFF09"), pending.length === 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "24px 0",
+        color: MUTED,
+        fontSize: 13
+      }
+    }, "\u627F\u8A8D\u5F85\u3061\u306E\u30BF\u30B9\u30AF\u306F\u3042\u308A\u307E\u305B\u3093"), pending.map(entry => {
+      const member = [...data.children, ...(data.parents || [])].find(m => m.id === entry.cid);
+      return /*#__PURE__*/React.createElement("div", {
+        key: entry.id,
+        style: {
+          background: GOLDS,
+          border: `1.5px solid ${GOLD}`,
+          borderRadius: 14,
+          padding: "12px 14px",
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 26
+        }
+      }, entry.taskEmoji), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontWeight: 700,
+          fontSize: 13,
+          color: TEXT
+        }
+      }, entry.taskLabel), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: MUTED
+        }
+      }, member?.name || "?", " \xB7 +", entry.pts, "pt"))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 8
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: () => approve(entry),
+        style: {
+          flex: 1,
+          background: G,
+          border: "none",
+          borderRadius: 10,
+          padding: "9px",
+          color: "#fff",
+          fontWeight: 800,
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: F
+        }
+      }, "\u2705 \u627F\u8A8D"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => reject(entry),
+        style: {
+          flex: 1,
+          background: `${R}15`,
+          border: `1.5px solid ${R}`,
+          borderRadius: 10,
+          padding: "9px",
+          color: R,
+          fontWeight: 800,
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: F
+        }
+      }, "\u274C \u5374\u4E0B")));
+    }));
+  })(), settingsTab === "transfer" && (() => {
+    const code = (() => {
+      try {
+        return localStorage.getItem(FAMILY_CODE_KEY) || "---";
+      } catch (e) {
+        return "---";
+      }
+    })();
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12,
+        fontWeight: 800,
+        margin: "0 0 16px"
+      }
+    }, "\u30B9\u30DE\u30DB\u5F15\u304D\u7D99\u304E\u30FB\u5171\u6709"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg,${GS},#fff)`,
+        border: `2px solid ${G}`,
+        borderRadius: 16,
+        padding: "20px",
+        textAlign: "center",
+        marginBottom: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: MUTED,
+        fontWeight: 700,
+        marginBottom: 8
+      }
+    }, "\u3042\u306A\u305F\u306E\u30D5\u30A1\u30DF\u30EA\u30FC\u30B3\u30FC\u30C9"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 900,
+        fontSize: 28,
+        letterSpacing: 4,
+        color: GP,
+        marginBottom: 8
+      }
+    }, code), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: MUTED,
+        marginBottom: 14
+      }
+    }, "\u3053\u306E\u30B3\u30FC\u30C9\u3092\u65B0\u3057\u3044\u30B9\u30DE\u30DB\u3084\u5BB6\u65CF\u306B\u5171\u6709\u3057\u3066\u304F\u3060\u3055\u3044"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        try {
+          navigator.clipboard.writeText(code);
+        } catch (e) {}
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      style: {
+        background: copied ? G : GP,
+        border: "none",
+        borderRadius: 12,
+        padding: "10px 28px",
+        color: "#fff",
+        fontWeight: 800,
+        fontSize: 14,
+        cursor: "pointer",
+        fontFamily: F,
+        transition: "background .3s"
+      }
+    }, copied ? "✅ コピーしました！" : "📋 コードをコピー")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: BG,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px"
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        margin: "0 0 10px"
+      }
+    }, "\uD83D\uDCF1 \u65B0\u3057\u3044\u30B9\u30DE\u30DB\u3078\u306E\u5F15\u304D\u7D99\u304E\u624B\u9806"), [["1", "新しいスマホでTane Moneyを開く"], ["2", "「すでにコードがある」をタップ"], ["3", "上のコードを入力"], ["4", "データが同期される"]].map(([n, t]) => /*#__PURE__*/React.createElement("div", {
+      key: n,
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        background: GP,
+        color: "#fff",
+        fontWeight: 800,
+        fontSize: 11,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, n), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: TEXT,
+        lineHeight: 1.6,
+        paddingTop: 2
+      }
+    }, t)))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!confirm("このiPhoneからログアウトしますか？\nコードを入力すれば再びアクセスできます。")) return;
+        try {
+          localStorage.removeItem(FAMILY_CODE_KEY);
+        } catch (e) {}
+        _familyCode = null;
+        window.location.reload();
+      },
+      style: {
+        width: "100%",
+        padding: "11px",
+        background: `${R}15`,
+        border: `1.5px solid ${R}`,
+        borderRadius: 12,
+        color: R,
+        fontWeight: 700,
+        fontSize: 13,
+        cursor: "pointer",
+        fontFamily: F,
+        marginTop: 14
+      }
+    }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"));
+  })())));
 }
 function ChildScreen({
   child,
@@ -3466,6 +3824,10 @@ function ChildScreen({
   };
   const doTask = task => {
     const pts = taskPts(task, child.id);
+    const fs = data.familySettings || INIT.familySettings;
+    const needApproval = fs.requireApproval && pts > 0;
+    const alreadyPending = (data.pendingApprovals || []).some(p => p.cid === child.id && p.taskId === task.id);
+    if (alreadyPending) return;
     setPressed(p => ({
       ...p,
       [task.id]: true
@@ -3477,14 +3839,36 @@ function ChildScreen({
       delete n[task.id];
       return n;
     }), 500);
-    showFlash(pts, task.emoji);
-    addLog({
-      cid: child.id,
-      type: pts >= 0 ? "good" : "bad",
-      label: task.label,
-      pts,
-      rid: task.id
-    });
+    if (needApproval) {
+      setFlash({
+        pts: 0,
+        emoji: "⏳",
+        pending: true
+      });
+      setTimeout(() => setFlash(null), 1400);
+      const entry = {
+        id: uid(),
+        cid: child.id,
+        taskId: task.id,
+        taskLabel: task.label,
+        taskEmoji: task.emoji,
+        pts,
+        date: new Date().toISOString()
+      };
+      update(d => ({
+        ...d,
+        pendingApprovals: [...(d.pendingApprovals || []), entry]
+      }));
+    } else {
+      showFlash(pts, task.emoji);
+      addLog({
+        cid: child.id,
+        type: pts >= 0 ? "good" : "bad",
+        label: task.label,
+        pts,
+        rid: task.id
+      });
+    }
   };
   const doRedeem = r => {
     showFlash(-r.cost, r.emoji);
@@ -3991,7 +4375,7 @@ function ChildScreen({
       top: "28%",
       left: "50%",
       transform: "translate(-50%,-50%)",
-      background: flash.pts >= 0 ? G : R,
+      background: flash.pending ? GOLD : flash.pts >= 0 ? G : R,
       color: "#fff",
       borderRadius: 20,
       padding: "14px 26px",
@@ -4004,7 +4388,13 @@ function ChildScreen({
     style: {
       fontSize: 38
     }
-  }, flash.emoji), /*#__PURE__*/React.createElement(Pt, {
+  }, flash.emoji), flash.pending ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      marginTop: 4
+    }
+  }, "\u304A\u3046\u3061\u306E\u4EBA\u306B\u78BA\u8A8D\u3059\u308B\u306D") : /*#__PURE__*/React.createElement(Pt, {
     v: flash.pts,
     sz: 22
   })), gachaRes && /*#__PURE__*/React.createElement(GachaAnim, {
@@ -4397,12 +4787,13 @@ function ChildScreen({
     }, [...filtGood].sort(sortTaskFn).map(t => {
       const pts = taskPts(t, child.id);
       const on = !!pressed[t.id];
+      const isPending = (data.pendingApprovals || []).some(p => p.cid === child.id && p.taskId === t.id);
       return /*#__PURE__*/React.createElement("button", {
         key: t.id,
         onClick: () => doTask(t),
         style: {
-          background: on ? "#e8faf0" : CARD,
-          border: `2.5px solid ${on ? G : BORDER}`,
+          background: isPending ? GOLDS : on ? "#e8faf0" : CARD,
+          border: `2.5px solid ${isPending ? GOLD : on ? G : BORDER}`,
           borderRadius: 18,
           padding: "13px 10px",
           cursor: "pointer",
@@ -4412,9 +4803,22 @@ function ChildScreen({
           gap: 6,
           transform: on ? "scale(.92)" : "scale(1)",
           transition: "all .2s",
-          fontFamily: F
+          fontFamily: F,
+          position: "relative"
         }
-      }, /*#__PURE__*/React.createElement("span", {
+      }, isPending && /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: "absolute",
+          top: 4,
+          right: 4,
+          fontSize: 9,
+          background: GOLD,
+          color: "#fff",
+          borderRadius: 999,
+          padding: "1px 5px",
+          fontWeight: 700
+        }
+      }, "\u78BA\u8A8D\u5F85\u3061"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: young ? 34 : 26
         }
@@ -14344,6 +14748,9 @@ function SetupWizard({
   const [goalLabel, setGoalLabel] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [familyCode] = useState(() => `TANE-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
+  const [joinMode, setJoinMode] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinErr, setJoinErr] = useState("");
   const CHILD_EMOJIS = ["⚡", "🌸", "🌟", "🦁", "🐯", "🐬", "🦊", "🐼", "🐉", "🌈", "🎸", "⚽", "🚀", "🎮", "🦄", "🐶", "🐱", "🍕"];
   const GOAL_EMOJIS = ["🎮", "📱", "🎵", "🚴", "✈", "👟", "📚", "🎨", "⚽", "🍰", "💻", "🎸", "🏊", "🎀", "🌍", "🍜"];
   const STARTER_TASKS = (data?.goodTasks || []).slice(0, 10);
@@ -14516,7 +14923,7 @@ function SetupWizard({
     style: {
       color: MUTED,
       fontSize: 12,
-      margin: "0 0 44px"
+      margin: "0 0 28px"
     }
   }, "\u23F1 \u30BB\u30C3\u30C8\u30A2\u30C3\u30D7\u306F\u7D043\u5206\u3067\u5B8C\u4E86"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setStep(1),
@@ -14524,9 +14931,106 @@ function SetupWizard({
       ...btnStyle(true),
       fontSize: 18,
       padding: "17px",
-      boxShadow: `0 8px 24px ${GP}40`
+      boxShadow: `0 8px 24px ${GP}40`,
+      marginBottom: 16
     }
-  }, "\u306F\u3058\u3081\u308B \uD83C\uDF1F")), step === 1 && /*#__PURE__*/React.createElement("div", {
+  }, "\u306F\u3058\u3081\u308B \uD83C\uDF1F"), !joinMode && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setJoinMode(true),
+    style: {
+      background: "none",
+      border: "none",
+      color: MUTED,
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: F,
+      textDecoration: "underline"
+    }
+  }, "\u3059\u3067\u306B\u30D5\u30A1\u30DF\u30EA\u30FC\u30B3\u30FC\u30C9\u304C\u3042\u308B \u2192"), joinMode && /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      maxWidth: 320,
+      background: CARD,
+      borderRadius: 18,
+      padding: "20px",
+      border: `1.5px solid ${BORDER}`,
+      textAlign: "left",
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontWeight: 800,
+      fontSize: 14,
+      color: TEXT,
+      margin: "0 0 10px",
+      textAlign: "center"
+    }
+  }, "\uD83D\uDD17 \u30D5\u30A1\u30DF\u30EA\u30FC\u30B3\u30FC\u30C9\u3092\u5165\u529B"), /*#__PURE__*/React.createElement("input", {
+    value: joinCode,
+    onChange: e => {
+      setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, ""));
+      setJoinErr("");
+    },
+    placeholder: "TANE-XXXX",
+    style: {
+      ...{
+        width: "100%",
+        padding: "12px 14px",
+        border: `1.5px solid ${joinErr ? R : BORDER}`,
+        borderRadius: 10,
+        fontSize: 16,
+        fontFamily: F,
+        background: BG,
+        outline: "none",
+        textAlign: "center",
+        letterSpacing: 3,
+        fontWeight: 900,
+        color: GP,
+        boxSizing: "border-box"
+      },
+      marginBottom: 8
+    }
+  }), joinErr && /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: R,
+      fontSize: 11,
+      fontWeight: 700,
+      margin: "0 0 8px"
+    }
+  }, joinErr), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const code = joinCode.trim();
+      if (!code || code.length < 4) {
+        setJoinErr("コードを入力してください");
+        return;
+      }
+      try {
+        localStorage.setItem(FAMILY_CODE_KEY, code);
+      } catch (e) {}
+      _familyCode = code;
+      onComplete();
+    },
+    style: {
+      ...btnStyle(joinCode.trim().length >= 4),
+      marginBottom: 8
+    }
+  }, "\u53C2\u52A0\u3059\u308B \u2192"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setJoinMode(false);
+      setJoinCode("");
+      setJoinErr("");
+    },
+    style: {
+      background: "none",
+      border: "none",
+      color: MUTED,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F,
+      width: "100%",
+      textAlign: "center"
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"))), step === 1 && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }

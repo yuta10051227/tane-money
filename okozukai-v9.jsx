@@ -395,8 +395,10 @@ const INIT = {
     rankingDefaultMetric: "approved_activity_points",
     enabledRankingMetrics: ["approved_activity_points","streak","learning_completed","goals_completed","operation_return_rate"],
     operationRanking: { enabled: true, defaultTab: "total", rankingBasis: "return_rate", includeFees: true, allowParents: true },
-    familyMission: { enabled: true, label: "みんなの活動で 3,000 pt を育てよう", target: 3000, reward: "週末に家族でアイスを選ぶ" }
+    familyMission: { enabled: true, label: "みんなの活動で 3,000 pt を育てよう", target: 3000, reward: "週末に家族でアイスを選ぶ" },
+    requireApproval: false,
   },
+  pendingApprovals: [],
 };
 
 function migrate(d) {
@@ -413,7 +415,9 @@ function migrate(d) {
   if(!d.forexHoldings) d.forexHoldings={};
   if(!d.claimedBadges) d.claimedBadges={};
   if(!d.noPinIds)      d.noPinIds={};
+  if(!d.pendingApprovals) d.pendingApprovals=[];
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
+  if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms={investment:"trade",forex:"trade",dailyBonus:true,ranking:true};
   const defaultChildVis={balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"};
@@ -733,30 +737,72 @@ function GachaAnim({ result, onClose }) {
   const theme = result.theme || getMonthTheme();
   const isSuper = result.rate <= 3;
   const isSR    = result.rate <= 12;
-  useEffect(()=>{ const t=setTimeout(()=>setPhase("show"),1600); return()=>clearTimeout(t); },[]);
+  const hasSuspense = isSR; // SR以上はタメ演出
+
+  useEffect(()=>{
+    const spinMs = 1100;
+    const suspenseMs = isSuper ? 2200 : 1400;
+    if(hasSuspense){
+      const t1=setTimeout(()=>{
+        setPhase("suspense");
+        try{
+          if(isSuper) navigator.vibrate([150,80,150,80,300,80,500]);
+          else        navigator.vibrate([100,60,180]);
+        }catch(e){}
+      }, spinMs);
+      const t2=setTimeout(()=>setPhase("show"), spinMs+suspenseMs);
+      return()=>{clearTimeout(t1);clearTimeout(t2);};
+    } else {
+      const t=setTimeout(()=>setPhase("show"), spinMs);
+      return()=>clearTimeout(t);
+    }
+  },[]);
+
   const starCount = isSuper ? 30 : isSR ? 15 : 0;
   return (
     <div style={{position:"fixed",inset:0,background:"#000e",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
-      {phase==="spin"
-        ? <div style={{textAlign:"center"}}>
-            <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:8,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
-            <div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div>
-            <p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p>
+      {phase==="spin"&&(
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:8,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
+          <div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div>
+          <p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p>
+        </div>
+      )}
+      {phase==="suspense"&&(
+        <div style={{textAlign:"center"}}>
+          <div style={{
+            width:130,height:130,borderRadius:"50%",margin:"0 auto",
+            background:`radial-gradient(circle at 40% 35%,${result.color}ff,${result.color}88)`,
+            animation:"heartbeat .65s ease-in-out infinite",
+            boxShadow:`0 0 0 20px ${result.color}22,0 0 60px ${result.color}66`,
+          }}/>
+          <div style={{color:"rgba(255,255,255,0.85)",fontSize:isSuper?24:18,fontWeight:900,marginTop:22,animation:"fadePulse .65s ease-in-out infinite"}}>
+            {isSuper?"‼ もしかして…":"あれ…？"}
           </div>
-        : <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
-            {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
-            <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%"}}>
-              <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
-              <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 6px"}}>{result.emoji} {result.label}</p>
-              <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>
-              <div style={{color:result.color,fontSize:48,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
-              <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:16}}>ptゲット！</div>
-              {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:14,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
-              <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 すごい！":"やったー🎉"}</button>
-            </div>
+          {isSuper&&<div style={{color:result.color,fontSize:13,fontWeight:700,marginTop:8,animation:"fadePulse .65s ease-in-out infinite .3s"}}>なにか来るかも…！</div>}
+        </div>
+      )}
+      {phase==="show"&&(
+        <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
+          {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
+          <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%"}}>
+            <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
+            <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 6px"}}>{result.emoji} {result.label}</p>
+            <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>
+            <div style={{color:result.color,fontSize:48,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
+            <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:16}}>ptゲット！</div>
+            {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:14,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
+            <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 すごい！":"やったー🎉"}</button>
           </div>
-      }
-      <style>{`@keyframes sp{to{transform:rotate(360deg)}}@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}@keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}`}</style>
+        </div>
+      )}
+      <style>{`
+        @keyframes sp{to{transform:rotate(360deg)}}
+        @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+        @keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}
+        @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
+        @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.25}}
+      `}</style>
     </div>
   );
 }
@@ -1059,6 +1105,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -1081,11 +1128,13 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
 
   const SETTING_TABS = [
     ["grant","🎁 pt付与"],
+    ["approval","✅ 承認"],
     ["tasks","📋 タスク"],
     ["assign","👤 個別割当"],
     ["rewards","🎁 特典"],
     ["interest","💹 利子"],
     ["members","👨 メンバー"],
+    ["transfer","🔄 引き継ぎ"],
   ];
 
   if(!authed) return (
@@ -1400,6 +1449,90 @@ settingsTab==="members"&&(
               </div>
             </div>
           )}
+
+          {/* ── 承認タブ ── */}
+          {settingsTab==="approval"&&(()=>{
+            const fs=data.familySettings||INIT.familySettings;
+            const pending=data.pendingApprovals||[];
+            const approve=(entry)=>{
+              const log={id:uid(),cid:entry.cid,type:"good",label:entry.taskLabel,pts:entry.pts,date:new Date().toISOString(),rid:entry.taskId};
+              addLogToFirestore(log);
+              update(d=>({...d,logs:[log,...d.logs],pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
+            };
+            const reject=(entry)=>{
+              update(d=>({...d,pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
+            };
+            return(<div>
+              {/* 承認モード切り替え */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>タスク承認が必要</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、子どものお手伝い記録を親が承認</div>
+                </div>
+                <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),requireApproval:!fs.requireApproval}}))}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.requireApproval?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:fs.requireApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
+              {/* 承認待ちキュー */}
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>承認待ち（{pending.length}件）</p>
+              {pending.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
+              {pending.map(entry=>{
+                const member=[...data.children,...(data.parents||[])].find(m=>m.id===entry.cid);
+                return(
+                  <div key={entry.id} style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:14,padding:"12px 14px",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                      <span style={{fontSize:26}}>{entry.taskEmoji}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{entry.taskLabel}</div>
+                        <div style={{fontSize:11,color:MUTED}}>{member?.name||"?"} · +{entry.pts}pt</div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>approve(entry)} style={{flex:1,background:G,border:"none",borderRadius:10,padding:"9px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>✅ 承認</button>
+                      <button onClick={()=>reject(entry)} style={{flex:1,background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,padding:"9px",color:R,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>❌ 却下</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>);
+          })()}
+
+          {/* ── 引き継ぎタブ ── */}
+          {settingsTab==="transfer"&&(()=>{
+            const code=(()=>{try{return localStorage.getItem(FAMILY_CODE_KEY)||"---";}catch(e){return"---";}})();
+            return(<div>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 16px"}}>スマホ引き継ぎ・共有</p>
+              {/* ファミリーコード表示 */}
+              <div style={{background:`linear-gradient(135deg,${GS},#fff)`,border:`2px solid ${G}`,borderRadius:16,padding:"20px",textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:12,color:MUTED,fontWeight:700,marginBottom:8}}>あなたのファミリーコード</div>
+                <div style={{fontWeight:900,fontSize:28,letterSpacing:4,color:GP,marginBottom:8}}>{code}</div>
+                <div style={{fontSize:11,color:MUTED,marginBottom:14}}>このコードを新しいスマホや家族に共有してください</div>
+                <button onClick={()=>{try{navigator.clipboard.writeText(code);}catch(e){}setCopied(true);setTimeout(()=>setCopied(false),2000);}}
+                  style={{background:copied?G:GP,border:"none",borderRadius:12,padding:"10px 28px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F,transition:"background .3s"}}>
+                  {copied?"✅ コピーしました！":"📋 コードをコピー"}
+                </button>
+              </div>
+              {/* 手順説明 */}
+              <div style={{background:BG,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px"}}>
+                <p style={{fontWeight:800,fontSize:13,color:TEXT,margin:"0 0 10px"}}>📱 新しいスマホへの引き継ぎ手順</p>
+                {[["1","新しいスマホでTane Moneyを開く"],["2","「すでにコードがある」をタップ"],["3","上のコードを入力"],["4","データが同期される"]].map(([n,t])=>(
+                  <div key={n} style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:GP,color:"#fff",fontWeight:800,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+                    <div style={{fontSize:12,color:TEXT,lineHeight:1.6,paddingTop:2}}>{t}</div>
+                  </div>
+                ))}
+              </div>
+              {/* ログアウト */}
+              <button onClick={()=>{
+                if(!confirm("このiPhoneからログアウトしますか？\nコードを入力すれば再びアクセスできます。"))return;
+                try{localStorage.removeItem(FAMILY_CODE_KEY);}catch(e){}
+                _familyCode=null;window.location.reload();
+              }} style={{width:"100%",padding:"11px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:12,color:R,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,marginTop:14}}>
+                🚪 このiPhoneからログアウト
+              </button>
+            </div>);
+          })()}
         </div>
       </div>
     </div>
@@ -1448,10 +1581,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const doTask = task => {
     const pts = taskPts(task, child.id);
+    const fs = data.familySettings || INIT.familySettings;
+    const needApproval = fs.requireApproval && pts > 0;
+    const alreadyPending = (data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);
+    if(alreadyPending) return;
     setPressed(p=>({...p,[task.id]:true}));
     setTimeout(()=>setPressed(p=>{const n={...p};delete n[task.id];return n;}),500);
-    showFlash(pts, task.emoji);
-    addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
+    if(needApproval) {
+      setFlash({pts:0,emoji:"⏳",pending:true});
+      setTimeout(()=>setFlash(null),1400);
+      const entry={id:uid(),cid:child.id,taskId:task.id,taskLabel:task.label,taskEmoji:task.emoji,pts,date:new Date().toISOString()};
+      update(d=>({...d,pendingApprovals:[...(d.pendingApprovals||[]),entry]}));
+    } else {
+      showFlash(pts, task.emoji);
+      addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
+    }
   };
 
   const doRedeem = r => {
@@ -1638,9 +1782,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Flash */}
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pending?GOLD:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease"}}>
           <div style={{fontSize:38}}>{flash.emoji}</div>
-          <Pt v={flash.pts} sz={22}/>
+          {flash.pending
+            ? <div style={{fontSize:12,fontWeight:700,marginTop:4}}>おうちの人に確認するね</div>
+            : <Pt v={flash.pts} sz={22}/>
+          }
         </div>
       )}
 
@@ -1774,7 +1921,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#e8faf0":CARD,border:`2.5px solid ${on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
@@ -5061,6 +5208,9 @@ function SetupWizard({ data, update, onComplete }) {
   const [goalTarget,    setGoalTarget]   = useState("");
 
   const [familyCode] = useState(()=>`TANE-${Math.random().toString(36).slice(2,6).toUpperCase()}`);
+  const [joinMode, setJoinMode] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinErr,  setJoinErr]  = useState("");
 
   const CHILD_EMOJIS = ["⚡","🌸","🌟","🦁","🐯","🐬","🦊","🐼","🐉","🌈","🎸","⚽","🚀","🎮","🦄","🐶","🐱","🍕"];
   const GOAL_EMOJIS  = ["🎮","📱","🎵","🚴","✈","👟","📚","🎨","⚽","🍰","💻","🎸","🏊","🎀","🌍","🍜"];
@@ -5128,10 +5278,36 @@ function SetupWizard({ data, update, onComplete }) {
           <p style={{color:TEXTS,fontSize:15,lineHeight:1.9,margin:"0 0 12px",maxWidth:280}}>
             家族みんなで楽しく<br/>お金のことを学ぼう！
           </p>
-          <p style={{color:MUTED,fontSize:12,margin:"0 0 44px"}}>⏱ セットアップは約3分で完了</p>
-          <button onClick={()=>setStep(1)} style={{...btnStyle(true),fontSize:18,padding:"17px",boxShadow:`0 8px 24px ${GP}40`}}>
+          <p style={{color:MUTED,fontSize:12,margin:"0 0 28px"}}>⏱ セットアップは約3分で完了</p>
+          <button onClick={()=>setStep(1)} style={{...btnStyle(true),fontSize:18,padding:"17px",boxShadow:`0 8px 24px ${GP}40`,marginBottom:16}}>
             はじめる 🌟
           </button>
+          {!joinMode&&(
+            <button onClick={()=>setJoinMode(true)} style={{background:"none",border:"none",color:MUTED,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:F,textDecoration:"underline"}}>
+              すでにファミリーコードがある →
+            </button>
+          )}
+          {joinMode&&(
+            <div style={{width:"100%",maxWidth:320,background:CARD,borderRadius:18,padding:"20px",border:`1.5px solid ${BORDER}`,textAlign:"left",marginTop:4}}>
+              <p style={{fontWeight:800,fontSize:14,color:TEXT,margin:"0 0 10px",textAlign:"center"}}>🔗 ファミリーコードを入力</p>
+              <input value={joinCode} onChange={e=>{setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g,""));setJoinErr("");}}
+                placeholder="TANE-XXXX"
+                style={{...{width:"100%",padding:"12px 14px",border:`1.5px solid ${joinErr?R:BORDER}`,borderRadius:10,fontSize:16,fontFamily:F,background:BG,outline:"none",textAlign:"center",letterSpacing:3,fontWeight:900,color:GP,boxSizing:"border-box"},marginBottom:8}}/>
+              {joinErr&&<p style={{color:R,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>{joinErr}</p>}
+              <button onClick={()=>{
+                const code=joinCode.trim();
+                if(!code||code.length<4){setJoinErr("コードを入力してください");return;}
+                try{localStorage.setItem(FAMILY_CODE_KEY,code);}catch(e){}
+                _familyCode=code;
+                onComplete();
+              }} style={{...btnStyle(joinCode.trim().length>=4),marginBottom:8}}>
+                参加する →
+              </button>
+              <button onClick={()=>{setJoinMode(false);setJoinCode("");setJoinErr("");}} style={{background:"none",border:"none",color:MUTED,fontSize:12,cursor:"pointer",fontFamily:F,width:"100%",textAlign:"center"}}>
+                キャンセル
+              </button>
+            </div>
+          )}
         </div>
       )}
 
