@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="2b47ca4">
+<meta name="tane-version" content="2875f12">
 </head>
 <body>
   <div id="root"></div>
@@ -1617,6 +1617,74 @@ function Pie({
 }
 
 // ═══════════════════════════════════════════════════════
+// GACHA — 月テーマ定義
+// ═══════════════════════════════════════════════════════
+const GACHA_THEMES = [{
+  name: "お正月",
+  emoji: "🎍",
+  color: "#D95C55",
+  bg: "#FCE6E4"
+}, {
+  name: "バレンタイン",
+  emoji: "💝",
+  color: "#ec4899",
+  bg: "#fce7f3"
+}, {
+  name: "はる",
+  emoji: "🌸",
+  color: "#e879a0",
+  bg: "#fce7f3"
+}, {
+  name: "はな",
+  emoji: "🌺",
+  color: "#f97316",
+  bg: "#ffedd5"
+}, {
+  name: "こどもの日",
+  emoji: "🎏",
+  color: "#3478D4",
+  bg: "#E5F0FF"
+}, {
+  name: "あめ",
+  emoji: "☔",
+  color: "#3478D4",
+  bg: "#E5F0FF"
+}, {
+  name: "なつ",
+  emoji: "🌊",
+  color: "#06b6d4",
+  bg: "#cffafe"
+}, {
+  name: "なつまつり",
+  emoji: "🎆",
+  color: "#f97316",
+  bg: "#ffedd5"
+}, {
+  name: "つき",
+  emoji: "🌕",
+  color: "#E8B83E",
+  bg: "#FFF1CB"
+}, {
+  name: "ハロウィン",
+  emoji: "🎃",
+  color: "#f97316",
+  bg: "#ffedd5"
+}, {
+  name: "あき",
+  emoji: "🍂",
+  color: "#E8B83E",
+  bg: "#FFF1CB"
+}, {
+  name: "クリスマス",
+  emoji: "🎄",
+  color: "#34C77B",
+  bg: "#DDF3E7"
+}];
+function getMonthTheme() {
+  return GACHA_THEMES[new Date().getMonth()];
+}
+
+// ═══════════════════════════════════════════════════════
 // GACHA ANIMATION
 // ═══════════════════════════════════════════════════════
 function GachaAnim({
@@ -1624,15 +1692,19 @@ function GachaAnim({
   onClose
 }) {
   const [phase, setPhase] = useState("spin");
+  const theme = result.theme || getMonthTheme();
+  const isSuper = result.rate <= 3;
+  const isSR = result.rate <= 12;
   useEffect(() => {
     const t = setTimeout(() => setPhase("show"), 1600);
     return () => clearTimeout(t);
   }, []);
+  const starCount = isSuper ? 30 : isSR ? 15 : 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
-      background: "#000d",
+      background: "#000e",
       zIndex: 999,
       display: "flex",
       alignItems: "center",
@@ -1644,6 +1716,13 @@ function GachaAnim({
       textAlign: "center"
     }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      color: "rgba(255,255,255,0.6)",
+      marginBottom: 8,
+      letterSpacing: 1
+    }
+  }, theme.emoji, " ", theme.name, "\u30AC\u30C1\u30E3"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 80,
       animation: "sp .4s linear infinite"
@@ -1658,57 +1737,83 @@ function GachaAnim({
   }, "\u30AC\u30C1\u30E3\u4E2D\u2026")) : /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      animation: "pop .35s cubic-bezier(.2,.8,.3,1.3)"
+      animation: "pop .35s cubic-bezier(.2,.8,.3,1.3)",
+      padding: "0 20px",
+      width: "100%",
+      maxWidth: 340
     }
-  }, result.rate <= 3 && /*#__PURE__*/React.createElement("div", {
+  }, starCount > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
       pointerEvents: "none"
     }
-  }, [...Array(20)].map((_, i) => /*#__PURE__*/React.createElement("span", {
+  }, [...Array(starCount)].map((_, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     style: {
       position: "absolute",
       left: `${Math.random() * 100}%`,
       top: 0,
-      fontSize: 20,
-      animation: `fall ${1 + Math.random()}s ${Math.random() * .5}s linear forwards`
+      fontSize: isSuper ? 24 : 18,
+      animation: `fall ${1 + Math.random() * 1.5}s ${Math.random() * .8}s linear forwards`
     }
-  }, "⭐✨🌟💫"[i % 4]))), /*#__PURE__*/React.createElement("div", {
+  }, "⭐✨🌟💫🎊"[i % 5]))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: CARD,
       borderRadius: 28,
-      padding: "36px 44px",
+      padding: "28px 32px",
       border: `4px solid ${result.color}`,
-      boxShadow: `0 20px 60px ${result.color}60`
+      boxShadow: `0 20px 60px ${result.color}60`,
+      width: "100%"
     }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: theme.color,
+      fontWeight: 700,
+      background: theme.bg,
+      display: "inline-block",
+      padding: "3px 12px",
+      borderRadius: 999,
+      marginBottom: 10
+    }
+  }, theme.emoji, " ", theme.name, "\u30AC\u30C1\u30E3"), /*#__PURE__*/React.createElement("p", {
     style: {
       color: result.color,
       fontWeight: 900,
-      fontSize: 13,
+      fontSize: 14,
       letterSpacing: 2,
-      margin: "0 0 8px"
+      margin: "0 0 6px"
     }
   }, result.emoji, " ", result.label), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 64,
+      fontSize: isSuper ? 72 : 60,
       margin: "4px 0"
     }
-  }, "\uD83C\uDF81"), /*#__PURE__*/React.createElement("div", {
+  }, isSuper ? "👑" : "🎁"), /*#__PURE__*/React.createElement("div", {
     style: {
       color: result.color,
-      fontSize: 46,
-      fontWeight: 900
+      fontSize: 48,
+      fontWeight: 900,
+      lineHeight: 1
     }
   }, "+", result.pts), /*#__PURE__*/React.createElement("div", {
     style: {
       color: MUTED,
-      fontSize: 15,
-      marginBottom: 20
+      fontSize: 14,
+      marginBottom: result.bonusPts > 0 ? 6 : 16
     }
-  }, "pt\u30B2\u30C3\u30C8\uFF01"), /*#__PURE__*/React.createElement("button", {
+  }, "pt\u30B2\u30C3\u30C8\uFF01"), result.bonusPts > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: GOLDS,
+      borderRadius: 10,
+      padding: "5px 12px",
+      marginBottom: 14,
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#9a7000"
+    }
+  }, "\uD83D\uDD25 \u30B9\u30C8\u30EA\u30FC\u30AF\u30DC\u30FC\u30CA\u30B9 +", result.bonusPts, "pt"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
       background: result.color,
@@ -1719,9 +1824,10 @@ function GachaAnim({
       fontWeight: 900,
       fontSize: 16,
       cursor: "pointer",
-      fontFamily: F
+      fontFamily: F,
+      width: "100%"
     }
-  }, "\u3084\u3063\u305F\u30FC\uD83C\uDF89"))), /*#__PURE__*/React.createElement("style", null, `@keyframes sp{to{transform:rotate(360deg)}}@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}@keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}`));
+  }, isSuper ? "🎊 すごい！" : "やったー🎉"))), /*#__PURE__*/React.createElement("style", null, `@keyframes sp{to{transform:rotate(360deg)}}@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}@keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}`));
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3394,7 +3500,15 @@ function ChildScreen({
   const doGacha = () => {
     if (todayDone) return;
     const res = rollGacha(data.gacha);
-    setGachaRes(res);
+    const theme = getMonthTheme();
+    const bonusPts = curStreak >= 30 ? 50 : curStreak >= 10 ? 20 : curStreak >= 5 ? 10 : 0;
+    const finalRes = {
+      ...res,
+      pts: res.pts + bonusPts,
+      bonusPts,
+      theme
+    };
+    setGachaRes(finalRes);
     const today = todayKey();
     const prev = data.streak?.[child.id] || {
       cur: 0,
@@ -3415,9 +3529,10 @@ function ChildScreen({
           cid: child.id,
           type: "gacha",
           label: `🎰 ガチャ（${res.label}）`,
-          pts: res.pts,
+          pts: finalRes.pts,
           date: new Date().toISOString(),
-          rare: res.rate <= 3
+          rare: res.rate <= 3,
+          tierId: res.id
         };
         addLogToFirestore(_e);
         return [_e, ...d.logs];
@@ -3998,65 +4113,114 @@ function ChildScreen({
     style: {
       padding: "12px 16px 4px"
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: todayDone ? CARD : `linear-gradient(135deg,#fffbe6,#fff3cc)`,
-      border: `2px solid ${todayDone ? BORDER : GOLD}`,
-      borderRadius: 20,
-      padding: "16px 18px",
-      display: "flex",
-      alignItems: "center",
-      gap: 14
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: doGacha,
-    disabled: todayDone,
-    style: {
-      width: 62,
-      height: 62,
-      borderRadius: "50%",
-      border: "none",
-      flexShrink: 0,
-      background: todayDone ? "radial-gradient(circle at 35% 35%,#ccc,#aaa)" : "radial-gradient(circle at 35% 35%,#ffe066,#f5a623,#d97706)",
-      fontSize: 28,
-      cursor: todayDone ? "default" : "pointer",
-      boxShadow: todayDone ? "none" : "0 4px 16px #f5c84260",
-      animation: todayDone ? "none" : "glow 2s ease-in-out infinite"
-    }
-  }, "\uD83C\uDFB0"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 800,
-      fontSize: 14,
-      color: todayDone ? MUTED : TEXT
-    }
-  }, todayDone ? "✅ 今日は引き済み！" : "デイリーガチャ"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: MUTED,
-      marginTop: 2
-    }
-  }, todayDone ? "また明日ね🌙" : `1日1回 · 最大${Math.max(...(data.gacha || []).map(g => g.max))}pt`), curStreak >= 3 && !todayDone && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 4,
-      fontSize: 11,
-      color: R,
-      fontWeight: 700
-    }
-  }, "\uD83D\uDD25 ", curStreak, "\u65E5\u9023\u7D9A\u4E2D\uFF01")), !todayDone && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      background: GOLDS,
-      color: "#9a7000",
-      padding: "4px 10px",
-      borderRadius: 999,
-      fontWeight: 700,
-      flexShrink: 0
-    }
-  }, "TAP\uFF01")), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`)), /*#__PURE__*/React.createElement(TabHint, {
+  }, (() => {
+    const mTheme = getMonthTheme();
+    const bonusLabel = curStreak >= 30 ? "+50pt" : curStreak >= 10 ? "+20pt" : curStreak >= 5 ? "+10pt" : null;
+    const monthGacha = myLogs.filter(l => l.type === "gacha" && l.date.startsWith(monthKey()));
+    const tierCounts = (data.gacha || []).map(tier => ({
+      ...tier,
+      count: monthGacha.filter(l => l.tierId === tier.id || l.label.includes(tier.label)).length
+    }));
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: todayDone ? CARD : `linear-gradient(135deg,${mTheme.bg},#fffbe6)`,
+        border: `2px solid ${todayDone ? BORDER : mTheme.color}`,
+        borderRadius: 20,
+        padding: "16px 18px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: doGacha,
+      disabled: todayDone,
+      style: {
+        width: 62,
+        height: 62,
+        borderRadius: "50%",
+        border: "none",
+        flexShrink: 0,
+        background: todayDone ? "radial-gradient(circle at 35% 35%,#ccc,#aaa)" : `radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
+        fontSize: 28,
+        cursor: todayDone ? "default" : "pointer",
+        boxShadow: todayDone ? "none" : `0 4px 16px ${mTheme.color}60`,
+        animation: todayDone ? "none" : "glow 2s ease-in-out infinite"
+      }
+    }, mTheme.emoji), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: mTheme.color,
+        fontWeight: 700,
+        marginBottom: 2
+      }
+    }, mTheme.emoji, " ", mTheme.name, "\u30AC\u30C1\u30E3"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: todayDone ? MUTED : TEXT
+      }
+    }, todayDone ? "✅ 今日は引き済み！" : "デイリーガチャ"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: MUTED,
+        marginTop: 2
+      }
+    }, todayDone ? "また明日ね🌙" : `1日1回 · 最大${Math.max(...(data.gacha || []).map(g => g.max))}pt`), bonusLabel && !todayDone && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 4,
+        fontSize: 11,
+        color: R,
+        fontWeight: 700
+      }
+    }, "\uD83D\uDD25 ", curStreak, "\u9023\u7D9A\u30DC\u30FC\u30CA\u30B9 ", bonusLabel, "\uFF01"), !bonusLabel && curStreak >= 3 && !todayDone && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 4,
+        fontSize: 11,
+        color: R,
+        fontWeight: 700
+      }
+    }, "\uD83D\uDD25 ", curStreak, "\u65E5\u9023\u7D9A\u4E2D\uFF01")), !todayDone && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        background: mTheme.bg,
+        color: mTheme.color,
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontWeight: 700,
+        flexShrink: 0,
+        border: `1px solid ${mTheme.color}40`
+      }
+    }, "TAP\uFF01")), monthGacha.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: MUTED,
+        fontWeight: 600
+      }
+    }, "\u4ECA\u6708:"), tierCounts.filter(t => t.count > 0).map(t => /*#__PURE__*/React.createElement("span", {
+      key: t.id,
+      style: {
+        fontSize: 10,
+        background: CARD,
+        border: `1px solid ${t.color}50`,
+        borderRadius: 999,
+        padding: "2px 8px",
+        color: t.color,
+        fontWeight: 700
+      }
+    }, t.emoji, "\xD7", t.count))));
+  })(), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`)), /*#__PURE__*/React.createElement(TabHint, {
     id: "daily",
     text: "\u6BCE\u65E5\u30BF\u30B9\u30AF\u3092\u30C1\u30A7\u30C3\u30AF\u3057\u3088\u3046\uFF01\u5168\u90E8\u30AF\u30EA\u30A2\u3059\u308B\u3068\u30DC\u30FC\u30CA\u30B9\u30DD\u30A4\u30F3\u30C8\u304C\u3082\u3089\u3048\u308B\u3088\uD83C\uDF1F",
     data: data,

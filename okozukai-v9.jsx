@@ -707,23 +707,52 @@ function Pie({ data, size=140 }) {
 }
 
 // ═══════════════════════════════════════════════════════
+// GACHA — 月テーマ定義
+// ═══════════════════════════════════════════════════════
+const GACHA_THEMES = [
+  {name:"お正月",  emoji:"🎍", color:"#D95C55", bg:"#FCE6E4"},
+  {name:"バレンタイン",emoji:"💝",color:"#ec4899",bg:"#fce7f3"},
+  {name:"はる",   emoji:"🌸", color:"#e879a0", bg:"#fce7f3"},
+  {name:"はな",   emoji:"🌺", color:"#f97316", bg:"#ffedd5"},
+  {name:"こどもの日",emoji:"🎏",color:"#3478D4", bg:"#E5F0FF"},
+  {name:"あめ",   emoji:"☔", color:"#3478D4", bg:"#E5F0FF"},
+  {name:"なつ",   emoji:"🌊", color:"#06b6d4", bg:"#cffafe"},
+  {name:"なつまつり",emoji:"🎆",color:"#f97316",bg:"#ffedd5"},
+  {name:"つき",   emoji:"🌕", color:"#E8B83E", bg:"#FFF1CB"},
+  {name:"ハロウィン",emoji:"🎃",color:"#f97316",bg:"#ffedd5"},
+  {name:"あき",   emoji:"🍂", color:"#E8B83E", bg:"#FFF1CB"},
+  {name:"クリスマス",emoji:"🎄",color:"#34C77B",bg:"#DDF3E7"},
+];
+function getMonthTheme(){ return GACHA_THEMES[new Date().getMonth()]; }
+
+// ═══════════════════════════════════════════════════════
 // GACHA ANIMATION
 // ═══════════════════════════════════════════════════════
 function GachaAnim({ result, onClose }) {
   const [phase, setPhase] = useState("spin");
+  const theme = result.theme || getMonthTheme();
+  const isSuper = result.rate <= 3;
+  const isSR    = result.rate <= 12;
   useEffect(()=>{ const t=setTimeout(()=>setPhase("show"),1600); return()=>clearTimeout(t); },[]);
+  const starCount = isSuper ? 30 : isSR ? 15 : 0;
   return (
-    <div style={{position:"fixed",inset:0,background:"#000d",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
+    <div style={{position:"fixed",inset:0,background:"#000e",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
       {phase==="spin"
-        ? <div style={{textAlign:"center"}}><div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div><p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p></div>
-        : <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)"}}>
-            {result.rate<=3 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(20)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:20,animation:`fall ${1+Math.random()}s ${Math.random()*.5}s linear forwards`}}>{"⭐✨🌟💫"[i%4]}</span>)}</div>}
-            <div style={{background:CARD,borderRadius:28,padding:"36px 44px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`}}>
-              <p style={{color:result.color,fontWeight:900,fontSize:13,letterSpacing:2,margin:"0 0 8px"}}>{result.emoji} {result.label}</p>
-              <div style={{fontSize:64,margin:"4px 0"}}>🎁</div>
-              <div style={{color:result.color,fontSize:46,fontWeight:900}}>+{result.pts}</div>
-              <div style={{color:MUTED,fontSize:15,marginBottom:20}}>ptゲット！</div>
-              <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F}}>やったー🎉</button>
+        ? <div style={{textAlign:"center"}}>
+            <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:8,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
+            <div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div>
+            <p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p>
+          </div>
+        : <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
+            {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
+            <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%"}}>
+              <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
+              <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 6px"}}>{result.emoji} {result.label}</p>
+              <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>
+              <div style={{color:result.color,fontSize:48,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
+              <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:16}}>ptゲット！</div>
+              {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:14,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
+              <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 すごい！":"やったー🎉"}</button>
             </div>
           </div>
       }
@@ -1434,14 +1463,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const doGacha = () => {
     if (todayDone) return;
     const res = rollGacha(data.gacha);
-    setGachaRes(res);
+    const theme = getMonthTheme();
+    const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
+    const finalRes = {...res, pts:res.pts+bonusPts, bonusPts, theme};
+    setGachaRes(finalRes);
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
     const yesterday = (()=>{ const d=new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; })();
     const newCur = prev.last===yesterday ? prev.cur+1 : 1;
     update(d => ({
       ...d,
-      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:res.pts, date:new Date().toISOString(), rare:res.rate<=3 }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
+      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
       gachaDate: {...(d.gachaDate||{}), [child.id]: today},
       streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }},
     }));
@@ -1640,26 +1672,44 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && <>
         {/* ── デイリーガチャ（最上部） ── */}
         <div style={{padding:"12px 16px 4px"}}>
-          <div style={{background:todayDone?CARD:`linear-gradient(135deg,#fffbe6,#fff3cc)`,border:`2px solid ${todayDone?BORDER:GOLD}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
-            <button onClick={doGacha} disabled={todayDone}
-              style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
-                background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":"radial-gradient(circle at 35% 35%,#ffe066,#f5a623,#d97706)",
-                fontSize:28,cursor:todayDone?"default":"pointer",
-                boxShadow:todayDone?"none":"0 4px 16px #f5c84260",
-                animation:todayDone?"none":"glow 2s ease-in-out infinite"}}>
-              🎰
-            </button>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:14,color:todayDone?MUTED:TEXT}}>
-                {todayDone?"✅ 今日は引き済み！":"デイリーガチャ"}
+          {(()=>{
+            const mTheme=getMonthTheme();
+            const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
+            const monthGacha=myLogs.filter(l=>l.type==="gacha"&&l.date.startsWith(monthKey()));
+            const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||l.label.includes(tier.label)).length}));
+            return(<>
+              <div style={{background:todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`,border:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+                <button onClick={doGacha} disabled={todayDone}
+                  style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
+                    background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
+                    fontSize:28,cursor:todayDone?"default":"pointer",
+                    boxShadow:todayDone?"none":`0 4px 16px ${mTheme.color}60`,
+                    animation:todayDone?"none":"glow 2s ease-in-out infinite"}}>
+                  {mTheme.emoji}
+                </button>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
+                  <div style={{fontWeight:800,fontSize:14,color:todayDone?MUTED:TEXT}}>
+                    {todayDone?"✅ 今日は引き済み！":"デイリーガチャ"}
+                  </div>
+                  <div style={{fontSize:12,color:MUTED,marginTop:2}}>
+                    {todayDone?"また明日ね🌙":`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+                  </div>
+                  {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
+                  {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
+                </div>
+                {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
-              <div style={{fontSize:12,color:MUTED,marginTop:2}}>
-                {todayDone?"また明日ね🌙":`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
-              </div>
-              {curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
-            </div>
-            {!todayDone&&<div style={{fontSize:11,background:GOLDS,color:"#9a7000",padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0}}>TAP！</div>}
-          </div>
+              {monthGacha.length>0&&(
+                <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,color:MUTED,fontWeight:600}}>今月:</span>
+                  {tierCounts.filter(t=>t.count>0).map(t=>(
+                    <span key={t.id} style={{fontSize:10,background:CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
+                  ))}
+                </div>
+              )}
+            </>);
+          })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
         <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
