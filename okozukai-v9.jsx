@@ -1612,10 +1612,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
-        <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
-        <DailyTasks child={child} data={data} update={update}/>
-        {/* ── デイリーガチャ ── */}
-        <div style={{padding:"4px 16px 24px"}}>
+        {/* ── デイリーガチャ（最上部） ── */}
+        <div style={{padding:"12px 16px 4px"}}>
           <div style={{background:todayDone?CARD:`linear-gradient(135deg,#fffbe6,#fff3cc)`,border:`2px solid ${todayDone?BORDER:GOLD}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
             <button onClick={doGacha} disabled={todayDone}
               style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
@@ -1638,6 +1636,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
+        <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
+        <DailyTasks child={child} data={data} update={update}/>
       </>}
 
       {/* ── ACTIVITY サブナビ ── */}
