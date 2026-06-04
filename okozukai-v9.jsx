@@ -138,6 +138,11 @@ function startRealtimeSync(updateFn){
             // リアルタイム取得系（ローカル優先）
             if(prev.stocks&&prev.stocks.length>0) merged.stocks=prev.stocks;
             if(prev.forex&&Object.keys(prev.forex).length>0) merged.forex=prev.forex;
+            // ゲーム進行系（ローカル優先）
+            // ※ gachaDateをここで守らないとFirestoreの遅延snaphotで1日1回制限が崩れる
+            if(prev.gachaDate){merged.gachaDate={...(merged.gachaDate||{})};const _td=todayKey();Object.keys(prev.gachaDate).forEach(cid=>{if(prev.gachaDate[cid]===_td)merged.gachaDate[cid]=_td;});}
+            if(prev.streak) merged.streak=prev.streak;
+            if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
             return merged;
           });
           console.log("Realtime sync:",t);
@@ -3894,6 +3899,10 @@ function ForexSection({data, update, child}){
     </div>
   );
 
+  // 外貨保有合計（円・pt換算）
+  const totalForexJpy=pairs.reduce((s,fx)=>s+(myForex[fx.code]||0)*(fx.price||0),0);
+  const totalForexPts=Math.round(totalForexJpy/100);
+
   return(
     <div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
@@ -3902,6 +3911,18 @@ function ForexSection({data, update, child}){
           {pairs[0]?.realData?"● LIVE":"● シミュ"}
         </span>
       </div>
+
+      {/* 外貨資産サマリー */}
+      {totalForexPts>0&&(
+        <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:16,padding:"12px 16px",marginBottom:14,color:"#fff"}}>
+          <p style={{color:"#aaa",fontSize:11,fontWeight:700,margin:"0 0 6px"}}>💱 外貨資産（合計）</p>
+          <div style={{fontSize:22,fontWeight:900,color:"#f5c842"}}>{Math.round(totalForexJpy).toLocaleString()}円</div>
+          <div style={{fontSize:12,color:"#aaa",marginTop:2}}>
+            ポイントに換えると <span style={{color:"#4ade80",fontWeight:800,fontSize:14}}>{totalForexPts.toLocaleString()}pt</span>
+          </div>
+          <div style={{fontSize:10,color:"#666",marginTop:4}}>※ 100円 = 1pt換算・手数料除く</div>
+        </div>
+      )}
 
       {pairs.map(fx=>{
         const isUp=(fx.changePct||0)>=0;
@@ -3931,7 +3952,10 @@ function ForexSection({data, update, child}){
                   <div style={{fontSize:13,fontWeight:700,color:isUp?"#4ade80":"#f87171"}}>
                     {isUp?"▲":"▼"}{Math.abs(fx.changePct||0).toFixed(2)}%
                   </div>
-                  {held>0&&<div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>}
+                  {held>0&&<>
+                    <div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>
+                    <div style={{fontSize:10,color:"#4ade80",fontWeight:700}}>≈¥{Math.round(held*(fx.price||0)).toLocaleString()} / {Math.round(held*(fx.price||0)/100)}pt</div>
+                  </>}
                 </div>
               </div>
             </button>
@@ -3951,9 +3975,11 @@ function ForexSection({data, update, child}){
             {isSel&&child&&(
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #333"}}>
                 {/* 換算例 */}
-                <div style={{background:"#0d0d1a",borderRadius:8,padding:"6px 10px",fontSize:11,color:"#aaa",marginBottom:10}}>
-                  💡 {fx.code==="KRW"?"10000":"100"}{fx.code} ≈ ¥{(fx.code==="KRW"?10000:100)*(fx.price||0)|0}
-                </div>
+                {(()=>{const ex=fx.code==="KRW"?10000:100;const exJpy=Math.round(ex*(fx.price||0));const exPts=Math.round(exJpy/100);return(
+                <div style={{background:"#0d0d1a",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#aaa",marginBottom:10}}>
+                  <div>💡 <span style={{color:"#fff",fontWeight:700}}>{ex}{fx.code}</span> を円に換えると <span style={{color:"#f5c842",fontWeight:700}}>¥{exJpy.toLocaleString()}</span></div>
+                  <div style={{marginTop:2}}>　 ポイントに換えると <span style={{color:"#4ade80",fontWeight:700}}>{exPts}pt</span>（100円=1pt）</div>
+                </div>);})()}
 
                 {/* 買い/売り切替 */}
                 <div style={{display:"flex",gap:6,marginBottom:10}}>

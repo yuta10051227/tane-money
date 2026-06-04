@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="a32ba59">
+<meta name="tane-version" content="9d8b079">
 </head>
 <body>
   <div id="root"></div>
@@ -210,6 +210,19 @@ function startRealtimeSync(updateFn) {
             // リアルタイム取得系（ローカル優先）
             if (prev.stocks && prev.stocks.length > 0) merged.stocks = prev.stocks;
             if (prev.forex && Object.keys(prev.forex).length > 0) merged.forex = prev.forex;
+            // ゲーム進行系（ローカル優先）
+            // ※ gachaDateをここで守らないとFirestoreの遅延snaphotで1日1回制限が崩れる
+            if (prev.gachaDate) {
+              merged.gachaDate = {
+                ...(merged.gachaDate || {})
+              };
+              const _td = todayKey();
+              Object.keys(prev.gachaDate).forEach(cid => {
+                if (prev.gachaDate[cid] === _td) merged.gachaDate[cid] = _td;
+              });
+            }
+            if (prev.streak) merged.streak = prev.streak;
+            if (prev.dailyProgress) merged.dailyProgress = prev.dailyProgress;
             return merged;
           });
           console.log("Realtime sync:", t);
@@ -10776,6 +10789,10 @@ function ForexSection({
       fontFamily: F
     }
   }, "\u518D\u8AAD\u307F\u8FBC\u307F"));
+
+  // 外貨保有合計（円・pt換算）
+  const totalForexJpy = pairs.reduce((s, fx) => s + (myForex[fx.code] || 0) * (fx.price || 0), 0);
+  const totalForexPts = Math.round(totalForexJpy / 100);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -10797,7 +10814,46 @@ function ForexSection({
       color: pairs[0]?.realData ? "#4ade80" : "#f87171",
       fontWeight: 700
     }
-  }, pairs[0]?.realData ? "● LIVE" : "● シミュ")), pairs.map(fx => {
+  }, pairs[0]?.realData ? "● LIVE" : "● シミュ")), totalForexPts > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,#1a1a2e,#16213e)",
+      borderRadius: 16,
+      padding: "12px 16px",
+      marginBottom: 14,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "#aaa",
+      fontSize: 11,
+      fontWeight: 700,
+      margin: "0 0 6px"
+    }
+  }, "\uD83D\uDCB1 \u5916\u8CA8\u8CC7\u7523\uFF08\u5408\u8A08\uFF09"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontWeight: 900,
+      color: "#f5c842"
+    }
+  }, Math.round(totalForexJpy).toLocaleString(), "\u5186"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#aaa",
+      marginTop: 2
+    }
+  }, "\u30DD\u30A4\u30F3\u30C8\u306B\u63DB\u3048\u308B\u3068 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#4ade80",
+      fontWeight: 800,
+      fontSize: 14
+    }
+  }, totalForexPts.toLocaleString(), "pt")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#666",
+      marginTop: 4
+    }
+  }, "\u203B 100\u5186 = 1pt\u63DB\u7B97\u30FB\u624B\u6570\u6599\u9664\u304F")), pairs.map(fx => {
     const isUp = (fx.changePct || 0) >= 0;
     const isSel = selected === fx.code;
     const held = myForex[fx.code] || 0;
@@ -10867,13 +10923,19 @@ function ForexSection({
         fontWeight: 700,
         color: isUp ? "#4ade80" : "#f87171"
       }
-    }, isUp ? "▲" : "▼", Math.abs(fx.changePct || 0).toFixed(2), "%"), held > 0 && /*#__PURE__*/React.createElement("div", {
+    }, isUp ? "▲" : "▼", Math.abs(fx.changePct || 0).toFixed(2), "%"), held > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: "#f5c842",
         fontWeight: 700
       }
-    }, "\u4FDD\u6709:", held, fx.code)))), fx.history && fx.history.length > 1 && /*#__PURE__*/React.createElement("div", {
+    }, "\u4FDD\u6709:", held, fx.code), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#4ade80",
+        fontWeight: 700
+      }
+    }, "\u2248\xA5", Math.round(held * (fx.price || 0)).toLocaleString(), " / ", Math.round(held * (fx.price || 0) / 100), "pt"))))), fx.history && fx.history.length > 1 && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 8
       }
@@ -10896,16 +10958,40 @@ function ForexSection({
         paddingTop: 10,
         borderTop: "1px solid #333"
       }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        background: "#0d0d1a",
-        borderRadius: 8,
-        padding: "6px 10px",
-        fontSize: 11,
-        color: "#aaa",
-        marginBottom: 10
-      }
-    }, "\uD83D\uDCA1 ", fx.code === "KRW" ? "10000" : "100", fx.code, " \u2248 \xA5", (fx.code === "KRW" ? 10000 : 100) * (fx.price || 0) | 0), /*#__PURE__*/React.createElement("div", {
+    }, (() => {
+      const ex = fx.code === "KRW" ? 10000 : 100;
+      const exJpy = Math.round(ex * (fx.price || 0));
+      const exPts = Math.round(exJpy / 100);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: "#0d0d1a",
+          borderRadius: 8,
+          padding: "8px 10px",
+          fontSize: 11,
+          color: "#aaa",
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", null, "\uD83D\uDCA1 ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#fff",
+          fontWeight: 700
+        }
+      }, ex, fx.code), " \u3092\u5186\u306B\u63DB\u3048\u308B\u3068 ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#f5c842",
+          fontWeight: 700
+        }
+      }, "\xA5", exJpy.toLocaleString())), /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 2
+        }
+      }, "\u3000 \u30DD\u30A4\u30F3\u30C8\u306B\u63DB\u3048\u308B\u3068 ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "#4ade80",
+          fontWeight: 700
+        }
+      }, exPts, "pt"), "\uFF08100\u5186=1pt\uFF09"));
+    })(), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
