@@ -3809,11 +3809,17 @@ function SeedMonster({ child, data }) {
       : happyScore>=4
       ? ["いっしょにがんばろ！","きょうもよろしく！","お手伝いしよう！","タスクやってみよ！"]
       : ["さびしいな…","もっとやろうよ〜","おきてる？","がんばって！"];
+    // 初回は2秒後に表示
+    const t0=setTimeout(()=>{
+      setSpeech(msgs[Math.floor(Math.random()*msgs.length)]);
+      setTimeout(()=>setSpeech(null),2500);
+    },2000);
+    // 以降は6〜9秒ごと
     const iv=setInterval(()=>{
       setSpeech(msgs[Math.floor(Math.random()*msgs.length)]);
-      setTimeout(()=>setSpeech(null),2200);
-    },7000+Math.random()*5000);
-    return()=>clearInterval(iv);
+      setTimeout(()=>setSpeech(null),2500);
+    },6000+Math.random()*3000);
+    return()=>{ clearTimeout(t0); clearInterval(iv); };
   },[happyScore,isSleeping]);
 
   const handleTap = ()=>{
@@ -3872,27 +3878,28 @@ function SeedMonster({ child, data }) {
         }}>✨</div>
       ))}
 
-      {/* ふきだし — 親が overflow:visible なので上に飛び出せる */}
+      {/* ふきだし — position:fixed で必ず画面上に表示 */}
       {speech&&(
         <div style={{
-          position:"absolute",bottom:"108%",left:"50%",
+          position:"fixed",top:108,left:"50%",
           transform:"translateX(-50%)",
-          background:"rgba(255,255,255,0.97)",
-          border:"1.5px solid rgba(255,255,255,0.6)",
-          borderRadius:10,padding:"5px 10px",
-          fontSize:11,fontWeight:700,color:TEXT,
+          background:"#fff",
+          border:`2px solid ${G}`,
+          borderRadius:14,padding:"8px 14px",
+          fontSize:13,fontWeight:800,color:TEXT,
           whiteSpace:"nowrap",
-          boxShadow:"0 3px 12px rgba(0,0,0,0.22)",
-          zIndex:50,
-          animation:"smPop .2s ease",
+          boxShadow:"0 4px 18px rgba(24,35,29,0.18)",
+          zIndex:900,
+          animation:"smPop .25s cubic-bezier(.34,1.56,.64,1)",
+          pointerEvents:"none",
         }}>
           {speech}
           <div style={{
-            position:"absolute",bottom:-6,left:"50%",
+            position:"absolute",bottom:-8,left:"50%",
             transform:"translateX(-50%)",
             width:0,height:0,
-            borderLeft:"5px solid transparent",borderRight:"5px solid transparent",
-            borderTop:"6px solid rgba(255,255,255,0.97)",
+            borderLeft:"7px solid transparent",borderRight:"7px solid transparent",
+            borderTop:`8px solid ${G}`,
           }}/>
         </div>
       )}
