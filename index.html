@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="00c2487">
+<meta name="tane-version" content="f6d9e78">
 </head>
 <body>
   <div id="root"></div>
@@ -3325,6 +3325,7 @@ function ChildScreen({
   const [rewardSort, setRewardSort] = useState("default");
   const [logSort, setLogSort] = useState("new");
   const [showSettings, setShowSettings] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const ageMode = child.ageMode || "middle";
   const young = ageMode === "young";
   const isJunior = child.displayMode === "junior"; // Junior/Teenモード分岐
@@ -3715,7 +3716,8 @@ function ChildScreen({
       display: "flex",
       alignItems: "center",
       gap: 6,
-      flexWrap: "wrap"
+      flexWrap: "wrap",
+      marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -3737,7 +3739,21 @@ function ChildScreen({
       borderRadius: 999,
       fontWeight: 600
     }
-  }, "\uD83D\uDD25 ", curStreak, "\u65E5"))), /*#__PURE__*/React.createElement(SeedMonster, {
+  }, "\uD83D\uDD25 ", curStreak, "\u65E5")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowTransfer(true),
+    style: {
+      background: "rgba(255,255,255,0.18)",
+      border: "1.5px solid rgba(255,255,255,0.35)",
+      borderRadius: 10,
+      padding: "5px 13px",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 800,
+      cursor: "pointer",
+      fontFamily: F,
+      letterSpacing: 0.3
+    }
+  }, "\uD83D\uDCB8 \u304A\u304F\u308B")), /*#__PURE__*/React.createElement(SeedMonster, {
     child: child,
     data: data
   })))), /*#__PURE__*/React.createElement("div", {
@@ -3837,7 +3853,12 @@ function ChildScreen({
         color: GP
       }
     }, pct, "%")));
-  })(), showWeekly && /*#__PURE__*/React.createElement(WeeklyReport, {
+  })(), showTransfer && /*#__PURE__*/React.createElement(PointTransferModal, {
+    child: child,
+    data: data,
+    update: update,
+    onClose: () => setShowTransfer(false)
+  }), showWeekly && /*#__PURE__*/React.createElement(WeeklyReport, {
     child: child,
     data: data,
     onClose: () => setShowWeekly(false)
@@ -5003,7 +5024,7 @@ function ChildScreen({
       marginTop: 20
     }
   }, "\u307E\u3060\u304D\u308D\u304F\u304C\u306A\u3044\u3088"), [...myLogs].sort((a, b) => logSort === "new" ? b.date.localeCompare(a.date) : logSort === "old" ? a.date.localeCompare(b.date) : logSort === "pts_high" ? b.pts - a.pts : a.pts - b.pts).slice(0, 50).map(l => {
-    const emoji = l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...data.goodTasks, ...data.badTasks].find(t => t.id === l.rid)?.emoji || "📌";
+    const emoji = l.type === "transfer_out" ? "💸" : l.type === "transfer_in" ? "💌" : l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...data.goodTasks, ...data.badTasks].find(t => t.id === l.rid)?.emoji || "📌";
     return /*#__PURE__*/React.createElement("div", {
       key: l.id,
       style: {
@@ -10802,6 +10823,480 @@ function SeedMonster({
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
       `));
+}
+
+// ── Point Transfer Modal ───────────────────────────────
+function PointTransferModal({
+  child,
+  data,
+  update,
+  onClose
+}) {
+  const [toId, setToId] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [done, setDone] = useState(false);
+  const myBal = bal(data.logs, child.id);
+  const allMembers = [...data.children, ...(data.parents || [])].filter(m => m.id !== child.id);
+  const receiver = allMembers.find(m => m.id === toId);
+  const amt = parseInt(amount);
+  const amtOk = !isNaN(amt) && amt >= 10 && amt <= myBal;
+  const doTransfer = () => {
+    const now = new Date().toISOString();
+    const outE = {
+      id: uid(),
+      cid: child.id,
+      type: "transfer_out",
+      label: `💸 ${receiver.name}へ送金`,
+      pts: -amt,
+      toId: receiver.id,
+      date: now
+    };
+    const inE = {
+      id: uid(),
+      cid: receiver.id,
+      type: "transfer_in",
+      label: `💌 ${child.name}からのプレゼント！`,
+      pts: amt,
+      fromId: child.id,
+      date: now
+    };
+    update(d => ({
+      ...d,
+      logs: [outE, inE, ...d.logs]
+    }));
+    addLogToFirestore(outE);
+    addLogToFirestore(inE);
+    setDone(true);
+  };
+  const backdrop = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.52)",
+    zIndex: 800,
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center"
+  };
+  const sheet = {
+    background: CARD,
+    borderRadius: "24px 24px 0 0",
+    padding: "28px 22px 36px",
+    width: "100%",
+    maxWidth: 480,
+    fontFamily: F,
+    maxHeight: "88vh",
+    overflowY: "auto"
+  };
+  if (done) return /*#__PURE__*/React.createElement("div", {
+    style: backdrop
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...sheet,
+      textAlign: "center",
+      padding: "40px 24px 48px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 64,
+      marginBottom: 10
+    }
+  }, "\uD83C\uDF89"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 900,
+      fontSize: 20,
+      color: GP,
+      marginBottom: 6
+    }
+  }, "\u304A\u304F\u3063\u305F\u3088\uFF01"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: MUTED,
+      fontSize: 14,
+      marginBottom: 24
+    }
+  }, receiver?.emoji, " ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: TEXT
+    }
+  }, receiver?.name), " \u306B", " ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: GP,
+      fontSize: 16
+    }
+  }, amt.toLocaleString(), "pt"), " \u5C4A\u304D\u307E\u3057\u305F"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      width: "100%",
+      background: GP,
+      border: "none",
+      borderRadius: 14,
+      padding: "14px",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 15,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u3068\u3058\u308B")));
+  if (confirmed) return /*#__PURE__*/React.createElement("div", {
+    style: backdrop
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...sheet
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0,
+      fontWeight: 900,
+      fontSize: 18,
+      color: TEXT
+    }
+  }, "\u3053\u308C\u3092\u9001\u308A\u307E\u3059\u304B\uFF1F"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmed(false),
+    style: {
+      background: BG,
+      border: "none",
+      borderRadius: 10,
+      width: 32,
+      height: 32,
+      cursor: "pointer",
+      fontSize: 16,
+      color: MUTED,
+      fontFamily: F
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: GS,
+      border: `2px solid ${G}`,
+      borderRadius: 18,
+      padding: "20px 16px",
+      marginBottom: 20,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 18,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 30,
+      lineHeight: 1
+    }
+  }, child.emoji), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: TEXT,
+      marginTop: 4
+    }
+  }, child.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: R,
+      fontWeight: 700
+    }
+  }, "-", amt.toLocaleString(), "pt")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 26,
+      color: GP
+    }
+  }, "\u2192"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: GP,
+      fontWeight: 800
+    }
+  }, amt.toLocaleString(), "pt")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 30,
+      lineHeight: 1
+    }
+  }, receiver?.emoji), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: TEXT,
+      marginTop: 4
+    }
+  }, receiver?.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: GP,
+      fontWeight: 700
+    }
+  }, "+", amt.toLocaleString(), "pt"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: MUTED
+    }
+  }, "\u9001\u4FE1\u5F8C\u306E\u6B8B\u9AD8: ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: GP
+    }
+  }, (myBal - amt).toLocaleString(), "pt"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmed(false),
+    style: {
+      flex: 1,
+      background: BORDER,
+      border: "none",
+      borderRadius: 14,
+      padding: 13,
+      fontWeight: 800,
+      color: MUTED,
+      cursor: "pointer",
+      fontFamily: F,
+      fontSize: 14
+    }
+  }, "\u3082\u3069\u308B"), /*#__PURE__*/React.createElement("button", {
+    onClick: doTransfer,
+    style: {
+      flex: 2,
+      background: GP,
+      border: "none",
+      borderRadius: 14,
+      padding: 13,
+      fontWeight: 900,
+      color: "#fff",
+      fontSize: 15,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u2708 \u9001\u308B\uFF01"))));
+  return /*#__PURE__*/React.createElement("div", {
+    style: backdrop,
+    onClick: e => {
+      if (e.target === e.currentTarget) onClose();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: sheet
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("h3", {
+    style: {
+      margin: 0,
+      fontWeight: 900,
+      fontSize: 18,
+      color: TEXT
+    }
+  }, "\uD83D\uDCB8 \u30DD\u30A4\u30F3\u30C8\u3092\u9001\u308B"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: BG,
+      border: "none",
+      borderRadius: 10,
+      width: 32,
+      height: 32,
+      cursor: "pointer",
+      fontSize: 16,
+      color: MUTED,
+      fontFamily: F
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: MUTED,
+      marginBottom: 16
+    }
+  }, "\uD83D\uDCB0 \u3044\u307E\u306E\u6B8B\u9AD8: ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: GP,
+      fontSize: 14
+    }
+  }, myBal.toLocaleString(), "pt")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: MUTED,
+      marginBottom: 8,
+      letterSpacing: 0.3
+    }
+  }, "\u3060\u308C\u306B\u9001\u308B\uFF1F"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, allMembers.map(m => {
+    const mBal = bal(data.logs, m.id);
+    const sel = toId === m.id;
+    return /*#__PURE__*/React.createElement("button", {
+      key: m.id,
+      onClick: () => {
+        setToId(sel ? null : m.id);
+        setAmount("");
+      },
+      style: {
+        width: "100%",
+        marginBottom: 8,
+        background: sel ? `${GP}12` : BG,
+        border: `2px solid ${sel ? GP : BORDER}`,
+        borderRadius: 14,
+        padding: "11px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        cursor: "pointer",
+        textAlign: "left",
+        fontFamily: F
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 38,
+        height: 38,
+        borderRadius: 11,
+        background: sel ? GP : CARD,
+        border: `1.5px solid ${sel ? GP : BORDER}`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 20,
+        flexShrink: 0
+      }
+    }, m.emoji), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, m.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: MUTED
+      }
+    }, m.gradeLabel || m.displayMode || "", " \xB7 ", mBal.toLocaleString(), "pt \u6240\u6301")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 18,
+        color: sel ? GP : MUTED,
+        fontWeight: 700
+      }
+    }, sel ? "✓" : "›"));
+  })), toId && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      height: 1,
+      background: BORDER,
+      marginBottom: 16
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: MUTED,
+      marginBottom: 8
+    }
+  }, "\u4F55pt\u9001\u308B\uFF1F"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 10,
+      flexWrap: "wrap"
+    }
+  }, [10, 50, 100, 200, 500, 1000].filter(v => v <= myBal).map(v => /*#__PURE__*/React.createElement("button", {
+    key: v,
+    onClick: () => setAmount(String(v)),
+    style: {
+      padding: "6px 13px",
+      border: `1.5px solid ${amount === String(v) ? GP : BORDER}`,
+      borderRadius: 8,
+      background: amount === String(v) ? `${GP}18` : "transparent",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F,
+      color: amount === String(v) ? GP : MUTED
+    }
+  }, v, "pt"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: amount,
+    onChange: e => setAmount(e.target.value),
+    placeholder: "pt\u6570\u3092\u5165\u529B\uFF08\u6700\u5C0F10pt\uFF09",
+    style: {
+      ...INP,
+      flex: 1,
+      fontSize: 15,
+      fontWeight: 700
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: MUTED,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "pt")), !isNaN(amt) && amt > 0 && amt < 10 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: R,
+      fontSize: 11,
+      fontWeight: 700,
+      marginBottom: 6
+    }
+  }, "\u6700\u5C0F10pt\u304B\u3089\u9001\u308C\u307E\u3059"), !isNaN(amt) && amt > myBal && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: R,
+      fontSize: 11,
+      fontWeight: 700,
+      marginBottom: 6
+    }
+  }, "\u6B8B\u9AD8\u304C\u8DB3\u308A\u307E\u305B\u3093"), /*#__PURE__*/React.createElement("button", {
+    disabled: !amtOk,
+    onClick: () => setConfirmed(true),
+    style: {
+      marginTop: 8,
+      width: "100%",
+      background: amtOk ? GP : BORDER,
+      border: "none",
+      borderRadius: 14,
+      padding: "13px",
+      color: amtOk ? "#fff" : MUTED,
+      fontWeight: 900,
+      fontSize: 15,
+      cursor: amtOk ? "pointer" : "default",
+      fontFamily: F,
+      transition: "all 0.2s"
+    }
+  }, "\u3064\u304E\u3078 \u2192"))));
 }
 
 // ── Weekly Report ─────────────────────────────────────

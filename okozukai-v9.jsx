@@ -1394,6 +1394,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [rewardSort, setRewardSort] = useState("default");
   const [logSort, setLogSort] = useState("new");
   const [showSettings, setShowSettings] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
 
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
@@ -1543,11 +1544,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <div style={{color:"#fff",fontSize:34,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</div>
                 <div style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,marginBottom:3}}>pt</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:10}}>
                 <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>今月</span>
                 <span style={{fontSize:13,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
                 {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 8px",borderRadius:999,fontWeight:600}}>🔥 {curStreak}日</span>}
               </div>
+              <button onClick={()=>setShowTransfer(true)}
+                style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.35)",borderRadius:10,padding:"5px 13px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F,letterSpacing:0.3}}>
+                💸 おくる
+              </button>
             </div>
             {/* 右：種モンスター（overflow:visibleなのでふきだしが上に出る） */}
             <SeedMonster child={child} data={data}/>
@@ -1594,6 +1599,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       })()}
 
       {/* Modals */}
+      {showTransfer&&<PointTransferModal child={child} data={data} update={update} onClose={()=>setShowTransfer(false)}/>}
       {showWeekly&&<WeeklyReport child={child} data={data} onClose={()=>setShowWeekly(false)}/>}
       {showCustomizer&&<TaskCustomizer child={child} data={data} update={update} onClose={()=>setShowCustomizer(false)}/>}
       {goalCelebration&&<GoalCelebration goal={goalCelebration} onClose={()=>setGoalCelebration(null)}/>}
@@ -1896,7 +1902,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
           {[...myLogs].sort((a,b)=>logSort==="new"?b.date.localeCompare(a.date):logSort==="old"?a.date.localeCompare(b.date):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
-            const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
+            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
             return(
               <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:20}}>{emoji}</span>
@@ -3977,6 +3983,177 @@ function SeedMonster({ child, data }) {
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
       `}</style>
+    </div>
+  );
+}
+
+// ── Point Transfer Modal ───────────────────────────────
+function PointTransferModal({ child, data, update, onClose }) {
+  const [toId,      setToId]      = useState(null);
+  const [amount,    setAmount]    = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [done,      setDone]      = useState(false);
+
+  const myBal      = bal(data.logs, child.id);
+  const allMembers = [...data.children, ...(data.parents||[])].filter(m => m.id !== child.id);
+  const receiver   = allMembers.find(m => m.id === toId);
+  const amt        = parseInt(amount);
+  const amtOk      = !isNaN(amt) && amt >= 10 && amt <= myBal;
+
+  const doTransfer = () => {
+    const now = new Date().toISOString();
+    const outE = { id:uid(), cid:child.id,    type:"transfer_out", label:`💸 ${receiver.name}へ送金`,            pts:-amt, toId:receiver.id,  date:now };
+    const inE  = { id:uid(), cid:receiver.id, type:"transfer_in",  label:`💌 ${child.name}からのプレゼント！`,   pts: amt, fromId:child.id,   date:now };
+    update(d => ({...d, logs:[outE, inE, ...d.logs]}));
+    addLogToFirestore(outE);
+    addLogToFirestore(inE);
+    setDone(true);
+  };
+
+  const backdrop = { position:"fixed",inset:0,background:"rgba(0,0,0,0.52)",zIndex:800,display:"flex",alignItems:"flex-end",justifyContent:"center" };
+  const sheet    = { background:CARD,borderRadius:"24px 24px 0 0",padding:"28px 22px 36px",width:"100%",maxWidth:480,fontFamily:F,maxHeight:"88vh",overflowY:"auto" };
+
+  if (done) return (
+    <div style={backdrop}>
+      <div style={{...sheet, textAlign:"center", padding:"40px 24px 48px"}}>
+        <div style={{fontSize:64, marginBottom:10}}>🎉</div>
+        <div style={{fontWeight:900,fontSize:20,color:GP,marginBottom:6}}>おくったよ！</div>
+        <div style={{color:MUTED,fontSize:14,marginBottom:24}}>
+          {receiver?.emoji} <strong style={{color:TEXT}}>{receiver?.name}</strong> に{" "}
+          <strong style={{color:GP,fontSize:16}}>{amt.toLocaleString()}pt</strong> 届きました
+        </div>
+        <button onClick={onClose} style={{width:"100%",background:GP,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>
+          とじる
+        </button>
+      </div>
+    </div>
+  );
+
+  if (confirmed) return (
+    <div style={backdrop}>
+      <div style={{...sheet}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+          <h3 style={{margin:0,fontWeight:900,fontSize:18,color:TEXT}}>これを送りますか？</h3>
+          <button onClick={()=>setConfirmed(false)} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:16,color:MUTED,fontFamily:F}}>✕</button>
+        </div>
+        <div style={{background:GS,border:`2px solid ${G}`,borderRadius:18,padding:"20px 16px",marginBottom:20,textAlign:"center"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:14}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:30,lineHeight:1}}>{child.emoji}</div>
+              <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{child.name}</div>
+              <div style={{fontSize:10,color:R,fontWeight:700}}>-{amt.toLocaleString()}pt</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:26,color:GP}}>→</div>
+              <div style={{fontSize:11,color:GP,fontWeight:800}}>{amt.toLocaleString()}pt</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:30,lineHeight:1}}>{receiver?.emoji}</div>
+              <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{receiver?.name}</div>
+              <div style={{fontSize:10,color:GP,fontWeight:700}}>+{amt.toLocaleString()}pt</div>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:MUTED}}>送信後の残高: <strong style={{color:GP}}>{(myBal-amt).toLocaleString()}pt</strong></div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setConfirmed(false)} style={{flex:1,background:BORDER,border:"none",borderRadius:14,padding:13,fontWeight:800,color:MUTED,cursor:"pointer",fontFamily:F,fontSize:14}}>
+            もどる
+          </button>
+          <button onClick={doTransfer} style={{flex:2,background:GP,border:"none",borderRadius:14,padding:13,fontWeight:900,color:"#fff",fontSize:15,cursor:"pointer",fontFamily:F}}>
+            ✈ 送る！
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={backdrop} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={sheet}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+          <h3 style={{margin:0,fontWeight:900,fontSize:18,color:TEXT}}>💸 ポイントを送る</h3>
+          <button onClick={onClose} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:16,color:MUTED,fontFamily:F}}>✕</button>
+        </div>
+        <div style={{fontSize:12,color:MUTED,marginBottom:16}}>
+          💰 いまの残高: <strong style={{color:GP,fontSize:14}}>{myBal.toLocaleString()}pt</strong>
+        </div>
+
+        {/* メンバー選択 */}
+        <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8,letterSpacing:0.3}}>だれに送る？</div>
+        <div style={{marginBottom:16}}>
+          {allMembers.map(m => {
+            const mBal = bal(data.logs, m.id);
+            const sel  = toId === m.id;
+            return (
+              <button key={m.id} onClick={()=>{setToId(sel?null:m.id);setAmount("");}}
+                style={{
+                  width:"100%",marginBottom:8,
+                  background:sel?`${GP}12`:BG,
+                  border:`2px solid ${sel?GP:BORDER}`,
+                  borderRadius:14,padding:"11px 14px",
+                  display:"flex",alignItems:"center",gap:12,
+                  cursor:"pointer",textAlign:"left",fontFamily:F,
+                }}>
+                <div style={{width:38,height:38,borderRadius:11,background:sel?GP:CARD,border:`1.5px solid ${sel?GP:BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {m.emoji}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:TEXT}}>{m.name}</div>
+                  <div style={{fontSize:11,color:MUTED}}>{m.gradeLabel||m.displayMode||""} · {mBal.toLocaleString()}pt 所持</div>
+                </div>
+                <div style={{fontSize:18,color:sel?GP:MUTED,fontWeight:700}}>{sel?"✓":"›"}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 金額入力（相手選択後のみ表示） */}
+        {toId && (
+          <div>
+            <div style={{width:"100%",height:1,background:BORDER,marginBottom:16}}/>
+            <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>何pt送る？</div>
+            <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+              {[10,50,100,200,500,1000].filter(v=>v<=myBal).map(v=>(
+                <button key={v} onClick={()=>setAmount(String(v))}
+                  style={{
+                    padding:"6px 13px",
+                    border:`1.5px solid ${amount===String(v)?GP:BORDER}`,
+                    borderRadius:8,
+                    background:amount===String(v)?`${GP}18`:"transparent",
+                    fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,
+                    color:amount===String(v)?GP:MUTED,
+                  }}>
+                  {v}pt
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+              <input
+                type="number" value={amount} onChange={e=>setAmount(e.target.value)}
+                placeholder="pt数を入力（最小10pt）"
+                style={{...INP,flex:1,fontSize:15,fontWeight:700}}
+              />
+              <span style={{fontSize:13,color:MUTED,fontWeight:700,flexShrink:0}}>pt</span>
+            </div>
+            {!isNaN(amt)&&amt>0&&amt<10&&<div style={{color:R,fontSize:11,fontWeight:700,marginBottom:6}}>最小10ptから送れます</div>}
+            {!isNaN(amt)&&amt>myBal&&<div style={{color:R,fontSize:11,fontWeight:700,marginBottom:6}}>残高が足りません</div>}
+            <button
+              disabled={!amtOk}
+              onClick={()=>setConfirmed(true)}
+              style={{
+                marginTop:8,width:"100%",
+                background:amtOk?GP:BORDER,
+                border:"none",borderRadius:14,padding:"13px",
+                color:amtOk?"#fff":MUTED,
+                fontWeight:900,fontSize:15,
+                cursor:amtOk?"pointer":"default",
+                fontFamily:F,transition:"all 0.2s",
+              }}>
+              つぎへ →
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
