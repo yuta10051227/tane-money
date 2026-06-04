@@ -4965,6 +4965,204 @@ function TaskCustomizer({child,data,update,onClose}){
 }
 
 
+// ── Setup Wizard ──────────────────────────────────────
+function SetupWizard({ data, update, onComplete }) {
+  const [step,          setStep]         = useState(0);
+  const [familyName,    setFamilyName]   = useState("");
+  const [childName,     setChildName]    = useState("");
+  const [childEmoji,    setChildEmoji]   = useState("⚡");
+  const [childMode,     setChildMode]    = useState("teen");
+  const [selectedTasks, setSelectedTasks]= useState([]);
+  const [goalEmoji,     setGoalEmoji]    = useState("🎮");
+  const [goalLabel,     setGoalLabel]    = useState("");
+  const [goalTarget,    setGoalTarget]   = useState("");
+
+  const [familyCode] = useState(()=>`TANE-${Math.random().toString(36).slice(2,6).toUpperCase()}`);
+
+  const CHILD_EMOJIS = ["⚡","🌸","🌟","🦁","🐯","🐬","🦊","🐼","🐉","🌈","🎸","⚽","🚀","🎮","🦄","🐶","🐱","🍕"];
+  const GOAL_EMOJIS  = ["🎮","📱","🎵","🚴","✈","👟","📚","🎨","⚽","🍰","💻","🎸","🏊","🎀","🌍","🍜"];
+  const STARTER_TASKS = (data?.goodTasks||[]).slice(0,10);
+
+  const handleComplete = (skipGoal=false) => {
+    const childId = uid();
+    const newChild = {
+      id:childId, name:childName.trim()||"こども", emoji:childEmoji,
+      pin:"0000", displayMode:childMode, role:"child",
+      gradeLabel:childMode==="junior"?"小学生":"中学生",
+      ageMode:childMode==="junior"?"young":"middle",
+      permissions:{canChangePin:true,canViewBalance:true,canCreateGoals:true,canRedeemRewards:true},
+      visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
+    };
+    const newGoal = !skipGoal && goalLabel.trim() && parseInt(goalTarget)>0
+      ? {id:uid(),cid:childId,emoji:goalEmoji,label:goalLabel.trim(),target:parseInt(goalTarget),done:false}
+      : null;
+    const bonusLog = {id:uid(),cid:childId,type:"grant",label:"🎉 タネマネースタートボーナス！",pts:100,date:new Date().toISOString()};
+
+    try { localStorage.setItem(FAMILY_CODE_KEY, familyCode); } catch(e){}
+    _familyCode = familyCode;
+
+    update(d=>({
+      ...d,
+      children:[newChild], parents:[],
+      goals:newGoal?[newGoal]:[],
+      myTaskIds:selectedTasks.length>0?{[childId]:selectedTasks}:{},
+      tutorialSeen:{[childId]:true},
+      setupComplete:true,
+      logs:[bonusLog],
+      gachaDate:{}, streak:{},
+    }));
+    addLogToFirestore(bonusLog);
+    onComplete();
+  };
+
+  const btnStyle = (ok) => ({
+    width:"100%",background:ok?GP:BORDER,border:"none",borderRadius:16,
+    padding:"15px",color:ok?"#fff":MUTED,fontWeight:900,fontSize:16,
+    cursor:ok?"pointer":"default",fontFamily:F,transition:"all .2s",
+  });
+
+  return (
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${GS} 0%,#fff 50%,${GOLDS} 100%)`,fontFamily:F,display:"flex",flexDirection:"column",padding:"56px 24px 40px",maxWidth:480,margin:"0 auto",boxSizing:"border-box"}}>
+
+      {/* プログレスバー (step 1〜4) */}
+      {step>=1&&step<=4&&(
+        <div style={{marginBottom:28}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <span style={{fontSize:11,color:MUTED,fontWeight:700}}>ステップ {step} / 4</span>
+            <button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:"none",color:GP,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>← もどる</button>
+          </div>
+          <div style={{background:BORDER,borderRadius:999,height:6,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${step/4*100}%`,background:G,borderRadius:999,transition:"width .4s ease"}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Step 0: ようこそ */}
+      {step===0&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center"}}>
+          <div style={{fontSize:88,marginBottom:16,lineHeight:1}}>🌱</div>
+          <h1 style={{fontWeight:900,fontSize:30,color:GP,margin:"0 0 14px",lineHeight:1.2,fontFamily:FB}}>Tane Money</h1>
+          <p style={{color:TEXTS,fontSize:15,lineHeight:1.9,margin:"0 0 12px",maxWidth:280}}>
+            家族みんなで楽しく<br/>お金のことを学ぼう！
+          </p>
+          <p style={{color:MUTED,fontSize:12,margin:"0 0 44px"}}>⏱ セットアップは約3分で完了</p>
+          <button onClick={()=>setStep(1)} style={{...btnStyle(true),fontSize:18,padding:"17px",boxShadow:`0 8px 24px ${GP}40`}}>
+            はじめる 🌟
+          </button>
+        </div>
+      )}
+
+      {/* Step 1: ファミリー名 */}
+      {step===1&&(
+        <div style={{flex:1}}>
+          <div style={{fontSize:48,marginBottom:14}}>🏠</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>ファミリー名を決めよう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 22px",lineHeight:1.6}}>あとで変えることもできます</p>
+          <input value={familyName} onChange={e=>setFamilyName(e.target.value)}
+            placeholder="例：田中家、くるりんファミリー"
+            style={{...INP,fontSize:15,marginBottom:14}}/>
+          {familyName.trim()&&(
+            <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"12px 16px",marginBottom:22}}>
+              <div style={{fontSize:11,color:MUTED,marginBottom:4}}>接続コード（家族でシェアして使います）</div>
+              <div style={{fontWeight:900,fontSize:18,color:GP,letterSpacing:2}}>{familyCode}</div>
+              <div style={{fontSize:10,color:MUTED,marginTop:4}}>このコードを他の端末で入力すると同じデータを使えます</div>
+            </div>
+          )}
+          <button onClick={()=>setStep(2)} style={btnStyle(!!familyName.trim())} disabled={!familyName.trim()}>
+            つぎへ →
+          </button>
+        </div>
+      )}
+
+      {/* Step 2: 子どもを追加 */}
+      {step===2&&(
+        <div style={{flex:1}}>
+          <div style={{fontSize:48,marginBottom:14}}>👦</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>子どもを追加しよう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 16px"}}>あとで何人でも追加できます</p>
+          <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>絵文字を選ぼう</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:16}}>
+            {CHILD_EMOJIS.map(e=>(
+              <button key={e} onClick={()=>setChildEmoji(e)} style={{width:42,height:42,borderRadius:11,border:`2.5px solid ${childEmoji===e?GP:BORDER}`,background:childEmoji===e?`${GP}18`:"#fff",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {e}
+              </button>
+            ))}
+          </div>
+          <input value={childName} onChange={e=>setChildName(e.target.value)}
+            placeholder="名前（例：かなと）"
+            style={{...INP,fontSize:15,marginBottom:12}}/>
+          <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>年代</div>
+          <div style={{display:"flex",gap:8,marginBottom:24}}>
+            {[["junior","小学生"],["teen","中学生・高校生"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setChildMode(v)} style={{flex:1,padding:"11px 0",border:`2px solid ${childMode===v?GP:BORDER}`,borderRadius:12,background:childMode===v?`${GP}15`:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,color:childMode===v?GP:MUTED,transition:"all .15s"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>setStep(3)} style={btnStyle(!!childName.trim())} disabled={!childName.trim()}>
+            つぎへ →
+          </button>
+        </div>
+      )}
+
+      {/* Step 3: お手伝いを選ぶ */}
+      {step===3&&(
+        <div style={{flex:1}}>
+          <div style={{fontSize:48,marginBottom:14}}>✅</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>お手伝いを選ぼう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 16px"}}>やってみたいものを選んでね！（あとで変えられます）</p>
+          <div style={{marginBottom:20,maxHeight:340,overflowY:"auto"}}>
+            {STARTER_TASKS.map(t=>{
+              const sel=selectedTasks.includes(t.id);
+              return(
+                <button key={t.id} onClick={()=>setSelectedTasks(p=>sel?p.filter(x=>x!==t.id):[...p,t.id])}
+                  style={{width:"100%",marginBottom:8,background:sel?`${GP}12`:"#fff",border:`2px solid ${sel?GP:BORDER}`,borderRadius:13,padding:"10px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .15s"}}>
+                  <span style={{fontSize:22,flexShrink:0}}>{t.emoji}</span>
+                  <span style={{flex:1,fontWeight:700,fontSize:13,color:TEXT}}>{t.label}</span>
+                  <span style={{fontSize:12,color:GP,fontWeight:800,flexShrink:0}}>+{t.pts}pt</span>
+                  {sel&&<span style={{color:GP,fontSize:16,fontWeight:900,flexShrink:0}}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={()=>setStep(4)} style={btnStyle(true)}>
+            {selectedTasks.length===0?"スキップ →":`${selectedTasks.length}個選択 → つぎへ`}
+          </button>
+        </div>
+      )}
+
+      {/* Step 4: 最初の目標 */}
+      {step===4&&(
+        <div style={{flex:1}}>
+          <div style={{fontSize:48,marginBottom:14}}>🎯</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>はじめての目標を決めよう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 16px",lineHeight:1.6}}>何のために貯める？<br/>スキップしてあとで設定もOK！</p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:14}}>
+            {GOAL_EMOJIS.map(e=>(
+              <button key={e} onClick={()=>setGoalEmoji(e)} style={{width:42,height:42,borderRadius:11,border:`2.5px solid ${goalEmoji===e?GOLD:BORDER}`,background:goalEmoji===e?GOLDS:"#fff",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {e}
+              </button>
+            ))}
+          </div>
+          <input value={goalLabel} onChange={e=>setGoalLabel(e.target.value)}
+            placeholder="例：ゲーム、自転車、旅行" style={{...INP,fontSize:15,marginBottom:10}}/>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:22}}>
+            <input value={goalTarget} onChange={e=>setGoalTarget(e.target.value)} type="number"
+              placeholder="目標pt（例：500）" style={{...INP,flex:1,fontSize:15}}/>
+            <span style={{fontSize:13,color:MUTED,fontWeight:700,flexShrink:0}}>pt</span>
+          </div>
+          <button onClick={()=>handleComplete(false)} style={{...btnStyle(true),marginBottom:10,background:GP,boxShadow:`0 6px 20px ${GP}40`}}>
+            完成！🎉
+          </button>
+          <button onClick={()=>handleComplete(true)} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"6px"}}>
+            スキップして始める
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tutorial ──────────────────────────────────────────
 const CHILD_TUTORIAL = [
   {
@@ -5310,6 +5508,15 @@ export default function App() {
       <style>{`@keyframes sp{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
+
+  // 新規ファミリー：ファミリーコード未設定ならウィザードを表示
+  if (!loading && !getFamilyCode() && !data?.setupComplete) {
+    return (
+      <ErrorBoundary>
+        <SetupWizard data={data} update={update} onComplete={()=>setScreen("home")}/>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
