@@ -1520,29 +1520,37 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             ⚙
           </button>
         </div>
-        {/* 残高カード */}
-        <div style={{background:GP,borderRadius:22,padding:"20px 20px 22px",marginBottom:20,position:"relative",overflow:"hidden"}}>
-          <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
-          <div style={{position:"absolute",bottom:-30,left:-10,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}/>
-          <div style={{position:"relative",zIndex:1}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
-                {child.emoji}
+        {/* 残高カード + 種モンスター */}
+        <div style={{background:GP,borderRadius:22,padding:"16px 18px 18px",marginBottom:20,position:"relative",overflow:"visible"}}>
+          {/* 背景装飾（overflow:hiddenで内側クリップ） */}
+          <div style={{position:"absolute",inset:0,borderRadius:22,overflow:"hidden",pointerEvents:"none",zIndex:0}}>
+            <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
+            <div style={{position:"absolute",bottom:-30,left:-10,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}/>
+          </div>
+          <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-end",gap:10}}>
+            {/* 左：残高情報 */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <div style={{width:30,height:30,borderRadius:9,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
+                  {child.emoji}
+                </div>
+                <div>
+                  <div style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,letterSpacing:0.5}}>こんにちは、{child.name}</div>
+                  <div style={{color:"rgba(255,255,255,0.5)",fontSize:10}}>現在のタネ</div>
+                </div>
               </div>
-              <div>
-                <div style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,letterSpacing:0.5}}>こんにちは、{child.name}</div>
-                <div style={{color:"rgba(255,255,255,0.5)",fontSize:10}}>現在のタネ</div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:8}}>
+                <div style={{color:"#fff",fontSize:34,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</div>
+                <div style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,marginBottom:3}}>pt</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>今月</span>
+                <span style={{fontSize:13,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+                {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 8px",borderRadius:999,fontWeight:600}}>🔥 {curStreak}日</span>}
               </div>
             </div>
-            <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:8}}>
-              <div style={{color:"#fff",fontSize:36,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</div>
-              <div style={{color:"rgba(255,255,255,0.7)",fontSize:14,fontWeight:600,marginBottom:4}}>pt</div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>今月</span>
-              <span style={{fontSize:13,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
-              {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 8px",borderRadius:999,fontWeight:600}}>🔥 {curStreak}日</span>}
-            </div>
+            {/* 右：種モンスター（overflow:visibleなのでふきだしが上に出る） */}
+            <SeedMonster child={child} data={data}/>
           </div>
         </div>
       </div>
@@ -1624,8 +1632,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
-        {/* ── 種モンスター ── */}
-        <SeedMonster child={child} data={data}/>
         {/* ── デイリーガチャ（最上部） ── */}
         <div style={{padding:"12px 16px 4px"}}>
           <div style={{background:todayDone?CARD:`linear-gradient(135deg,#fffbe6,#fff3cc)`,border:`2px solid ${todayDone?BORDER:GOLD}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
@@ -3759,408 +3765,218 @@ async function fetchRealStockPrices(data,update){
 
 // ── Seed Monster ──────────────────────────────────────
 function SeedMonster({ child, data }) {
-  const [tick, setTick] = useState(0);
-  const [mood, setMood] = useState(0); // 0=normal 1=happy 2=sleep
+  const [tick, setTick]       = useState(0);
+  const [mood, setMood]       = useState(0);
   const [sparkles, setSparkles] = useState([]);
-  const [speech, setSpeech] = useState(null);
+  const [speech, setSpeech]   = useState(null);
   const [blinkOn, setBlinkOn] = useState(true);
   const [leafAngle, setLeafAngle] = useState(0);
 
-  const myBal    = bal(data.logs, child.id);
+  const myBal     = bal(data.logs, child.id);
   const curStreak = data.streak?.[child.id]?.cur || 0;
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthPts  = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)&&l.pts>0).reduce((s,l)=>s+l.pts,0);
   const goalsDone = (data.goals||[]).filter(g=>g.cid===child.id&&g.done).length;
   const todayDone = data.gachaDate?.[child.id] === todayKey();
-  const hour = new Date().getHours();
-
-  // 進化段階
-  const stage = myBal < 100 ? 0
-    : myBal < 500  ? 1
-    : myBal < 2000 ? 2
-    : myBal < 5000 ? 3
-    : 4;
-
-  const STAGES = [
-    { name:"タネっち",  color:"#c8a97e", bodyH:28, bodyW:24 },
-    { name:"メっち",    color:"#6dbb5a", bodyH:34, bodyW:28 },
-    { name:"ハっち",    color:"#34C77B", bodyH:42, bodyW:36 },
-    { name:"サカっち",  color:"#187A4E", bodyH:50, bodyW:44 },
-    { name:"キングタネ",color:"#E8B83E", bodyH:58, bodyW:52 },
-  ];
-  const st = STAGES[stage];
-
-  // 機嫌スコア
-  const happyScore = Math.min(10,
-    (curStreak >= 7 ? 3 : curStreak >= 3 ? 2 : curStreak >= 1 ? 1 : 0) +
-    (monthPts >= 500 ? 3 : monthPts >= 200 ? 2 : monthPts >= 50 ? 1 : 0) +
-    (goalsDone >= 2 ? 2 : goalsDone >= 1 ? 1 : 0) +
-    (todayDone ? 1 : 0) +
-    (myBal >= 1000 ? 1 : 0)
-  );
-
-  // 睡眠時間
+  const hour      = new Date().getHours();
   const isSleeping = hour >= 22 || hour < 7;
 
-  // アニメーション tick (500ms)
-  useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 500);
-    return () => clearInterval(iv);
-  }, []);
+  const stage = myBal<100?0:myBal<500?1:myBal<2000?2:myBal<5000?3:4;
+  const NAMES = ["タネっち","メっち","ハっち","サカっち","キングタネ"];
 
-  // まばたき (3秒周期)
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setBlinkOn(false);
-      setTimeout(() => setBlinkOn(true), 120);
-    }, 3000);
-    return () => clearInterval(iv);
-  }, []);
+  const happyScore = Math.min(10,
+    (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
+    (monthPts>=500?3:monthPts>=200?2:monthPts>=50?1:0) +
+    (goalsDone>=2?2:goalsDone>=1?1:0) +
+    (todayDone?1:0) + (myBal>=1000?1:0)
+  );
 
-  // 葉っぱ揺れ
-  useEffect(() => {
-    setLeafAngle(Math.sin(tick * 0.8) * 12);
-  }, [tick]);
+  useEffect(()=>{ const iv=setInterval(()=>setTick(t=>t+1),500); return()=>clearInterval(iv); },[]);
+  useEffect(()=>{ const iv=setInterval(()=>{setBlinkOn(false);setTimeout(()=>setBlinkOn(true),120);},3000); return()=>clearInterval(iv); },[]);
+  useEffect(()=>{ setLeafAngle(Math.sin(tick*0.8)*12); },[tick]);
+  useEffect(()=>{ setMood(isSleeping?2:happyScore>=6?1:0); },[tick]);
 
-  // きげん変化
-  useEffect(() => {
-    if (isSleeping) { setMood(2); return; }
-    setMood(happyScore >= 6 ? 1 : 0);
-  }, [tick]);
-
-  // ランダムふきだし
-  useEffect(() => {
-    if (isSleeping) return;
-    const msgs = happyScore >= 7
+  useEffect(()=>{
+    if(isSleeping) return;
+    const msgs = happyScore>=7
       ? ["わーい！✨","きょうもがんばるよ！","ポイントたまってる〜！","うれしい〜！","ありがとう！"]
-      : happyScore >= 4
+      : happyScore>=4
       ? ["いっしょにがんばろ！","きょうもよろしく！","お手伝いしよう！","タスクやってみよ！"]
       : ["さびしいな…","もっとやろうよ〜","おきてる？","がんばって！"];
-    const iv = setInterval(() => {
-      setSpeech(msgs[Math.floor(Math.random() * msgs.length)]);
-      setTimeout(() => setSpeech(null), 2200);
-    }, 7000 + Math.random() * 5000);
-    return () => clearInterval(iv);
-  }, [happyScore, isSleeping]);
+    const iv=setInterval(()=>{
+      setSpeech(msgs[Math.floor(Math.random()*msgs.length)]);
+      setTimeout(()=>setSpeech(null),2200);
+    },7000+Math.random()*5000);
+    return()=>clearInterval(iv);
+  },[happyScore,isSleeping]);
 
-  // タップでスパークル
-  const handleTap = () => {
-    const id = Date.now();
-    setSparkles(s => [...s, { id, x: Math.random() * 60 - 30, y: -(20 + Math.random() * 30) }]);
-    setTimeout(() => setSparkles(s => s.filter(x => x.id !== id)), 800);
-    setSpeech(happyScore >= 6 ? "えへへ〜！" : "タッチしてくれた！");
-    setTimeout(() => setSpeech(null), 1800);
+  const handleTap = ()=>{
+    const id=Date.now();
+    setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
+    setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
+    setSpeech(happyScore>=6?"えへへ〜！":"タッチしてくれた！");
+    setTimeout(()=>setSpeech(null),1800);
   };
 
-  // float offset
-  const floatY = Math.sin(tick * 0.9) * 4;
-  const bodyColor = st.color;
+  const floatY = Math.sin(tick*0.9)*4;
+  const px = 3;
 
-  // SVGドット絵モンスター描画
-  const px = 4; // 1ドット = 4px
+  // 緑カード背景用：白クリーム系カラー
+  const bodyColor = stage===4?"#FFE566":"rgba(255,255,255,0.93)";
+  const darkColor = stage===4?"rgba(200,150,0,0.75)":"rgba(255,255,255,0.42)";
+  const hlColor   = "#fff";
+  const leafFill  = "rgba(180,255,210,0.88)";
+  const eyeC      = stage===4?"rgba(90,55,0,0.85)":"rgba(24,35,29,0.82)";
+  const mouthC    = stage===4?"rgba(90,55,0,0.65)":"rgba(24,35,29,0.65)";
 
-  // ステージ別ドットパターン (body shape)
-  const bodyPixels = stage === 0 ? [
-    [0,0,1,1,0,0],
-    [0,1,1,1,1,0],
-    [0,1,1,1,1,0],
-    [0,0,1,1,0,0],
-    [0,0,1,1,0,0],
-  ] : stage === 1 ? [
-    [0,1,1,1,1,0],
-    [1,1,1,1,1,1],
-    [1,1,1,1,1,1],
-    [0,1,1,1,1,0],
-    [0,1,1,1,1,0],
-    [0,0,1,1,0,0],
-  ] : stage === 2 ? [
-    [0,0,1,1,1,0,0],
-    [0,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1],
-    [0,1,1,1,1,1,0],
-    [0,0,1,1,1,0,0],
-    [0,0,1,1,1,0,0],
-  ] : stage === 3 ? [
-    [0,0,1,1,1,1,0,0],
-    [0,1,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1],
-    [0,1,1,1,1,1,1,0],
-    [0,0,1,1,1,1,0,0],
-    [0,0,0,1,1,0,0,0],
-  ] : [
-    [0,0,1,1,1,1,1,0,0],
-    [0,1,1,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1,1],
-    [0,1,1,1,1,1,1,1,0],
-    [0,1,1,1,1,1,1,1,0],
-    [0,0,1,1,1,1,1,0,0],
-    [0,0,0,1,1,1,0,0,0],
+  const bodyPixels = stage===0?[
+    [0,0,1,1,0,0],[0,1,1,1,1,0],[0,1,1,1,1,0],[0,0,1,1,0,0],[0,0,1,1,0,0],
+  ]:stage===1?[
+    [0,1,1,1,1,0],[1,1,1,1,1,1],[1,1,1,1,1,1],[0,1,1,1,1,0],[0,1,1,1,1,0],[0,0,1,1,0,0],
+  ]:stage===2?[
+    [0,0,1,1,1,0,0],[0,1,1,1,1,1,0],[1,1,1,1,1,1,1],[1,1,1,1,1,1,1],[0,1,1,1,1,1,0],[0,0,1,1,1,0,0],[0,0,1,1,1,0,0],
+  ]:stage===3?[
+    [0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,0,1,1,0,0,0],
+  ]:[
+    [0,0,1,1,1,1,1,0,0],[0,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,0,0],[0,0,0,1,1,1,0,0,0],
   ];
 
-  const cols = bodyPixels[0].length;
-  const rows = bodyPixels.length;
-  const svgW = cols * px;
-  const svgH = rows * px;
+  const cols    = bodyPixels[0].length;
+  const rows    = bodyPixels.length;
+  const eyeRow  = Math.floor(rows*0.28);
+  const eyeColL = Math.floor(cols*0.28);
+  const eyeColR = Math.floor(cols*0.60);
+  const leafCX  = Math.floor(cols/2)*px;
+  const totalW  = cols*px+16;
+  const totalH  = rows*px+(stage>=1?12:6);
 
-  // 目の位置（相対）
-  const eyeRow = Math.floor(rows * 0.28);
-  const eyeColL = Math.floor(cols * 0.28);
-  const eyeColR = Math.floor(cols * 0.60);
-
-  // 葉っぱ位置（top center）
-  const leafCX = Math.floor(cols / 2) * px;
-
-  const darkColor = `hsl(${stage===4?45:stage===3?150:stage===2?145:stage===1?120:30},${stage===4?60:55}%,${stage===4?45:30}%)`;
-  const hlColor   = `hsl(${stage===4?55:stage===3?145:stage===2?140:stage===1?115:35},50%,75%)`;
-
-  const totalW = svgW + 20;
-  const totalH = svgH + (stage >= 2 ? 24 : 16);
+  const nextPt = stage===0?100:stage===1?500:stage===2?2000:stage===3?5000:null;
+  const prevPt = stage===0?0:stage===1?100:stage===2?500:stage===3?2000:5000;
+  const evoPct = nextPt ? Math.min(100,Math.round((myBal-prevPt)/(nextPt-prevPt)*100)) : 100;
 
   return (
-    <div style={{ padding:"16px 16px 4px" }}>
-      <div style={{
-        background: `linear-gradient(135deg, ${stage===4?"#fffbe6,#fff1a0":stage===3?"#e8f5ee,#c8eeda":stage===2?"#edf9f3,#d4f0e2":stage===1?"#f0faf4,#ddf3e7":"#fdf8f0,#f5ede0"})`,
-        border: `2px solid ${stage===4?GOLD:stage>=2?G:stage>=1?"#a8d8b0":BORDER}`,
-        borderRadius: 20,
-        padding: "16px",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: `0 4px 20px ${stage===4?"rgba(232,184,62,0.18)":stage>=2?"rgba(52,199,123,0.12)":"rgba(24,35,29,0.05)"}`,
-      }}>
-        {/* 背景装飾ドット */}
-        <div style={{ position:"absolute", inset:0, pointerEvents:"none", overflow:"hidden" }}>
-          {[...Array(8)].map((_,i) => (
-            <div key={i} style={{
-              position:"absolute",
-              width: 3+Math.random()*4, height: 3+Math.random()*4,
-              borderRadius:"50%",
-              background: stage>=3?`${G}30`:stage>=1?`${G}20`:`#c8a97e20`,
-              left:`${10+i*12}%`, top:`${15+((i*37)%70)}%`,
-              animation:`seedFloat${i%3} ${2+i*0.4}s ease-in-out infinite`,
-            }}/>
-          ))}
+    <div style={{position:"relative",flexShrink:0,textAlign:"center"}}>
+      {/* スパークル */}
+      {sparkles.map(sp=>(
+        <div key={sp.id} style={{
+          position:"absolute",top:"40%",left:"50%",
+          transform:`translate(${sp.x}px,${sp.y}px)`,
+          fontSize:12,pointerEvents:"none",zIndex:50,
+          animation:"smSparkle 0.8s ease-out forwards",
+        }}>✨</div>
+      ))}
+
+      {/* ふきだし — 親が overflow:visible なので上に飛び出せる */}
+      {speech&&(
+        <div style={{
+          position:"absolute",bottom:"108%",left:"50%",
+          transform:"translateX(-50%)",
+          background:"rgba(255,255,255,0.97)",
+          border:"1.5px solid rgba(255,255,255,0.6)",
+          borderRadius:10,padding:"5px 10px",
+          fontSize:11,fontWeight:700,color:TEXT,
+          whiteSpace:"nowrap",
+          boxShadow:"0 3px 12px rgba(0,0,0,0.22)",
+          zIndex:50,
+          animation:"smPop .2s ease",
+        }}>
+          {speech}
+          <div style={{
+            position:"absolute",bottom:-6,left:"50%",
+            transform:"translateX(-50%)",
+            width:0,height:0,
+            borderLeft:"5px solid transparent",borderRight:"5px solid transparent",
+            borderTop:"6px solid rgba(255,255,255,0.97)",
+          }}/>
         </div>
+      )}
 
-        <div style={{ display:"flex", alignItems:"flex-start", gap:14, position:"relative" }}>
-          {/* モンスター本体 */}
-          <div
-            onClick={handleTap}
-            style={{
-              cursor:"pointer",
-              position:"relative",
-              transform:`translateY(${floatY}px)`,
-              transition:"transform 0.1s",
-              flexShrink:0,
-              userSelect:"none",
-            }}
-          >
-            {/* スパークル */}
-            {sparkles.map(sp => (
-              <div key={sp.id} style={{
-                position:"absolute", top:"50%", left:"50%",
-                transform:`translate(${sp.x}px,${sp.y}px)`,
-                fontSize:14, pointerEvents:"none",
-                animation:"sparkleUp 0.8s ease-out forwards",
-              }}>✨</div>
-            ))}
-
-            {/* ふきだし */}
-            {speech && (
-              <div style={{
-                position:"absolute", bottom:"100%", left:"50%",
-                transform:"translateX(-50%)",
-                background:"#fff", border:`1.5px solid ${stage>=3?G:BORDER}`,
-                borderRadius:10, padding:"4px 8px",
-                fontSize:11, fontWeight:700, color:TEXT,
-                whiteSpace:"nowrap", marginBottom:4,
-                boxShadow:"0 2px 8px #0002",
-                animation:"popIn .2s ease",
-                zIndex:10,
-              }}>
-                {speech}
-                <div style={{
-                  position:"absolute", bottom:-6, left:"50%",
-                  transform:"translateX(-50%)",
-                  width:0, height:0,
-                  borderLeft:"5px solid transparent", borderRight:"5px solid transparent",
-                  borderTop:`6px solid ${stage>=3?G:BORDER}`,
-                }}/>
-              </div>
-            )}
-
-            {/* ドット絵SVG */}
-            <svg width={totalW} height={totalH} style={{ display:"block" }} viewBox={`0 0 ${totalW} ${totalH}`}>
-              {/* 葉っぱ（stage 1以上） */}
-              {stage >= 1 && (
-                <g transform={`translate(${leafCX+10},${4}) rotate(${leafAngle},0,8)`}>
-                  <rect x={-2} y={0} width={4} height={10} fill={darkColor} rx={1}/>
-                  <ellipse cx={-6} cy={5} rx={6} ry={4} fill={stage>=3?G:"#6dbb5a"} transform="rotate(-30,-6,5)"/>
-                  {stage >= 2 && <ellipse cx={7} cy={3} rx={5} ry={3} fill={stage>=3?G:"#6dbb5a"} transform="rotate(25,7,3)"/>}
-                  {stage >= 4 && <ellipse cx={-10} cy={2} rx={4} ry={2.5} fill={GOLD} transform="rotate(-45,-10,2)"/>}
-                </g>
-              )}
-
-              {/* ボディドット */}
-              {bodyPixels.map((row, ri) =>
-                row.map((cell, ci) => {
-                  if (!cell) return null;
-                  const bx = ci * px + 10;
-                  const by = ri * px + (stage >= 1 ? 14 : 6);
-                  const isEdge = !row[ci-1] || !row[ci+1] || !bodyPixels[ri-1]?.[ci] || !bodyPixels[ri+1]?.[ci];
-                  const isHL  = ri <= 1 && ci >= 1 && ci <= 2;
-                  return (
-                    <rect key={`${ri}-${ci}`}
-                      x={bx} y={by} width={px} height={px}
-                      fill={isHL ? hlColor : isEdge ? darkColor : bodyColor}
-                      rx={0}
-                    />
-                  );
-                })
-              )}
-
-              {/* 目 */}
-              {(() => {
-                const bOffY = (stage >= 1 ? 14 : 6);
-                const ex = eyeColL * px + 10 + 1;
-                const ey = eyeRow * px + bOffY + 1;
-                const ex2 = eyeColR * px + 10 + 1;
-                if (isSleeping || mood === 2) {
-                  // 閉じ目（zzz）
-                  return (<>
-                    <rect x={ex} y={ey+1} width={px-2} height={1} fill="#18231D" rx={1}/>
-                    <rect x={ex2} y={ey+1} width={px-2} height={1} fill="#18231D" rx={1}/>
-                  </>);
-                }
-                if (!blinkOn) {
-                  return (<>
-                    <rect x={ex} y={ey+1} width={px-2} height={1} fill="#18231D" rx={1}/>
-                    <rect x={ex2} y={ey+1} width={px-2} height={1} fill="#18231D" rx={1}/>
-                  </>);
-                }
-                return (<>
-                  <rect x={ex} y={ey} width={px-2} height={px-2} fill="#18231D" rx={1}/>
-                  <rect x={ex+1} y={ey} width={1} height={1} fill="#fff"/>
-                  <rect x={ex2} y={ey} width={px-2} height={px-2} fill="#18231D" rx={1}/>
-                  <rect x={ex2+1} y={ey} width={1} height={1} fill="#fff"/>
-                  {/* ハッピー時はほっぺ */}
-                  {mood === 1 && <>
-                    <rect x={ex-1} y={ey+px} width={3} height={2} fill="#ff9999" rx={1} opacity={0.7}/>
-                    <rect x={ex2+1} y={ey+px} width={3} height={2} fill="#ff9999" rx={1} opacity={0.7}/>
-                  </>}
-                </>);
-              })()}
-
-              {/* 口 */}
-              {(() => {
-                const bOffY = (stage >= 1 ? 14 : 6);
-                const mx = Math.floor(cols/2) * px + 10 - 1;
-                const my = (eyeRow+1) * px + bOffY + 2;
-                if (isSleeping) return (
-                  <text x={mx-4} y={my+4} fontSize={6} fill="#7B61C9" fontFamily="monospace">zzz</text>
-                );
-                return mood === 1
-                  ? <><rect x={mx-1} y={my+1} width={1} height={2} fill="#18231D"/><rect x={mx+1} y={my} width={1} height={3} fill="#18231D"/><rect x={mx+3} y={my+1} width={1} height={2} fill="#18231D"/></>
-                  : <rect x={mx} y={my+1} width={3} height={1} fill="#18231D"/>;
-              })()}
-
-              {/* 王冠（stage 4） */}
-              {stage === 4 && (
-                <g transform={`translate(${Math.floor(cols/2)*px+10-8},-2)`}>
-                  <rect x={0} y={6} width={16} height={5} fill={GOLD} rx={1}/>
-                  <rect x={0} y={2} width={3} height={8} fill={GOLD} rx={1}/>
-                  <rect x={6} y={0} width={3} height={10} fill={GOLD} rx={1}/>
-                  <rect x={12} y={2} width={3} height={8} fill={GOLD} rx={1}/>
-                  <rect x={2} y={7} width={2} height={2} fill="#fff" rx={0.5}/>
-                  <rect x={7} y={7} width={2} height={2} fill="#fff" rx={0.5}/>
-                  <rect x={12} y={7} width={2} height={2} fill="#fff" rx={0.5}/>
-                </g>
-              )}
-            </svg>
-          </div>
-
-          {/* ステータス情報 */}
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
-              <span style={{ fontWeight:900, fontSize:15, color:TEXT }}>{st.name}</span>
-              {stage === 4 && <span style={{ fontSize:10, background:GOLDS, color:"#9a7000", padding:"2px 6px", borderRadius:999, fontWeight:700 }}>MAX</span>}
-            </div>
-
-            {/* きげんバー */}
-            <div style={{ marginBottom:8 }}>
-              <div style={{ fontSize:10, color:MUTED, marginBottom:3 }}>
-                {isSleeping ? "😴 おやすみ中…" : mood===1 ? "😊 きげんいい！" : "😐 ふつう"}
-              </div>
-              <div style={{ display:"flex", gap:2 }}>
-                {[...Array(10)].map((_,i) => (
-                  <div key={i} style={{
-                    flex:1, height:5, borderRadius:999,
-                    background: i < happyScore
-                      ? (happyScore >= 7 ? G : happyScore >= 4 ? GOLD : "#ccc")
-                      : BORDER,
-                    transition:"background 0.3s",
-                  }}/>
-                ))}
-              </div>
-            </div>
-
-            {/* ステージ進捗 */}
-            {stage < 4 && (
-              <div style={{ marginBottom:8 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:MUTED, marginBottom:2 }}>
-                  <span>次の進化まで</span>
-                  <span style={{ fontWeight:700, color:GP }}>
-                    {stage===0?"100pt":stage===1?"500pt":stage===2?"2,000pt":"5,000pt"}
-                  </span>
-                </div>
-                <div style={{ background:BORDER, borderRadius:999, height:4, overflow:"hidden" }}>
-                  <div style={{
-                    height:"100%", borderRadius:999,
-                    background: stage>=3?G:stage>=1?G:GOLD,
-                    width:`${Math.min(100,
-                      stage===0?(myBal/100*100):
-                      stage===1?((myBal-100)/400*100):
-                      stage===2?((myBal-500)/1500*100):
-                      ((myBal-2000)/3000*100)
-                    )}%`,
-                    transition:"width 0.6s ease",
-                  }}/>
-                </div>
-              </div>
-            )}
-
-            {/* ミニステータス */}
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <span style={{ fontSize:10, background:"#fff", border:`1px solid ${BORDER}`, borderRadius:999, padding:"2px 7px", color:GP, fontWeight:700 }}>
-                💰 {myBal.toLocaleString()}pt
-              </span>
-              {curStreak >= 1 && (
-                <span style={{ fontSize:10, background:"#fff", border:`1px solid ${BORDER}`, borderRadius:999, padding:"2px 7px", color:R, fontWeight:700 }}>
-                  🔥 {curStreak}日連続
-                </span>
-              )}
-              {goalsDone >= 1 && (
-                <span style={{ fontSize:10, background:"#fff", border:`1px solid ${BORDER}`, borderRadius:999, padding:"2px 7px", color:B, fontWeight:700 }}>
-                  🎯 目標{goalsDone}個
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* アニメーションCSS */}
-        <style>{`
-          @keyframes seedFloat0{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-3px) scale(1.02)}}
-          @keyframes seedFloat1{0%,100%{transform:translateY(-2px)}50%{transform:translateY(2px)}}
-          @keyframes seedFloat2{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-4px) rotate(5deg)}}
-          @keyframes sparkleUp{0%{opacity:1;transform:translate(var(--sx,0),var(--sy,0)) scale(1)}100%{opacity:0;transform:translate(var(--sx,0),calc(var(--sy,0) - 30px)) scale(0.5)}}
-          @keyframes popIn{0%{transform:translateX(-50%) scale(0.6)}70%{transform:translateX(-50%) scale(1.08)}100%{transform:translateX(-50%) scale(1)}}
-        `}</style>
+      {/* モンスターSVG */}
+      <div
+        onClick={handleTap}
+        style={{
+          cursor:"pointer",display:"inline-block",
+          transform:`translateY(${floatY}px)`,
+          transition:"transform 0.1s",
+          userSelect:"none",
+        }}
+      >
+        <svg width={totalW} height={totalH} style={{display:"block"}} viewBox={`0 0 ${totalW} ${totalH}`}>
+          {/* 葉っぱ */}
+          {stage>=1&&(
+            <g transform={`translate(${leafCX+8},2) rotate(${leafAngle},0,6)`}>
+              <rect x={-1.5} y={0} width={3} height={9} fill="rgba(255,255,255,0.5)" rx={1}/>
+              <ellipse cx={-5} cy={4} rx={5} ry={3.5} fill={leafFill} transform="rotate(-30,-5,4)"/>
+              {stage>=2&&<ellipse cx={6} cy={2.5} rx={4} ry={2.5} fill={leafFill} transform="rotate(25,6,2.5)"/>}
+              {stage>=4&&<ellipse cx={-9} cy={1.5} rx={3.5} ry={2} fill="#FFE566" transform="rotate(-45,-9,1.5)"/>}
+            </g>
+          )}
+          {/* ボディ */}
+          {bodyPixels.map((row,ri)=>row.map((cell,ci)=>{
+            if(!cell) return null;
+            const bx=ci*px+8;
+            const by=ri*px+(stage>=1?10:4);
+            const isEdge=!row[ci-1]||!row[ci+1]||!bodyPixels[ri-1]?.[ci]||!bodyPixels[ri+1]?.[ci];
+            const isHL=ri<=1&&ci>=1&&ci<=2;
+            return(<rect key={`${ri}-${ci}`} x={bx} y={by} width={px} height={px} fill={isHL?hlColor:isEdge?darkColor:bodyColor}/>);
+          }))}
+          {/* 目 */}
+          {(()=>{
+            const bOY=(stage>=1?10:4);
+            const ex=eyeColL*px+8+1, ey=eyeRow*px+bOY+1, ex2=eyeColR*px+8+1;
+            if(isSleeping||!blinkOn){
+              return(<><rect x={ex} y={ey+1} width={px-2} height={1} fill={eyeC} rx={1}/><rect x={ex2} y={ey+1} width={px-2} height={1} fill={eyeC} rx={1}/></>);
+            }
+            return(<>
+              <rect x={ex} y={ey} width={px-2} height={px-2} fill={eyeC} rx={1}/>
+              <rect x={ex2} y={ey} width={px-2} height={px-2} fill={eyeC} rx={1}/>
+              {mood===1&&<>
+                <rect x={ex-1} y={ey+px} width={3} height={2} fill="rgba(255,160,160,0.8)" rx={1} opacity={0.7}/>
+                <rect x={ex2+1} y={ey+px} width={3} height={2} fill="rgba(255,160,160,0.8)" rx={1} opacity={0.7}/>
+              </>}
+            </>);
+          })()}
+          {/* 口 */}
+          {(()=>{
+            const bOY=(stage>=1?10:4);
+            const mx=Math.floor(cols/2)*px+8-1, my=(eyeRow+1)*px+bOY+2;
+            if(isSleeping) return(<text x={mx-4} y={my+4} fontSize={5} fill="rgba(255,255,255,0.6)" fontFamily="monospace">zzz</text>);
+            return mood===1
+              ?<><rect x={mx-1} y={my+1} width={1} height={2} fill={mouthC}/><rect x={mx+1} y={my} width={1} height={3} fill={mouthC}/><rect x={mx+3} y={my+1} width={1} height={2} fill={mouthC}/></>
+              :<rect x={mx} y={my+1} width={3} height={1} fill={mouthC}/>;
+          })()}
+          {/* 王冠 */}
+          {stage===4&&(
+            <g transform={`translate(${Math.floor(cols/2)*px+8-7},-2)`}>
+              <rect x={0} y={5} width={14} height={4} fill="#FFE566" rx={1}/>
+              <rect x={0} y={2} width={2.5} height={7} fill="#FFE566" rx={1}/>
+              <rect x={5} y={0} width={2.5} height={9} fill="#FFE566" rx={1}/>
+              <rect x={10} y={2} width={2.5} height={7} fill="#FFE566" rx={1}/>
+              <rect x={1.5} y={6} width={1.5} height={1.5} fill="#fff" rx={0.5}/>
+              <rect x={6} y={6} width={1.5} height={1.5} fill="#fff" rx={0.5}/>
+              <rect x={10.5} y={6} width={1.5} height={1.5} fill="#fff" rx={0.5}/>
+            </g>
+          )}
+        </svg>
       </div>
+
+      {/* 名前 */}
+      <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
+        {NAMES[stage]}{stage===4&&" 👑"}
+      </div>
+      {/* 進化バー */}
+      {nextPt&&(
+        <div style={{width:totalW,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"3px auto 0",overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${evoPct}%`,background:"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
+        </div>
+      )}
+      {!nextPt&&<div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:2}}>MAX✨</div>}
+
+      {/* アニメCSS */}
+      <style>{`
+        @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
+        @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
+      `}</style>
     </div>
   );
 }
