@@ -6,7 +6,8 @@
   "scripts": {
     "check": "python3 check.py okozukai-v9.jsx",
     "build": "node scripts/build.js",
-    "serve": "npx --yes serve . -p 3000"
+    "serve": "npx --yes serve . -p 3000",
+    "deploy": "bash scripts/deploy.sh"
   },
   "devDependencies": {
     "@babel/core": "^7.27.0",
