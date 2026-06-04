@@ -1,0 +1,19 @@
+{
+  "name": "tane-money",
+  "version": "9.0.0",
+  "private": true,
+  "description": "家族向けおこづかい・ポイント管理 PWA（Tane Money / タネマネー）",
+  "scripts": {
+    "check": "python3 check.py okozukai-v9.jsx",
+    "build": "node scripts/build.js",
+    "serve": "npx --yes serve . -p 3000"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.27.0",
+    "@babel/parser": "^7.27.0",
+    "@babel/preset-react": "^7.27.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
