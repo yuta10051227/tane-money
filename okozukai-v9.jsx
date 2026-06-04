@@ -1614,39 +1614,31 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && <>
         <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
         <DailyTasks child={child} data={data} update={update}/>
-      </>}
-
-      {/* ── GACHA ── */}
-      {false && /* gacha moved to daily bonus */ (
-        <div style={{padding:20,display:"flex",flexDirection:"column",alignItems:"center"}}>
-          <p style={{color:MUTED,fontSize:13,fontWeight:700,margin:"20px 0 16px",textAlign:"center"}}>
-            {todayDone ? "✅ 今日はもう引いたよ！また明日ね🌙" : "今日のガチャを引こう！"}
-          </p>
-          <button onClick={doGacha} disabled={todayDone}
-            style={{width:young?190:170,height:young?190:170,borderRadius:"50%",border:"none",
-              background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#999)":"radial-gradient(circle at 35% 35%,#ffe066,#f5a623,#d97706)",
-              fontSize:young?70:60,cursor:todayDone?"default":"pointer",
-              boxShadow:todayDone?"none":"0 8px 40px #f5c84250,0 0 0 10px #f5c84225",
-              animation:todayDone?"none":"glow 2s ease-in-out infinite"}}>
-            🎰
-          </button>
-          {curStreak>0 && <p style={{color:R,fontWeight:800,fontSize:14,marginTop:14}}>🔥 {curStreak}日連続！</p>}
-          {!young && (
-            <div style={{width:"100%",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:14,marginTop:20}}>
-              <p style={{fontWeight:800,fontSize:12,color:MUTED,margin:"0 0 10px"}}>🎲 レアリティ</p>
-              {data.gacha.map(g=>(
-                <div key={g.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-                  <span style={{fontSize:16}}>{g.emoji}</span>
-                  <span style={{fontWeight:800,fontSize:13,color:g.color,flex:1}}>{g.label}</span>
-                  <span style={{color:MUTED,fontSize:11}}>{g.min}〜{g.max}円</span>
-                  <span style={{background:`${g.color}20`,color:g.color,fontWeight:800,fontSize:11,padding:"1px 7px",borderRadius:20}}>{g.rate}%</span>
-                </div>
-              ))}
+        {/* ── デイリーガチャ ── */}
+        <div style={{padding:"4px 16px 24px"}}>
+          <div style={{background:todayDone?CARD:`linear-gradient(135deg,#fffbe6,#fff3cc)`,border:`2px solid ${todayDone?BORDER:GOLD}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+            <button onClick={doGacha} disabled={todayDone}
+              style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
+                background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":"radial-gradient(circle at 35% 35%,#ffe066,#f5a623,#d97706)",
+                fontSize:28,cursor:todayDone?"default":"pointer",
+                boxShadow:todayDone?"none":"0 4px 16px #f5c84260",
+                animation:todayDone?"none":"glow 2s ease-in-out infinite"}}>
+              🎰
+            </button>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:800,fontSize:14,color:todayDone?MUTED:TEXT}}>
+                {todayDone?"✅ 今日は引き済み！":"デイリーガチャ"}
+              </div>
+              <div style={{fontSize:12,color:MUTED,marginTop:2}}>
+                {todayDone?"また明日ね🌙":`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+              </div>
+              {curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
             </div>
-          )}
-          <style>{`@keyframes glow{0%,100%{box-shadow:0 8px 40px #f5c84250,0 0 0 10px #f5c84225}50%{box-shadow:0 8px 60px #f5c84280,0 0 0 18px #f5c84240}}@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
+            {!todayDone&&<div style={{fontSize:11,background:GOLDS,color:"#9a7000",padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0}}>TAP！</div>}
+          </div>
+          <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
-      )}
+      </>}
 
       {/* ── ACTIVITY サブナビ ── */}
       {effectiveTab==="activity"&&!isJunior&&!young&&(
