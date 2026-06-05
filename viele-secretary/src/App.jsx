@@ -15,8 +15,8 @@ const C = {
   panel2: "#1E222B",
   line: "#2A2F3A",
   text: "#E8EAED",
-  sub: "#9AA1AC",
-  faint: "#6B7280",
+  sub: "#A7AEB8",
+  faint: "#8C95A2",
   accent: "#C9A227", // gold
   green: "#3FB984",
   orange: "#E8A13E",
@@ -109,6 +109,51 @@ const TEMPLATES = {
   ],
 };
 
+/* 二段ローンチ等の「逆算テンプレ」。基準日(offset 0)からの相対日数で締切群を自動生成 */
+const LAUNCH_TEMPLATES = {
+  二段ローンチ標準: {
+    anchorLabel: "本申込 開始日",
+    steps: [
+      { title: "予告・教育コンテンツ開始", stage: "予告", offset: -14 },
+      { title: "LINE先行登録 開始", stage: "先行登録", offset: -10 },
+      { title: "先行登録 締切", stage: "先行登録", offset: -1 },
+      { title: "本申込 開始", stage: "本申込", offset: 0 },
+      { title: "締切リマインド送信", stage: "本申込", offset: 4 },
+      { title: "本申込 締切", stage: "本申込", offset: 6 },
+    ],
+  },
+  セミナー集客: {
+    anchorLabel: "セミナー開催日",
+    steps: [
+      { title: "告知開始", stage: "告知", offset: -21 },
+      { title: "申込ページ公開", stage: "募集", offset: -18 },
+      { title: "リマインド①", stage: "募集", offset: -7 },
+      { title: "申込締切", stage: "募集", offset: -1 },
+      { title: "セミナー開催", stage: "開催", offset: 0 },
+    ],
+  },
+  単発ローンチ: {
+    anchorLabel: "販売開始日",
+    steps: [
+      { title: "予告開始", stage: "予告", offset: -7 },
+      { title: "販売開始", stage: "販売", offset: 0 },
+      { title: "締切リマインド送信", stage: "販売", offset: 5 },
+      { title: "販売締切", stage: "販売", offset: 7 },
+    ],
+  },
+};
+
+// テンプレ＋基準日から締切群を生成
+function buildLaunch(name, anchorISO) {
+  const tpl = LAUNCH_TEMPLATES[name];
+  if (!tpl) return [];
+  return tpl.steps.map((s) => ({
+    title: s.title,
+    stage: s.stage,
+    date: iso(addDays(new Date(anchorISO), s.offset)),
+  }));
+}
+
 function templateItems(name) {
   return (TEMPLATES[name] || []).map((it) => ({ ...it, done: false }));
 }
@@ -183,7 +228,7 @@ function makeSeed() {
 /* ──────────────────────────────────────────────────────────────
    小物UI
    ────────────────────────────────────────────────────────────── */
-function Panel({ title, accent, right, children }) {
+function Panel({ title, accent, right, help, children }) {
   return (
     <section
       style={{
@@ -194,13 +239,35 @@ function Panel({ title, accent, right, children }) {
         marginBottom: 16,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ width: 8, height: 18, borderRadius: 4, background: accent || C.accent, marginRight: 10 }} />
-        <h2 style={{ fontSize: 15, fontWeight: 700, letterSpacing: 0.4, margin: 0, flex: 1 }}>{title}</h2>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 14, gap: 8 }}>
+        <span style={{ width: 8, height: 20, borderRadius: 4, background: accent || C.accent }} />
+        <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: 0.4, margin: 0 }}>{title}</h2>
+        {help && <Help text={help} />}
+        <span style={{ flex: 1 }} />
         {right}
       </div>
       {children}
     </section>
+  );
+}
+
+/* 用語の「?」ヘルプ（タップで説明をポップ） */
+function Help({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="説明"
+        style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${C.line}`, background: "transparent", color: C.sub, fontSize: 13, cursor: "pointer", lineHeight: 1, display: "grid", placeItems: "center", flex: "0 0 auto" }}
+      >?</button>
+      {open && (
+        <span
+          onClick={() => setOpen(false)}
+          style={{ position: "absolute", top: 26, left: 0, zIndex: 20, width: 240, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: C.text, fontWeight: 400, lineHeight: 1.6, boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}
+        >{text}</span>
+      )}
+    </span>
   );
 }
 
@@ -219,9 +286,9 @@ function Check({ done, onClick }) {
       onClick={onClick}
       aria-label={done ? "完了を取消" : "完了にする"}
       style={{
-        width: 22,
-        height: 22,
-        borderRadius: 7,
+        width: 28,
+        height: 28,
+        borderRadius: 8,
         border: `1.5px solid ${done ? C.green : C.line}`,
         background: done ? C.green : "transparent",
         color: "#0B0D11",
@@ -229,7 +296,7 @@ function Check({ done, onClick }) {
         flex: "0 0 auto",
         display: "grid",
         placeItems: "center",
-        fontSize: 13,
+        fontSize: 16,
         lineHeight: 1,
       }}
     >
@@ -255,7 +322,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
   const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
 
   return (
-    <Panel title="出張・遠征の逆算チェーン" accent={C.green} right={<AddTrip onAdd={onAdd} />}>
+    <Panel title="出張・遠征の逆算チェーン" accent={C.green} help="本番日から逆算して、各手配の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。「型から追加」で遠征の種類を選ぶと、手配項目が一式そろいます。" right={<AddTrip onAdd={onAdd} />}>
       {(!trips || trips.length === 0) && <Empty>遠征予定はありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
@@ -302,11 +369,11 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                   return (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Check done={item.done} onClick={() => onToggle(trip.id, idx)} />
-                      <span style={{ flex: 1, fontSize: 13, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
+                      <span style={{ flex: 1, fontSize: 14, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
                         {item.label}
                       </span>
-                      {!item.done && <span style={{ fontSize: 11, color: C.faint }}>締切 {fmt(sig.deadlineISO)}</span>}
-                      <span style={{ fontSize: 11, color: sig.color, minWidth: 54, textAlign: "right" }}>{sig.dot} {sig.label}</span>
+                      {!item.done && <span style={{ fontSize: 12, color: C.sub }}>締切 {fmt(sig.deadlineISO)}</span>}
+                      <span style={{ fontSize: 12, color: sig.color, minWidth: 62, textAlign: "right", fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                       <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✎</button>
                       <button onClick={() => onRemoveItem(trip.id, idx)} style={iconBtn} title="削除">✕</button>
                     </div>
@@ -364,31 +431,61 @@ function AddTrip({ onAdd }) {
 /* ──────────────────────────────────────────────────────────────
    締切の逆算（二段ローンチ）
    ────────────────────────────────────────────────────────────── */
-function DeadlineBoard({ deadlines, onAdd, onEdit, onRemove }) {
+function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
   const sorted = [...(deadlines || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState(null); // null | "single" | "template"
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
   const [editId, setEditId] = useState(null);
   const [e, setE] = useState(blank);
+  const [tpl, setTpl] = useState(Object.keys(LAUNCH_TEMPLATES)[0]);
+  const [anchor, setAnchor] = useState(iso(addDays(new Date(), 21)));
   const startEdit = (d) => { setEditId(d.id); setE({ title: d.title, stage: d.stage || "", date: d.date }); };
   const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), stage: e.stage, date: e.date }); setEditId(null); };
+  const preview = buildLaunch(tpl, anchor);
 
   return (
     <Panel
       title="締切からの逆算（二段ローンチ）"
       accent={C.purple}
-      right={<button onClick={() => setOpen((o) => !o)} style={chipBtn}>{open ? "閉じる" : "＋締切を追加"}</button>}
+      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。"
+      right={
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setMode(mode === "template" ? null : "template")} style={chipBtn}>型で一括</button>
+          <button onClick={() => setMode(mode === "single" ? null : "single")} style={chipBtn}>＋締切</button>
+        </div>
+      }
     >
-      {open && (
+      {mode === "single" && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <input value={f.title} onChange={(ev) => setF({ ...f, title: ev.target.value })} placeholder="締切名（例：本申込 開始）" style={inp} />
           <input value={f.stage} onChange={(ev) => setF({ ...f, stage: ev.target.value })} placeholder="段階（例：先行登録 / 本申込）" style={inp} />
           <input type="date" value={f.date} onChange={(ev) => setF({ ...f, date: ev.target.value })} style={inp} />
           <button
             style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
-            onClick={() => { if (!f.title.trim()) return; onAdd({ title: f.title.trim(), stage: f.stage, date: f.date }); setF(blank); setOpen(false); }}
+            onClick={() => { if (!f.title.trim()) return; onAdd({ title: f.title.trim(), stage: f.stage, date: f.date }); setF(blank); setMode(null); }}
           >追加</button>
+        </div>
+      )}
+      {mode === "template" && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>型を選び、基準日を入れると締切を逆算して一括作成します。</div>
+          <select value={tpl} onChange={(ev) => setTpl(ev.target.value)} style={inp}>
+            {Object.keys(LAUNCH_TEMPLATES).map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 4 }}>{LAUNCH_TEMPLATES[tpl].anchorLabel}</label>
+          <input type="date" value={anchor} onChange={(ev) => setAnchor(ev.target.value)} style={inp} />
+          <div style={{ background: C.panel, borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+            {preview.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.sub, padding: "2px 0" }}>
+                <span>{p.title}</span><span>{fmt(p.date)}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
+            onClick={() => { onAddBulk(preview); setMode(null); }}
+          >{preview.length}件まとめて追加</button>
         </div>
       )}
       {sorted.length === 0 && <Empty>締切は登録されていません。右上から追加できます。</Empty>}
@@ -410,14 +507,14 @@ function DeadlineBoard({ deadlines, onAdd, onEdit, onRemove }) {
           const sig = deadlineSignal(d.date);
           return (
             <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
-              <span style={{ width: 26, height: 26, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 12, color: C.sub }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
                 {i + 1}
               </span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14 }}>{d.title}</div>
-                <div style={{ fontSize: 11, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
+                <div style={{ fontSize: 15 }}>{d.title}</div>
+                <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
               </div>
-              <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
+              <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
               <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
               <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
             </div>
@@ -444,7 +541,7 @@ function TimeMeter() {
   const systemPct = total > 0 ? Math.round((system / total) * 100) : 0;
 
   return (
-    <Panel title="今週の時間配分メーター" accent={C.accent} right={<span style={{ fontSize: 12, color: C.sub }}>計 {total}h</span>}>
+    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {total}h</span>}>
       <SampleNote>サンプル表示（準備中）— Googleカレンダー連携で自分の予定が反映されます。</SampleNote>
       <div style={{ display: "grid", gap: 12 }}>
         {Object.keys(CAT).map((cat) => (
@@ -690,6 +787,13 @@ function ErrorScreen({ error, onSignOut }) {
 export default function App() {
   const [user, setUser] = useState(firebaseEnabled ? undefined : null); // undefined=判定中 / null=未ログイン
   const [authError, setAuthError] = useState(null);
+  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("viele-fontscale")) || 1);
+  const cycleFont = () => {
+    const next = fontScale >= 1.3 ? 1 : fontScale === 1 ? 1.15 : 1.3;
+    setFontScale(next);
+    try { localStorage.setItem("viele-fontscale", String(next)); } catch { /* ignore */ }
+  };
+  const fontLabel = fontScale >= 1.3 ? "特大" : fontScale > 1 ? "大" : "標準";
   const seed = useMemo(() => makeSeed(), []);
 
   // Firebase設定があればクラウド同期、なければこの端末にローカル保存。
@@ -744,19 +848,23 @@ export default function App() {
     const trip = { id: "t" + Date.now(), title, template, date, items: templateItems(template) };
     update({ trips: [...data.trips, trip] });
   };
-  const removeTrip = (id) => update({ trips: data.trips.filter((t) => t.id !== id) });
+  // 削除は誤操作防止のため確認を挟む
+  const confirmDelete = (fn) => { if (window.confirm("削除しますか？この操作は取り消せません。")) fn(); };
+  const removeTrip = (id) => confirmDelete(() => update({ trips: data.trips.filter((t) => t.id !== id) }));
   const editTrip = (id, patch) => update({ trips: data.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
   const mapTripItems = (tripId, fn) =>
     update({ trips: data.trips.map((t) => (t.id === tripId ? { ...t, items: fn(t.items) } : t)) });
   const addTripItem = (tripId, item) => mapTripItems(tripId, (items) => [...items, { ...item, done: false }]);
   const editTripItem = (tripId, idx, patch) =>
     mapTripItems(tripId, (items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  const removeTripItem = (tripId, idx) => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx));
+  const removeTripItem = (tripId, idx) => confirmDelete(() => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx)));
 
   // ── 締切（二段ローンチ）操作 ──
   const addDeadline = (d) => update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] });
+  const addDeadlinesBulk = (arr) =>
+    update({ deadlines: [...(data.deadlines || []), ...arr.map((d, i) => ({ id: "d" + Date.now() + "_" + i, ...d }))] });
   const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const removeDeadline = (id) => update({ deadlines: data.deadlines.filter((x) => x.id !== id) });
+  const removeDeadline = (id) => confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }));
 
   // ── 汎用リスト操作（content / money / tasks）──
   const makeListOps = (key) => ({
@@ -766,7 +874,7 @@ export default function App() {
       update({ [key]: [...data[key], { id: key[0] + Date.now(), done: false, ...base }] });
     },
     edit: (id, patch) => update({ [key]: data[key].map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
-    remove: (id) => update({ [key]: data[key].filter((x) => x.id !== id) }),
+    remove: (id) => confirmDelete(() => update({ [key]: data[key].filter((x) => x.id !== id) })),
   });
   const content = makeListOps("content");
   const money = makeListOps("money");
@@ -783,12 +891,15 @@ export default function App() {
         <strong style={{ fontSize: 15 }}>secretary</strong>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
+        <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>
+          文字{fontLabel}
+        </button>
         {firebaseEnabled && (
           <button onClick={() => signOut(auth)} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
         )}
       </header>
 
-      <main style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative" }}>
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
@@ -805,7 +916,7 @@ export default function App() {
           onEditItem={editTripItem}
           onRemoveItem={removeTripItem}
         />
-        <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onEdit={editDeadline} onRemove={removeDeadline} />
+        <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
         <TimeMeter />
         <Today />
 
