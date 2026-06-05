@@ -1349,7 +1349,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>こうかんアイテムの管理</p>
               {(data.rewards||[]).map(r=>(
                 <div key={r.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:22}}>{r.emoji}</span>
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
                     <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
@@ -1815,8 +1815,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`,overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 8px rgba(24,35,29,0.04)"}}>
         {MAIN_TABS.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
-            style={{flex:1,padding:"12px 4px 10px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?GP:MUTED,fontWeight:effectiveTab===v?700:500,fontSize:11,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s"}}>
-            {l}
+            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?GP:MUTED,fontWeight:effectiveTab===v?700:500,fontSize:10,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <img src={`/assets/tab_${v}.jpg`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.45,transition:"opacity .15s"}}/>
+            {l.replace(/^\S+\s+/,"")}
           </button>
         ))}
       </div>
@@ -2230,7 +2231,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
                   style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:F,opacity:ok?1:.55}}>
-                  <span style={{fontSize:34}}>{r.emoji}</span>
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
                   <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:10,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
                 </button>
@@ -3560,7 +3561,7 @@ function ParentScreen({ data, update, onBack }) {
                 </div>
               ) : (
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:22}}>{r.emoji}</span>
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12}}>{r.unit}</div></div>
                   <span style={{fontWeight:800,color:P,marginRight:6}}>{r.cost.toLocaleString()}pt</span>
                   <div style={{display:"flex",gap:5}}>{sb(B,"✏",()=>setEditReward({...r,cost:String(r.cost)}))}{sb(R,"🗑",()=>delReward(r.id))}</div>

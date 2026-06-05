@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="069ac7f">
+<meta name="tane-version" content="9ef4198">
 </head>
 <body>
   <div id="root"></div>
@@ -3274,7 +3274,17 @@ function SettingsModal({
       alignItems: "center",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
+    src: `/assets/reward_${r.id}.jpg`,
+    style: {
+      width: 30,
+      height: 30,
+      objectFit: "contain",
+      borderRadius: 6,
+      flexShrink: 0
+    },
+    alt: ""
+  }) : /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 22
     }
@@ -4581,20 +4591,34 @@ function ChildScreen({
     onClick: () => setTab(v),
     style: {
       flex: 1,
-      padding: "12px 4px 10px",
+      padding: "7px 4px 7px",
       border: "none",
       borderBottom: effectiveTab === v ? `2.5px solid ${GP}` : "2.5px solid transparent",
       background: "none",
       color: effectiveTab === v ? GP : MUTED,
       fontWeight: effectiveTab === v ? 700 : 500,
-      fontSize: 11,
+      fontSize: 10,
       cursor: "pointer",
       fontFamily: F,
       whiteSpace: "nowrap",
       minWidth: 56,
-      transition: "all .15s"
+      transition: "all .15s",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 1
     }
-  }, l))), curStreak >= 3 && !todayTaskDone && effectiveTab === "daily" && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("img", {
+    src: `/assets/tab_${v}.jpg`,
+    alt: "",
+    style: {
+      width: 22,
+      height: 22,
+      objectFit: "contain",
+      opacity: effectiveTab === v ? 1 : 0.45,
+      transition: "opacity .15s"
+    }
+  }), l.replace(/^\S+\s+/, "")))), curStreak >= 3 && !todayTaskDone && effectiveTab === "daily" && /*#__PURE__*/React.createElement("div", {
     style: {
       margin: "10px 16px 0",
       background: `linear-gradient(135deg,#fff8e1,#fffde7)`,
@@ -6094,7 +6118,17 @@ function ChildScreen({
         fontFamily: F,
         opacity: ok ? 1 : .55
       }
-    }, /*#__PURE__*/React.createElement("span", {
+    }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
+      src: `/assets/reward_${r.id}.jpg`,
+      style: {
+        width: 48,
+        height: 48,
+        objectFit: "contain",
+        borderRadius: 10,
+        flexShrink: 0
+      },
+      alt: ""
+    }) : /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 34
       }
@@ -10190,7 +10224,17 @@ function ParentScreen({
       alignItems: "center",
       gap: 10
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
+    src: `/assets/reward_${r.id}.jpg`,
+    style: {
+      width: 30,
+      height: 30,
+      objectFit: "contain",
+      borderRadius: 6,
+      flexShrink: 0
+    },
+    alt: ""
+  }) : /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 22
     }
