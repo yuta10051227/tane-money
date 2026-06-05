@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0F1115" />
     <title>VIELE secretary</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      body { background: #0F1115; color: #E8EAED; font-family: system-ui, -apple-system, sans-serif; }
+      #root:empty::after {
+        content: "読み込み中…";
+        display: grid;
+        place-items: center;
+        height: 100%;
+        color: #9AA1AC;
+        font-size: 14px;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
