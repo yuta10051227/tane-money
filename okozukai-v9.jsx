@@ -4032,36 +4032,22 @@ function SeedMonster({ child, data }) {
   useEffect(()=>{ setLeafAngle(Math.sin(tick*0.8)*12); },[tick]);
   useEffect(()=>{ setMood(isSleeping?2:happyScore>=6?1:0); },[tick]);
 
-  useEffect(()=>{
-    if(isSleeping) return;
-    const msgs = happyScore>=7
-      ? ["わーい！✨","きょうもがんばるよ！","ポイントたまってる〜！","うれしい〜！","ありがとう！"]
-      : happyScore>=4
-      ? ["いっしょにがんばろ！","きょうもよろしく！","お手伝いしよう！","タスクやってみよ！"]
-      : ["さびしいな…","もっとやろうよ〜","おきてる？","がんばって！"];
-    // 初回は2秒後に表示
-    const t0=setTimeout(()=>{
-      setSpeech(msgs[Math.floor(Math.random()*msgs.length)]);
-      setTimeout(()=>setSpeech(null),2500);
-    },2000);
-    // 以降は6〜9秒ごと
-    const iv=setInterval(()=>{
-      setSpeech(msgs[Math.floor(Math.random()*msgs.length)]);
-      setTimeout(()=>setSpeech(null),2500);
-    },6000+Math.random()*3000);
-    return()=>{ clearTimeout(t0); clearInterval(iv); };
-  },[happyScore,isSleeping]);
+  const tapMsgs = happyScore>=7
+    ? ["わーい！✨","うれしい〜！","ありがとう！","えへへ〜！"]
+    : happyScore>=4
+    ? ["いっしょにがんばろ！","きょうもよろしく！","タスクやってみよ！"]
+    : ["さびしいな…","がんばって！","タッチしてくれた！"];
 
   const handleTap = ()=>{
     const id=Date.now();
     setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
     setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
-    setSpeech(happyScore>=6?"えへへ〜！":"タッチしてくれた！");
+    setSpeech(tapMsgs[Math.floor(Math.random()*tapMsgs.length)]);
     setTimeout(()=>setSpeech(null),1800);
   };
 
   const floatY = Math.sin(tick*0.9)*4;
-  const px = 3;
+  const px = 5;
 
   // 緑カード背景用：白クリーム系カラー
   const bodyColor = stage===4?"#FFE566":"rgba(255,255,255,0.93)";
@@ -4108,24 +4094,25 @@ function SeedMonster({ child, data }) {
         }}>✨</div>
       ))}
 
-      {/* ふきだし — position:fixed で必ず画面上に表示 */}
+      {/* ふきだし — モンスターの上に相対表示 */}
       {speech&&(
         <div style={{
-          position:"fixed",top:108,left:"50%",
+          position:"absolute",bottom:"100%",left:"50%",
           transform:"translateX(-50%)",
+          marginBottom:6,
           background:"#fff",
           border:`2px solid ${G}`,
-          borderRadius:14,padding:"8px 14px",
-          fontSize:13,fontWeight:800,color:TEXT,
+          borderRadius:14,padding:"6px 12px",
+          fontSize:12,fontWeight:800,color:TEXT,
           whiteSpace:"nowrap",
           boxShadow:"0 4px 18px rgba(24,35,29,0.18)",
-          zIndex:900,
+          zIndex:10,
           animation:"smPop .25s cubic-bezier(.34,1.56,.64,1)",
           pointerEvents:"none",
         }}>
           {speech}
           <div style={{
-            position:"absolute",bottom:-8,left:"50%",
+            position:"absolute",top:"100%",left:"50%",
             transform:"translateX(-50%)",
             width:0,height:0,
             borderLeft:"7px solid transparent",borderRight:"7px solid transparent",
