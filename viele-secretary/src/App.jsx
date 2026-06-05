@@ -241,13 +241,21 @@ function Check({ done, onClick }) {
 /* ──────────────────────────────────────────────────────────────
    逆算チェーン（出張・遠征）
    ────────────────────────────────────────────────────────────── */
-function TripChain({ trips, onToggle, onAdd, onRemove }) {
+function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem }) {
+  const [editTripId, setEditTripId] = useState(null);
+  const [te, setTe] = useState({ title: "", date: "" });
+  const [editItem, setEditItem] = useState(null); // { tripId, idx }
+  const [ie, setIe] = useState({ label: "", daysBefore: 0 });
+  const [addItemFor, setAddItemFor] = useState(null);
+  const [ni, setNi] = useState({ label: "", daysBefore: 7 });
+
+  const startTrip = (t) => { setEditTripId(t.id); setTe({ title: t.title, date: t.date }); };
+  const saveTrip = () => { if (te.title.trim()) onEditTrip(editTripId, { title: te.title.trim(), date: te.date }); setEditTripId(null); };
+  const startItem = (tripId, idx, item) => { setEditItem({ tripId, idx }); setIe({ label: item.label, daysBefore: item.daysBefore }); };
+  const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
+
   return (
-    <Panel
-      title="出張・遠征の逆算チェーン"
-      accent={C.green}
-      right={<AddTrip onAdd={onAdd} />}
-    >
+    <Panel title="出張・遠征の逆算チェーン" accent={C.green} right={<AddTrip onAdd={onAdd} />}>
       {(!trips || trips.length === 0) && <Empty>遠征予定はありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
@@ -255,37 +263,67 @@ function TripChain({ trips, onToggle, onAdd, onRemove }) {
           const doneCount = trip.items.filter((i) => i.done).length;
           return (
             <div key={trip.id} style={{ background: C.panel2, borderRadius: 12, padding: 14 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <strong style={{ fontSize: 14 }}>{trip.title}</strong>
-                <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 6, padding: "1px 6px" }}>
-                  {trip.template}
-                </span>
-                <span style={{ flex: 1 }} />
-                <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
-                <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
-              </div>
+              {editTripId === trip.id ? (
+                <div style={{ marginBottom: 10 }}>
+                  <input value={te.title} onChange={(e) => setTe({ ...te, title: e.target.value })} placeholder="タイトル" style={inp} />
+                  <input type="date" value={te.date} onChange={(e) => setTe({ ...te, date: e.target.value })} style={inp} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={saveTrip} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存</button>
+                    <button onClick={() => setEditTripId(null)} style={chipBtn}>取消</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <strong style={{ fontSize: 14 }}>{trip.title}</strong>
+                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 6, padding: "1px 6px" }}>{trip.template}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
+                  <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
+                  <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              )}
               <div style={{ fontSize: 12, color: dleft < 0 ? C.red : C.accent, margin: "4px 0 10px" }}>
                 {dleft < 0 ? `本番から${-dleft}日経過` : `本番まであと ${dleft}日`} ・ 手配 {doneCount}/{trip.items.length}
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 {trip.items.map((item, idx) => {
                   const sig = itemSignal(item, trip.date);
+                  if (editItem && editItem.tripId === trip.id && editItem.idx === idx) {
+                    return (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: 1 }} />
+                        <input value={ie.daysBefore} onChange={(e) => setIe({ ...ie, daysBefore: e.target.value })} inputMode="numeric" title="本番の何日前" style={{ ...inp, marginBottom: 0, width: 56 }} />
+                        <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                        <button onClick={saveItem} style={chipBtn}>保存</button>
+                        <button onClick={() => setEditItem(null)} style={iconBtn} title="取消">✕</button>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Check done={item.done} onClick={() => onToggle(trip.id, idx)} />
                       <span style={{ flex: 1, fontSize: 13, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
                         {item.label}
                       </span>
-                      {!item.done && (
-                        <span style={{ fontSize: 11, color: C.faint }}>締切 {fmt(sig.deadlineISO)}</span>
-                      )}
-                      <span style={{ fontSize: 11, color: sig.color, minWidth: 54, textAlign: "right" }}>
-                        {sig.dot} {sig.label}
-                      </span>
+                      {!item.done && <span style={{ fontSize: 11, color: C.faint }}>締切 {fmt(sig.deadlineISO)}</span>}
+                      <span style={{ fontSize: 11, color: sig.color, minWidth: 54, textAlign: "right" }}>{sig.dot} {sig.label}</span>
+                      <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✎</button>
+                      <button onClick={() => onRemoveItem(trip.id, idx)} style={iconBtn} title="削除">✕</button>
                     </div>
                   );
                 })}
               </div>
+              {addItemFor === trip.id ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+                  <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: 1 }} />
+                  <input value={ni.daysBefore} onChange={(e) => setNi({ ...ni, daysBefore: e.target.value })} inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 56 }} />
+                  <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                  <button onClick={() => { if (!ni.label.trim()) return; onAddItem(trip.id, { label: ni.label.trim(), daysBefore: Number(ni.daysBefore) || 0 }); setNi({ label: "", daysBefore: 7 }); setAddItemFor(null); }} style={chipBtn}>追加</button>
+                  <button onClick={() => setAddItemFor(null)} style={iconBtn} title="閉じる">✕</button>
+                </div>
+              ) : (
+                <button onClick={() => setAddItemFor(trip.id)} style={{ ...chipBtn, marginTop: 8, fontSize: 11 }}>＋手配項目を追加</button>
+              )}
             </div>
           );
         })}
@@ -326,13 +364,49 @@ function AddTrip({ onAdd }) {
 /* ──────────────────────────────────────────────────────────────
    締切の逆算（二段ローンチ）
    ────────────────────────────────────────────────────────────── */
-function DeadlineBoard({ deadlines }) {
+function DeadlineBoard({ deadlines, onAdd, onEdit, onRemove }) {
   const sorted = [...(deadlines || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const [open, setOpen] = useState(false);
+  const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
+  const [f, setF] = useState(blank);
+  const [editId, setEditId] = useState(null);
+  const [e, setE] = useState(blank);
+  const startEdit = (d) => { setEditId(d.id); setE({ title: d.title, stage: d.stage || "", date: d.date }); };
+  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), stage: e.stage, date: e.date }); setEditId(null); };
+
   return (
-    <Panel title="締切からの逆算（二段ローンチ）" accent={C.purple}>
-      {sorted.length === 0 && <Empty>締切は登録されていません。</Empty>}
+    <Panel
+      title="締切からの逆算（二段ローンチ）"
+      accent={C.purple}
+      right={<button onClick={() => setOpen((o) => !o)} style={chipBtn}>{open ? "閉じる" : "＋締切を追加"}</button>}
+    >
+      {open && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <input value={f.title} onChange={(ev) => setF({ ...f, title: ev.target.value })} placeholder="締切名（例：本申込 開始）" style={inp} />
+          <input value={f.stage} onChange={(ev) => setF({ ...f, stage: ev.target.value })} placeholder="段階（例：先行登録 / 本申込）" style={inp} />
+          <input type="date" value={f.date} onChange={(ev) => setF({ ...f, date: ev.target.value })} style={inp} />
+          <button
+            style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
+            onClick={() => { if (!f.title.trim()) return; onAdd({ title: f.title.trim(), stage: f.stage, date: f.date }); setF(blank); setOpen(false); }}
+          >追加</button>
+        </div>
+      )}
+      {sorted.length === 0 && <Empty>締切は登録されていません。右上から追加できます。</Empty>}
       <div style={{ display: "grid", gap: 10 }}>
         {sorted.map((d, i) => {
+          if (editId === d.id) {
+            return (
+              <div key={d.id} style={{ background: C.panel2, borderRadius: 12, padding: 12 }}>
+                <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="締切名" style={inp} />
+                <input value={e.stage} onChange={(ev) => setE({ ...e, stage: ev.target.value })} placeholder="段階" style={inp} />
+                <input type="date" value={e.date} onChange={(ev) => setE({ ...e, date: ev.target.value })} style={inp} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={saveEdit} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存</button>
+                  <button onClick={() => setEditId(null)} style={chipBtn}>取消</button>
+                </div>
+              </div>
+            );
+          }
           const sig = deadlineSignal(d.date);
           return (
             <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
@@ -344,6 +418,8 @@ function DeadlineBoard({ deadlines }) {
                 <div style={{ fontSize: 11, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
               </div>
               <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
+              <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
+              <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
             </div>
           );
         })}
@@ -369,6 +445,7 @@ function TimeMeter() {
 
   return (
     <Panel title="今週の時間配分メーター" accent={C.accent} right={<span style={{ fontSize: 12, color: C.sub }}>計 {total}h</span>}>
+      <SampleNote>サンプル表示（準備中）— Googleカレンダー連携で自分の予定が反映されます。</SampleNote>
       <div style={{ display: "grid", gap: 12 }}>
         {Object.keys(CAT).map((cat) => (
           <div key={cat}>
@@ -406,6 +483,7 @@ function Today() {
   const items = LOG.filter((e) => e.wd === wd).sort((a, b) => a.time.localeCompare(b.time));
   return (
     <Panel title={`今日の予定（${WD[wd]}曜）`} accent={C.blue}>
+      <SampleNote>サンプル表示（準備中）— Googleカレンダー連携で今日の予定が反映されます。</SampleNote>
       {items.length === 0 ? (
         <Empty>今日の登録予定はありません。</Empty>
       ) : (
@@ -427,9 +505,13 @@ function Today() {
 /* ──────────────────────────────────────────────────────────────
    汎用チェックリスト（コンテンツ / お金 / 追加タスク）
    ────────────────────────────────────────────────────────────── */
-function CheckList({ title, accent, items, onToggle, onAdd, onRemove, renderMeta, placeholder }) {
+function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, renderMeta, placeholder }) {
   const [text, setText] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState("");
   const list = items || [];
+  const startEdit = (it) => { setEditId(it.id); setEditText(it.title); };
+  const saveEdit = () => { if (editText.trim()) onEdit(editId, { title: editText.trim() }); setEditId(null); };
   return (
     <Panel title={title} accent={accent}>
       <div style={{ display: "grid", gap: 8 }}>
@@ -437,11 +519,28 @@ function CheckList({ title, accent, items, onToggle, onAdd, onRemove, renderMeta
         {list.map((it) => (
           <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Check done={it.done} onClick={() => onToggle(it.id)} />
-            <span style={{ flex: 1, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>
-              {it.title}
-            </span>
-            {renderMeta && renderMeta(it)}
-            <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+            {editId === it.id ? (
+              <>
+                <input
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditId(null); }}
+                  style={{ ...inp, marginBottom: 0, flex: 1 }}
+                />
+                <button onClick={saveEdit} style={chipBtn}>保存</button>
+                <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+              </>
+            ) : (
+              <>
+                <span style={{ flex: 1, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>
+                  {it.title}
+                </span>
+                {renderMeta && renderMeta(it)}
+                {onEdit && <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>}
+                <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -461,8 +560,82 @@ function CheckList({ title, accent, items, onToggle, onAdd, onRemove, renderMeta
   );
 }
 
+/* 請求・お金（金額・種別つき。未処理合計を表示） */
+const yen = (n) => "¥" + (Number(n) || 0).toLocaleString("ja-JP");
+const MONEY_KINDS = ["請求", "入金", "支払"];
+
+function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
+  const list = items || [];
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [kind, setKind] = useState("請求");
+  const [editId, setEditId] = useState(null);
+  const [e, setE] = useState({ title: "", amount: "", kind: "請求" });
+  const outstanding = list.filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, amount: it.amount || "", kind: it.kind || "請求" }); };
+  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), amount: Number(e.amount) || 0, kind: e.kind }); setEditId(null); };
+  const kindColor = (k) => (k === "入金" ? C.green : k === "支払" ? C.red : C.accent);
+
+  return (
+    <Panel
+      title="請求・お金"
+      accent={C.accent}
+      right={<span style={{ fontSize: 12, color: outstanding > 0 ? C.accent : C.sub }}>未処理 {yen(outstanding)}</span>}
+    >
+      <div style={{ display: "grid", gap: 8 }}>
+        {list.length === 0 && <Empty>項目はありません。</Empty>}
+        {list.map((it) => (
+          <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Check done={it.done} onClick={() => onToggle(it.id)} />
+            {editId === it.id ? (
+              <>
+                <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="項目" style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 80 }} />
+                <input value={e.amount} onChange={(ev) => setE({ ...e, amount: ev.target.value })} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+                <select value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 70 }}>
+                  {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
+                </select>
+                <button onClick={saveEdit} style={chipBtn}>保存</button>
+                <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+              </>
+            ) : (
+              <>
+                <span style={{ flex: 1, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
+                {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
+                {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind) }}>{it.kind}</span>}
+                <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
+                <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <form
+        onSubmit={(ev) => { ev.preventDefault(); if (!title.trim()) return; onAdd({ title: title.trim(), amount: Number(amount) || 0, kind }); setTitle(""); setAmount(""); }}
+        style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
+      >
+        <input value={title} onChange={(ev) => setTitle(ev.target.value)} placeholder="請求・入金項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
+        <input value={amount} onChange={(ev) => setAmount(ev.target.value)} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+        <select value={kind} onChange={(ev) => setKind(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 70 }}>
+          {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
+        </select>
+        <button type="submit" style={chipBtn}>追加</button>
+      </form>
+    </Panel>
+  );
+}
+
 function Empty({ children }) {
   return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
+}
+
+/* 固定サンプル（Phase2でカレンダー連携予定）の領域に出す注記 */
+function SampleNote({ children }) {
+  return (
+    <div style={{ fontSize: 11, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
+      <span>⚙️</span>
+      <span>{children}</span>
+    </div>
+  );
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -572,11 +745,27 @@ export default function App() {
     update({ trips: [...data.trips, trip] });
   };
   const removeTrip = (id) => update({ trips: data.trips.filter((t) => t.id !== id) });
+  const editTrip = (id, patch) => update({ trips: data.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
+  const mapTripItems = (tripId, fn) =>
+    update({ trips: data.trips.map((t) => (t.id === tripId ? { ...t, items: fn(t.items) } : t)) });
+  const addTripItem = (tripId, item) => mapTripItems(tripId, (items) => [...items, { ...item, done: false }]);
+  const editTripItem = (tripId, idx, patch) =>
+    mapTripItems(tripId, (items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const removeTripItem = (tripId, idx) => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx));
+
+  // ── 締切（二段ローンチ）操作 ──
+  const addDeadline = (d) => update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] });
+  const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
+  const removeDeadline = (id) => update({ deadlines: data.deadlines.filter((x) => x.id !== id) });
 
   // ── 汎用リスト操作（content / money / tasks）──
   const makeListOps = (key) => ({
     toggle: (id) => update({ [key]: data[key].map((x) => (x.id === id ? { ...x, done: !x.done } : x)) }),
-    add: (title) => update({ [key]: [...data[key], { id: key[0] + Date.now(), title, done: false }] }),
+    add: (item) => {
+      const base = typeof item === "string" ? { title: item } : item;
+      update({ [key]: [...data[key], { id: key[0] + Date.now(), done: false, ...base }] });
+    },
+    edit: (id, patch) => update({ [key]: data[key].map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
     remove: (id) => update({ [key]: data[key].filter((x) => x.id !== id) }),
   });
   const content = makeListOps("content");
@@ -606,8 +795,17 @@ export default function App() {
             ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
           </div>
         )}
-        <TripChain trips={data.trips} onToggle={toggleTripItem} onAdd={addTrip} onRemove={removeTrip} />
-        <DeadlineBoard deadlines={data.deadlines} />
+        <TripChain
+          trips={data.trips}
+          onToggle={toggleTripItem}
+          onAdd={addTrip}
+          onRemove={removeTrip}
+          onEditTrip={editTrip}
+          onAddItem={addTripItem}
+          onEditItem={editTripItem}
+          onRemoveItem={removeTripItem}
+        />
+        <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onEdit={editDeadline} onRemove={removeDeadline} />
         <TimeMeter />
         <Today />
 
@@ -617,20 +815,18 @@ export default function App() {
           items={data.content}
           onToggle={content.toggle}
           onAdd={content.add}
+          onEdit={content.edit}
           onRemove={content.remove}
           placeholder="制作物を追加…"
           renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
         />
 
-        <CheckList
-          title="請求・お金"
-          accent={C.accent}
+        <MoneyList
           items={data.money}
           onToggle={money.toggle}
           onAdd={money.add}
+          onEdit={money.edit}
           onRemove={money.remove}
-          placeholder="請求・入金項目を追加…"
-          renderMeta={(it) => it.kind && <span style={{ fontSize: 11, color: it.kind === "入金" ? C.green : C.accent }}>{it.kind}</span>}
         />
 
         <CheckList
@@ -639,6 +835,7 @@ export default function App() {
           items={data.tasks}
           onToggle={tasks.toggle}
           onAdd={tasks.add}
+          onEdit={tasks.edit}
           onRemove={tasks.remove}
           placeholder="タスクを追加…"
         />
