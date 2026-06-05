@@ -5156,7 +5156,7 @@ function BadgesSection({child,data,update}){
       {filtered.map(b=>(
         <div key={b.id} style={{background:b.earned?CARD:BG,border:`2px solid ${b.earned?(b.type==="achieve"?Y:G):BORDER}`,borderRadius:16,padding:"14px 12px",textAlign:"center",opacity:b.earned?1:0.5,position:"relative"}}>
           {b.earned&&<div style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",background:G,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>✓</div>}
-          <div style={{fontSize:30,marginBottom:6,filter:b.earned?"none":"grayscale(1)"}}>{b.emoji}</div>
+          <img src={`/assets/badge_${b.id}.jpg`} alt={b.name} style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 6px",borderRadius:8,filter:b.earned?"none":"grayscale(1) opacity(0.35)"}}/>
           <div style={{fontWeight:800,fontSize:12,color:b.earned?TEXT:MUTED,marginBottom:4,lineHeight:1.3}}>{b.name}</div>
           <div style={{fontSize:10,color:MUTED,lineHeight:1.4}}>{b.desc}</div>
         </div>
