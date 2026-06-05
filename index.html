@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="9ef4198">
+<meta name="tane-version" content="cf743ce">
 </head>
 <body>
   <div id="root"></div>
@@ -11919,8 +11919,6 @@ function SeedMonster({
   child,
   data
 }) {
-  const [tick, setTick] = useState(0);
-  const [mood, setMood] = useState(0);
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
   const myBal = bal(data.logs, child.id);
@@ -11937,13 +11935,6 @@ function SeedMonster({
   const stage = totalTasksDone < 10 ? 0 : totalTasksDone < 50 ? 1 : totalTasksDone < 150 ? 2 : totalTasksDone < 400 ? 3 : 4;
   const NAMES = ["タネっち", "メっち", "ハっち", "サカっち", "キングタネ"];
   const happyScore = Math.min(10, (curStreak >= 7 ? 3 : curStreak >= 3 ? 2 : curStreak >= 1 ? 1 : 0) + (monthPts >= 500 ? 3 : monthPts >= 200 ? 2 : monthPts >= 50 ? 1 : 0) + (goalsDone >= 2 ? 2 : goalsDone >= 1 ? 1 : 0) + (todayDone ? 1 : 0) + (myBal >= 1000 ? 1 : 0));
-  useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 500);
-    return () => clearInterval(iv);
-  }, []);
-  useEffect(() => {
-    setMood(isSleeping ? 2 : happyScore >= 6 ? 1 : 0);
-  }, [tick]);
   const tapMsgs = happyScore >= 7 ? ["わーい！✨", "うれしい〜！", "ありがとう！", "えへへ〜！"] : happyScore >= 4 ? ["いっしょにがんばろ！", "きょうもよろしく！", "タスクやってみよ！"] : ["さびしいな…", "がんばって！", "タッチしてくれた！"];
   const handleTap = () => {
     const id = Date.now();
@@ -11956,7 +11947,6 @@ function SeedMonster({
     setSpeech(tapMsgs[Math.floor(Math.random() * tapMsgs.length)]);
     setTimeout(() => setSpeech(null), 1800);
   };
-  const floatY = Math.sin(tick * 0.9) * 4;
 
   // 進化バー（タスク回数ベース）
   const nextTask = stage === 0 ? 10 : stage === 1 ? 50 : stage === 2 ? 150 : stage === 3 ? 400 : null;
@@ -12048,24 +12038,26 @@ function SeedMonster({
       borderTop: `8px solid ${G}`
     }
   })), /*#__PURE__*/React.createElement("div", {
-    onClick: handleTap,
     style: {
+      animation: "monFloat 2.5s ease-in-out infinite"
+    },
+    onClick: handleTap
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      animation: "monBreathe 3.5s ease-in-out infinite",
       cursor: "pointer",
       display: "inline-block",
-      transform: `translateY(${floatY}px)`,
-      transition: "transform 0.1s",
       userSelect: "none",
       position: "relative"
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: `/assets/monster_${stage}.jpg`,
+    src: `/assets/monster_${stage}.png`,
     alt: NAMES[stage],
     style: {
       width: 90,
       height: 90,
       objectFit: "contain",
-      display: "block",
-      borderRadius: 10
+      display: "block"
     }
   }), accessories.map((acc, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
@@ -12083,7 +12075,16 @@ function SeedMonster({
       boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
       border: "1.5px solid rgba(255,255,255,0.9)"
     }
-  }, acc.emoji))), /*#__PURE__*/React.createElement("div", {
+  }, acc.emoji)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 50,
+      height: 8,
+      borderRadius: "50%",
+      background: "rgba(0,0,0,0.15)",
+      margin: "-4px auto 0",
+      animation: "monShadow 2.5s ease-in-out infinite"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "rgba(255,255,255,0.88)",
@@ -12118,6 +12119,9 @@ function SeedMonster({
   }, "MAX\u2728"), /*#__PURE__*/React.createElement("style", null, `
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
+        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
       `));
 }
 

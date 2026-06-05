@@ -4191,8 +4191,6 @@ async function fetchRealStockPrices(data,update){
 
 // ── Seed Monster ──────────────────────────────────────
 function SeedMonster({ child, data }) {
-  const [tick, setTick]     = useState(0);
-  const [mood, setMood]     = useState(0);
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
 
@@ -4217,9 +4215,6 @@ function SeedMonster({ child, data }) {
     (todayDone?1:0) + (myBal>=1000?1:0)
   );
 
-  useEffect(()=>{ const iv=setInterval(()=>setTick(t=>t+1),500); return()=>clearInterval(iv); },[]);
-  useEffect(()=>{ setMood(isSleeping?2:happyScore>=6?1:0); },[tick]);
-
   const tapMsgs = happyScore>=7
     ? ["わーい！✨","うれしい〜！","ありがとう！","えへへ〜！"]
     : happyScore>=4
@@ -4233,8 +4228,6 @@ function SeedMonster({ child, data }) {
     setSpeech(tapMsgs[Math.floor(Math.random()*tapMsgs.length)]);
     setTimeout(()=>setSpeech(null),1800);
   };
-
-  const floatY = Math.sin(tick*0.9)*4;
 
   // 進化バー（タスク回数ベース）
   const nextTask = stage===0?10:stage===1?50:stage===2?150:stage===3?400:null;
@@ -4292,35 +4285,30 @@ function SeedMonster({ child, data }) {
         </div>
       )}
 
-      {/* モンスター画像＋アクセサリー */}
-      <div
-        onClick={handleTap}
-        style={{
-          cursor:"pointer",display:"inline-block",
-          transform:`translateY(${floatY}px)`,
-          transition:"transform 0.1s",
-          userSelect:"none",
-          position:"relative",
-        }}
-      >
-        <img
-          src={`/assets/monster_${stage}.jpg`}
-          alt={NAMES[stage]}
-          style={{width:90,height:90,objectFit:"contain",display:"block",borderRadius:10}}
-        />
-        {accessories.map((acc,i)=>(
-          <div key={i} style={{
-            position:"absolute",...acc.pos,
-            background:acc.bg,
-            borderRadius:"50%",
-            width:20,height:20,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:11,
-            boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
-            border:"1.5px solid rgba(255,255,255,0.9)",
-          }}>{acc.emoji}</div>
-        ))}
+      {/* モンスター画像＋アクセサリー（浮遊アニメ） */}
+      <div style={{animation:"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
+        <div style={{animation:"monBreathe 3.5s ease-in-out infinite",cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative"}}>
+          <img
+            src={`/assets/monster_${stage}.png`}
+            alt={NAMES[stage]}
+            style={{width:90,height:90,objectFit:"contain",display:"block"}}
+          />
+          {accessories.map((acc,i)=>(
+            <div key={i} style={{
+              position:"absolute",...acc.pos,
+              background:acc.bg,
+              borderRadius:"50%",
+              width:20,height:20,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:11,
+              boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
+              border:"1.5px solid rgba(255,255,255,0.9)",
+            }}>{acc.emoji}</div>
+          ))}
+        </div>
       </div>
+      {/* 影 */}
+      <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
       {/* 名前 */}
       <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
@@ -4338,6 +4326,9 @@ function SeedMonster({ child, data }) {
       <style>{`
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
+        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
       `}</style>
     </div>
   );
