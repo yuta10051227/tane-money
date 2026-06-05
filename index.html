@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="ba0dbab">
+<meta name="tane-version" content="9b087bd">
 </head>
 <body>
   <div id="root"></div>
@@ -3945,7 +3945,7 @@ function ChildScreen({
     amt: ""
   });
   const [kAdd, setKAdd] = useState(false);
-  const kExps = (data.expenses || []).filter(e => e.cid === child.id && e.date.startsWith(kMonth));
+  const kExps = (data.expenses || []).filter(e => e.cid === child.id && (e.date || "").startsWith(kMonth));
   const kCatData = (data.cats || []).map(cat => ({
     ...cat,
     v: kExps.filter(e => e.catId === cat.id).reduce((s, e) => s + e.amt, 0)
@@ -4506,10 +4506,10 @@ function ChildScreen({
   }, (() => {
     const mTheme = getMonthTheme();
     const bonusLabel = curStreak >= 30 ? "+50pt" : curStreak >= 10 ? "+20pt" : curStreak >= 5 ? "+10pt" : null;
-    const monthGacha = myLogs.filter(l => l.type === "gacha" && l.date.startsWith(monthKey()));
+    const monthGacha = myLogs.filter(l => l.type === "gacha" && (l.date || "").startsWith(monthKey()));
     const tierCounts = (data.gacha || []).map(tier => ({
       ...tier,
-      count: monthGacha.filter(l => l.tierId === tier.id || l.label.includes(tier.label)).length
+      count: monthGacha.filter(l => l.tierId === tier.id || (l.label || "").includes(tier.label)).length
     }));
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -5847,7 +5847,7 @@ function ChildScreen({
     const allMembers = [...data.children, ...(data.parents || [])];
     const rankings = allMembers.map(m => {
       const isChild = data.children.some(c => c.id === m.id);
-      const monthLogs = (data.logs || []).filter(l => l.cid === m.id && l.date.startsWith(month));
+      const monthLogs = (data.logs || []).filter(l => l.cid === m.id && (l.date || "").startsWith(month));
       const totalLogs = (data.logs || []).filter(l => l.cid === m.id);
       const monthPts = monthLogs.reduce((s, l) => s + l.pts, 0);
       const totalPts = bal(data.logs, m.id);
@@ -8861,9 +8861,9 @@ function ParentScreen({
     }
   }, "\uD83D\uDCCB \u4ECA\u6708\u306E\u307E\u3068\u3081"), data.children.map(child => {
     const ym = monthKey();
-    const logs = data.logs.filter(l => l.cid === child.id && l.date.startsWith(ym));
+    const logs = (data.logs || []).filter(l => l.cid === child.id && (l.date || "").startsWith(ym));
     const earned = logs.filter(l => l.type === "good").reduce((s, l) => s + l.pts, 0);
-    const spent = (data.expenses || []).filter(e => e.cid === child.id && e.date.startsWith(ym)).reduce((s, e) => s + e.amt, 0);
+    const spent = (data.expenses || []).filter(e => e.cid === child.id && (e.date || "").startsWith(ym)).reduce((s, e) => s + e.amt, 0);
     const streak = data.streak?.[child.id]?.cur || 0;
     return /*#__PURE__*/React.createElement("div", {
       key: child.id,
@@ -9808,7 +9808,7 @@ function ParentScreen({
       color: MUTED,
       fontSize: 12
     }
-  }, "\u4ECA\u6708\u652F\u51FA: ", (data.expenses || []).filter(e => e.cid === child.id && e.date.startsWith(monthKey())).reduce((s, e) => s + e.amt, 0).toLocaleString(), "pt")), /*#__PURE__*/React.createElement("span", {
+  }, "\u4ECA\u6708\u652F\u51FA: ", (data.expenses || []).filter(e => e.cid === child.id && (e.date || "").startsWith(monthKey())).reduce((s, e) => s + e.amt, 0).toLocaleString(), "pt")), /*#__PURE__*/React.createElement("span", {
     style: {
       color: MUTED,
       fontSize: 22

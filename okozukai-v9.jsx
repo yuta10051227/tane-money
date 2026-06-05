@@ -1629,7 +1629,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [kForm, setKForm] = useState({catId:"cat1",label:"",amt:""});
   const [kAdd,  setKAdd]  = useState(false);
 
-  const kExps = (data.expenses||[]).filter(e=>e.cid===child.id&&e.date.startsWith(kMonth));
+  const kExps = (data.expenses||[]).filter(e=>e.cid===child.id&&(e.date||"").startsWith(kMonth));
   const kCatData = (data.cats||[]).map(cat=>({ ...cat, v:kExps.filter(e=>e.catId===cat.id).reduce((s,e)=>s+e.amt,0) })).filter(c=>c.v>0).sort((a,b)=>b.v-a.v);
   const kTotal = kExps.reduce((s,e)=>s+e.amt,0);
   const kLife  = (data.expenses||[]).filter(e=>e.cid===child.id).reduce((s,e)=>s+e.amt,0);
@@ -1822,8 +1822,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
-            const monthGacha=myLogs.filter(l=>l.type==="gacha"&&l.date.startsWith(monthKey()));
-            const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||l.label.includes(tier.label)).length}));
+            const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
+            const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`,border:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
                 <button onClick={doGacha} disabled={todayDone}
@@ -2199,7 +2199,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const allMembers=[...data.children,...(data.parents||[])];
         const rankings=allMembers.map(m=>{
           const isChild=data.children.some(c=>c.id===m.id);
-          const monthLogs=(data.logs||[]).filter(l=>l.cid===m.id&&l.date.startsWith(month));
+          const monthLogs=(data.logs||[]).filter(l=>l.cid===m.id&&(l.date||"").startsWith(month));
           const totalLogs=(data.logs||[]).filter(l=>l.cid===m.id);
           const monthPts=monthLogs.reduce((s,l)=>s+l.pts,0);
           const totalPts=bal(data.logs,m.id);
@@ -3180,9 +3180,9 @@ function ParentScreen({ data, update, onBack }) {
             <p style={{fontWeight:800,fontSize:13,color:MUTED,margin:"0 0 12px"}}>📋 今月のまとめ</p>
             {data.children.map(child=>{
               const ym=monthKey();
-              const logs=data.logs.filter(l=>l.cid===child.id&&l.date.startsWith(ym));
+              const logs=(data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(ym));
               const earned=logs.filter(l=>l.type==="good").reduce((s,l)=>s+l.pts,0);
-              const spent=(data.expenses||[]).filter(e=>e.cid===child.id&&e.date.startsWith(ym)).reduce((s,e)=>s+e.amt,0);
+              const spent=(data.expenses||[]).filter(e=>e.cid===child.id&&(e.date||"").startsWith(ym)).reduce((s,e)=>s+e.amt,0);
               const streak=data.streak?.[child.id]?.cur||0;
               return (
                 <div key={child.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
@@ -3461,7 +3461,7 @@ function ParentScreen({ data, update, onBack }) {
               <span style={{fontSize:32}}>{child.emoji}</span>
               <div style={{flex:1}}>
                 <div style={{fontWeight:800,fontSize:15}}>{child.name}</div>
-                <div style={{color:MUTED,fontSize:12}}>今月支出: {(data.expenses||[]).filter(e=>e.cid===child.id&&e.date.startsWith(monthKey())).reduce((s,e)=>s+e.amt,0).toLocaleString()}pt</div>
+                <div style={{color:MUTED,fontSize:12}}>今月支出: {(data.expenses||[]).filter(e=>e.cid===child.id&&(e.date||"").startsWith(monthKey())).reduce((s,e)=>s+e.amt,0).toLocaleString()}pt</div>
               </div>
               <span style={{color:MUTED,fontSize:22}}>›</span>
             </button>
