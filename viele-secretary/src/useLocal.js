@@ -43,5 +43,5 @@ export function useLocal(key, seed) {
     });
   };
 
-  return { data, loading: false, update };
+  return { data, loading: false, error: null, update };
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
@@ -468,7 +468,7 @@ function Empty({ children }) {
 /* ──────────────────────────────────────────────────────────────
    ログインゲート
    ────────────────────────────────────────────────────────────── */
-function LoginGate({ onLogin }) {
+function LoginGate({ onLogin, error }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.text }}>
       <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
@@ -483,7 +483,30 @@ function LoginGate({ onLogin }) {
         >
           Googleでログイン
         </button>
+        {error && (
+          <div style={{ marginTop: 18, textAlign: "left", background: "#2A1715", border: `1px solid ${C.red}`, borderRadius: 10, padding: 12 }}>
+            <div style={{ color: C.red, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>ログインできませんでした</div>
+            <div style={{ color: C.sub, fontSize: 12, wordBreak: "break-word" }}>{error.code || ""} {error.message}</div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/* Firestore等のデータ取得エラー画面 */
+function ErrorScreen({ error, onSignOut }) {
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
+      <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データに接続できません</h2>
+      <p style={{ color: C.sub, fontSize: 13 }}>
+        多くの場合 Firestore のルール未公開が原因です（ルールを公開すると直ります）。
+      </p>
+      <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, background: C.panel, padding: 12, borderRadius: 8 }}>
+        {String(error?.code || "")} {String(error?.message || error)}
+      </pre>
+      <button onClick={onSignOut} style={{ ...chipBtn, marginTop: 8 }}>ログアウト</button>
     </div>
   );
 }
@@ -493,24 +516,48 @@ function LoginGate({ onLogin }) {
    ────────────────────────────────────────────────────────────── */
 export default function App() {
   const [user, setUser] = useState(firebaseEnabled ? undefined : null); // undefined=判定中 / null=未ログイン
+  const [authError, setAuthError] = useState(null);
   const seed = useMemo(() => makeSeed(), []);
 
   // Firebase設定があればクラウド同期、なければこの端末にローカル保存。
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
-  const { data, loading, update } = firebaseEnabled ? cloud : local;
+  const { data, loading, error, update } = firebaseEnabled ? cloud : local;
 
   useEffect(() => {
     if (!firebaseEnabled) return; // ローカルモードは認証なし
     const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
+    // リダイレクト方式ログインの結果・エラーを拾う
+    getRedirectResult(auth).catch((e) => setAuthError(e));
     return unsub;
   }, []);
 
-  const login = () =>
-    signInWithPopup(auth, googleProvider).catch((e) => alert("ログイン失敗: " + e.message));
+  // スマホSafari等ではポップアップがブロックされやすいので、失敗時はリダイレクト方式で再試行
+  const login = async () => {
+    setAuthError(null);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      const popupIssue =
+        e.code === "auth/popup-blocked" ||
+        e.code === "auth/popup-closed-by-user" ||
+        e.code === "auth/cancelled-popup-request" ||
+        e.code === "auth/operation-not-supported-in-this-environment";
+      if (popupIssue) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (e2) {
+          setAuthError(e2);
+        }
+      } else {
+        setAuthError(e);
+      }
+    }
+  };
 
   if (firebaseEnabled && user === undefined) return <Splash text="読み込み中…" />;
-  if (firebaseEnabled && user === null) return <LoginGate onLogin={login} />;
+  if (firebaseEnabled && user === null) return <LoginGate onLogin={login} error={authError} />;
+  if (error) return <ErrorScreen error={error} onSignOut={() => signOut(auth)} />;
   if (loading || !data) return <Splash text="読み込み中…" />;
 
   // ── trips 操作 ──

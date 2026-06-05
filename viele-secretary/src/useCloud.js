@@ -14,6 +14,7 @@ import { db } from "./firebase";
 export function useCloud(uid, seed) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!uid) {
@@ -22,6 +23,7 @@ export function useCloud(uid, seed) {
       return;
     }
     setLoading(true);
+    setError(null);
     const ref = doc(db, "users", uid);
     const unsub = onSnapshot(
       ref,
@@ -30,13 +32,17 @@ export function useCloud(uid, seed) {
           setData(snap.data());
         } else {
           // 初回ログイン：SEEDを書き込む
-          setDoc(ref, seed).catch((e) => console.error("seed write failed", e));
+          setDoc(ref, seed).catch((e) => {
+            console.error("seed write failed", e);
+            setError(e);
+          });
           setData(seed);
         }
         setLoading(false);
       },
       (err) => {
         console.error("snapshot error", err);
+        setError(err);
         setLoading(false);
       }
     );
@@ -52,5 +58,5 @@ export function useCloud(uid, seed) {
     );
   };
 
-  return { data, loading, update };
+  return { data, loading, error, update };
 }
