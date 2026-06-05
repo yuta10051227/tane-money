@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // VIELE secretary の Firebase 設定。
@@ -30,6 +30,10 @@ if (firebaseEnabled) {
   auth = getAuth(app);
   googleProvider = new GoogleAuthProvider();
   db = getFirestore(app);
+  // ログイン状態を端末に永続化（毎回ログインを防ぐ）。IndexedDB優先、ダメならlocalStorage。
+  setPersistence(auth, indexedDBLocalPersistence).catch(() =>
+    setPersistence(auth, browserLocalPersistence).catch(() => {})
+  );
 }
 
 export { auth, googleProvider, db };
