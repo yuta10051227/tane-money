@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="cf743ce">
+<meta name="tane-version" content="04801ac">
 </head>
 <body>
   <div id="root"></div>
@@ -10850,6 +10850,10 @@ function HomeScreen({
   const monthDelta = memberId => {
     return (data.logs || []).filter(l => l.cid === memberId && (l.date || "").startsWith(thisMonth)).reduce((s, l) => s + l.pts, 0);
   };
+  const todayDelta = memberId => {
+    const td = todayKey();
+    return (data.logs || []).filter(l => l.cid === memberId && (l.date || "").startsWith(td) && l.pts > 0).reduce((s, l) => s + l.pts, 0);
+  };
   const topGoal = memberId => {
     const goals = (data.goals || []).filter(g => g.cid === memberId && !g.done);
     if (!goals.length) return null;
@@ -10951,13 +10955,7 @@ function HomeScreen({
       fontWeight: 700,
       color: TEXT
     }
-  }, "\u30E1\u30F3\u30D0\u30FC\u3092\u9078\u629E"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: MUTED,
-      marginTop: 2
-    }
-  }, "\u6B8B\u9AD8\u306F\u30ED\u30B0\u30A4\u30F3\u5F8C\u306B\u8868\u793A\u3055\u308C\u307E\u3059")), /*#__PURE__*/React.createElement("div", {
+  }, "\u30E1\u30F3\u30D0\u30FC\u3092\u9078\u629E")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "0 20px"
     }
@@ -11007,7 +11005,7 @@ function HomeScreen({
         display: "flex",
         alignItems: "center",
         gap: 6,
-        marginBottom: 3
+        marginBottom: 4
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -11026,10 +11024,38 @@ function HomeScreen({
       }
     }, "Child")), /*#__PURE__*/React.createElement("div", {
       style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
         fontSize: 11,
         color: MUTED
       }
-    }, member.gradeLabel || "中高生")), /*#__PURE__*/React.createElement(ChevronRightIcon, null)), goal && /*#__PURE__*/React.createElement("div", {
+    }, member.gradeLabel || "中高生"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        background: GS,
+        color: GP,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontWeight: 700
+      }
+    }, "\u7D2F\u8A08 ", bal(data.logs, member.id).toLocaleString(), "pt"), (() => {
+      const td = todayDelta(member.id);
+      return td > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          background: GOLDS,
+          color: GOLD,
+          padding: "2px 7px",
+          borderRadius: 999,
+          fontWeight: 700
+        }
+      }, "\u4ECA\u65E5 +", td, "pt");
+    })())), /*#__PURE__*/React.createElement(ChevronRightIcon, null)), goal && /*#__PURE__*/React.createElement("div", {
       style: {
         background: BG,
         borderRadius: 10,

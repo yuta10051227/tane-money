@@ -3768,6 +3768,12 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
       .filter(l=>l.cid===memberId && (l.date||"").startsWith(thisMonth))
       .reduce((s,l)=>s+l.pts,0);
   };
+  const todayDelta = (memberId) => {
+    const td = todayKey();
+    return (data.logs||[])
+      .filter(l=>l.cid===memberId && (l.date||"").startsWith(td) && l.pts>0)
+      .reduce((s,l)=>s+l.pts,0);
+  };
   const topGoal = (memberId) => {
     const goals=(data.goals||[]).filter(g=>g.cid===memberId&&!g.done);
     if(!goals.length) return null;
@@ -3804,7 +3810,6 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
           </button>
         </div>
         <div style={{fontSize:13,fontWeight:700,color:TEXT}}>メンバーを選択</div>
-        <div style={{fontSize:11,color:MUTED,marginTop:2}}>残高はログイン後に表示されます</div>
       </div>
 
       <div style={{padding:"0 20px"}}>
@@ -3818,11 +3823,15 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:goal?12:0}}>
                 <ChildAvatar child={member} size={44}/>
                 <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                     <span style={{fontWeight:700,fontSize:15,color:TEXT}}>{member.name}</span>
                     <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>Child</span>
                   </div>
-                  <div style={{fontSize:11,color:MUTED}}>{member.gradeLabel||"中高生"}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||"中高生"}</span>
+                    <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt</span>
+                    {(()=>{const td=todayDelta(member.id);return td>0&&<span style={{fontSize:10,background:GOLDS,color:GOLD,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今日 +{td}pt</span>;})()}
+                  </div>
                 </div>
                 <ChevronRightIcon/>
               </div>
