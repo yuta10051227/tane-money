@@ -11,13 +11,19 @@ React + Vite + Firebase（Auth / Firestore）。PC・スマホで同期し、本
 - **今日の予定 / コンテンツ制作サイクル / 請求・お金 / 追加タスク**
 - **Firestore同期** — ログイン本人のデータのみ、全端末で即同期
 
+## デスクトップ＆スマホで使う
+
+両端末で同じデータを同期するには Firebase ＋ Vercel の設定が必要です。
+👉 **クリック順の手順は [`SETUP.md`](./SETUP.md) を参照**（15〜20分）。
+
 ## ローカル開発
 
 ```bash
 npm install
-cp .env.example .env   # Firebaseの値を入れる（下記）
-npm run dev            # http://localhost:5173
+npm run dev            # http://localhost:5173 （.env無しでもローカルモードで動く）
 ```
+
+Firebaseの値を `.env`（`cp .env.example .env`）に入れると、ログイン＋クラウド同期モードに自動で切り替わります。
 
 ## Firebaseセットアップ（手作業）
 
