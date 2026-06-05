@@ -22,25 +22,12 @@
 ## ② Vercelにデプロイ（固定URLを作る）
 
 このリポジトリ（tane-money）の中の `viele-secretary/` フォルダだけを別プロジェクトとして公開する。
+**Firebase設定はコードに組み込み済みなので、環境変数の入力は不要。**
 
 - [ ] 1. <https://vercel.com> にGitHubでログイン → **Add New… → Project** → `yuta10051227/tane-money` を Import
 - [ ] 2. **Root Directory** を `viele-secretary` に変更（Edit→フォルダ選択）。Framework は **Vite** が自動検出される
-- [ ] 3. **Environment Variables** に①-4で控えた7項目を登録（名前は下記そのまま）：
-
-  | Name | Value |
-  |------|-------|
-  | `VITE_FB_API_KEY` | apiKey |
-  | `VITE_FB_AUTH_DOMAIN` | authDomain |
-  | `VITE_FB_PROJECT_ID` | projectId |
-  | `VITE_FB_STORAGE_BUCKET` | storageBucket |
-  | `VITE_FB_MESSAGING_SENDER_ID` | messagingSenderId |
-  | `VITE_FB_APP_ID` | appId |
-  | `VITE_FB_MEASUREMENT_ID` | measurementId |
-
-  > **重要**：これを忘れると本番でログインモードにならず動きません。
-
-- [ ] 4. **Deploy** → 数分でURL（例 `viele-secretary.vercel.app`）が出る
-- [ ] 5. **Firebaseに戻り** Authentication → **Settings → 承認済みドメイン → ドメインを追加** → ④で出たVercelのドメイン（`viele-secretary.vercel.app`）を追加
+- [ ] 3. **Deploy** をそのまま押す → 数分でURL（例 `viele-secretary.vercel.app`）が出る
+- [ ] 4. **Firebaseに戻り** Authentication → **Settings → 承認済みドメイン → ドメインを追加** → ③で出たVercelのドメイン（`viele-secretary.vercel.app`）を追加
       （これをやらないと本番URLでGoogleログインがブロックされる）
 
 ---
