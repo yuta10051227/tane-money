@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// VIELE secretary — 本人だけ読み書き可
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 自分のUIDのドキュメントだけアクセス可
+    match /users/{uid} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid
+                         && isAllowed(request.auth.uid);
+
+      // 配下のサブコレクションも同じ本人のみ
+      match /{document=**} {
+        allow read, write: if request.auth != null
+                           && request.auth.uid == uid
+                           && isAllowed(request.auth.uid);
+      }
+    }
+
+    // ── ALLOWLIST ──────────────────────────────────────────────
+    // 完全に自分のアカウントだけにロックしたい場合は、初回ログイン後に
+    // Authentication 画面で確認できる自分のUIDを下の配列に入れる。
+    // 例:  return uid in ['abc123YOUR_UID'];
+    // 空配列のままなら「ログイン本人＝ドキュメント所有者」のみ許可（既定）。
+    function isAllowed(uid) {
+      let allowlist = [];
+      return allowlist.size() == 0 || uid in allowlist;
+    }
+  }
+}
