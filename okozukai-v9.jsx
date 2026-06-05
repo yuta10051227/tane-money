@@ -419,6 +419,7 @@ function migrate(d) {
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(!d.onboardingChecks) d.onboardingChecks={};
+  if(!d.gachaCollection) d.gachaCollection={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms={investment:"trade",forex:"trade",dailyBonus:true,ranking:true};
   const defaultChildVis={balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"};
@@ -730,6 +731,27 @@ const GACHA_THEMES = [
 ];
 function getMonthTheme(){ return GACHA_THEMES[new Date().getMonth()]; }
 
+const GACHA_ITEMS = [
+  {id:"gi_n1",tierId:"gc1",emoji:"🌱",name:"タネっち",  desc:"まいにちのタネ"},
+  {id:"gi_n2",tierId:"gc1",emoji:"🌿",name:"わかば",    desc:"みどりのわかば"},
+  {id:"gi_n3",tierId:"gc1",emoji:"🍀",name:"よつば",    desc:"しあわせのよつば"},
+  {id:"gi_n4",tierId:"gc1",emoji:"🌾",name:"こむぎ",    desc:"ゆたかなみのり"},
+  {id:"gi_n5",tierId:"gc1",emoji:"🍂",name:"おちば",    desc:"あきのきおく"},
+  {id:"gi_n6",tierId:"gc1",emoji:"🌻",name:"ひまわり",  desc:"たいようのちから"},
+  {id:"gi_r1",tierId:"gc2",emoji:"⭐",name:"スター",     desc:"かがやくほし"},
+  {id:"gi_r2",tierId:"gc2",emoji:"🦋",name:"ちょうちょ",desc:"はねのかがやき"},
+  {id:"gi_r3",tierId:"gc2",emoji:"🐠",name:"さかな",    desc:"うみのたから"},
+  {id:"gi_r4",tierId:"gc2",emoji:"🌙",name:"みかづき",  desc:"よるのひかり"},
+  {id:"gi_r5",tierId:"gc2",emoji:"🎵",name:"おんぷ",    desc:"こころのメロディ"},
+  {id:"gi_r6",tierId:"gc2",emoji:"🔮",name:"まほうだま",desc:"ふしぎなちから"},
+  {id:"gi_sr1",tierId:"gc3",emoji:"🌈",name:"にじ",     desc:"そらにかかるにじ"},
+  {id:"gi_sr2",tierId:"gc3",emoji:"💎",name:"ダイヤ",   desc:"しんぴのほうせき"},
+  {id:"gi_sr3",tierId:"gc3",emoji:"🦄",name:"ユニコーン",desc:"まほうのいきもの"},
+  {id:"gi_sr4",tierId:"gc3",emoji:"🐉",name:"ドラゴン", desc:"でんせつのりゅう"},
+  {id:"gi_ur1",tierId:"gc4",emoji:"👑",name:"おうかん",  desc:"さいこうのしるし"},
+  {id:"gi_ur2",tierId:"gc4",emoji:"🌟",name:"ゴールドスター",desc:"きょくちょうのかがやき"},
+];
+
 // ═══════════════════════════════════════════════════════
 // GACHA ANIMATION
 // ═══════════════════════════════════════════════════════
@@ -788,11 +810,18 @@ function GachaAnim({ result, onClose }) {
           {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
           <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%"}}>
             <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
-            <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 6px"}}>{result.emoji} {result.label}</p>
-            <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>
-            <div style={{color:result.color,fontSize:48,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
-            <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:16}}>ptゲット！</div>
-            {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:14,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
+            <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 8px"}}>{result.emoji} {result.label}</p>
+            {result.collItem ? (
+              <div style={{position:"relative",margin:"0 auto 4px"}}>
+                {result.isNewItem&&<div style={{position:"absolute",top:-10,right:"calc(50% - 42px)",background:R,color:"#fff",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:900,zIndex:1,letterSpacing:.5}}>NEW!</div>}
+                <div style={{fontSize:isSuper?80:64,margin:"4px 0",lineHeight:1}}>{result.collItem.emoji}</div>
+                <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:2}}>{result.collItem.name}</div>
+                <div style={{fontSize:11,color:MUTED,marginBottom:8}}>{result.collItem.desc}</div>
+              </div>
+            ) : <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>}
+            <div style={{color:result.color,fontSize:44,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
+            <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:14}}>ptゲット！</div>
+            {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:12,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
             <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 すごい！":"やったー🎉"}</button>
           </div>
         </div>
@@ -1591,6 +1620,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [logSort, setLogSort] = useState("new");
   const [showSettings, setShowSettings] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showZukan, setShowZukan] = useState(false);
 
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
@@ -1646,7 +1676,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const res = rollGacha(data.gacha);
     const theme = getMonthTheme();
     const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
-    const finalRes = {...res, pts:res.pts+bonusPts, bonusPts, theme};
+    const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
+    const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
+    const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
+    const finalRes = {...res, pts:res.pts+bonusPts, bonusPts, theme, collItem, isNewItem};
     setGachaRes(finalRes);
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
@@ -1654,9 +1687,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const newCur = prev.last===yesterday ? prev.cur+1 : 1;
     update(d => ({
       ...d,
-      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
+      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
       gachaDate: {...(d.gachaDate||{}), [child.id]: today},
       streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }},
+      gachaCollection: collItem ? {...(d.gachaCollection||{}), [child.id]: {...(d.gachaCollection?.[child.id]||{}), [collItem.id]:((d.gachaCollection?.[child.id]?.[collItem.id]||0)+1)}} : (d.gachaCollection||{}),
     }));
   };
 
@@ -1908,6 +1942,40 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   ))}
                 </div>
               )}
+              {/* 図鑑 */}
+              {(()=>{
+                const coll=data.gachaCollection?.[child.id]||{};
+                const zukanCount=GACHA_ITEMS.filter(i=>coll[i.id]>0).length;
+                const tierColorMap=Object.fromEntries((data.gacha||[]).map(g=>[g.id,g.color]));
+                return(<div style={{marginTop:10}}>
+                  <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:CARDS,border:`1.5px solid ${BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:15}}>📖</span>
+                      <span style={{fontWeight:800,fontSize:13,color:TEXT}}>図鑑</span>
+                      <span style={{fontSize:11,color:MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{height:5,width:60,background:BORDER,borderRadius:999,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${zukanCount/GACHA_ITEMS.length*100}%`,background:G,borderRadius:999}}/>
+                      </div>
+                      <span style={{fontSize:11,color:MUTED}}>{showZukan?"▲":"▼"}</span>
+                    </div>
+                  </button>
+                  {showZukan&&(
+                    <div style={{background:CARDS,borderRadius:"0 0 14px 14px",padding:"10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,border:`1.5px solid ${BORDER}`,borderTop:"none"}}>
+                      {GACHA_ITEMS.map(item=>{
+                        const cnt=coll[item.id]||0;
+                        const tc=tierColorMap[item.tierId]||BORDER;
+                        return(<div key={item.id} style={{textAlign:"center",background:cnt>0?CARD:`rgba(0,0,0,0.04)`,borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:BORDER}`,transition:"all .2s"}}>
+                          <div style={{fontSize:22,filter:cnt>0?"none":"grayscale(1) opacity(0.3)"}}>{cnt>0?item.emoji:"❓"}</div>
+                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?TEXT:MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
+                          {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
+                        </div>);
+                      })}
+                    </div>
+                  )}
+                </div>);
+              })()}
             </>);
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>

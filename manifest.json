@@ -1,14 +1,17 @@
 {
   "name": "Tane Money",
-  "short_name": "TaneMoney",
-  "description": "家族でポイントを貯めよう！お手伝い・投資・ガチャで楽しく学ぶアプリ",
+  "short_name": "タネマネ",
+  "description": "家族でお金を楽しく学ぶアプリ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8f8f8",
-  "theme_color": "#f5c842",
-  "orientation": "portrait",
+  "background_color": "#F7F5EF",
+  "theme_color": "#187A4E",
+  "orientation": "portrait-primary",
+  "lang": "ja",
   "icons": [
-    {"src": "icon.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "icon.png", "sizes": "512x512", "type": "image/png"}
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "今日のガチャ", "short_name": "ガチャ", "url": "/", "description": "毎日ガチャを引こう！"}
   ]
 }
