@@ -17,6 +17,28 @@
         font-size: 14px;
       }
     </style>
+    <script>
+      // どんな読み込み/実行エラーも画面に出す（真っ白・無限ローディング防止）
+      (function () {
+        function show(msg) {
+          var r = document.getElementById("root");
+          if (!r) return;
+          r.innerHTML =
+            '<div style="padding:20px;font-family:system-ui,sans-serif">' +
+            '<h2 style="color:#E2554B;font-size:16px">エラーが発生しました</h2>' +
+            '<p style="color:#9AA1AC;font-size:13px">下の内容をコピーして共有してください。</p>' +
+            '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#171A21;padding:12px;border-radius:8px">' +
+            String(msg).replace(/</g, "&lt;") +
+            "</pre></div>";
+        }
+        window.addEventListener("error", function (e) {
+          show((e.error && e.error.stack) || e.message || e);
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          show("UnhandledRejection: " + ((e.reason && e.reason.stack) || e.reason));
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

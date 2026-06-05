@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // デバッグ中：以前インストールされたSWを自己消去してキャッシュ問題を解消。
+      // 正常稼働を確認したら false に戻す。
+      selfDestroying: true,
       includeAssets: ["icon-512.png"],
       manifest: {
         name: "VIELE secretary",
