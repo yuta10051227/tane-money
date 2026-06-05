@@ -25,18 +25,43 @@
           if (!r) return;
           r.innerHTML =
             '<div style="padding:20px;font-family:system-ui,sans-serif">' +
-            '<h2 style="color:#E2554B;font-size:16px">エラーが発生しました</h2>' +
+            '<h2 style="color:#E2554B;font-size:16px">読み込みの問題</h2>' +
             '<p style="color:#9AA1AC;font-size:13px">下の内容をコピーして共有してください。</p>' +
             '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#171A21;padding:12px;border-radius:8px">' +
             String(msg).replace(/</g, "&lt;") +
             "</pre></div>";
         }
+        // 実行エラー・スクリプト読込失敗(capture)・Promise例外をすべて捕捉
         window.addEventListener("error", function (e) {
-          show((e.error && e.error.stack) || e.message || e);
-        });
+          show((e.error && e.error.stack) || e.message || ("リソース読込失敗: " + (e.target && e.target.src || e.target && e.target.href || e)));
+        }, true);
         window.addEventListener("unhandledrejection", function (e) {
           show("UnhandledRejection: " + ((e.reason && e.reason.stack) || e.reason));
         });
+
+        // 古い service worker / キャッシュが壊れた版を配り続ける問題を自動解消
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            var had = regs.length > 0;
+            Promise.all(regs.map(function (r) { return r.unregister(); })).then(function () {
+              if (window.caches && caches.keys) {
+                caches.keys().then(function (keys) { keys.forEach(function (k) { caches.delete(k); }); });
+              }
+              if (had && !sessionStorage.getItem("sw-cleared")) {
+                sessionStorage.setItem("sw-cleared", "1");
+                location.reload();
+              }
+            });
+          }).catch(function () {});
+        }
+
+        // 5秒たっても描画されない場合は状況を表示（無限ローディング防止）
+        setTimeout(function () {
+          var r = document.getElementById("root");
+          if (r && r.childElementCount === 0) {
+            show("アプリのJavaScriptが実行されていません。\n古いキャッシュ/Service Workerの可能性が高いです。\nSafariのプライベートタブで開くか、ページを数回リロードしてください。");
+          }
+        }, 5000);
       })();
     </script>
   </head>
