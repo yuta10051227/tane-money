@@ -814,7 +814,7 @@ function GachaAnim({ result, onClose }) {
             {result.collItem ? (
               <div style={{position:"relative",margin:"0 auto 4px"}}>
                 {result.isNewItem&&<div style={{position:"absolute",top:-10,right:"calc(50% - 42px)",background:R,color:"#fff",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:900,zIndex:1,letterSpacing:.5}}>NEW!</div>}
-                <div style={{fontSize:isSuper?80:64,margin:"4px 0",lineHeight:1}}>{result.collItem.emoji}</div>
+                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.jpg`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14}}/>
                 <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:2}}>{result.collItem.name}</div>
                 <div style={{fontSize:11,color:MUTED,marginBottom:8}}>{result.collItem.desc}</div>
               </div>
@@ -1967,7 +1967,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         const cnt=coll[item.id]||0;
                         const tc=tierColorMap[item.tierId]||BORDER;
                         return(<div key={item.id} style={{textAlign:"center",background:cnt>0?CARD:`rgba(0,0,0,0.04)`,borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:BORDER}`,transition:"all .2s"}}>
-                          <div style={{fontSize:22,filter:cnt>0?"none":"grayscale(1) opacity(0.3)"}}>{cnt>0?item.emoji:"❓"}</div>
+                          {cnt>0
+                            ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.jpg`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
+                            : <div style={{fontSize:22,opacity:0.3}}>❓</div>
+                          }
                           <div style={{fontSize:8,fontWeight:700,color:cnt>0?TEXT:MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
                           {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
                         </div>);

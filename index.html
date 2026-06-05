@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="1c1091c">
+<meta name="tane-version" content="a144471">
 </head>
 <body>
   <div id="root"></div>
@@ -1967,13 +1967,18 @@ function GachaAnim({
       zIndex: 1,
       letterSpacing: .5
     }
-  }, "NEW!"), /*#__PURE__*/React.createElement("div", {
+  }, "NEW!"), /*#__PURE__*/React.createElement("img", {
+    src: `/assets/${result.collItem.id.replace("gi_", "gacha_")}.jpg`,
+    alt: result.collItem.name,
     style: {
-      fontSize: isSuper ? 80 : 64,
-      margin: "4px 0",
-      lineHeight: 1
+      width: isSuper ? 110 : 88,
+      height: isSuper ? 110 : 88,
+      objectFit: "contain",
+      display: "block",
+      margin: "4px auto",
+      borderRadius: 14
     }
-  }, result.collItem.emoji), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontWeight: 900,
       fontSize: 16,
@@ -5037,12 +5042,23 @@ function ChildScreen({
             border: `1.5px solid ${cnt > 0 ? tc : BORDER}`,
             transition: "all .2s"
           }
-        }, /*#__PURE__*/React.createElement("div", {
+        }, cnt > 0 ? /*#__PURE__*/React.createElement("img", {
+          src: `/assets/${item.id.replace("gi_", "gacha_")}.jpg`,
+          alt: item.name,
+          style: {
+            width: 38,
+            height: 38,
+            objectFit: "contain",
+            borderRadius: 6,
+            display: "block",
+            margin: "0 auto"
+          }
+        }) : /*#__PURE__*/React.createElement("div", {
           style: {
             fontSize: 22,
-            filter: cnt > 0 ? "none" : "grayscale(1) opacity(0.3)"
+            opacity: 0.3
           }
-        }, cnt > 0 ? item.emoji : "❓"), /*#__PURE__*/React.createElement("div", {
+        }, "\u2753"), /*#__PURE__*/React.createElement("div", {
           style: {
             fontSize: 8,
             fontWeight: 700,
