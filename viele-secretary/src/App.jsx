@@ -358,8 +358,8 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                   const sig = itemSignal(item, trip.date);
                   if (editItem && editItem.tripId === trip.id && editItem.idx === idx) {
                     return (
-                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: 1 }} />
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                         <input value={ie.daysBefore} onChange={(e) => setIe({ ...ie, daysBefore: e.target.value })} inputMode="numeric" title="本番の何日前" style={{ ...inp, marginBottom: 0, width: 56 }} />
                         <span style={{ fontSize: 11, color: C.faint }}>日前</span>
                         <button onClick={saveItem} style={chipBtn}>保存</button>
@@ -368,22 +368,28 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                     );
                   }
                   return (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                       <Check done={item.done} onClick={() => onToggle(trip.id, idx)} />
-                      <span style={{ flex: 1, fontSize: 14, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
-                        {item.label}
-                      </span>
-                      {!item.done && <span style={{ fontSize: 12, color: C.sub }}>締切 {fmt(sig.deadlineISO)}</span>}
-                      <span style={{ fontSize: 12, color: sig.color, minWidth: 62, textAlign: "right", fontWeight: 600 }}>{sig.dot} {sig.label}</span>
-                      <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✎</button>
-                      <button onClick={() => onRemoveItem(trip.id, idx)} style={iconBtn} title="削除">✕</button>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
+                            {item.label}
+                          </span>
+                          <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✎</button>
+                          <button onClick={() => onRemoveItem(trip.id, idx)} style={iconBtn} title="削除">✕</button>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+                          {!item.done && <span style={{ fontSize: 12, color: C.sub }}>締切 {fmt(sig.deadlineISO)}</span>}
+                          <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
               </div>
               {addItemFor === trip.id ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-                  <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: 1 }} />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                  <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                   <input value={ni.daysBefore} onChange={(e) => setNi({ ...ni, daysBefore: e.target.value })} inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 56 }} />
                   <span style={{ fontSize: 11, color: C.faint }}>日前</span>
                   <button onClick={() => { if (!ni.label.trim()) return; onAddItem(trip.id, { label: ni.label.trim(), daysBefore: Number(ni.daysBefore) || 0 }); setNi({ label: "", daysBefore: 7 }); setAddItemFor(null); }} style={chipBtn}>追加</button>
@@ -580,25 +586,38 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
 /* ──────────────────────────────────────────────────────────────
    今日の予定（カレンダー連携 or サンプルから本日の曜日を抽出）
    ────────────────────────────────────────────────────────────── */
-function Today({ entries, source, status, error, count, onConnect, connecting }) {
+const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他"];
+
+function Today({ entries, source, status, error, count, onConnect, connecting, onSetCat }) {
   const wd = new Date().getDay();
   const items = entries.filter((e) => e.wd === wd).sort((a, b) => a.time.localeCompare(b.time));
+  const canEdit = source === "calendar" && !!onSetCat;
   return (
     <Panel title={`今日の予定（${WD[wd]}曜）`} accent={C.blue}>
       <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
       {items.length === 0 ? (
         <Empty>今日の予定はありません。</Empty>
       ) : (
-        <div style={{ display: "grid", gap: 8 }}>
-          {items.map((e, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46 }}>{e.time}</span>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT[e.cat] || C.faint }} />
-              <span style={{ flex: 1, fontSize: 15 }}>{e.title}</span>
-              <span style={{ fontSize: 12, color: CAT[e.cat] || C.faint }}>{e.cat}</span>
-            </div>
-          ))}
-        </div>
+        <>
+          {canEdit && <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>役割タグをタップで変更できます（同じ予定名は次回も自動適用）。</div>}
+          <div style={{ display: "grid", gap: 10 }}>
+            {items.map((e, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT[e.cat] || C.faint, flex: "0 0 auto", marginTop: 7 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35 }}>{e.title}</span>
+                {canEdit ? (
+                  <button
+                    onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
+                    style={{ flex: "0 0 auto", fontSize: 12, color: CAT[e.cat] || C.faint, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+                  >{e.cat} ⇄</button>
+                ) : (
+                  <span style={{ fontSize: 12, color: CAT[e.cat] || C.faint, flex: "0 0 auto" }}>{e.cat}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </Panel>
   );
@@ -955,7 +974,15 @@ export default function App() {
 
   // 時間配分・今日の予定の元データ：カレンダー連携OKなら実データ、なければサンプルLOG
   const usingCal = !!calToken && calStatus === "ok";
-  const scheduleEntries = usingCal ? calEntries : LOG;
+  // 予定タイトル→役割 の手動割り当て（自動推定の上書き。同名は次回も適用）
+  const catMap = data.catMap || {};
+  const axisOfCat = (cat) => (cat === "制作" || cat === "集客" ? "仕組み" : "労働");
+  const calEntriesMapped = calEntries.map((e) => {
+    const ov = catMap[e.title];
+    return ov ? { ...e, cat: ov, axis: axisOfCat(ov) } : e;
+  });
+  const setEventCat = (title, cat) => update({ catMap: { ...catMap, [title]: cat } });
+  const scheduleEntries = usingCal ? calEntriesMapped : LOG;
   const scheduleSource = usingCal ? "calendar" : "sample";
   const calProps = {
     source: scheduleSource,
@@ -1001,7 +1028,7 @@ export default function App() {
         />
         <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
         <TimeMeter entries={scheduleEntries} {...calProps} />
-        <Today entries={scheduleEntries} {...calProps} />
+        <Today entries={scheduleEntries} {...calProps} onSetCat={setEventCat} />
 
         <CheckList
           title="コンテンツ制作サイクル"
