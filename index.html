@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="3a68655">
+<meta name="tane-version" content="1c1091c">
 </head>
 <body>
   <div id="root"></div>
@@ -11863,8 +11863,6 @@ function SeedMonster({
   const [mood, setMood] = useState(0);
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
-  const [blinkOn, setBlinkOn] = useState(true);
-  const [leafAngle, setLeafAngle] = useState(0);
   const myBal = bal(data.logs, child.id);
   const curStreak = data.streak?.[child.id]?.cur || 0;
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -11873,23 +11871,16 @@ function SeedMonster({
   const todayDone = data.gachaDate?.[child.id] === todayKey();
   const hour = new Date().getHours();
   const isSleeping = hour >= 22 || hour < 7;
-  const stage = myBal < 100 ? 0 : myBal < 500 ? 1 : myBal < 2000 ? 2 : myBal < 5000 ? 3 : 4;
+
+  // タスク累計回数でステージ決定（お手伝い＋デイリータスク）
+  const totalTasksDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
+  const stage = totalTasksDone < 10 ? 0 : totalTasksDone < 50 ? 1 : totalTasksDone < 150 ? 2 : totalTasksDone < 400 ? 3 : 4;
   const NAMES = ["タネっち", "メっち", "ハっち", "サカっち", "キングタネ"];
   const happyScore = Math.min(10, (curStreak >= 7 ? 3 : curStreak >= 3 ? 2 : curStreak >= 1 ? 1 : 0) + (monthPts >= 500 ? 3 : monthPts >= 200 ? 2 : monthPts >= 50 ? 1 : 0) + (goalsDone >= 2 ? 2 : goalsDone >= 1 ? 1 : 0) + (todayDone ? 1 : 0) + (myBal >= 1000 ? 1 : 0));
   useEffect(() => {
     const iv = setInterval(() => setTick(t => t + 1), 500);
     return () => clearInterval(iv);
   }, []);
-  useEffect(() => {
-    const iv = setInterval(() => {
-      setBlinkOn(false);
-      setTimeout(() => setBlinkOn(true), 120);
-    }, 3000);
-    return () => clearInterval(iv);
-  }, []);
-  useEffect(() => {
-    setLeafAngle(Math.sin(tick * 0.8) * 12);
-  }, [tick]);
   useEffect(() => {
     setMood(isSleeping ? 2 : happyScore >= 6 ? 1 : 0);
   }, [tick]);
@@ -11906,27 +11897,46 @@ function SeedMonster({
     setTimeout(() => setSpeech(null), 1800);
   };
   const floatY = Math.sin(tick * 0.9) * 4;
-  const px = 5;
 
-  // 緑カード背景用：白クリーム系カラー
-  const bodyColor = stage === 4 ? "#FFE566" : "rgba(255,255,255,0.93)";
-  const darkColor = stage === 4 ? "rgba(200,150,0,0.75)" : "rgba(255,255,255,0.42)";
-  const hlColor = "#fff";
-  const leafFill = "rgba(180,255,210,0.88)";
-  const eyeC = stage === 4 ? "rgba(90,55,0,0.85)" : "rgba(24,35,29,0.82)";
-  const mouthC = stage === 4 ? "rgba(90,55,0,0.65)" : "rgba(24,35,29,0.65)";
-  const bodyPixels = stage === 0 ? [[0, 0, 1, 1, 0, 0], [0, 1, 1, 1, 1, 0], [0, 1, 1, 1, 1, 0], [0, 0, 1, 1, 0, 0], [0, 0, 1, 1, 0, 0]] : stage === 1 ? [[0, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [0, 1, 1, 1, 1, 0], [0, 1, 1, 1, 1, 0], [0, 0, 1, 1, 0, 0]] : stage === 2 ? [[0, 0, 1, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1], [0, 1, 1, 1, 1, 1, 0], [0, 0, 1, 1, 1, 0, 0], [0, 0, 1, 1, 1, 0, 0]] : stage === 3 ? [[0, 0, 1, 1, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [0, 1, 1, 1, 1, 1, 1, 0], [0, 0, 1, 1, 1, 1, 0, 0], [0, 0, 0, 1, 1, 0, 0, 0]] : [[0, 0, 1, 1, 1, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1, 1], [0, 1, 1, 1, 1, 1, 1, 1, 0], [0, 1, 1, 1, 1, 1, 1, 1, 0], [0, 0, 1, 1, 1, 1, 1, 0, 0], [0, 0, 0, 1, 1, 1, 0, 0, 0]];
-  const cols = bodyPixels[0].length;
-  const rows = bodyPixels.length;
-  const eyeRow = Math.floor(rows * 0.28);
-  const eyeColL = Math.floor(cols * 0.28);
-  const eyeColR = Math.floor(cols * 0.60);
-  const leafCX = Math.floor(cols / 2) * px;
-  const totalW = cols * px + 16;
-  const totalH = rows * px + (stage >= 1 ? 12 : 6);
-  const nextPt = stage === 0 ? 100 : stage === 1 ? 500 : stage === 2 ? 2000 : stage === 3 ? 5000 : null;
-  const prevPt = stage === 0 ? 0 : stage === 1 ? 100 : stage === 2 ? 500 : stage === 3 ? 2000 : 5000;
-  const evoPct = nextPt ? Math.min(100, Math.round((myBal - prevPt) / (nextPt - prevPt) * 100)) : 100;
+  // 進化バー（タスク回数ベース）
+  const nextTask = stage === 0 ? 10 : stage === 1 ? 50 : stage === 2 ? 150 : stage === 3 ? 400 : null;
+  const prevTask = stage === 0 ? 0 : stage === 1 ? 10 : stage === 2 ? 50 : stage === 3 ? 150 : 400;
+  const evoPct = nextTask ? Math.min(100, Math.round((totalTasksDone - prevTask) / (nextTask - prevTask) * 100)) : 100;
+
+  // 獲得バッジによるアクセサリーステッカー（最大3個）
+  const logs4badge = (data.logs || []).filter(l => l.cid === child.id);
+  const goodCount = logs4badge.filter(l => l.type === "good").length;
+  const maxStreak4 = (data.streak || {})[child.id]?.max || 0;
+  const tipsRead4 = logs4badge.filter(l => l.type === "tips").length;
+  const accessories = [goodCount >= 100 ? {
+    emoji: "🏆",
+    bg: GOLDS,
+    pos: {
+      top: -6,
+      right: -6
+    }
+  } : null, maxStreak4 >= 7 ? {
+    emoji: "⚡",
+    bg: BS,
+    pos: {
+      top: -6,
+      left: -6
+    }
+  } : null, tipsRead4 >= 10 ? {
+    emoji: "📚",
+    bg: PS,
+    pos: {
+      bottom: 6,
+      left: -6
+    }
+  } : null, myBal >= 5000 ? {
+    emoji: "💎",
+    bg: BS,
+    pos: {
+      bottom: 6,
+      right: -6
+    }
+  } : null].filter(Boolean).slice(0, 3);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
@@ -11984,200 +11994,36 @@ function SeedMonster({
       display: "inline-block",
       transform: `translateY(${floatY}px)`,
       transition: "transform 0.1s",
-      userSelect: "none"
+      userSelect: "none",
+      position: "relative"
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    width: totalW,
-    height: totalH,
+  }, /*#__PURE__*/React.createElement("img", {
+    src: `/assets/monster_${stage}.jpg`,
+    alt: NAMES[stage],
     style: {
-      display: "block"
-    },
-    viewBox: `0 0 ${totalW} ${totalH}`
-  }, stage >= 1 && /*#__PURE__*/React.createElement("g", {
-    transform: `translate(${leafCX + 8},2) rotate(${leafAngle},0,6)`
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: -1.5,
-    y: 0,
-    width: 3,
-    height: 9,
-    fill: "rgba(255,255,255,0.5)",
-    rx: 1
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: -5,
-    cy: 4,
-    rx: 5,
-    ry: 3.5,
-    fill: leafFill,
-    transform: "rotate(-30,-5,4)"
-  }), stage >= 2 && /*#__PURE__*/React.createElement("ellipse", {
-    cx: 6,
-    cy: 2.5,
-    rx: 4,
-    ry: 2.5,
-    fill: leafFill,
-    transform: "rotate(25,6,2.5)"
-  }), stage >= 4 && /*#__PURE__*/React.createElement("ellipse", {
-    cx: -9,
-    cy: 1.5,
-    rx: 3.5,
-    ry: 2,
-    fill: "#FFE566",
-    transform: "rotate(-45,-9,1.5)"
-  })), bodyPixels.map((row, ri) => row.map((cell, ci) => {
-    if (!cell) return null;
-    const bx = ci * px + 8;
-    const by = ri * px + (stage >= 1 ? 10 : 4);
-    const isEdge = !row[ci - 1] || !row[ci + 1] || !bodyPixels[ri - 1]?.[ci] || !bodyPixels[ri + 1]?.[ci];
-    const isHL = ri <= 1 && ci >= 1 && ci <= 2;
-    return /*#__PURE__*/React.createElement("rect", {
-      key: `${ri}-${ci}`,
-      x: bx,
-      y: by,
-      width: px,
-      height: px,
-      fill: isHL ? hlColor : isEdge ? darkColor : bodyColor
-    });
-  })), (() => {
-    const bOY = stage >= 1 ? 10 : 4;
-    const ex = eyeColL * px + 8 + 1,
-      ey = eyeRow * px + bOY + 1,
-      ex2 = eyeColR * px + 8 + 1;
-    if (isSleeping || !blinkOn) {
-      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
-        x: ex,
-        y: ey + 1,
-        width: px - 2,
-        height: 1,
-        fill: eyeC,
-        rx: 1
-      }), /*#__PURE__*/React.createElement("rect", {
-        x: ex2,
-        y: ey + 1,
-        width: px - 2,
-        height: 1,
-        fill: eyeC,
-        rx: 1
-      }));
+      width: 90,
+      height: 90,
+      objectFit: "contain",
+      display: "block",
+      borderRadius: 10
     }
-    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
-      x: ex,
-      y: ey,
-      width: px - 2,
-      height: px - 2,
-      fill: eyeC,
-      rx: 1
-    }), /*#__PURE__*/React.createElement("rect", {
-      x: ex2,
-      y: ey,
-      width: px - 2,
-      height: px - 2,
-      fill: eyeC,
-      rx: 1
-    }), mood === 1 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
-      x: ex - 1,
-      y: ey + px,
-      width: 3,
-      height: 2,
-      fill: "rgba(255,160,160,0.8)",
-      rx: 1,
-      opacity: 0.7
-    }), /*#__PURE__*/React.createElement("rect", {
-      x: ex2 + 1,
-      y: ey + px,
-      width: 3,
-      height: 2,
-      fill: "rgba(255,160,160,0.8)",
-      rx: 1,
-      opacity: 0.7
-    })));
-  })(), (() => {
-    const bOY = stage >= 1 ? 10 : 4;
-    const mx = Math.floor(cols / 2) * px + 8 - 1,
-      my = (eyeRow + 1) * px + bOY + 2;
-    if (isSleeping) return /*#__PURE__*/React.createElement("text", {
-      x: mx - 4,
-      y: my + 4,
-      fontSize: 5,
-      fill: "rgba(255,255,255,0.6)",
-      fontFamily: "monospace"
-    }, "zzz");
-    return mood === 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("rect", {
-      x: mx - 1,
-      y: my + 1,
-      width: 1,
-      height: 2,
-      fill: mouthC
-    }), /*#__PURE__*/React.createElement("rect", {
-      x: mx + 1,
-      y: my,
-      width: 1,
-      height: 3,
-      fill: mouthC
-    }), /*#__PURE__*/React.createElement("rect", {
-      x: mx + 3,
-      y: my + 1,
-      width: 1,
-      height: 2,
-      fill: mouthC
-    })) : /*#__PURE__*/React.createElement("rect", {
-      x: mx,
-      y: my + 1,
-      width: 3,
-      height: 1,
-      fill: mouthC
-    });
-  })(), stage === 4 && /*#__PURE__*/React.createElement("g", {
-    transform: `translate(${Math.floor(cols / 2) * px + 8 - 7},-2)`
-  }, /*#__PURE__*/React.createElement("rect", {
-    x: 0,
-    y: 5,
-    width: 14,
-    height: 4,
-    fill: "#FFE566",
-    rx: 1
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 0,
-    y: 2,
-    width: 2.5,
-    height: 7,
-    fill: "#FFE566",
-    rx: 1
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 5,
-    y: 0,
-    width: 2.5,
-    height: 9,
-    fill: "#FFE566",
-    rx: 1
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 10,
-    y: 2,
-    width: 2.5,
-    height: 7,
-    fill: "#FFE566",
-    rx: 1
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 1.5,
-    y: 6,
-    width: 1.5,
-    height: 1.5,
-    fill: "#fff",
-    rx: 0.5
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 6,
-    y: 6,
-    width: 1.5,
-    height: 1.5,
-    fill: "#fff",
-    rx: 0.5
-  }), /*#__PURE__*/React.createElement("rect", {
-    x: 10.5,
-    y: 6,
-    width: 1.5,
-    height: 1.5,
-    fill: "#fff",
-    rx: 0.5
-  })))), /*#__PURE__*/React.createElement("div", {
+  }), accessories.map((acc, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      position: "absolute",
+      ...acc.pos,
+      background: acc.bg,
+      borderRadius: "50%",
+      width: 20,
+      height: 20,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+      border: "1.5px solid rgba(255,255,255,0.9)"
+    }
+  }, acc.emoji))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "rgba(255,255,255,0.88)",
@@ -12185,9 +12031,9 @@ function SeedMonster({
       marginTop: 2,
       letterSpacing: 0.3
     }
-  }, NAMES[stage], stage === 4 && " 👑"), nextPt && /*#__PURE__*/React.createElement("div", {
+  }, NAMES[stage], stage === 4 && " 👑"), nextTask && /*#__PURE__*/React.createElement("div", {
     style: {
-      width: totalW,
+      width: 90,
       height: 3,
       background: "rgba(255,255,255,0.18)",
       borderRadius: 999,
@@ -12202,7 +12048,7 @@ function SeedMonster({
       borderRadius: 999,
       transition: "width 0.6s ease"
     }
-  })), !nextPt && /*#__PURE__*/React.createElement("div", {
+  })), !nextTask && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 9,
       color: "rgba(255,220,0,0.9)",
