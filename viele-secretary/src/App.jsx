@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
+import { useLocal } from "./useLocal";
+
+const STORE_KEY = "viele-secretary";
 
 /* ──────────────────────────────────────────────────────────────
    配色（落ち着いた秘書ダッシュボード）
@@ -489,20 +492,26 @@ function LoginGate({ onLogin }) {
    本体
    ────────────────────────────────────────────────────────────── */
 export default function App() {
-  const [user, setUser] = useState(undefined); // undefined=判定中 / null=未ログイン
+  const [user, setUser] = useState(firebaseEnabled ? undefined : null); // undefined=判定中 / null=未ログイン
   const seed = useMemo(() => makeSeed(), []);
-  const { data, loading, update } = useCloud(user?.uid || null, seed);
+
+  // Firebase設定があればクラウド同期、なければこの端末にローカル保存。
+  const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
+  const local = useLocal(STORE_KEY, seed);
+  const { data, loading, update } = firebaseEnabled ? cloud : local;
 
   useEffect(() => {
+    if (!firebaseEnabled) return; // ローカルモードは認証なし
     const unsub = onAuthStateChanged(auth, (u) => setUser(u || null));
     return unsub;
   }, []);
 
-  const login = () => signInWithPopup(auth, googleProvider).catch((e) => alert("ログイン失敗: " + e.message));
+  const login = () =>
+    signInWithPopup(auth, googleProvider).catch((e) => alert("ログイン失敗: " + e.message));
 
-  if (user === undefined) return <Splash text="読み込み中…" />;
-  if (user === null) return <LoginGate onLogin={login} />;
-  if (loading || !data) return <Splash text="同期中…" />;
+  if (firebaseEnabled && user === undefined) return <Splash text="読み込み中…" />;
+  if (firebaseEnabled && user === null) return <LoginGate onLogin={login} />;
+  if (loading || !data) return <Splash text="読み込み中…" />;
 
   // ── trips 操作 ──
   const toggleTripItem = (tripId, idx) => {
@@ -538,10 +547,18 @@ export default function App() {
         <strong style={{ fontSize: 15 }}>secretary</strong>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
-        <button onClick={() => signOut(auth)} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
+        {firebaseEnabled && (
+          <button onClick={() => signOut(auth)} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
+        )}
       </header>
 
       <main style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative" }}>
+        {!firebaseEnabled && (
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: C.accent }}>●</span>
+            ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
+          </div>
+        )}
         <TripChain trips={data.trips} onToggle={toggleTripItem} onAdd={addTrip} onRemove={removeTrip} />
         <DeadlineBoard deadlines={data.deadlines} />
         <TimeMeter />
@@ -580,7 +597,9 @@ export default function App() {
         />
 
         <footer style={{ textAlign: "center", color: C.faint, fontSize: 11, padding: "12px 0 32px" }}>
-          {user.displayName ? `${user.displayName} としてログイン中` : "ログイン中"} ・ 全端末でFirestore同期
+          {firebaseEnabled
+            ? `${user?.displayName ? user.displayName + " として" : ""}ログイン中 ・ 全端末でFirestore同期`
+            : "ローカルモード ・ この端末に保存"}
         </footer>
       </main>
     </div>

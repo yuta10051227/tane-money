@@ -13,8 +13,20 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FB_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Firebaseの必須値が揃っているか。揃っていなければローカルモードで動く。
+export const firebaseEnabled = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId
+);
 
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+let auth = null;
+let googleProvider = null;
+let db = null;
+
+if (firebaseEnabled) {
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+  db = getFirestore(app);
+}
+
+export { auth, googleProvider, db };
