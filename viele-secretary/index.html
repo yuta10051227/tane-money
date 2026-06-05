@@ -39,22 +39,6 @@
           show("UnhandledRejection: " + ((e.reason && e.reason.stack) || e.reason));
         });
 
-        // 古い service worker / キャッシュが壊れた版を配り続ける問題を自動解消
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function (regs) {
-            var had = regs.length > 0;
-            Promise.all(regs.map(function (r) { return r.unregister(); })).then(function () {
-              if (window.caches && caches.keys) {
-                caches.keys().then(function (keys) { keys.forEach(function (k) { caches.delete(k); }); });
-              }
-              if (had && !sessionStorage.getItem("sw-cleared")) {
-                sessionStorage.setItem("sw-cleared", "1");
-                location.reload();
-              }
-            });
-          }).catch(function () {});
-        }
-
         // 5秒たっても描画されない場合は状況を表示（無限ローディング防止）
         setTimeout(function () {
           var r = document.getElementById("root");
