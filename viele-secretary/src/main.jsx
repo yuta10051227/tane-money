@@ -37,3 +37,17 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// 新しい版が出たら自動で適用（毎回の手動再インストールを不要に）。
+if ("serviceWorker" in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+  // アプリを開いている間、定期的に更新をチェック
+  setInterval(() => {
+    navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+  }, 60 * 1000);
+}

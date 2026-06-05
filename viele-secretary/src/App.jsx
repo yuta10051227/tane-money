@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectRes
 import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
-import { CALENDAR_SCOPE, fetchWeekEvents, eventToEntry } from "./calendar";
+import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 
 const STORE_KEY = "viele-secretary";
 
@@ -33,6 +33,8 @@ const CAT = {
   集客: C.purple,
   経営: C.accent,
 };
+const FAMILY_COLOR = "#C77B9C"; // 家族・プライベートの色（仕事と区別）
+const catColor = (cat) => CAT[cat] || (cat === "家族" ? FAMILY_COLOR : C.faint);
 
 /* ──────────────────────────────────────────────────────────────
    日付ユーティリティ
@@ -588,36 +590,123 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
    ────────────────────────────────────────────────────────────── */
 const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他"];
 
-function Today({ entries, source, status, error, count, onConnect, connecting, onSetCat }) {
+function Today({ items, source, status, error, count, onConnect, connecting, onSetCat }) {
   const wd = new Date().getDay();
-  const items = entries.filter((e) => e.wd === wd).sort((a, b) => a.time.localeCompare(b.time));
-  const canEdit = source === "calendar" && !!onSetCat;
+  const list = items || [];
   return (
     <Panel title={`今日の予定（${WD[wd]}曜）`} accent={C.blue}>
       <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
-      {items.length === 0 ? (
+      {list.length === 0 ? (
         <Empty>今日の予定はありません。</Empty>
       ) : (
-        <>
-          {canEdit && <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>役割タグをタップで変更できます（同じ予定名は次回も自動適用）。</div>}
-          <div style={{ display: "grid", gap: 10 }}>
-            {items.map((e, i) => (
+        <div style={{ display: "grid", gap: 10 }}>
+          {list.map((e, i) => {
+            const isFamily = e.role === "family";
+            const canEdit = source === "calendar" && !!onSetCat && !isFamily;
+            return (
               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT[e.cat] || C.faint, flex: "0 0 auto", marginTop: 7 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35 }}>{e.title}</span>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</span>
                 {canEdit ? (
                   <button
                     onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
-                    style={{ flex: "0 0 auto", fontSize: 12, color: CAT[e.cat] || C.faint, background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+                    style={{ flex: "0 0 auto", fontSize: 12, color: catColor(e.cat), background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
                   >{e.cat} ⇄</button>
                 ) : (
-                  <span style={{ fontSize: 12, color: CAT[e.cat] || C.faint, flex: "0 0 auto" }}>{e.cat}</span>
+                  <span style={{ fontSize: 12, color: catColor(e.cat), flex: "0 0 auto" }}>{e.cat}</span>
                 )}
               </div>
-            ))}
-          </div>
-        </>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* 今後の予定（先2ヶ月・重要イベント）。月ごとにまとめ、初期は10件表示。 */
+function Upcoming({ events }) {
+  const [showAll, setShowAll] = useState(false);
+  const list = events || [];
+  const shown = showAll ? list : list.slice(0, 10);
+  // 月ごとにグルーピング
+  const groups = [];
+  shown.forEach((e) => {
+    const key = `${e.start.getFullYear()}年${e.start.getMonth() + 1}月`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, items: [] }; groups.push(g); }
+    g.items.push(e);
+  });
+  return (
+    <Panel title="今後の予定（先2ヶ月）" accent={FAMILY_COLOR} help="出張・登壇・ライブ・イベント等の重要予定と、家族・プライベートの予定（別色）を先まで表示します。日常の細かい予定は出しません。">
+      {list.length === 0 ? (
+        <Empty>先2ヶ月に重要な予定はありません。</Empty>
+      ) : (
+        <div style={{ display: "grid", gap: 14 }}>
+          {groups.map((g) => (
+            <div key={g.key}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 700, marginBottom: 6 }}>{g.key}</div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {g.items.map((e, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 13, width: 78, flex: "0 0 auto", paddingTop: 1 }}>
+                      {e.start.getMonth() + 1}/{e.start.getDate()}({WD[e.start.getDay()]}){e.allDay ? "" : ` ${e.time}`}
+                    </span>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 6 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35, color: e.role === "family" ? C.sub : C.text }}>{e.title}</span>
+                    <span style={{ fontSize: 11, color: catColor(e.cat), flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {list.length > 10 && (
+            <button onClick={() => setShowAll((v) => !v)} style={{ ...chipBtn, justifySelf: "start" }}>
+              {showAll ? "閉じる" : `もっと見る（残り${list.length - 10}件）`}
+            </button>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* どのカレンダーを仕事/家族として取り込むかの設定 */
+function CalendarSettings({ calList, roleForCal, onSetRole }) {
+  const [open, setOpen] = useState(false);
+  const ROLES = [
+    { v: "work", label: "仕事" },
+    { v: "family", label: "家族" },
+    { v: "off", label: "取り込まない" },
+  ];
+  return (
+    <Panel
+      title="カレンダー設定"
+      accent={C.sub}
+      help="どのGoogleカレンダーを取り込むかを選びます。『仕事』は時間メーターに反映、『家族』は別色でブロッカー表示（メーター除外）、『取り込まない』は非表示。"
+      right={<button onClick={() => setOpen((o) => !o)} style={chipBtn}>{open ? "閉じる" : "開く"}</button>}
+    >
+      {open && (
+        <div style={{ display: "grid", gap: 10 }}>
+          {calList.map((c) => {
+            const role = roleForCal(c.id);
+            return (
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>{c.summary}{c.primary ? "（メイン）" : ""}</span>
+                <div style={{ display: "flex", gap: 4, flex: "0 0 auto" }}>
+                  {ROLES.map((r) => (
+                    <button
+                      key={r.v}
+                      onClick={() => onSetRole(c.id, r.v)}
+                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
+                    >{r.label}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </Panel>
   );
@@ -842,9 +931,10 @@ export default function App() {
   const fontLabel = fontScale >= 1.3 ? "特大" : fontScale > 1 ? "大" : "標準";
   const seed = useMemo(() => makeSeed(), []);
 
-  // ── Googleカレンダー連携（任意・クライアント側）──
+  // ── Googleカレンダー連携（任意・クライアント側・複数カレンダー）──
   const [calToken, setCalToken] = useState(() => sessionStorage.getItem("viele-cal-token") || null);
-  const [calEvents, setCalEvents] = useState([]);
+  const [calList, setCalList] = useState([]);   // 利用可能なカレンダー一覧
+  const [calEvents, setCalEvents] = useState([]); // 全カレンダーの生イベント（calendarId付き）
   const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
   const [calError, setCalError] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -854,18 +944,29 @@ export default function App() {
     let cancelled = false;
     setCalStatus("loading");
     setCalError(null);
-    fetchWeekEvents(calToken)
-      .then((evs) => { if (!cancelled) { setCalEvents(evs); setCalStatus("ok"); } })
-      .catch((err) => {
+    (async () => {
+      try {
+        const list = await fetchCalendarList(calToken);
+        if (cancelled) return;
+        setCalList(list);
+        const now = new Date();
+        const timeMin = startOfWeekMonday(now).toISOString();
+        const timeMax = addDays(now, 62).toISOString();
+        const all = (
+          await Promise.all(list.map((c) => fetchEvents(calToken, c.id, timeMin, timeMax).catch(() => [])))
+        ).flat();
+        if (cancelled) return;
+        setCalEvents(all);
+        setCalStatus("ok");
+      } catch (err) {
         if (cancelled) return;
         if (err.status === 401) { sessionStorage.removeItem("viele-cal-token"); setCalToken(null); }
         setCalError(err);
         setCalStatus("error");
-      });
+      }
+    })();
     return () => { cancelled = true; };
   }, [calToken]);
-
-  const calEntries = useMemo(() => calEvents.map(eventToEntry), [calEvents]);
 
   // 連携（カレンダー読み取り権限を追加要求して再認証→アクセストークン取得）
   const connectCalendar = async () => {
@@ -972,25 +1073,60 @@ export default function App() {
   const today = new Date();
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
 
-  // 時間配分・今日の予定の元データ：カレンダー連携OKなら実データ、なければサンプルLOG
+  // ── カレンダー由来データの組み立て（複数カレンダー対応）──
   const usingCal = !!calToken && calStatus === "ok";
-  // 予定タイトル→役割 の手動割り当て（自動推定の上書き。同名は次回も適用）
-  const catMap = data.catMap || {};
+  const catMap = data.catMap || {};       // 予定名→役割 の手動上書き（同名は次回も適用）
+  const calConfig = data.calConfig || {}; // カレンダーID→ロール(work/family/off)
   const axisOfCat = (cat) => (cat === "制作" || cat === "集客" ? "仕組み" : "労働");
-  const calEntriesMapped = calEntries.map((e) => {
-    const ov = catMap[e.title];
-    return ov ? { ...e, cat: ov, axis: axisOfCat(ov) } : e;
-  });
   const setEventCat = (title, cat) => update({ catMap: { ...catMap, [title]: cat } });
-  const scheduleEntries = usingCal ? calEntriesMapped : LOG;
+  const setCalRole = (calId, role) => update({ calConfig: { ...calConfig, [calId]: role } });
+  const roleForCal = (calId) => {
+    if (calConfig[calId]) return calConfig[calId];
+    const c = calList.find((x) => x.id === calId);
+    return c && c.primary ? "work" : "off"; // 既定: primary=仕事、その他=取り込まない
+  };
+  const buildEntry = (ev) => {
+    const role = roleForCal(ev.calendarId);
+    const start = new Date(ev.startISO);
+    const end = ev.endISO ? new Date(ev.endISO) : null;
+    const hours = ev.allDay ? 0 : end ? Math.max(0.25, (end - start) / 3600000) : 1;
+    let cat, axis;
+    if (role === "family") { cat = "家族"; axis = "家族"; }
+    else {
+      const ov = catMap[ev.title];
+      if (ov) { cat = ov; axis = axisOfCat(ov); }
+      else { const c = classifyEvent(ev.title); cat = c.cat; axis = c.axis; }
+    }
+    return { ...ev, role, start, wd: start.getDay(), time: ev.allDay ? "終日" : `${pad2(start.getHours())}:${pad2(start.getMinutes())}`, hours, cat, axis };
+  };
+  const includedEntries = calEvents.filter((ev) => roleForCal(ev.calendarId) !== "off").map(buildEntry);
+
+  // 今週の時間メーター：仕事カレンダーの時間指定予定のみ（家族は除外）
+  const weekStart = startOfWeekMonday(today);
+  const weekEnd = addDays(weekStart, 7);
+  const weekWork = includedEntries.filter((e) => e.role === "work" && !e.allDay && e.start >= weekStart && e.start < weekEnd);
+  const scheduleEntries = usingCal ? weekWork : LOG;
   const scheduleSource = usingCal ? "calendar" : "sample";
+
+  // 今日の予定：仕事＋家族（本日分）
+  const todayStart = startOfDay(today);
+  const todayEnd = addDays(todayStart, 1);
+  const todayItems = usingCal
+    ? includedEntries.filter((e) => e.start >= todayStart && e.start < todayEnd).sort((a, b) => a.time.localeCompare(b.time))
+    : LOG.filter((e) => e.wd === today.getDay());
+
+  // 今後の予定（先2ヶ月）：家族は全件、仕事は重要イベント（出張/ライブ/終日 等）のみ
+  const upcoming = includedEntries
+    .filter((e) => e.start >= todayEnd && e.start < addDays(today, 62) && (e.role === "family" || isNotable(e)))
+    .sort((a, b) => a.start - b.start);
+
   const calProps = {
     source: scheduleSource,
     status: calStatus,
     error: calError,
     onConnect: connectCalendar,
     connecting,
-    count: calEntries.length,
+    count: weekWork.length,
   };
 
   return (
@@ -1028,7 +1164,9 @@ export default function App() {
         />
         <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
         <TimeMeter entries={scheduleEntries} {...calProps} />
-        <Today entries={scheduleEntries} {...calProps} onSetCat={setEventCat} />
+        <Today items={todayItems} {...calProps} onSetCat={setEventCat} />
+        {usingCal && <Upcoming events={upcoming} />}
+        {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} />}
 
         <CheckList
           title="コンテンツ制作サイクル"
