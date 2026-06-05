@@ -1101,7 +1101,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("grant");
+  const [settingsTab, setSettingsTab] = useState((data.pendingApprovals||[]).length>0?"approval":"grant");
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
@@ -1523,6 +1523,27 @@ settingsTab==="members"&&(
                   </div>
                 ))}
               </div>
+              {/* データエクスポート */}
+              <div style={{background:BG,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginTop:14}}>
+                <p style={{fontWeight:800,fontSize:13,color:TEXT,margin:"0 0 8px"}}>📊 データをエクスポート</p>
+                <p style={{fontSize:11,color:MUTED,margin:"0 0 12px"}}>全ログをCSVファイルでダウンロードできます（Excel対応）</p>
+                <button onClick={()=>{
+                  const rows=[["日付","子ども","種別","内容","pt"]];
+                  (data.logs||[]).forEach(l=>{
+                    const c=(data.children||[]).find(x=>x.id===l.cid);
+                    rows.push([(l.date||"").slice(0,10),c?.name||"",l.type,l.label||"",l.pts||0]);
+                  });
+                  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+                  const blob=new Blob([""+csv],{type:"text/csv;charset=utf-8"});
+                  const url=URL.createObjectURL(blob);
+                  const a=document.createElement("a");
+                  a.href=url;a.download=`tane-money-${new Date().toISOString().slice(0,7)}.csv`;
+                  document.body.appendChild(a);a.click();document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }} style={{width:"100%",padding:"11px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:12,color:B,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
+                  ⬇ CSVダウンロード
+                </button>
+              </div>
               {/* ログアウト */}
               <button onClick={()=>{
                 if(!confirm("このiPhoneからログアウトしますか？\nコードを入力すれば再びアクセスできます。"))return;
@@ -1567,6 +1588,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const myLogs   = (data.logs||[]).filter(l=>l.cid===child.id);
   const todayDone= data.gachaDate?.[child.id] === todayKey();
   const curStreak= data.streak?.[child.id]?.cur || 0;
+  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayKey())).map(l=>l.rid));
+  const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayKey()));
 
   // Apply interest on open
   useEffect(()=>{ applyInterest(data,update,child.id); fetchRealStockPrices(data,update); },[]);
@@ -1585,6 +1608,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const needApproval = fs.requireApproval && pts > 0;
     const alreadyPending = (data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);
     if(alreadyPending) return;
+    if(doneTodayIds.has(task.id)) return;
     setPressed(p=>({...p,[task.id]:true}));
     setTimeout(()=>setPressed(p=>{const n={...p};delete n[task.id];return n;}),500);
     if(needApproval) {
@@ -1693,8 +1717,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
           <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:GP,letterSpacing:0.5}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)}
-            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:SHADOW}}>
+            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:SHADOW,position:"relative"}}>
             ⚙
+            {(data.pendingApprovals||[]).length>0&&(
+              <div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>
+                {(data.pendingApprovals||[]).length}
+              </div>
+            )}
           </button>
         </div>
         {/* 残高カード + 種モンスター */}
@@ -1744,6 +1773,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
         ))}
       </div>
+
+      {/* ── ストリーク消滅リマインダー ── */}
+      {curStreak>=3 && !todayTaskDone && effectiveTab==="daily" && (
+        <div style={{margin:"10px 16px 0",background:`linear-gradient(135deg,#fff8e1,#fffde7)`,border:`2px solid ${GOLD}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:24}}>🔥</span>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:800,fontSize:13,color:"#b45309"}}>連続{curStreak}日！今日もタスクをやろう</div>
+            <div style={{fontSize:11,color:MUTED,marginTop:1}}>タスクを完了しないと記録が途切れるよ</div>
+          </div>
+        </div>
+      )}
 
       {/* ── 学ぶ（Teenモード） ── */}
       {effectiveTab==="learn" && !isJunior && (
@@ -1921,7 +1961,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const isDone=doneTodayIds.has(t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isDone?CARDS:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isDone?BORDER:isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isDone?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative",opacity:isDone?0.6:1}}>{isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:G,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>✓ 完了</div>}{isPending&&!isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>

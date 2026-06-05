@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="bd9924a">
+<meta name="tane-version" content="a60c82d">
 </head>
 <body>
   <div id="root"></div>
@@ -2500,7 +2500,7 @@ function SettingsModal({
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("grant");
+  const [settingsTab, setSettingsTab] = useState((data.pendingApprovals || []).length > 0 ? "approval" : "grant");
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
@@ -3742,7 +3742,60 @@ function SettingsModal({
         lineHeight: 1.6,
         paddingTop: 2
       }
-    }, t)))), /*#__PURE__*/React.createElement("button", {
+    }, t)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: BG,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginTop: 14
+      }
+    }, /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        margin: "0 0 8px"
+      }
+    }, "\uD83D\uDCCA \u30C7\u30FC\u30BF\u3092\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: MUTED,
+        margin: "0 0 12px"
+      }
+    }, "\u5168\u30ED\u30B0\u3092CSV\u30D5\u30A1\u30A4\u30EB\u3067\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3067\u304D\u307E\u3059\uFF08Excel\u5BFE\u5FDC\uFF09"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const rows = [["日付", "子ども", "種別", "内容", "pt"]];
+        (data.logs || []).forEach(l => {
+          const c = (data.children || []).find(x => x.id === l.cid);
+          rows.push([(l.date || "").slice(0, 10), c?.name || "", l.type, l.label || "", l.pts || 0]);
+        });
+        const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
+        const blob = new Blob(["" + csv], {
+          type: "text/csv;charset=utf-8"
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `tane-money-${new Date().toISOString().slice(0, 7)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      },
+      style: {
+        width: "100%",
+        padding: "11px",
+        background: `${B}15`,
+        border: `1.5px solid ${B}`,
+        borderRadius: 12,
+        color: B,
+        fontWeight: 700,
+        fontSize: 13,
+        cursor: "pointer",
+        fontFamily: F
+      }
+    }, "\u2B07 CSV\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9")), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         if (!confirm("このiPhoneからログアウトしますか？\nコードを入力すれば再びアクセスできます。")) return;
         try {
@@ -3799,6 +3852,8 @@ function ChildScreen({
   const myLogs = (data.logs || []).filter(l => l.cid === child.id);
   const todayDone = data.gachaDate?.[child.id] === todayKey();
   const curStreak = data.streak?.[child.id]?.cur || 0;
+  const doneTodayIds = new Set(myLogs.filter(l => l.rid && (l.date || "").startsWith(todayKey())).map(l => l.rid));
+  const todayTaskDone = myLogs.some(l => l.type === "good" && (l.date || "").startsWith(todayKey()));
 
   // Apply interest on open
   useEffect(() => {
@@ -3828,6 +3883,7 @@ function ChildScreen({
     const needApproval = fs.requireApproval && pts > 0;
     const alreadyPending = (data.pendingApprovals || []).some(p => p.cid === child.id && p.taskId === task.id);
     if (alreadyPending) return;
+    if (doneTodayIds.has(task.id)) return;
     setPressed(p => ({
       ...p,
       [task.id]: true
@@ -4104,9 +4160,28 @@ function ChildScreen({
       justifyContent: "center",
       cursor: "pointer",
       fontSize: 15,
-      boxShadow: SHADOW
+      boxShadow: SHADOW,
+      position: "relative"
     }
-  }, "\u2699")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2699", (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -5,
+      right: -5,
+      minWidth: 17,
+      height: 17,
+      borderRadius: 999,
+      background: R,
+      color: "#fff",
+      fontSize: 9,
+      fontWeight: 900,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 3px",
+      lineHeight: 1
+    }
+  }, (data.pendingApprovals || []).length))), /*#__PURE__*/React.createElement("div", {
     style: {
       background: GP,
       borderRadius: 22,
@@ -4285,7 +4360,38 @@ function ChildScreen({
       minWidth: 56,
       transition: "all .15s"
     }
-  }, l))), effectiveTab === "learn" && !isJunior && /*#__PURE__*/React.createElement(TipsSection, {
+  }, l))), curStreak >= 3 && !todayTaskDone && effectiveTab === "daily" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: "10px 16px 0",
+      background: `linear-gradient(135deg,#fff8e1,#fffde7)`,
+      border: `2px solid ${GOLD}`,
+      borderRadius: 14,
+      padding: "10px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 24
+    }
+  }, "\uD83D\uDD25"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 13,
+      color: "#b45309"
+    }
+  }, "\u9023\u7D9A", curStreak, "\u65E5\uFF01\u4ECA\u65E5\u3082\u30BF\u30B9\u30AF\u3092\u3084\u308D\u3046"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: MUTED,
+      marginTop: 1
+    }
+  }, "\u30BF\u30B9\u30AF\u3092\u5B8C\u4E86\u3057\u306A\u3044\u3068\u8A18\u9332\u304C\u9014\u5207\u308C\u308B\u3088"))), effectiveTab === "learn" && !isJunior && /*#__PURE__*/React.createElement(TipsSection, {
     ageMode: child.ageMode || "middle",
     child: child,
     data: data,
@@ -4788,15 +4894,16 @@ function ChildScreen({
       const pts = taskPts(t, child.id);
       const on = !!pressed[t.id];
       const isPending = (data.pendingApprovals || []).some(p => p.cid === child.id && p.taskId === t.id);
+      const isDone = doneTodayIds.has(t.id);
       return /*#__PURE__*/React.createElement("button", {
         key: t.id,
         onClick: () => doTask(t),
         style: {
-          background: isPending ? GOLDS : on ? "#e8faf0" : CARD,
-          border: `2.5px solid ${isPending ? GOLD : on ? G : BORDER}`,
+          background: isDone ? CARDS : isPending ? GOLDS : on ? "#e8faf0" : CARD,
+          border: `2.5px solid ${isDone ? BORDER : isPending ? GOLD : on ? G : BORDER}`,
           borderRadius: 18,
           padding: "13px 10px",
-          cursor: "pointer",
+          cursor: isDone ? "default" : "pointer",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -4804,9 +4911,22 @@ function ChildScreen({
           transform: on ? "scale(.92)" : "scale(1)",
           transition: "all .2s",
           fontFamily: F,
-          position: "relative"
+          position: "relative",
+          opacity: isDone ? 0.6 : 1
         }
-      }, isPending && /*#__PURE__*/React.createElement("div", {
+      }, isDone && /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: "absolute",
+          top: 4,
+          right: 4,
+          fontSize: 9,
+          background: G,
+          color: "#fff",
+          borderRadius: 999,
+          padding: "1px 5px",
+          fontWeight: 700
+        }
+      }, "\u2713 \u5B8C\u4E86"), isPending && !isDone && /*#__PURE__*/React.createElement("div", {
         style: {
           position: "absolute",
           top: 4,
