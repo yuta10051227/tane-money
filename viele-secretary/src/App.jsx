@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, GoogleAuthProvider } from "firebase/auth";
 import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
+import { CALENDAR_SCOPE, fetchWeekEvents, eventToEntry } from "./calendar";
 
 const STORE_KEY = "viele-secretary";
 
@@ -528,69 +529,73 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
 /* ──────────────────────────────────────────────────────────────
    今週の時間配分メーター（役割 ＋ 労働⟷仕組みの2軸）
    ────────────────────────────────────────────────────────────── */
-function TimeMeter() {
-  const total = LOG.reduce((s, e) => s + e.hours, 0);
-  const byCat = useMemo(() => {
-    const m = {};
-    for (const k of Object.keys(CAT)) m[k] = 0;
-    for (const e of LOG) m[e.cat] += e.hours;
-    return m;
-  }, []);
-  const labor = LOG.filter((e) => e.axis === "労働").reduce((s, e) => s + e.hours, 0);
+function TimeMeter({ entries, source, status, error, count, onConnect, connecting }) {
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const total = entries.reduce((s, e) => s + e.hours, 0);
+  const cats = Array.from(new Set([...Object.keys(CAT), ...entries.map((e) => e.cat)]));
+  const byCat = {};
+  cats.forEach((c) => (byCat[c] = 0));
+  entries.forEach((e) => { byCat[e.cat] = (byCat[e.cat] || 0) + e.hours; });
+  const labor = entries.filter((e) => e.axis === "労働").reduce((s, e) => s + e.hours, 0);
   const system = total - labor;
   const systemPct = total > 0 ? Math.round((system / total) * 100) : 0;
 
   return (
-    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {total}h</span>}>
-      <SampleNote>サンプル表示（準備中）— Googleカレンダー連携で自分の予定が反映されます。</SampleNote>
-      <div style={{ display: "grid", gap: 12 }}>
-        {Object.keys(CAT).map((cat) => (
-          <div key={cat}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: CAT[cat] }}>● {cat}</span>
-              <span style={{ color: C.sub }}>{byCat[cat]}h</span>
-            </div>
-            <Bar value={byCat[cat]} total={total} color={CAT[cat]} />
+    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
+      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
+      {total === 0 ? (
+        <Empty>{source === "calendar" ? "今週の時間指定の予定が見つかりませんでした。" : "データがありません。"}</Empty>
+      ) : (
+        <>
+          <div style={{ display: "grid", gap: 12 }}>
+            {cats.filter((c) => byCat[c] > 0).map((cat) => (
+              <div key={cat}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: CAT[cat] || C.faint }}>● {cat}</span>
+                  <span style={{ color: C.sub }}>{r1(byCat[cat])}h</span>
+                </div>
+                <Bar value={byCat[cat]} total={total} color={CAT[cat] || C.faint} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.sub, marginBottom: 6 }}>
-          <span>労働（自分が動く） {labor}h</span>
-          <span>仕組み（資産になる） {system}h</span>
-        </div>
-        <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden" }}>
-          <div style={{ width: `${100 - systemPct}%`, background: C.orange }} />
-          <div style={{ width: `${systemPct}%`, background: C.green }} />
-        </div>
-        <div style={{ fontSize: 12, color: systemPct >= 40 ? C.green : C.orange, marginTop: 8 }}>
-          仕組み化 {systemPct}% — {systemPct >= 40 ? "資産づくりに時間が回っています。" : "労働比率が高め。仕組み側へ寄せる余地あり。"}
-        </div>
-      </div>
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sub, marginBottom: 6 }}>
+              <span>労働（自分が動く） {r1(labor)}h</span>
+              <span>仕組み（資産になる） {r1(system)}h</span>
+            </div>
+            <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden" }}>
+              <div style={{ width: `${100 - systemPct}%`, background: C.orange }} />
+              <div style={{ width: `${systemPct}%`, background: C.green }} />
+            </div>
+            <div style={{ fontSize: 13, color: systemPct >= 40 ? C.green : C.orange, marginTop: 8 }}>
+              仕組み化 {systemPct}% — {systemPct >= 40 ? "資産づくりに時間が回っています。" : "労働比率が高め。仕組み側へ寄せる余地あり。"}
+            </div>
+          </div>
+        </>
+      )}
     </Panel>
   );
 }
 
 /* ──────────────────────────────────────────────────────────────
-   今日の予定（LOGから本日の曜日を抽出）
+   今日の予定（カレンダー連携 or サンプルから本日の曜日を抽出）
    ────────────────────────────────────────────────────────────── */
-function Today() {
+function Today({ entries, source, status, error, count, onConnect, connecting }) {
   const wd = new Date().getDay();
-  const items = LOG.filter((e) => e.wd === wd).sort((a, b) => a.time.localeCompare(b.time));
+  const items = entries.filter((e) => e.wd === wd).sort((a, b) => a.time.localeCompare(b.time));
   return (
     <Panel title={`今日の予定（${WD[wd]}曜）`} accent={C.blue}>
-      <SampleNote>サンプル表示（準備中）— Googleカレンダー連携で今日の予定が反映されます。</SampleNote>
+      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
       {items.length === 0 ? (
-        <Empty>今日の登録予定はありません。</Empty>
+        <Empty>今日の予定はありません。</Empty>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {items.map((e, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 13, width: 46 }}>{e.time}</span>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT[e.cat] }} />
-              <span style={{ flex: 1, fontSize: 14 }}>{e.title}</span>
-              <span style={{ fontSize: 11, color: CAT[e.cat] }}>{e.cat}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46 }}>{e.time}</span>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: CAT[e.cat] || C.faint }} />
+              <span style={{ flex: 1, fontSize: 15 }}>{e.title}</span>
+              <span style={{ fontSize: 12, color: CAT[e.cat] || C.faint }}>{e.cat}</span>
             </div>
           ))}
         </div>
@@ -725,12 +730,34 @@ function Empty({ children }) {
   return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
 }
 
-/* 固定サンプル（Phase2でカレンダー連携予定）の領域に出す注記 */
-function SampleNote({ children }) {
+/* カレンダー連携の状態表示＋連携ボタン（時間メーター/今日の予定の上に出す） */
+function CalStatusNote({ source, status, error, count, onConnect, connecting }) {
+  if (source === "calendar") {
+    return (
+      <div style={{ fontSize: 12, color: C.green, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
+        <span>✅</span>
+        <span>Googleカレンダー連携中（今週 {count}件を反映）</span>
+      </div>
+    );
+  }
+  const isErr = status === "error";
   return (
-    <div style={{ fontSize: 11, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
-      <span>⚙️</span>
-      <span>{children}</span>
+    <div style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${isErr ? C.red : C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 8 }}>
+        <span>{isErr ? "⚠️" : "⚙️"}</span>
+        <span style={{ color: isErr ? C.red : C.sub, wordBreak: "break-word" }}>
+          {isErr
+            ? `カレンダー取得に失敗：${(error && error.message) || error}`
+            : "サンプル表示（準備中）— Googleカレンダーと連携すると、今週の実績が自動で反映されます。"}
+        </span>
+      </div>
+      <button
+        onClick={onConnect}
+        disabled={connecting}
+        style={{ ...chipBtn, background: connecting ? "transparent" : C.text, color: connecting ? C.sub : "#0B0D11", borderColor: connecting ? C.line : C.text, fontWeight: 700 }}
+      >
+        {connecting ? "連携中…" : isErr ? "再連携する" : "Googleカレンダーを連携"}
+      </button>
     </div>
   );
 }
@@ -795,6 +822,49 @@ export default function App() {
   };
   const fontLabel = fontScale >= 1.3 ? "特大" : fontScale > 1 ? "大" : "標準";
   const seed = useMemo(() => makeSeed(), []);
+
+  // ── Googleカレンダー連携（任意・クライアント側）──
+  const [calToken, setCalToken] = useState(() => sessionStorage.getItem("viele-cal-token") || null);
+  const [calEvents, setCalEvents] = useState([]);
+  const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
+  const [calError, setCalError] = useState(null);
+  const [connecting, setConnecting] = useState(false);
+
+  useEffect(() => {
+    if (!calToken) return;
+    let cancelled = false;
+    setCalStatus("loading");
+    setCalError(null);
+    fetchWeekEvents(calToken)
+      .then((evs) => { if (!cancelled) { setCalEvents(evs); setCalStatus("ok"); } })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.status === 401) { sessionStorage.removeItem("viele-cal-token"); setCalToken(null); }
+        setCalError(err);
+        setCalStatus("error");
+      });
+    return () => { cancelled = true; };
+  }, [calToken]);
+
+  const calEntries = useMemo(() => calEvents.map(eventToEntry), [calEvents]);
+
+  // 連携（カレンダー読み取り権限を追加要求して再認証→アクセストークン取得）
+  const connectCalendar = async () => {
+    setConnecting(true);
+    setCalError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope(CALENDAR_SCOPE);
+      const result = await signInWithPopup(auth, provider);
+      const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+      if (token) { sessionStorage.setItem("viele-cal-token", token); setCalToken(token); }
+      else { setCalError(new Error("アクセストークンを取得できませんでした")); setCalStatus("error"); }
+    } catch (e) {
+      setCalError(e);
+      setCalStatus("error");
+    }
+    setConnecting(false);
+  };
 
   // Firebase設定があればクラウド同期、なければこの端末にローカル保存。
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
@@ -883,6 +953,19 @@ export default function App() {
   const today = new Date();
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
 
+  // 時間配分・今日の予定の元データ：カレンダー連携OKなら実データ、なければサンプルLOG
+  const usingCal = !!calToken && calStatus === "ok";
+  const scheduleEntries = usingCal ? calEntries : LOG;
+  const scheduleSource = usingCal ? "calendar" : "sample";
+  const calProps = {
+    source: scheduleSource,
+    status: calStatus,
+    error: calError,
+    onConnect: connectCalendar,
+    connecting,
+    count: calEntries.length,
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif" }}>
       {/* ヘッダー */}
@@ -917,8 +1000,8 @@ export default function App() {
           onRemoveItem={removeTripItem}
         />
         <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
-        <TimeMeter />
-        <Today />
+        <TimeMeter entries={scheduleEntries} {...calProps} />
+        <Today entries={scheduleEntries} {...calProps} />
 
         <CheckList
           title="コンテンツ制作サイクル"
