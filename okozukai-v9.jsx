@@ -418,6 +418,7 @@ function migrate(d) {
   if(!d.pendingApprovals) d.pendingApprovals=[];
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
+  if(!d.onboardingChecks) d.onboardingChecks={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms={investment:"trade",forex:"trade",dailyBonus:true,ranking:true};
   const defaultChildVis={balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"};
@@ -1101,6 +1102,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [settingsGroup, setSettingsGroup] = useState("quick");
   const [settingsTab, setSettingsTab] = useState((data.pendingApprovals||[]).length>0?"approval":"grant");
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
@@ -1119,30 +1121,32 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
     setPin(next);
     if(next.length === 4) {
       if(next === data.parentPin) {
-        setTimeout(()=>setAuthed(true), 200);
+        setTimeout(()=>{
+          setAuthed(true);
+          if(data.parentPin==="0000"){ setSettingsGroup("adv"); setSettingsTab("members"); }
+        }, 200);
       } else {
         setTimeout(()=>{setPinErr(true);setPin("");}, 300);
       }
     }
   };
 
-  const SETTING_TABS = [
-    ["grant","🎁 pt付与"],
-    ["approval","✅ 承認"],
-    ["tasks","📋 タスク"],
-    ["assign","👤 個別割当"],
-    ["rewards","🎁 特典"],
-    ["interest","💹 利子"],
-    ["members","👨 メンバー"],
-    ["transfer","🔄 引き継ぎ"],
-  ];
+  const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
+  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["members","🔐 PIN"],["transfer","🔄 引継"]];
+  const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
 
   if(!authed) return (
     <div style={{position:"fixed",inset:0,background:"#000a",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
       <div style={{background:CARD,borderRadius:24,padding:"32px 24px",width:"100%",maxWidth:320,textAlign:"center",boxShadow:"0 8px 40px #0004"}}>
         <div style={{fontSize:44,marginBottom:8}}>🔐</div>
         <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 4px"}}>設定・管理</h3>
-        <p style={{color:MUTED,fontSize:12,margin:"0 0 20px"}}>おや用PIN（初期：0000）</p>
+        <p style={{color:MUTED,fontSize:12,margin:"0 0 12px"}}>おや用PIN（初期：0000）</p>
+        {data.parentPin==="0000"&&(
+          <div style={{background:`${R}12`,border:`1.5px solid ${R}50`,borderRadius:12,padding:"10px 14px",marginBottom:14,textAlign:"left"}}>
+            <p style={{margin:0,fontSize:12,color:R,fontWeight:700}}>⚠ PINが初期値のままです</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:MUTED}}>認証後、すぐに変更してください</p>
+          </div>
+        )}
         <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:16}}>
           {[0,1,2,3].map(i=>(
             <div key={i} style={{width:14,height:14,borderRadius:"50%",background:pin.length>i?(pinErr?R:TEXT):BORDER,transition:"background .15s"}}/>
@@ -1173,12 +1177,21 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:24,cursor:"pointer",color:MUTED}}>✕</button>
         </div>
+        {/* グループ切り替え */}
+        <div style={{display:"flex",gap:6,padding:"12px 16px 0",flexShrink:0}}>
+          {[["quick","⚡ よく使う"],["adv","⚙ 詳細設定"]].map(([g,l])=>(
+            <button key={g} onClick={()=>{setSettingsGroup(g);setSettingsTab(g==="quick"?"grant":"tasks");}}
+              style={{flex:1,padding:"7px 0",borderRadius:10,border:"none",background:settingsGroup===g?GP:"transparent",color:settingsGroup===g?"#fff":MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              {l}
+            </button>
+          ))}
+        </div>
         {/* タブ */}
-        <div style={{display:"flex",gap:0,padding:"12px 16px 0",overflowX:"auto",flexShrink:0}}>
+        <div style={{display:"flex",gap:0,padding:"6px 16px 0",overflowX:"auto",flexShrink:0}}>
           {SETTING_TABS.map(([v,l])=>(
             <button key={v} onClick={()=>setSettingsTab(v)}
               style={{padding:"8px 14px",border:"none",borderBottom:settingsTab===v?`3px solid ${Y}`:"3px solid transparent",background:"none",color:settingsTab===v?TEXT:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
-              {l}
+              {l}{v==="approval"&&(data.pendingApprovals||[]).length>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length}</span>}
             </button>
           ))}
         </div>
@@ -1976,7 +1989,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
             </div>
           </>}
-          {filtGood.length===0&&filtBad.length===0&&<div style={{textAlign:"center",padding:"32px 0"}}><p style={{color:MUTED}}>タスクが選択されていないよ</p><button onClick={()=>setShowCustomizer(true)} style={{marginTop:8,background:G,border:"none",borderRadius:12,padding:"10px 20px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>リストを編集する</button></div>}
+          {filtGood.length===0&&filtBad.length===0&&(
+            <div style={{textAlign:"center",padding:"32px 16px"}}>
+              {(data.goodTasks||[]).length>0
+                ?<><div style={{fontSize:40,marginBottom:12}}>✅</div><p style={{fontWeight:800,fontSize:15,color:TEXT,margin:"0 0 8px"}}>やることリストを作ろう！</p><p style={{color:MUTED,fontSize:12,margin:"0 0 16px"}}>お手伝いの中から好きなものを選んでね</p><button onClick={()=>setShowCustomizer(true)} style={{background:G,border:"none",borderRadius:12,padding:"12px 28px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:F}}>リストを選ぶ →</button></>
+                :<><div style={{fontSize:40,marginBottom:12}}>📋</div><p style={{fontWeight:800,fontSize:15,color:TEXT,margin:"0 0 8px"}}>お手伝いが登録されていないよ</p><p style={{color:MUTED,fontSize:12}}>🔐 おや管理からタスクを追加してもらおう！</p></>
+              }
+            </div>
+          )}
         </div>);
       })()}
       {effectiveTab==="activity"&&actTab==="invest"&&!young&&<InvestTab child={child} data={data} update={update}/>}
@@ -3663,8 +3683,9 @@ function ParentScreen({ data, update, onBack }) {
 // ═══════════════════════════════════════════════════════
 // HOME
 // ═══════════════════════════════════════════════════════
-function HomeScreen({ data, onChild, onParent, onParentCard }) {
+function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboardGuide, setShowOnboardGuide] = useState(false);
   const allMembers = [
     ...data.children.map(c=>({...c, isChild:true})),
     ...(data.parents||[]).map(p=>({...p, isChild:false})),
@@ -3684,6 +3705,14 @@ function HomeScreen({ data, onChild, onParent, onParentCard }) {
     return{label:g.label,pct,target:g.target};
   };
 
+  const onboardChecks = {
+    pin: data.parentPin !== "0000",
+    tasks: !!(data.onboardingChecks?.tasksOpened),
+    rewards: !!(data.onboardingChecks?.rewardsOpened),
+  };
+  const onboardRemaining = Object.values(onboardChecks).filter(v=>!v).length;
+  const showOnboard = data.setupComplete === true && onboardRemaining > 0;
+
   return (
     <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:32}}>
       {/* ヘッダー */}
@@ -3697,8 +3726,9 @@ function HomeScreen({ data, onChild, onParent, onParentCard }) {
             </div>
           </div>
           <button onClick={()=>setShowSettings(true)}
-            style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)"}}>
+            style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)",position:"relative"}}>
             ⚙
+            {data.parentPin==="0000"&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
           </button>
         </div>
         <div style={{fontSize:13,fontWeight:700,color:TEXT}}>メンバーを選択</div>
@@ -3769,6 +3799,54 @@ function HomeScreen({ data, onChild, onParent, onParentCard }) {
           </span>
         </div>
       </div>
+
+      {/* 初心者ガイド 浮きボタン（LINE Farm風） */}
+      {showOnboard&&(
+        <div style={{position:"fixed",left:10,top:220,zIndex:500}}>
+          <button onClick={()=>setShowOnboardGuide(true)} style={{background:CARD,border:`2px solid ${GP}`,borderRadius:20,padding:"10px 7px",boxShadow:`0 4px 18px ${GP}30`,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",fontFamily:F,position:"relative",width:54}}>
+            {onboardRemaining>0&&<div style={{position:"absolute",top:-7,right:-7,width:20,height:20,borderRadius:"50%",background:R,color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{onboardRemaining}</div>}
+            <span style={{fontSize:22}}>📋</span>
+            <span style={{fontSize:8,fontWeight:800,color:GP,lineHeight:1.3,textAlign:"center"}}>初心者<br/>ガイド</span>
+          </button>
+        </div>
+      )}
+
+      {/* 初心者ガイド モーダル */}
+      {showOnboardGuide&&(
+        <div style={{position:"fixed",inset:0,background:"#0008",zIndex:9100,display:"flex",alignItems:"flex-end",fontFamily:F}} onClick={()=>setShowOnboardGuide(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:CARD,borderRadius:"24px 24px 0 0",width:"100%",padding:"24px 20px 48px",boxShadow:"0 -8px 32px rgba(24,35,29,0.12)"}}>
+            <div style={{width:36,height:4,borderRadius:999,background:BORDER,margin:"0 auto 16px"}}/>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+              <span style={{fontSize:22}}>📋</span>
+              <h3 style={{fontWeight:900,fontSize:17,color:TEXT,margin:0}}>初心者ガイド</h3>
+              {onboardRemaining>0&&<span style={{background:R,color:"#fff",borderRadius:999,padding:"2px 9px",fontSize:11,fontWeight:900}}>{onboardRemaining}つ残り</span>}
+            </div>
+            <p style={{color:MUTED,fontSize:12,margin:"0 0 18px"}}>最初に設定しておくと安心！</p>
+            {[
+              {key:"pin",emoji:"🔐",title:"PINを変更する",desc:"おや管理 → 詳細設定 → PIN タブ",done:onboardChecks.pin,
+               action:()=>{setShowOnboardGuide(false);onParent();}},
+              {key:"tasks",emoji:"📋",title:"タスクを確認する",desc:"おや管理 → 詳細設定 → タスク タブ",done:onboardChecks.tasks,
+               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),tasksOpened:true}}));setShowOnboardGuide(false);onParent();}},
+              {key:"rewards",emoji:"🎁",title:"特典を確認する",desc:"おや管理 → 詳細設定 → 特典 タブ",done:onboardChecks.rewards,
+               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),rewardsOpened:true}}));setShowOnboardGuide(false);onParent();}},
+            ].map(item=>(
+              <div key={item.key} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 0",borderBottom:`1px solid ${BORDER}`}}>
+                <div style={{width:44,height:44,borderRadius:14,background:item.done?GS:BG,border:`2px solid ${item.done?G:BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {item.done?"✅":item.emoji}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,color:item.done?MUTED:TEXT,textDecoration:item.done?"line-through":"none"}}>{item.title}</div>
+                  <div style={{fontSize:11,color:MUTED,marginTop:2}}>{item.desc}</div>
+                </div>
+                {!item.done&&<button onClick={item.action} style={{padding:"8px 14px",background:GP,border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>開く →</button>}
+              </div>
+            ))}
+            <button onClick={()=>setShowOnboardGuide(false)} style={{width:"100%",marginTop:16,padding:"11px",background:"transparent",border:`1.5px solid ${BORDER}`,borderRadius:12,color:MUTED,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
+              後で確認する
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 設定モーダル */}
       {showSettings&&(
@@ -5233,6 +5311,7 @@ function SetupWizard({ data, update, onComplete }) {
   const [goalEmoji,     setGoalEmoji]    = useState("🎮");
   const [goalLabel,     setGoalLabel]    = useState("");
   const [goalTarget,    setGoalTarget]   = useState("");
+  const [goalSkipped,   setGoalSkipped]  = useState(false);
 
   const [familyCode] = useState(()=>`TANE-${Math.random().toString(36).slice(2,6).toUpperCase()}`);
   const [joinMode, setJoinMode] = useState(false);
@@ -5243,7 +5322,7 @@ function SetupWizard({ data, update, onComplete }) {
   const GOAL_EMOJIS  = ["🎮","📱","🎵","🚴","✈","👟","📚","🎨","⚽","🍰","💻","🎸","🏊","🎀","🌍","🍜"];
   const STARTER_TASKS = (data?.goodTasks||[]).slice(0,10);
 
-  const handleComplete = (skipGoal=false) => {
+  const handleComplete = (skipGoal=false, parentPin="0000") => {
     const childId = uid();
     const newChild = {
       id:childId, name:childName.trim()||"こども", emoji:childEmoji,
@@ -5268,6 +5347,7 @@ function SetupWizard({ data, update, onComplete }) {
       myTaskIds:selectedTasks.length>0?{[childId]:selectedTasks}:{},
       tutorialSeen:{[childId]:true},
       setupComplete:true,
+      parentPin: parentPin||"0000",
       logs:[bonusLog],
       gachaDate:{}, streak:{},
     }));
@@ -5284,15 +5364,15 @@ function SetupWizard({ data, update, onComplete }) {
   return (
     <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${GS} 0%,#fff 50%,${GOLDS} 100%)`,fontFamily:F,display:"flex",flexDirection:"column",padding:"56px 24px 40px",maxWidth:480,margin:"0 auto",boxSizing:"border-box"}}>
 
-      {/* プログレスバー (step 1〜4) */}
-      {step>=1&&step<=4&&(
+      {/* プログレスバー (step 1〜5) */}
+      {step>=1&&step<=5&&(
         <div style={{marginBottom:28}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span style={{fontSize:11,color:MUTED,fontWeight:700}}>ステップ {step} / 4</span>
-            <button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:"none",color:GP,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>← もどる</button>
+            <span style={{fontSize:11,color:MUTED,fontWeight:700}}>ステップ {step} / 5</span>
+            {step<5&&<button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:"none",color:GP,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>← もどる</button>}
           </div>
           <div style={{background:BORDER,borderRadius:999,height:6,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${step/4*100}%`,background:G,borderRadius:999,transition:"width .4s ease"}}/>
+            <div style={{height:"100%",width:`${step/5*100}%`,background:G,borderRadius:999,transition:"width .4s ease"}}/>
           </div>
         </div>
       )}
@@ -5437,11 +5517,24 @@ function SetupWizard({ data, update, onComplete }) {
               placeholder="目標pt（例：500）" style={{...INP,flex:1,fontSize:15}}/>
             <span style={{fontSize:13,color:MUTED,fontWeight:700,flexShrink:0}}>pt</span>
           </div>
-          <button onClick={()=>handleComplete(false)} style={{...btnStyle(true),marginBottom:10,background:GP,boxShadow:`0 6px 20px ${GP}40`}}>
-            完成！🎉
+          <button onClick={()=>{setGoalSkipped(false);setStep(5);}} style={{...btnStyle(true),marginBottom:10,background:GP,boxShadow:`0 6px 20px ${GP}40`}}>
+            次へ → PIN設定
           </button>
-          <button onClick={()=>handleComplete(true)} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"6px"}}>
-            スキップして始める
+          <button onClick={()=>{setGoalSkipped(true);setStep(5);}} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"6px"}}>
+            スキップしてPIN設定へ
+          </button>
+        </div>
+      )}
+
+      {/* Step 5: おや用PIN設定 */}
+      {step===5&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center"}}>
+          <div style={{fontSize:56,marginBottom:16}}>🔐</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 8px"}}>おや用PINを設定しよう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 28px",lineHeight:1.7}}>子どもに見られないよう<br/>4けたの番号を決めよう</p>
+          <PinInput onDone={pin=>handleComplete(goalSkipped,pin)}/>
+          <button onClick={()=>handleComplete(goalSkipped,"0000")} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"20px 0 0"}}>
+            スキップして後で設定する
           </button>
         </div>
       )}
@@ -5813,7 +5906,7 @@ export default function App() {
       </div>
 
       {screen==="home" && (
-        <HomeScreen data={data}
+        <HomeScreen data={data} update={update}
           onChild={child=>{
             setActiveChild(child);
             // PINなし設定の場合は直接画面へ

@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="a60c82d">
+<meta name="tane-version" content="6c0443d">
 </head>
 <body>
   <div id="root"></div>
@@ -1000,6 +1000,7 @@ function migrate(d) {
     ...INIT.familySettings
   };
   if (d.familySettings.requireApproval === undefined) d.familySettings.requireApproval = false;
+  if (!d.onboardingChecks) d.onboardingChecks = {};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms = {
     investment: "trade",
@@ -2500,6 +2501,7 @@ function SettingsModal({
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [settingsGroup, setSettingsGroup] = useState("quick");
   const [settingsTab, setSettingsTab] = useState((data.pendingApprovals || []).length > 0 ? "approval" : "grant");
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
@@ -2537,7 +2539,13 @@ function SettingsModal({
     setPin(next);
     if (next.length === 4) {
       if (next === data.parentPin) {
-        setTimeout(() => setAuthed(true), 200);
+        setTimeout(() => {
+          setAuthed(true);
+          if (data.parentPin === "0000") {
+            setSettingsGroup("adv");
+            setSettingsTab("members");
+          }
+        }, 200);
       } else {
         setTimeout(() => {
           setPinErr(true);
@@ -2546,7 +2554,9 @@ function SettingsModal({
       }
     }
   };
-  const SETTING_TABS = [["grant", "🎁 pt付与"], ["approval", "✅ 承認"], ["tasks", "📋 タスク"], ["assign", "👤 個別割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "👨 メンバー"], ["transfer", "🔄 引き継ぎ"]];
+  const QUICK_TABS = [["grant", "🎁 pt付与"], ["approval", "✅ 承認"]];
+  const ADV_TABS = [["tasks", "📋 タスク"], ["assign", "👤 割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "🔐 PIN"], ["transfer", "🔄 引継"]];
+  const SETTING_TABS = settingsGroup === "quick" ? QUICK_TABS : ADV_TABS;
   if (!authed) return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
@@ -2584,9 +2594,31 @@ function SettingsModal({
     style: {
       color: MUTED,
       fontSize: 12,
-      margin: "0 0 20px"
+      margin: "0 0 12px"
     }
-  }, "\u304A\u3084\u7528PIN\uFF08\u521D\u671F\uFF1A0000\uFF09"), /*#__PURE__*/React.createElement("div", {
+  }, "\u304A\u3084\u7528PIN\uFF08\u521D\u671F\uFF1A0000\uFF09"), data.parentPin === "0000" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: `${R}12`,
+      border: `1.5px solid ${R}50`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 14,
+      textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontSize: 12,
+      color: R,
+      fontWeight: 700
+    }
+  }, "\u26A0 PIN\u304C\u521D\u671F\u5024\u306E\u307E\u307E\u3067\u3059"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "3px 0 0",
+      fontSize: 11,
+      color: MUTED
+    }
+  }, "\u8A8D\u8A3C\u5F8C\u3001\u3059\u3050\u306B\u5909\u66F4\u3057\u3066\u304F\u3060\u3055\u3044")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "center",
@@ -2694,8 +2726,33 @@ function SettingsModal({
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 0,
+      gap: 6,
       padding: "12px 16px 0",
+      flexShrink: 0
+    }
+  }, [["quick", "⚡ よく使う"], ["adv", "⚙ 詳細設定"]].map(([g, l]) => /*#__PURE__*/React.createElement("button", {
+    key: g,
+    onClick: () => {
+      setSettingsGroup(g);
+      setSettingsTab(g === "quick" ? "grant" : "tasks");
+    },
+    style: {
+      flex: 1,
+      padding: "7px 0",
+      borderRadius: 10,
+      border: "none",
+      background: settingsGroup === g ? GP : "transparent",
+      color: settingsGroup === g ? "#fff" : MUTED,
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, l))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 0,
+      padding: "6px 16px 0",
       overflowX: "auto",
       flexShrink: 0
     }
@@ -2714,7 +2771,17 @@ function SettingsModal({
       fontFamily: F,
       whiteSpace: "nowrap"
     }
-  }, l))), /*#__PURE__*/React.createElement("div", {
+  }, l, v === "approval" && (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 5,
+      background: R,
+      color: "#fff",
+      borderRadius: 999,
+      padding: "0 5px",
+      fontSize: 10,
+      fontWeight: 900
+    }
+  }, (data.pendingApprovals || []).length)))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflowY: "auto",
@@ -5039,27 +5106,57 @@ function ChildScreen({
     })))), filtGood.length === 0 && filtBad.length === 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
-        padding: "32px 0"
+        padding: "32px 16px"
       }
-    }, /*#__PURE__*/React.createElement("p", {
+    }, (data.goodTasks || []).length > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
-        color: MUTED
+        fontSize: 40,
+        marginBottom: 12
       }
-    }, "\u30BF\u30B9\u30AF\u304C\u9078\u629E\u3055\u308C\u3066\u3044\u306A\u3044\u3088"), /*#__PURE__*/React.createElement("button", {
+    }, "\u2705"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontWeight: 800,
+        fontSize: 15,
+        color: TEXT,
+        margin: "0 0 8px"
+      }
+    }, "\u3084\u308B\u3053\u3068\u30EA\u30B9\u30C8\u3092\u4F5C\u308D\u3046\uFF01"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12,
+        margin: "0 0 16px"
+      }
+    }, "\u304A\u624B\u4F1D\u3044\u306E\u4E2D\u304B\u3089\u597D\u304D\u306A\u3082\u306E\u3092\u9078\u3093\u3067\u306D"), /*#__PURE__*/React.createElement("button", {
       onClick: () => setShowCustomizer(true),
       style: {
-        marginTop: 8,
         background: G,
         border: "none",
         borderRadius: 12,
-        padding: "10px 20px",
+        padding: "12px 28px",
         color: "#fff",
         fontWeight: 700,
-        fontSize: 13,
+        fontSize: 14,
         cursor: "pointer",
         fontFamily: F
       }
-    }, "\u30EA\u30B9\u30C8\u3092\u7DE8\u96C6\u3059\u308B")));
+    }, "\u30EA\u30B9\u30C8\u3092\u9078\u3076 \u2192")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 40,
+        marginBottom: 12
+      }
+    }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontWeight: 800,
+        fontSize: 15,
+        color: TEXT,
+        margin: "0 0 8px"
+      }
+    }, "\u304A\u624B\u4F1D\u3044\u304C\u767B\u9332\u3055\u308C\u3066\u3044\u306A\u3044\u3088"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12
+      }
+    }, "\uD83D\uDD10 \u304A\u3084\u7BA1\u7406\u304B\u3089\u30BF\u30B9\u30AF\u3092\u8FFD\u52A0\u3057\u3066\u3082\u3089\u304A\u3046\uFF01"))));
   })(), effectiveTab === "activity" && actTab === "invest" && !young && /*#__PURE__*/React.createElement(InvestTab, {
     child: child,
     data: data,
@@ -10400,11 +10497,13 @@ function ParentScreen({
 // ═══════════════════════════════════════════════════════
 function HomeScreen({
   data,
+  update,
   onChild,
   onParent,
   onParentCard
 }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboardGuide, setShowOnboardGuide] = useState(false);
   const allMembers = [...data.children.map(c => ({
     ...c,
     isChild: true
@@ -10428,6 +10527,13 @@ function HomeScreen({
       target: g.target
     };
   };
+  const onboardChecks = {
+    pin: data.parentPin !== "0000",
+    tasks: !!data.onboardingChecks?.tasksOpened,
+    rewards: !!data.onboardingChecks?.rewardsOpened
+  };
+  const onboardRemaining = Object.values(onboardChecks).filter(v => !v).length;
+  const showOnboard = data.setupComplete === true && onboardRemaining > 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -10490,9 +10596,21 @@ function HomeScreen({
       alignItems: "center",
       justifyContent: "center",
       cursor: "pointer",
-      boxShadow: "0 2px 8px rgba(24,35,29,0.05)"
+      boxShadow: "0 2px 8px rgba(24,35,29,0.05)",
+      position: "relative"
     }
-  }, "\u2699")), /*#__PURE__*/React.createElement("div", {
+  }, "\u2699", data.parentPin === "0000" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -4,
+      right: -4,
+      width: 10,
+      height: 10,
+      borderRadius: "50%",
+      background: R,
+      border: "2px solid #fff"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 700,
@@ -10718,7 +10836,233 @@ function HomeScreen({
     } catch (e) {
       return "---";
     }
-  })()))), showSettings && /*#__PURE__*/React.createElement("div", {
+  })()))), showOnboard && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      left: 10,
+      top: 220,
+      zIndex: 500
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowOnboardGuide(true),
+    style: {
+      background: CARD,
+      border: `2px solid ${GP}`,
+      borderRadius: 20,
+      padding: "10px 7px",
+      boxShadow: `0 4px 18px ${GP}30`,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3,
+      cursor: "pointer",
+      fontFamily: F,
+      position: "relative",
+      width: 54
+    }
+  }, onboardRemaining > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: -7,
+      right: -7,
+      width: 20,
+      height: 20,
+      borderRadius: "50%",
+      background: R,
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 900,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "2px solid #fff"
+    }
+  }, onboardRemaining), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 22
+    }
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      fontWeight: 800,
+      color: GP,
+      lineHeight: 1.3,
+      textAlign: "center"
+    }
+  }, "\u521D\u5FC3\u8005", /*#__PURE__*/React.createElement("br", null), "\u30AC\u30A4\u30C9"))), showOnboardGuide && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "#0008",
+      zIndex: 9100,
+      display: "flex",
+      alignItems: "flex-end",
+      fontFamily: F
+    },
+    onClick: () => setShowOnboardGuide(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      background: CARD,
+      borderRadius: "24px 24px 0 0",
+      width: "100%",
+      padding: "24px 20px 48px",
+      boxShadow: "0 -8px 32px rgba(24,35,29,0.12)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 36,
+      height: 4,
+      borderRadius: 999,
+      background: BORDER,
+      margin: "0 auto 16px"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 22
+    }
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("h3", {
+    style: {
+      fontWeight: 900,
+      fontSize: 17,
+      color: TEXT,
+      margin: 0
+    }
+  }, "\u521D\u5FC3\u8005\u30AC\u30A4\u30C9"), onboardRemaining > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: R,
+      color: "#fff",
+      borderRadius: 999,
+      padding: "2px 9px",
+      fontSize: 11,
+      fontWeight: 900
+    }
+  }, onboardRemaining, "\u3064\u6B8B\u308A")), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: MUTED,
+      fontSize: 12,
+      margin: "0 0 18px"
+    }
+  }, "\u6700\u521D\u306B\u8A2D\u5B9A\u3057\u3066\u304A\u304F\u3068\u5B89\u5FC3\uFF01"), [{
+    key: "pin",
+    emoji: "🔐",
+    title: "PINを変更する",
+    desc: "おや管理 → 詳細設定 → PIN タブ",
+    done: onboardChecks.pin,
+    action: () => {
+      setShowOnboardGuide(false);
+      onParent();
+    }
+  }, {
+    key: "tasks",
+    emoji: "📋",
+    title: "タスクを確認する",
+    desc: "おや管理 → 詳細設定 → タスク タブ",
+    done: onboardChecks.tasks,
+    action: () => {
+      if (update) update(d => ({
+        ...d,
+        onboardingChecks: {
+          ...(d.onboardingChecks || {}),
+          tasksOpened: true
+        }
+      }));
+      setShowOnboardGuide(false);
+      onParent();
+    }
+  }, {
+    key: "rewards",
+    emoji: "🎁",
+    title: "特典を確認する",
+    desc: "おや管理 → 詳細設定 → 特典 タブ",
+    done: onboardChecks.rewards,
+    action: () => {
+      if (update) update(d => ({
+        ...d,
+        onboardingChecks: {
+          ...(d.onboardingChecks || {}),
+          rewardsOpened: true
+        }
+      }));
+      setShowOnboardGuide(false);
+      onParent();
+    }
+  }].map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.key,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "13px 0",
+      borderBottom: `1px solid ${BORDER}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      background: item.done ? GS : BG,
+      border: `2px solid ${item.done ? G : BORDER}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 20,
+      flexShrink: 0
+    }
+  }, item.done ? "✅" : item.emoji), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: item.done ? MUTED : TEXT,
+      textDecoration: item.done ? "line-through" : "none"
+    }
+  }, item.title), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: MUTED,
+      marginTop: 2
+    }
+  }, item.desc)), !item.done && /*#__PURE__*/React.createElement("button", {
+    onClick: item.action,
+    style: {
+      padding: "8px 14px",
+      background: GP,
+      border: "none",
+      borderRadius: 10,
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F,
+      flexShrink: 0
+    }
+  }, "\u958B\u304F \u2192"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowOnboardGuide(false),
+    style: {
+      width: "100%",
+      marginTop: 16,
+      padding: "11px",
+      background: "transparent",
+      border: `1.5px solid ${BORDER}`,
+      borderRadius: 12,
+      color: MUTED,
+      fontWeight: 700,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u5F8C\u3067\u78BA\u8A8D\u3059\u308B"))), showSettings && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,
@@ -14851,6 +15195,7 @@ function SetupWizard({
   const [goalEmoji, setGoalEmoji] = useState("🎮");
   const [goalLabel, setGoalLabel] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
+  const [goalSkipped, setGoalSkipped] = useState(false);
   const [familyCode] = useState(() => `TANE-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
   const [joinMode, setJoinMode] = useState(false);
   const [joinCode, setJoinCode] = useState("");
@@ -14858,7 +15203,7 @@ function SetupWizard({
   const CHILD_EMOJIS = ["⚡", "🌸", "🌟", "🦁", "🐯", "🐬", "🦊", "🐼", "🐉", "🌈", "🎸", "⚽", "🚀", "🎮", "🦄", "🐶", "🐱", "🍕"];
   const GOAL_EMOJIS = ["🎮", "📱", "🎵", "🚴", "✈", "👟", "📚", "🎨", "⚽", "🍰", "💻", "🎸", "🏊", "🎀", "🌍", "🍜"];
   const STARTER_TASKS = (data?.goodTasks || []).slice(0, 10);
-  const handleComplete = (skipGoal = false) => {
+  const handleComplete = (skipGoal = false, parentPin = "0000") => {
     const childId = uid();
     const newChild = {
       id: childId,
@@ -14916,6 +15261,7 @@ function SetupWizard({
         [childId]: true
       },
       setupComplete: true,
+      parentPin: parentPin || "0000",
       logs: [bonusLog],
       gachaDate: {},
       streak: {}
@@ -14948,7 +15294,7 @@ function SetupWizard({
       margin: "0 auto",
       boxSizing: "border-box"
     }
-  }, step >= 1 && step <= 4 && /*#__PURE__*/React.createElement("div", {
+  }, step >= 1 && step <= 5 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 28
     }
@@ -14965,7 +15311,7 @@ function SetupWizard({
       color: MUTED,
       fontWeight: 700
     }
-  }, "\u30B9\u30C6\u30C3\u30D7 ", step, " / 4"), /*#__PURE__*/React.createElement("button", {
+  }, "\u30B9\u30C6\u30C3\u30D7 ", step, " / 5"), step < 5 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setStep(s => s - 1),
     style: {
       background: "none",
@@ -14986,7 +15332,7 @@ function SetupWizard({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       height: "100%",
-      width: `${step / 4 * 100}%`,
+      width: `${step / 5 * 100}%`,
       background: G,
       borderRadius: 999,
       transition: "width .4s ease"
@@ -15449,15 +15795,21 @@ function SetupWizard({
       flexShrink: 0
     }
   }, "pt")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => handleComplete(false),
+    onClick: () => {
+      setGoalSkipped(false);
+      setStep(5);
+    },
     style: {
       ...btnStyle(true),
       marginBottom: 10,
       background: GP,
       boxShadow: `0 6px 20px ${GP}40`
     }
-  }, "\u5B8C\u6210\uFF01\uD83C\uDF89"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => handleComplete(true),
+  }, "\u6B21\u3078 \u2192 PIN\u8A2D\u5B9A"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setGoalSkipped(true);
+      setStep(5);
+    },
     style: {
       width: "100%",
       background: "transparent",
@@ -15469,7 +15821,49 @@ function SetupWizard({
       fontWeight: 700,
       padding: "6px"
     }
-  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066\u59CB\u3081\u308B")));
+  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066PIN\u8A2D\u5B9A\u3078")), step === 5 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 56,
+      marginBottom: 16
+    }
+  }, "\uD83D\uDD10"), /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontWeight: 900,
+      fontSize: 22,
+      color: TEXT,
+      margin: "0 0 8px"
+    }
+  }, "\u304A\u3084\u7528PIN\u3092\u8A2D\u5B9A\u3057\u3088\u3046"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: MUTED,
+      fontSize: 13,
+      margin: "0 0 28px",
+      lineHeight: 1.7
+    }
+  }, "\u5B50\u3069\u3082\u306B\u898B\u3089\u308C\u306A\u3044\u3088\u3046", /*#__PURE__*/React.createElement("br", null), "4\u3051\u305F\u306E\u756A\u53F7\u3092\u6C7A\u3081\u3088\u3046"), /*#__PURE__*/React.createElement(PinInput, {
+    onDone: pin => handleComplete(goalSkipped, pin)
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleComplete(goalSkipped, "0000"),
+    style: {
+      width: "100%",
+      background: "transparent",
+      border: "none",
+      color: MUTED,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F,
+      fontWeight: 700,
+      padding: "20px 0 0"
+    }
+  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066\u5F8C\u3067\u8A2D\u5B9A\u3059\u308B")));
 }
 
 // ── Tutorial ──────────────────────────────────────────
@@ -16221,6 +16615,7 @@ function App() {
     status: syncSt
   })), screen === "home" && /*#__PURE__*/React.createElement(HomeScreen, {
     data: data,
+    update: update,
     onChild: child => {
       setActiveChild(child);
       // PINなし設定の場合は直接画面へ
