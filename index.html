@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="04801ac">
+<meta name="tane-version" content="6ef40a2">
 </head>
 <body>
   <div id="root"></div>
@@ -1968,7 +1968,7 @@ function GachaAnim({
       letterSpacing: .5
     }
   }, "NEW!"), /*#__PURE__*/React.createElement("img", {
-    src: `/assets/${result.collItem.id.replace("gi_", "gacha_")}.jpg`,
+    src: `/assets/${result.collItem.id.replace("gi_", "gacha_")}.png`,
     alt: result.collItem.name,
     style: {
       width: isSuper ? 110 : 88,
@@ -3275,7 +3275,7 @@ function SettingsModal({
       gap: 10
     }
   }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
-    src: `/assets/reward_${r.id}.jpg`,
+    src: `/assets/reward_${r.id}.png`,
     style: {
       width: 30,
       height: 30,
@@ -4609,7 +4609,7 @@ function ChildScreen({
       gap: 1
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: `/assets/tab_${v}.jpg`,
+    src: `/assets/tab_${v}.png`,
     alt: "",
     style: {
       width: 22,
@@ -5067,7 +5067,7 @@ function ChildScreen({
             transition: "all .2s"
           }
         }, cnt > 0 ? /*#__PURE__*/React.createElement("img", {
-          src: `/assets/${item.id.replace("gi_", "gacha_")}.jpg`,
+          src: `/assets/${item.id.replace("gi_", "gacha_")}.png`,
           alt: item.name,
           style: {
             width: 38,
@@ -6119,7 +6119,7 @@ function ChildScreen({
         opacity: ok ? 1 : .55
       }
     }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
-      src: `/assets/reward_${r.id}.jpg`,
+      src: `/assets/reward_${r.id}.png`,
       style: {
         width: 48,
         height: 48,
@@ -10225,7 +10225,7 @@ function ParentScreen({
       gap: 10
     }
   }, /^r0\d$/.test(r.id) ? /*#__PURE__*/React.createElement("img", {
-    src: `/assets/reward_${r.id}.jpg`,
+    src: `/assets/reward_${r.id}.png`,
     style: {
       width: 30,
       height: 30,
@@ -11103,59 +11103,79 @@ function HomeScreen({
       margin: "16px 0 10px",
       textTransform: "uppercase"
     }
-  }, "Parent"), allMembers.filter(m => !m.isChild).map(member => /*#__PURE__*/React.createElement("button", {
-    key: member.id,
-    onClick: () => onParentCard(member),
-    style: {
-      width: "100%",
-      background: CARD,
-      border: `1px solid ${BORDER}`,
-      borderRadius: 16,
-      padding: "14px 16px",
-      marginBottom: 8,
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      cursor: "pointer",
-      textAlign: "left",
-      fontFamily: F,
-      boxShadow: "0 4px 16px rgba(24,35,29,0.06)"
-    }
-  }, /*#__PURE__*/React.createElement(ChildAvatar, {
-    child: member,
-    size: 44
+  }, "Parent"), allMembers.filter(m => !m.isChild).map(member => {
+    const childCount = data.children.length;
+    const monthTotal = data.children.reduce((s, c) => s + monthDelta(c.id), 0);
+    return /*#__PURE__*/React.createElement("button", {
+      key: member.id,
+      onClick: () => onParentCard(member),
+      style: {
+        width: "100%",
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 16,
+        padding: "14px 16px",
+        marginBottom: 8,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        cursor: "pointer",
+        textAlign: "left",
+        fontFamily: F,
+        boxShadow: "0 4px 16px rgba(24,35,29,0.06)"
+      }
+    }, /*#__PURE__*/React.createElement(ChildAvatar, {
+      child: member,
+      size: 44
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, member.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        background: CARDS,
+        color: TEXTS,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontWeight: 600
+      }
+    }, "Parent")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: MUTED
+      }
+    }, "\u5B50\u3069\u3082 ", childCount, "\u4EBA"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        background: GS,
+        color: GP,
+        padding: "2px 7px",
+        borderRadius: 999,
+        fontWeight: 700
+      }
+    }, "\u4ECA\u6708\u8A08 ", monthTotal.toLocaleString(), "pt"))), /*#__PURE__*/React.createElement(ChevronRightIcon, null));
   }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      marginBottom: 2
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 14,
-      color: TEXT
-    }
-  }, member.name), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      background: CARDS,
-      color: TEXTS,
-      padding: "2px 7px",
-      borderRadius: 999,
-      fontWeight: 600
-    }
-  }, "Parent")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: MUTED
-    }
-  }, "\u53C2\u52A0\u8005\u30FB\u7BA1\u7406\u8005")), /*#__PURE__*/React.createElement(ChevronRightIcon, null))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 24,
       display: "flex",
@@ -14674,7 +14694,7 @@ function BadgesSection({
       fontWeight: 900
     }
   }, "\u2713"), /*#__PURE__*/React.createElement("img", {
-    src: `/assets/badge_${b.id}.jpg`,
+    src: `/assets/badge_${b.id}.png`,
     alt: b.name,
     style: {
       width: 52,

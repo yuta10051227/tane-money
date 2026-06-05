@@ -814,7 +814,7 @@ function GachaAnim({ result, onClose }) {
             {result.collItem ? (
               <div style={{position:"relative",margin:"0 auto 4px"}}>
                 {result.isNewItem&&<div style={{position:"absolute",top:-10,right:"calc(50% - 42px)",background:R,color:"#fff",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:900,zIndex:1,letterSpacing:.5}}>NEW!</div>}
-                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.jpg`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14}}/>
+                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.png`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14}}/>
                 <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:2}}>{result.collItem.name}</div>
                 <div style={{fontSize:11,color:MUTED,marginBottom:8}}>{result.collItem.desc}</div>
               </div>
@@ -1349,7 +1349,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>こうかんアイテムの管理</p>
               {(data.rewards||[]).map(r=>(
                 <div key={r.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
                     <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
@@ -1816,7 +1816,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {MAIN_TABS.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
             style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?GP:MUTED,fontWeight:effectiveTab===v?700:500,fontSize:10,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <img src={`/assets/tab_${v}.jpg`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.45,transition:"opacity .15s"}}/>
+            <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.45,transition:"opacity .15s"}}/>
             {l.replace(/^\S+\s+/,"")}
           </button>
         ))}
@@ -1969,7 +1969,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         const tc=tierColorMap[item.tierId]||BORDER;
                         return(<div key={item.id} style={{textAlign:"center",background:cnt>0?CARD:`rgba(0,0,0,0.04)`,borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:BORDER}`,transition:"all .2s"}}>
                           {cnt>0
-                            ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.jpg`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
+                            ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.png`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
                           <div style={{fontSize:8,fontWeight:700,color:cnt>0?TEXT:MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
@@ -2231,7 +2231,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
                   style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:F,opacity:ok?1:.55}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
                   <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:10,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
                 </button>
@@ -3561,7 +3561,7 @@ function ParentScreen({ data, update, onBack }) {
                 </div>
               ) : (
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.jpg`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
+                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12}}>{r.unit}</div></div>
                   <span style={{fontWeight:800,color:P,marginRight:6}}>{r.cost.toLocaleString()}pt</span>
                   <div style={{display:"flex",gap:5}}>{sb(B,"✏",()=>setEditReward({...r,cost:String(r.cost)}))}{sb(R,"🗑",()=>delReward(r.id))}</div>
@@ -3854,20 +3854,27 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
         {allMembers.filter(m=>!m.isChild).length>0&&(
           <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>Parent</div>
         )}
-        {allMembers.filter(m=>!m.isChild).map(member=>(
+        {allMembers.filter(m=>!m.isChild).map(member=>{
+          const childCount = data.children.length;
+          const monthTotal = data.children.reduce((s,c)=>s+monthDelta(c.id),0);
+          return (
           <button key={member.id} onClick={()=>onParentCard(member)}
             style={{width:"100%",background:CARD,border:`1px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:F,boxShadow:"0 4px 16px rgba(24,35,29,0.06)"}}>
             <ChildAvatar child={member} size={44}/>
             <div style={{flex:1}}>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                 <span style={{fontWeight:700,fontSize:14,color:TEXT}}>{member.name}</span>
                 <span style={{fontSize:10,background:CARDS,color:TEXTS,padding:"2px 7px",borderRadius:999,fontWeight:600}}>Parent</span>
               </div>
-              <div style={{fontSize:11,color:MUTED}}>参加者・管理者</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:MUTED}}>子ども {childCount}人</span>
+                <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今月計 {monthTotal.toLocaleString()}pt</span>
+              </div>
             </div>
             <ChevronRightIcon/>
           </button>
-        ))}
+          );
+        })}
 
         {/* 同期 */}
         <div style={{marginTop:24,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:CARD,borderRadius:12,border:`1px solid ${BORDER}`}}>
@@ -5157,7 +5164,7 @@ function BadgesSection({child,data,update}){
       {filtered.map(b=>(
         <div key={b.id} style={{background:b.earned?CARD:BG,border:`2px solid ${b.earned?(b.type==="achieve"?Y:G):BORDER}`,borderRadius:16,padding:"14px 12px",textAlign:"center",opacity:b.earned?1:0.5,position:"relative"}}>
           {b.earned&&<div style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",background:G,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>✓</div>}
-          <img src={`/assets/badge_${b.id}.jpg`} alt={b.name} style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 6px",borderRadius:8,filter:b.earned?"none":"grayscale(1) opacity(0.35)"}}/>
+          <img src={`/assets/badge_${b.id}.png`} alt={b.name} style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 6px",borderRadius:8,filter:b.earned?"none":"grayscale(1) opacity(0.35)"}}/>
           <div style={{fontWeight:800,fontSize:12,color:b.earned?TEXT:MUTED,marginBottom:4,lineHeight:1.3}}>{b.name}</div>
           <div style={{fontSize:10,color:MUTED,lineHeight:1.4}}>{b.desc}</div>
         </div>
