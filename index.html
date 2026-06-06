@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="612ffc8">
+<meta name="tane-version" content="a9a6326">
 </head>
 <body>
   <div id="root"></div>
@@ -2325,8 +2325,8 @@ function DailyTasks({
         alignItems: "center",
         gap: 12,
         transition: "all .25s",
-        transform: justDone[t.id] ? "scale(1.04)" : "scale(1)",
-        boxShadow: justDone[t.id] ? `0 0 0 3px ${G}40` : "none"
+        transform: justDone[t.id] ? "scale(1.08)" : "scale(1)",
+        boxShadow: justDone[t.id] ? `0 0 0 4px ${G}90` : "none"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -4599,7 +4599,59 @@ function ChildScreen({
         cursor: "pointer",
         fontFamily: F
       }
-    }, "\uD83D\uDCB8 \u304A\u304F\u308B"))), /*#__PURE__*/React.createElement("style", null, `@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`));
+    }, "\uD83D\uDCB8 \u304A\u304F\u308B")), (() => {
+      const rankable = [...data.children, ...(data.parents || [])].filter(m => m.visibility?.rankingParticipation !== false);
+      if (rankable.length < 2) return null;
+      const sorted = [...rankable].sort((a, b) => calcMonthlyActivity(b.id, data.logs) - calcMonthlyActivity(a.id, data.logs));
+      const rIdx = sorted.findIndex(m => m.id === child.id);
+      if (rIdx < 0) return null;
+      const medals = ["🥇", "🥈", "🥉"];
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: "1px solid rgba(255,255,255,0.15)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "rgba(255,255,255,0.45)"
+        }
+      }, "\u4ECA\u6708\u30E9\u30F3\u30AD\u30F3\u30B0"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => {
+          setTab("more");
+          setMoreOpen("ranking");
+        },
+        style: {
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: F,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: 0
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 16
+        }
+      }, medals[rIdx] || "🏅"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 900,
+          color: "rgba(255,255,255,0.9)"
+        }
+      }, rIdx + 1, "\u4F4D"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "rgba(255,255,255,0.4)"
+        }
+      }, "\u203A")));
+    })()), /*#__PURE__*/React.createElement("style", null, `@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`));
   })() : (() => {
     // Teen: ダークダッシュボード
     const ttd = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;

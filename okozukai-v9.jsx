@@ -984,7 +984,7 @@ function DailyTasks({ child, data, update }) {
         const count = isCheck(t) ? null : (prog[t.id]||0);
         return (
           <div key={t.id}
-            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.04)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 3px ${G}40`:"none"}}>
+            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.08)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 4px ${G}90`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
@@ -1812,6 +1812,24 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <button onClick={()=>setShowTransfer(true)} style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
           </div>
+          {(()=>{
+            const rankable=[...data.children,...(data.parents||[])].filter(m=>m.visibility?.rankingParticipation!==false);
+            if(rankable.length<2) return null;
+            const sorted=[...rankable].sort((a,b)=>calcMonthlyActivity(b.id,data.logs)-calcMonthlyActivity(a.id,data.logs));
+            const rIdx=sorted.findIndex(m=>m.id===child.id);
+            if(rIdx<0) return null;
+            const medals=["🥇","🥈","🥉"];
+            return(
+              <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
+                <button onClick={()=>{setTab("more");setMoreOpen("ranking");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5,padding:0}}>
+                  <span style={{fontSize:16}}>{medals[rIdx]||"🏅"}</span>
+                  <span style={{fontSize:14,fontWeight:900,color:"rgba(255,255,255,0.9)"}}>{rIdx+1}位</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>›</span>
+                </button>
+              </div>
+            );
+          })()}
         </div>
         <style>{`@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`}</style>
       </div>
