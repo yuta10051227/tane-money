@@ -298,9 +298,9 @@ const INIT = {
   ],
   gacha: [
     { id: "gc1", emoji: "⚪", label: "ノーマル",     color: "#9a917a", rate: 60, min: 1,  max: 10  },
-    { id: "gc2", emoji: "🔵", label: "レア",         color: "#4a9eff", rate: 25, min: 11, max: 30  },
-    { id: "gc3", emoji: "🟡", label: "スーパーレア", color: "#f5c842", rate: 12, min: 31, max: 80  },
-    { id: "gc4", emoji: "🔴", label: "激レア",       color: "#f0605a", rate: 3,  min: 81, max: 150 },
+    { id: "gc2", emoji: "🔵", label: "レア",         color: "#4a9eff", rate: 25, min: 11, max: 25  },
+    { id: "gc3", emoji: "🟡", label: "スーパーレア", color: "#f5c842", rate: 12, min: 26, max: 40  },
+    { id: "gc4", emoji: "🔴", label: "激レア",       color: "#f0605a", rate: 3,  min: 41, max: 50  },
   ],
   cats: [
     { id: "cat1", emoji: "🍕", label: "食べもの",     color: "#f97316" },
