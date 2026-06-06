@@ -1852,7 +1852,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
           {[
             ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう"],
-            ["⚡","ミッション",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう"],
+            ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう"],
             ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう"],
             ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう"],
           ].map(([e,l,v,c,tabTarget,hint])=>(
@@ -1965,8 +1965,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
-        {/* ── デイリーガチャ（最上部） ── */}
+        {/* Teen: タスクを先に表示（ガチャより優先） */}
+        {!isJunior && <>
+          <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
+        </>}
+        {/* ── デイリーガチャ（Junior: 最上部 / Teen: タスクの下） ── */}
         <div style={{padding:"12px 16px 4px"}}>
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 DAILY GACHA</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
@@ -2044,9 +2050,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
-        <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
-        <DailyTasks child={child} data={data} update={update}/>
+        {/* Junior: タスクはガチャの後 */}
         {isJunior && <>
+          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
           {/* やることへのショートカット */}
           <div style={{padding:"8px 16px 4px"}}>
             <button onClick={()=>setTab("tasks")}
@@ -2084,7 +2091,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── ACTIVITY サブナビ ── */}
       {effectiveTab==="activity"&&!isJunior&&!young&&(
         <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
-          {[["tasks","✅ ミッション"],["invest","📈 投資/為替"]].map(([v,l])=>(
+          {[["tasks","✅ タスク"],["invest","📈 投資/為替"]].map(([v,l])=>(
             <button key={v} onClick={()=>setActTab(v)}
               style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${darkBG?"#4a9eff":GP}`:"2.5px solid transparent",background:"none",color:actTab===v?(darkBG?"#4a9eff":GP):(darkBG?"rgba(255,255,255,0.4)":MUTED),fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
               {l}
