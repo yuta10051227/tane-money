@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // ═══════════════════════════════════════════════════════
 // CLOUD STORAGE (persistent across devices via claude.ai)
@@ -814,7 +814,7 @@ function GachaAnim({ result, onClose }) {
       {phase==="show"&&(
         <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
           {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
-          <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%"}}>
+          <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%",animation:isSR?"gachaShimmer 1.2s ease-in-out infinite":"none"}}>
             <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
             <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 8px"}}>{result.emoji} {result.label}</p>
             {result.collItem ? (
@@ -837,6 +837,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
         @keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}
         @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
+        @keyframes gachaShimmer{0%,100%{box-shadow:0 20px 60px ${result.color}60}50%{box-shadow:0 20px 80px ${result.color}cc,0 0 40px ${result.color}88}}
         @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.25}}
       `}</style>
     </div>
@@ -876,9 +877,17 @@ function DailyTasks({ child, data, update }) {
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
+  const [combo, setCombo] = useState(0);
+  const comboTimer = useRef(null);
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
-  const markJustDone = id => { setJustDone(p=>({...p,[id]:true})); setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550); };
+  const markJustDone = id => {
+    setJustDone(p=>({...p,[id]:true}));
+    setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550);
+    setCombo(c=>c+1);
+    if(comboTimer.current) clearTimeout(comboTimer.current);
+    comboTimer.current=setTimeout(()=>setCombo(0),3000);
+  };
 
   const isCheck   = t => t.type === "check";
   const isDone    = t => isCheck(t) ? !!prog[t.id] : (prog[t.id]||0) >= (t.target||1);
@@ -952,6 +961,7 @@ function DailyTasks({ child, data, update }) {
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<div style={{fontSize:11,color:"rgba(255,255,255,0.9)",marginTop:5}}>✨ タネっちがよろこんだ！</div>}
+          {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
       )}
 
