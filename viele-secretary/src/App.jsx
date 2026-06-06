@@ -48,7 +48,10 @@ function startOfDay(d) {
   return x;
 }
 function iso(d) {
-  return startOfDay(d).toISOString().slice(0, 10);
+  const x = startOfDay(d);
+  // 不正な日付でも toISOString() でアプリ全体が落ちないようフォールバック
+  const safe = isNaN(x.getTime()) ? startOfDay(new Date()) : x;
+  return safe.toISOString().slice(0, 10);
 }
 function addDays(base, n) {
   const d = new Date(base);
@@ -1130,6 +1133,11 @@ export default function App() {
     if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
     else alert("通知が許可されませんでした。端末の設定から許可できます。");
   };
+  const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
+  const local = useLocal(STORE_KEY, seed);
+  const { data, loading, error, update } = firebaseEnabled ? cloud : local;
+
+  // 開いた時に遅れがあればブラウザ通知（dataを使うのでdata宣言後に置く）
   useEffect(() => {
     if (notifiedRef.current || !notify || !data) return;
     if (!notifySupported || Notification.permission !== "granted") return;
@@ -1140,15 +1148,10 @@ export default function App() {
           body: `遅れ ${late.length}件・もうすぐ ${soon.length}件`,
           icon: "/icon-512.png",
         });
-      } catch { /* ignore */ }
+      } catch { /* iOS等はnew Notification不可。無視 */ }
     }
     notifiedRef.current = true;
   }, [notify, data, notifySupported]);
-
-
-  const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
-  const local = useLocal(STORE_KEY, seed);
-  const { data, loading, error, update } = firebaseEnabled ? cloud : local;
 
   useEffect(() => {
     if (!firebaseEnabled) return; // ローカルモードは認証なし
