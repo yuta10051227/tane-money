@@ -224,6 +224,26 @@ function makeSeed() {
       { id: "m2", title: "Academy 月額 入金確認", amount: 0, kind: "入金", done: false },
     ],
     tasks: [{ id: "k1", title: "確定申告まわりの資料整理", done: false }],
+    // 固定費・サブスク。次回請求日は保存せず anchorDate＋サイクルから毎回算出する
+    // （月が替わると自動で次回へ繰り越す＝再計算不要）。amount は1サイクルあたりの金額（円）。
+    subscriptions: [
+      { id: "s1", name: "Adobe Creative Cloud", amount: 7280, cycle: "monthly", anchorDate: iso(addDays(now, -27)), category: "制作・学習", note: "写真プラン", active: true },
+      { id: "s2", name: "ChatGPT Plus", amount: 3000, cycle: "monthly", anchorDate: iso(addDays(now, 18)), category: "仕事ツール", note: "", active: true },
+      { id: "s3", name: "Notion", amount: 1650, cycle: "monthly", anchorDate: iso(addDays(now, 11)), category: "仕事ツール", note: "プラスプラン", active: true },
+      { id: "s4", name: "Netflix", amount: 1890, cycle: "monthly", anchorDate: iso(addDays(now, 24)), category: "生活・通信", note: "", active: true },
+      { id: "s5", name: "ドメイン更新（お名前.com）", amount: 1500, cycle: "yearly", anchorDate: iso(addDays(now, 45)), category: "経営・会計", note: "", active: true },
+    ],
+    subSettings: { remindDays: 7, notify: false },
+    // 定期収入（売上）。固定費と対称。毎月の発生額は anchorDate＋cycle から自動計上。
+    recurringRevenues: [
+      { id: "r1", name: "月額顧問（A社）", customer: "A社", amount: 50000, cycle: "monthly", anchorDate: iso(addDays(now, 5)), category: "顧問・コンサル", note: "", active: true },
+      { id: "r2", name: "オンラインサロン", customer: "", amount: 120000, cycle: "monthly", anchorDate: iso(addDays(now, -10)), category: "講座・月額", note: "会費合計", active: true },
+    ],
+    // 単発収入（実績ログ）
+    revenues: [
+      { id: "o1", title: "単発施術 まとめ", customer: "", amount: 84000, date: iso(addDays(now, -3)), category: "施術・サービス" },
+      { id: "o2", title: "スポットコンサル", customer: "B社", amount: 50000, date: iso(addDays(now, -12)), category: "顧問・コンサル" },
+    ],
     updatedAt: Date.now(),
   };
 }
@@ -897,6 +917,327 @@ function Empty({ children }) {
   return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
 }
 
+/* ──────────────────────────────────────────────────────────────
+   固定費・サブスク管理
+   次回請求日は保存せず anchorDate＋サイクルから「今日」基準で毎回算出する。
+   → 月が替わるたびに自動で次回へ繰り越され、合計・年換算も自動再計算される。
+   ────────────────────────────────────────────────────────────── */
+const SUB_CATS = {
+  仕事ツール: C.blue,
+  集客・広告: C.purple,
+  経営・会計: C.accent,
+  制作・学習: C.green,
+  生活・通信: C.orange,
+  その他: C.faint,
+};
+const subCatColor = (c) => SUB_CATS[c] || C.faint;
+
+const CYCLES = [
+  { v: "monthly", label: "月払い", short: "月", months: 1 },
+  { v: "quarterly", label: "四半期（3ヶ月）", short: "3ヶ月", months: 3 },
+  { v: "halfyearly", label: "半年払い", short: "半年", months: 6 },
+  { v: "yearly", label: "年払い", short: "年", months: 12 },
+];
+const cycleMonths = (v) => CYCLES.find((c) => c.v === v)?.months || 1;
+const cycleShort = (v) => CYCLES.find((c) => c.v === v)?.short || "月";
+// 1ヶ月あたりの金額（月額換算）
+const toMonthly = (amount, cycle) => Math.round((Number(amount) || 0) / cycleMonths(cycle));
+
+// 月末クランプ付きの「Nヶ月後」。元の請求日(31日など)の意図を保つため必ず anchor から数える。
+function addMonthsClamped(baseDate, m) {
+  const d = new Date(baseDate);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + m);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return startOfDay(d);
+}
+
+// anchorDate からサイクルを繰り上げ、「今日以降で最初の請求日」を返す
+function nextBilling(sub, from) {
+  const step = cycleMonths(sub.cycle);
+  const anchor = startOfDay(new Date(sub.anchorDate));
+  const today = startOfDay(from || new Date());
+  if (anchor >= today) return anchor;
+  let k = 1;
+  let d = addMonthsClamped(anchor, step);
+  while (d < today && k < 1200) {
+    k += 1;
+    d = addMonthsClamped(anchor, step * k);
+  }
+  return d;
+}
+
+// 請求までの残り日数で信号を出す（緑=余裕 / 橙=もうすぐ / 赤=本日・超過）
+function subSignal(nextDateISO) {
+  const diff = daysUntil(nextDateISO);
+  if (diff < 0) return { color: C.red, dot: "🔴", label: `${-diff}日超過`, diff };
+  if (diff === 0) return { color: C.red, dot: "🔴", label: "本日請求", diff };
+  if (diff <= 7) return { color: C.orange, dot: "🟠", label: `あと${diff}日`, diff };
+  if (diff <= 30) return { color: C.green, dot: "🟢", label: `あと${diff}日`, diff };
+  return { color: C.faint, dot: "⚪️", label: `あと${diff}日`, diff };
+}
+
+// 金額＋サイクルの表示（年/半年/四半期は月額換算を併記）
+function priceLabel(sub) {
+  const m = toMonthly(sub.amount, sub.cycle);
+  if (sub.cycle === "monthly") return `${yen(sub.amount)}/月`;
+  return `${yen(sub.amount)}/${cycleShort(sub.cycle)}（月換算${yen(m)}）`;
+}
+
+/* 上部のタブ切替（ダッシュボード／固定費） */
+function MainTabs({ tab, onChange, dueCount }) {
+  const TABS = [
+    { v: "dashboard", label: "ホーム" },
+    { v: "subscriptions", label: "固定費" },
+    { v: "revenue", label: "売上" },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 4, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 4, marginBottom: 16 }}>
+      {TABS.map((t) => {
+        const on = tab === t.v;
+        return (
+          <button
+            key={t.v}
+            onClick={() => onChange(t.v)}
+            style={{ flex: 1, padding: "9px 0", fontSize: 13, fontWeight: on ? 700 : 400, color: on ? C.text : C.sub, background: on ? C.panel2 : "transparent", border: on ? `1px solid ${C.line}` : "1px solid transparent", borderRadius: 8, cursor: "pointer", textAlign: "center", position: "relative" }}
+          >
+            {t.label}
+            {t.v === "subscriptions" && dueCount > 0 && (
+              <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "#0B0D11", background: C.orange, borderRadius: 10, padding: "1px 7px" }}>{dueCount}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* KPIカード1枚 */
+function KpiCard({ label, value, valueColor, sub }) {
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "14px 16px" }}>
+      <div style={{ fontSize: 11, color: C.faint, marginBottom: 4, letterSpacing: 0.3 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: valueColor || C.text, lineHeight: 1.15 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.faint, marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+}
+
+/* 有効/無効トグル（スイッチ） */
+function Switch({ on, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={on ? "有効（タップで一時停止）" : "停止中（タップで有効化）"}
+      style={{ background: on ? C.green : C.line, border: "none", borderRadius: 20, width: 38, height: 22, cursor: "pointer", position: "relative", flex: "0 0 auto", padding: 0 }}
+    >
+      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+    </button>
+  );
+}
+
+/* 追加・編集フォーム（アコーディオン） */
+function SubForm({ initial, onSave, onCancel }) {
+  const [f, setF] = useState(
+    initial || { name: "", amount: "", cycle: "monthly", anchorDate: iso(new Date()), category: "仕事ツール", note: "" }
+  );
+  const valid = f.name.trim() && Number(f.amount) > 0 && f.anchorDate;
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+      <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="サービス名（例：Notion、Claude Pro）" style={inp} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} inputMode="numeric" placeholder="金額" style={{ ...inp, flex: 1 }} />
+        <select value={f.cycle} onChange={(e) => setF({ ...f, cycle: e.target.value })} style={{ ...inp, flex: 1 }}>
+          {CYCLES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+        </select>
+      </div>
+      <label style={{ fontSize: 11, color: C.faint, display: "block", marginBottom: 4 }}>次回（または直近）の請求日 — ここを起点に毎月自動で繰り越します</label>
+      <input type="date" value={f.anchorDate} onChange={(e) => setF({ ...f, anchorDate: e.target.value })} style={inp} />
+      <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} style={inp}>
+        {Object.keys(SUB_CATS).map((c) => <option key={c}>{c}</option>)}
+      </select>
+      <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="メモ（プラン名・用途など／任意）" style={inp} />
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button
+          onClick={() => valid && onSave({ name: f.name.trim(), amount: Number(f.amount) || 0, cycle: f.cycle, anchorDate: f.anchorDate, category: f.category, note: f.note.trim() })}
+          disabled={!valid}
+          style={{ ...chipBtn, background: valid ? C.accent : "transparent", color: valid ? "#0B0D11" : C.faint, borderColor: valid ? C.accent : C.line, cursor: valid ? "pointer" : "not-allowed" }}
+        >保存</button>
+        <button onClick={onCancel} style={chipBtn}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+/* 固定費・サブスクのタブ本体 */
+function SubscriptionsTab({ subs, settings, onAdd, onEdit, onRemove, onToggle, onSettings, uid }) {
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const list = subs || [];
+  const remindDays = settings?.remindDays ?? 7;
+
+  // 派生値（毎回算出＝常に最新。月替わりで自動繰越）
+  const enriched = useMemo(() => {
+    return list.map((s) => {
+      const next = nextBilling(s);
+      const nextISO = iso(next);
+      return { ...s, _next: next, _nextISO: nextISO, _monthly: toMonthly(s.amount, s.cycle), _sig: subSignal(nextISO) };
+    });
+  }, [list]);
+
+  const active = enriched.filter((s) => s.active);
+  const monthTotal = active.reduce((t, s) => t + s._monthly, 0);
+  const yearTotal = monthTotal * 12;
+
+  // 今月の請求予定（有効分で、次回請求日が今暦月に入るもの）
+  const today = new Date();
+  const inThisMonth = (d) => d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
+  const thisMonthCharge = active.filter((s) => inThisMonth(s._next)).reduce((t, s) => t + (Number(s.amount) || 0), 0);
+
+  // リマインド対象（有効・残りremindDays日以内）
+  const due = active.filter((s) => s._sig.diff <= remindDays).sort((a, b) => a._sig.diff - b._sig.diff);
+
+  // カテゴリ内訳（月額換算ベース）
+  const catTotals = {};
+  active.forEach((s) => { catTotals[s.category] = (catTotals[s.category] || 0) + s._monthly; });
+  const catRows = Object.keys(SUB_CATS).filter((c) => catTotals[c] > 0);
+
+  // 一覧の並び：有効→停止、各々 残日数の昇順
+  const sorted = [...enriched].sort((a, b) => (a.active === b.active ? a._sig.diff - b._sig.diff : a.active ? -1 : 1));
+
+  // ブラウザ通知（オプトイン）。許可済み＆閾値内なら、その端末で1日1回だけ通知。
+  useEffect(() => {
+    if (!settings?.notify || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    // dedupeキーはuid別（共有端末で別アカウントの通知済み状態を引き継がない）
+    const key = `viele-sub-notified-${uid || "local"}`;
+    const todayKey = iso(new Date());
+    if (localStorage.getItem(key) === todayKey) return;
+    if (due.length > 0) {
+      try {
+        // ロック画面に契約先が露出しないよう、本文は件数のみ（詳細はアプリ起動後に表示）
+        new Notification("まもなく固定費の請求があります", { body: `${due.length}件の請求が${remindDays}日以内に予定されています` });
+        localStorage.setItem(key, todayKey);
+      } catch { /* ignore */ }
+    }
+  }, [settings?.notify, due.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const enableNotify = async () => {
+    if (typeof Notification === "undefined") { onSettings({ notify: false }); return; }
+    if (settings?.notify) { onSettings({ notify: false }); return; }
+    const p = await Notification.requestPermission();
+    onSettings({ notify: p === "granted" });
+  };
+
+  return (
+    <>
+      {/* サマリー */}
+      <Panel title="今月の固定費" accent={C.accent} help="登録した固定費・サブスクを月額換算して合計します。次回請求日は登録した請求日を起点に毎月自動で繰り越され、合計・年換算も自動で再計算されます。停止中（一時解約）の項目は合計から除外します。">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <KpiCard label="月合計（月額換算）" value={yen(monthTotal)} sub={`年換算 ${yen(yearTotal)}`} />
+          <KpiCard label="今月の請求予定" value={yen(thisMonthCharge)} valueColor={thisMonthCharge > 0 ? C.text : C.sub} sub={`${due.length > 0 ? `まもなく ${due.length}件` : "直近の請求なし"}`} />
+          <KpiCard label="有効な固定費" value={`${active.length}件`} sub={`登録 ${list.length}件`} />
+          <KpiCard label="1日あたり" value={yen(Math.round(monthTotal / 30))} sub="月合計 ÷ 30" />
+        </div>
+      </Panel>
+
+      {/* リマインド */}
+      {due.length > 0 && (
+        <div style={{ background: "#241B07", border: `1px solid ${C.accent}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.accent }}>🟠 まもなく請求（{remindDays}日以内）</span>
+          </div>
+          <div style={{ display: "grid", gap: 2 }}>
+            {due.slice(0, 6).map((s) => (
+              <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "5px 0", borderTop: `1px solid rgba(201,162,39,0.18)` }}>
+                <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name} ・ {yen(s.amount)}</span>
+                <span style={{ color: s._sig.color, fontWeight: 600, flex: "0 0 auto", marginLeft: 8 }}>{fmt(s._nextISO)} {s._sig.label}</span>
+              </div>
+            ))}
+            {due.length > 6 && <div style={{ fontSize: 12, color: C.faint, marginTop: 4 }}>他 {due.length - 6}件</div>}
+          </div>
+        </div>
+      )}
+
+      {/* 一覧＋追加 */}
+      <Panel title="サブスク一覧" accent={C.blue} right={<button onClick={() => { setAdding((v) => !v); setEditId(null); }} style={chipBtn}>{adding ? "閉じる" : "＋追加"}</button>}>
+        {adding && (
+          <SubForm
+            onCancel={() => setAdding(false)}
+            onSave={(item) => { onAdd(item); setAdding(false); }}
+          />
+        )}
+        {sorted.length === 0 && !adding && <Empty>サブスクは登録されていません。右上の「＋追加」から登録できます。</Empty>}
+        <div style={{ display: "grid", gap: 10 }}>
+          {sorted.map((s) =>
+            editId === s.id ? (
+              <SubForm
+                key={s.id}
+                initial={{ name: s.name, amount: s.amount, cycle: s.cycle, anchorDate: s.anchorDate, category: s.category, note: s.note || "" }}
+                onCancel={() => setEditId(null)}
+                onSave={(patch) => { onEdit(s.id, patch); setEditId(null); }}
+              />
+            ) : (
+              <div key={s.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", opacity: s.active ? 1 : 0.5 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: subCatColor(s.category), flex: "0 0 auto" }} />
+                  <span style={{ fontSize: 10, color: subCatColor(s.category), border: `1px solid ${subCatColor(s.category)}`, borderRadius: 5, padding: "1px 6px", flex: "0 0 auto" }}>{s.category}</span>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}{!s.active && <span style={{ fontSize: 10, color: C.faint, marginLeft: 6 }}>停止中</span>}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums", flex: "0 0 auto" }}>{yen(s.amount)}<span style={{ fontSize: 11, color: C.faint, fontWeight: 400 }}>/{cycleShort(s.cycle)}</span></span>
+                  <Switch on={s.active} onClick={() => onToggle(s.id)} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: C.sub, flex: 1, minWidth: 0 }}>次回 {fmt(s._nextISO)}{s.cycle !== "monthly" ? `（月換算 ${yen(s._monthly)}）` : ""}{s.note ? ` ・ ${s.note}` : ""}</span>
+                  <span style={{ fontSize: 12, color: s._sig.color, fontWeight: 600, flex: "0 0 auto" }}>{s._sig.dot} {s._sig.label}</span>
+                  <button onClick={() => { setEditId(s.id); setAdding(false); }} style={iconBtn} title="編集">✎</button>
+                  <button onClick={() => onRemove(s.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      </Panel>
+
+      {/* カテゴリ内訳 */}
+      <Panel title="カテゴリ内訳（月額換算）" accent={C.purple} right={<span style={{ fontSize: 13, color: C.sub }}>月 {yen(monthTotal)}</span>}>
+        {catRows.length === 0 ? (
+          <Empty>有効な固定費がありません。</Empty>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {catRows.map((cat) => (
+              <div key={cat}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: subCatColor(cat) }}>● {cat}</span>
+                  <span style={{ color: C.sub }}>{yen(catTotals[cat])}（{monthTotal > 0 ? Math.round((catTotals[cat] / monthTotal) * 100) : 0}%）</span>
+                </div>
+                <Bar value={catTotals[cat]} total={monthTotal} color={subCatColor(cat)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* 設定（リマインド日数・通知） */}
+      <Panel title="リマインド設定" accent={C.sub}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 14, flex: 1 }}>請求の何日前から知らせる</span>
+          <button onClick={() => onSettings({ remindDays: Math.max(1, remindDays - 1) })} style={iconBtn}>－</button>
+          <span style={{ fontSize: 15, fontWeight: 700, width: 48, textAlign: "center" }}>{remindDays}日前</span>
+          <button onClick={() => onSettings({ remindDays: Math.min(30, remindDays + 1) })} style={iconBtn}>＋</button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14 }}>ブラウザ通知</div>
+            <div style={{ fontSize: 11, color: C.faint }}>この端末で、請求が近い日に1日1回お知らせします（任意）。</div>
+          </div>
+          <Switch on={!!settings?.notify} onClick={enableNotify} />
+        </div>
+      </Panel>
+    </>
+  );
+}
+
 /* カレンダー連携の状態表示＋連携ボタン（時間メーター/今日の予定の上に出す） */
 function CalStatusNote({ source, status, error, count, onConnect, connecting }) {
   if (source === "calendar") {
@@ -926,6 +1267,243 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting }) 
         {connecting ? "連携中…" : isErr ? "再連携する" : "Googleカレンダーを連携"}
       </button>
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   売上（収入）
+   固定費と対称のデータモデル。定期収入は固定費と同じ nextBilling/cycle
+   ロジックを共有し、毎月の発生額を毎回算出する（＝自動計上）。
+   ────────────────────────────────────────────────────────────── */
+const REV_CATS = {
+  施術・サービス: C.green,
+  講座・月額: C.blue,
+  顧問・コンサル: C.accent,
+  物販: C.purple,
+  広告・アフィリ: C.orange,
+  その他: C.faint,
+};
+const revCatColor = (c) => REV_CATS[c] || C.faint;
+
+// 指定の暦月(year, monthは0始まり)にこの定期項目の請求/入金が発生するか → 金額(無ければ0)
+// 月差がサイクル(月数)の倍数なら発生。日付クランプは月の判定に影響しないので月だけで判定できる。
+function billedInMonth(item, year, month) {
+  const step = cycleMonths(item.cycle);
+  const anchor = new Date(item.anchorDate);
+  const target = year * 12 + month;
+  const base = anchor.getFullYear() * 12 + anchor.getMonth();
+  const diff = target - base;
+  if (diff < 0 || diff % step !== 0) return 0;
+  return Number(item.amount) || 0;
+}
+
+/* 定期収入の追加・編集フォーム（固定費のSubFormに顧客名を足した収入版） */
+function RevRecForm({ initial, onSave, onCancel }) {
+  const [f, setF] = useState(
+    initial || { name: "", customer: "", amount: "", cycle: "monthly", anchorDate: iso(new Date()), category: "顧問・コンサル", note: "" }
+  );
+  const valid = f.name.trim() && Number(f.amount) > 0 && f.anchorDate;
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+      <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="名目（例：月額顧問、オンラインサロン）" style={inp} />
+      <input value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} placeholder="顧客・取引先（任意）" style={inp} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} inputMode="numeric" placeholder="金額" style={{ ...inp, flex: 1 }} />
+        <select value={f.cycle} onChange={(e) => setF({ ...f, cycle: e.target.value })} style={{ ...inp, flex: 1 }}>
+          {CYCLES.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}
+        </select>
+      </div>
+      <label style={{ fontSize: 11, color: C.faint, display: "block", marginBottom: 4 }}>次回（または直近）の入金日 — ここを起点に毎月自動で計上します</label>
+      <input type="date" value={f.anchorDate} onChange={(e) => setF({ ...f, anchorDate: e.target.value })} style={inp} />
+      <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} style={inp}>
+        {Object.keys(REV_CATS).map((c) => <option key={c}>{c}</option>)}
+      </select>
+      <input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="メモ（任意）" style={inp} />
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button
+          onClick={() => valid && onSave({ name: f.name.trim(), customer: f.customer.trim(), amount: Number(f.amount) || 0, cycle: f.cycle, anchorDate: f.anchorDate, category: f.category, note: f.note.trim() })}
+          disabled={!valid}
+          style={{ ...chipBtn, background: valid ? C.green : "transparent", color: valid ? "#0B0D11" : C.faint, borderColor: valid ? C.green : C.line, cursor: valid ? "pointer" : "not-allowed" }}
+        >保存</button>
+        <button onClick={onCancel} style={chipBtn}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+/* 単発収入の追加・編集フォーム */
+function RevOnceForm({ initial, onSave, onCancel }) {
+  const [f, setF] = useState(
+    initial || { title: "", customer: "", amount: "", date: iso(new Date()), category: "施術・サービス" }
+  );
+  const valid = f.title.trim() && Number(f.amount) > 0 && f.date;
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+      <input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="内容（例：単発施術、スポットコンサル）" style={inp} />
+      <input value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} placeholder="顧客・取引先（任意）" style={inp} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} inputMode="numeric" placeholder="金額" style={{ ...inp, flex: 1 }} />
+        <input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} style={{ ...inp, flex: 1 }} />
+      </div>
+      <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} style={inp}>
+        {Object.keys(REV_CATS).map((c) => <option key={c}>{c}</option>)}
+      </select>
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button
+          onClick={() => valid && onSave({ title: f.title.trim(), customer: f.customer.trim(), amount: Number(f.amount) || 0, date: f.date, category: f.category })}
+          disabled={!valid}
+          style={{ ...chipBtn, background: valid ? C.green : "transparent", color: valid ? "#0B0D11" : C.faint, borderColor: valid ? C.green : C.line, cursor: valid ? "pointer" : "not-allowed" }}
+        >保存</button>
+        <button onClick={onCancel} style={chipBtn}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+/* 売上タブ本体。固定費(月額換算 fixedMonthly / 今月分 fixedThisMonth)を受け取り「手残り」を出す。 */
+function RevenueTab({ recurring, oneTime, fixedMonthly, fixedThisMonth, recOps, onceOps }) {
+  const [addingRec, setAddingRec] = useState(false);
+  const [addingOnce, setAddingOnce] = useState(false);
+  const [editRec, setEditRec] = useState(null);
+  const [editOnce, setEditOnce] = useState(null);
+  const recs = recurring || [];
+  const onces = oneTime || [];
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+
+  const recActive = recs.filter((r) => r.active);
+  const mrr = recActive.reduce((t, r) => t + toMonthly(r.amount, r.cycle), 0); // 月次定期収入(MRR)
+  const recThisMonth = recActive.reduce((t, r) => t + billedInMonth(r, y, m), 0);
+  const onceThisMonth = onces.filter((r) => { const d = new Date(r.date); return d.getFullYear() === y && d.getMonth() === m; }).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+  const revThisMonth = recThisMonth + onceThisMonth; // 今月売上（定期の今月発生＋単発の今月実績）
+  const takeHome = revThisMonth - fixedThisMonth;     // 今月の手残り
+
+  // 直近12ヶ月の売上推移（単発実績＋定期の発生額）
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(y, m - i, 1);
+    const total = onces.filter((r) => { const x = new Date(r.date); return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth(); }).reduce((t, r) => t + (Number(r.amount) || 0), 0)
+      + recActive.reduce((t, r) => t + billedInMonth(r, d.getFullYear(), d.getMonth()), 0);
+    months.push({ key: i, label: `${d.getMonth() + 1}`, isNow: i === 0, total });
+  }
+  const maxRev = Math.max(1, ...months.map((x) => x.total));
+
+  // カテゴリ内訳（今月売上ベース）
+  const catTotals = {};
+  recActive.forEach((r) => { const a = billedInMonth(r, y, m); if (a) catTotals[r.category] = (catTotals[r.category] || 0) + a; });
+  onces.filter((r) => { const d = new Date(r.date); return d.getFullYear() === y && d.getMonth() === m; }).forEach((r) => { catTotals[r.category] = (catTotals[r.category] || 0) + (Number(r.amount) || 0); });
+  const catRows = Object.keys(REV_CATS).filter((c) => catTotals[c] > 0);
+
+  const sortedRec = [...recs].sort((a, b) => (a.active === b.active ? 0 : a.active ? -1 : 1));
+  const sortedOnce = [...onces].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <>
+      {/* サマリー（手残りが主役） */}
+      <Panel title="今月の売上と手残り" accent={C.green} help="「今月売上」は、登録した定期収入のうち今月発生する分と、今月の単発収入の合算です。定期収入は一度登録すれば毎月自動で計上されます。「今月の手残り」は今月売上から固定費（固定費タブの今月分）を引いた金額で、黒字は緑・赤字は赤で表示します。">
+        <div style={{ background: C.panel2, border: `1px solid ${takeHome >= 0 ? C.green : C.red}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.faint, marginBottom: 4 }}>今月の手残り（売上 − 固定費）</div>
+          <div style={{ fontSize: 30, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: takeHome >= 0 ? C.green : C.red, lineHeight: 1.1 }}>{takeHome >= 0 ? "" : "−"}{yen(Math.abs(takeHome))}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>売上 {yen(revThisMonth)} − 固定費 {yen(fixedThisMonth)}</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <KpiCard label="今月売上" value={yen(revThisMonth)} valueColor={C.green} sub={`定期 ${yen(recThisMonth)}・単発 ${yen(onceThisMonth)}`} />
+          <KpiCard label="MRR（月次定期収入）" value={yen(mrr)} sub={`年換算 ${yen(mrr * 12)}`} />
+          <KpiCard label="固定費（今月）" value={yen(fixedThisMonth)} sub={`月額換算 ${yen(fixedMonthly)}`} />
+          <KpiCard label="利益率（今月）" value={revThisMonth > 0 ? `${Math.round((takeHome / revThisMonth) * 100)}%` : "—"} valueColor={takeHome >= 0 ? C.green : C.red} sub="手残り ÷ 売上" />
+        </div>
+      </Panel>
+
+      {/* 12ヶ月推移 */}
+      <Panel title="売上の推移（直近12ヶ月）" accent={C.blue} right={<span style={{ fontSize: 12, color: C.sub }}>最大 {yen(maxRev)}</span>}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 120, padding: "0 2px" }}>
+          {months.map((mo) => (
+            <div key={mo.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 0 }}>
+              <div style={{ width: "100%", display: "flex", alignItems: "flex-end", height: 96 }}>
+                <div title={yen(mo.total)} style={{ width: "100%", height: `${Math.max(2, (mo.total / maxRev) * 96)}px`, background: mo.isNow ? C.green : C.panel2, border: `1px solid ${mo.isNow ? C.green : C.line}`, borderRadius: 4 }} />
+              </div>
+              <span style={{ fontSize: 9, color: mo.isNow ? C.green : C.faint }}>{mo.label}</span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      {/* 定期収入 */}
+      <Panel title="定期収入（毎月自動で計上）" accent={C.green} help="顧問料・月額講座・サブスク売上など、毎月決まって入る収入を登録します。一度登録すれば、月が替わるたびに自動で今月の売上に計上されます。" right={<button onClick={() => { setAddingRec((v) => !v); setEditRec(null); }} style={chipBtn}>{addingRec ? "閉じる" : "＋追加"}</button>}>
+        {addingRec && <RevRecForm onCancel={() => setAddingRec(false)} onSave={(item) => { recOps.add(item); setAddingRec(false); }} />}
+        {sortedRec.length === 0 && !addingRec && <Empty>定期収入は登録されていません。右上の「＋追加」から登録できます。</Empty>}
+        <div style={{ display: "grid", gap: 10 }}>
+          {sortedRec.map((r) =>
+            editRec === r.id ? (
+              <RevRecForm key={r.id} initial={{ name: r.name, customer: r.customer || "", amount: r.amount, cycle: r.cycle, anchorDate: r.anchorDate, category: r.category, note: r.note || "" }} onCancel={() => setEditRec(null)} onSave={(patch) => { recOps.edit(r.id, patch); setEditRec(null); }} />
+            ) : (
+              <div key={r.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", opacity: r.active ? 1 : 0.5 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: revCatColor(r.category), flex: "0 0 auto" }} />
+                  <span style={{ fontSize: 10, color: revCatColor(r.category), border: `1px solid ${revCatColor(r.category)}`, borderRadius: 5, padding: "1px 6px", flex: "0 0 auto" }}>{r.category}</span>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}{!r.active && <span style={{ fontSize: 10, color: C.faint, marginLeft: 6 }}>停止中</span>}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums", flex: "0 0 auto" }}>{yen(r.amount)}<span style={{ fontSize: 11, color: C.faint, fontWeight: 400 }}>/{cycleShort(r.cycle)}</span></span>
+                  <Switch on={r.active} onClick={() => recOps.toggle(r.id)} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: C.sub, flex: 1, minWidth: 0 }}>次回 {fmt(iso(nextBilling(r)))}{r.cycle !== "monthly" ? `（月換算 ${yen(toMonthly(r.amount, r.cycle))}）` : ""}{r.customer ? ` ・ ${r.customer}` : ""}</span>
+                  <button onClick={() => { setEditRec(r.id); setAddingRec(false); }} style={iconBtn} title="編集">✎</button>
+                  <button onClick={() => recOps.remove(r.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      </Panel>
+
+      {/* 単発収入 */}
+      <Panel title="単発の売上" accent={C.purple} right={<button onClick={() => { setAddingOnce((v) => !v); setEditOnce(null); }} style={chipBtn}>{addingOnce ? "閉じる" : "＋追加"}</button>}>
+        {addingOnce && <RevOnceForm onCancel={() => setAddingOnce(false)} onSave={(item) => { onceOps.add(item); setAddingOnce(false); }} />}
+        {sortedOnce.length === 0 && !addingOnce && <Empty>単発の売上は登録されていません。スポット案件や物販などをここに記録します。</Empty>}
+        <div style={{ display: "grid", gap: 8 }}>
+          {sortedOnce.map((r) =>
+            editOnce === r.id ? (
+              <RevOnceForm key={r.id} initial={{ title: r.title, customer: r.customer || "", amount: r.amount, date: r.date, category: r.category }} onCancel={() => setEditOnce(null)} onSave={(patch) => { onceOps.edit(r.id, patch); setEditOnce(null); }} />
+            ) : (
+              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: revCatColor(r.category), flex: "0 0 auto" }} />
+                <span style={{ fontSize: 13, color: C.sub, width: 64, flex: "0 0 auto", fontVariantNumeric: "tabular-nums" }}>{fmt(r.date)}</span>
+                <span style={{ flex: 1, fontSize: 14, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}{r.customer ? <span style={{ color: C.faint, fontSize: 12 }}> ・ {r.customer}</span> : null}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums", flex: "0 0 auto" }}>{yen(r.amount)}</span>
+                <button onClick={() => { setEditOnce(r.id); setAddingOnce(false); }} style={iconBtn} title="編集">✎</button>
+                <button onClick={() => onceOps.remove(r.id)} style={iconBtn} title="削除">✕</button>
+              </div>
+            )
+          )}
+        </div>
+      </Panel>
+
+      {/* カテゴリ内訳 */}
+      <Panel title="売上カテゴリ内訳（今月）" accent={C.accent} right={<span style={{ fontSize: 13, color: C.sub }}>今月 {yen(revThisMonth)}</span>}>
+        {catRows.length === 0 ? (
+          <Empty>今月の売上がありません。</Empty>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {catRows.map((cat) => (
+              <div key={cat}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: revCatColor(cat) }}>● {cat}</span>
+                  <span style={{ color: C.sub }}>{yen(catTotals[cat])}（{revThisMonth > 0 ? Math.round((catTotals[cat] / revThisMonth) * 100) : 0}%）</span>
+                </div>
+                <Bar value={catTotals[cat]} total={revThisMonth} color={revCatColor(cat)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* 自動取り込み（今後） */}
+      <div style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+        <div style={{ color: C.text, fontWeight: 700, marginBottom: 4 }}>売上の自動取り込み（順次対応予定）</div>
+        Googleスプレッドシート連携・Stripe/銀行のCSV取込・Stripe実売上の自動同期に対応予定です。現在は「定期収入の自動計上＋手入力」で、外部にデータを預けずにこの端末・アカウントだけで完結します。
+      </div>
+    </>
   );
 }
 
@@ -989,6 +1567,7 @@ export default function App() {
   };
   const fontLabel = fontScale >= 1.3 ? "特大" : fontScale > 1 ? "大" : "標準";
   const seed = useMemo(() => makeSeed(), []);
+  const [mainTab, setMainTab] = useState("dashboard"); // dashboard | subscriptions
 
   // ── Googleカレンダー連携（任意・クライアント側・複数カレンダー）──
   const [calToken, setCalToken] = useState(() => sessionStorage.getItem("viele-cal-token") || null);
@@ -1145,6 +1724,43 @@ export default function App() {
   const money = makeListOps("money");
   const tasks = makeListOps("tasks");
 
+  // ── 固定費・サブスク操作（既存ドキュメントには無い場合があるので必ず || [] でフォールバック）──
+  const subsList = data.subscriptions || [];
+  const subSettings = data.subSettings || { remindDays: 7, notify: false };
+  const subsOps = {
+    add: (item) => update({ subscriptions: [...subsList, { id: "s" + Date.now(), active: true, ...item }] }),
+    edit: (id, patch) => update({ subscriptions: subsList.map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
+    remove: (id) => confirmDelete(() => update({ subscriptions: subsList.filter((x) => x.id !== id) })),
+    toggle: (id) => update({ subscriptions: subsList.map((x) => (x.id === id ? { ...x, active: !x.active } : x)) }),
+  };
+  const setSubSettings = (patch) => update({ subSettings: { ...subSettings, ...patch } });
+
+  // タブ上のバッジ用：リマインド対象（有効・残りremindDays日以内）の件数
+  const subDueCount = subsList
+    .filter((s) => s.active)
+    .filter((s) => subSignal(iso(nextBilling(s))).diff <= (subSettings.remindDays ?? 7)).length;
+
+  // ── 売上（収入）操作。定期収入 recurringRevenues／単発 revenues。必ず || [] フォールバック ──
+  const recRevList = data.recurringRevenues || [];
+  const oneRevList = data.revenues || [];
+  const recRevOps = {
+    add: (item) => update({ recurringRevenues: [...recRevList, { id: "r" + Date.now(), active: true, ...item }] }),
+    edit: (id, patch) => update({ recurringRevenues: recRevList.map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
+    remove: (id) => confirmDelete(() => update({ recurringRevenues: recRevList.filter((x) => x.id !== id) })),
+    toggle: (id) => update({ recurringRevenues: recRevList.map((x) => (x.id === id ? { ...x, active: !x.active } : x)) }),
+  };
+  const oneRevOps = {
+    add: (item) => update({ revenues: [...oneRevList, { id: "o" + Date.now(), ...item }] }),
+    edit: (id, patch) => update({ revenues: oneRevList.map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
+    remove: (id) => confirmDelete(() => update({ revenues: oneRevList.filter((x) => x.id !== id) })),
+  };
+
+  // 固定費の月額換算合計／今月発生分（売上タブの「手残り」計算に渡す）
+  const _now = new Date();
+  const subActive = subsList.filter((s) => s.active);
+  const fixedMonthly = subActive.reduce((t, s) => t + toMonthly(s.amount, s.cycle), 0);
+  const fixedThisMonth = subActive.reduce((t, s) => t + billedInMonth(s, _now.getFullYear(), _now.getMonth()), 0);
+
   const today = new Date();
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
 
@@ -1235,52 +1851,83 @@ export default function App() {
             ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
           </div>
         )}
-        <TripChain
-          trips={data.trips}
-          onToggle={toggleTripItem}
-          onAdd={addTrip}
-          onRemove={removeTrip}
-          onEditTrip={editTrip}
-          onAddItem={addTripItem}
-          onEditItem={editTripItem}
-          onRemoveItem={removeTripItem}
-        />
-        <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
-        <TimeMeter entries={scheduleEntries} {...calProps} />
-        <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
-        {usingCal && <Upcoming events={upcoming} />}
-        {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
 
-        <CheckList
-          title="コンテンツ制作サイクル"
-          accent={C.blue}
-          items={data.content}
-          onToggle={content.toggle}
-          onAdd={content.add}
-          onEdit={content.edit}
-          onRemove={content.remove}
-          placeholder="制作物を追加…"
-          renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
-        />
+        <MainTabs tab={mainTab} onChange={setMainTab} dueCount={subDueCount} />
 
-        <MoneyList
-          items={data.money}
-          onToggle={money.toggle}
-          onAdd={money.add}
-          onEdit={money.edit}
-          onRemove={money.remove}
-        />
+        {mainTab === "dashboard" && (
+          <>
+            <TripChain
+              trips={data.trips}
+              onToggle={toggleTripItem}
+              onAdd={addTrip}
+              onRemove={removeTrip}
+              onEditTrip={editTrip}
+              onAddItem={addTripItem}
+              onEditItem={editTripItem}
+              onRemoveItem={removeTripItem}
+            />
+            <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <TimeMeter entries={scheduleEntries} {...calProps} />
+            <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
+            {usingCal && <Upcoming events={upcoming} />}
+            {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
 
-        <CheckList
-          title="追加タスク"
-          accent={C.purple}
-          items={data.tasks}
-          onToggle={tasks.toggle}
-          onAdd={tasks.add}
-          onEdit={tasks.edit}
-          onRemove={tasks.remove}
-          placeholder="タスクを追加…"
-        />
+            <CheckList
+              title="コンテンツ制作サイクル"
+              accent={C.blue}
+              items={data.content}
+              onToggle={content.toggle}
+              onAdd={content.add}
+              onEdit={content.edit}
+              onRemove={content.remove}
+              placeholder="制作物を追加…"
+              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
+            />
+
+            <MoneyList
+              items={data.money}
+              onToggle={money.toggle}
+              onAdd={money.add}
+              onEdit={money.edit}
+              onRemove={money.remove}
+            />
+
+            <CheckList
+              title="追加タスク"
+              accent={C.purple}
+              items={data.tasks}
+              onToggle={tasks.toggle}
+              onAdd={tasks.add}
+              onEdit={tasks.edit}
+              onRemove={tasks.remove}
+              placeholder="タスクを追加…"
+            />
+          </>
+        )}
+
+        {mainTab === "subscriptions" && (
+          <SubscriptionsTab
+            subs={subsList}
+            settings={subSettings}
+            onAdd={subsOps.add}
+            onEdit={subsOps.edit}
+            onRemove={subsOps.remove}
+            onToggle={subsOps.toggle}
+            onSettings={setSubSettings}
+            uid={firebaseEnabled ? user?.uid : "local"}
+          />
+        )}
+
+        {mainTab === "revenue" && (
+          <RevenueTab
+            recurring={recRevList}
+            oneTime={oneRevList}
+            fixedMonthly={fixedMonthly}
+            fixedThisMonth={fixedThisMonth}
+            recOps={recRevOps}
+            onceOps={oneRevOps}
+          />
+        )}
 
         <footer style={{ textAlign: "center", color: C.faint, fontSize: 11, padding: "12px 0 32px" }}>
           {firebaseEnabled
