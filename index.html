@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="15d512f">
+<meta name="tane-version" content="699f080">
 </head>
 <body>
   <div id="root"></div>
@@ -897,6 +897,7 @@ const INIT = {
   interestEnabled: true,
   interestRate: 0.05,
   interestLastDate: {},
+  holdBonusLastDate: {},
   weeklyReportSeen: {},
   stocks: [{
     id: "s1",
@@ -1088,6 +1089,7 @@ function migrate(d) {
   if (d.interestRate === undefined) d.interestRate = 0.05;
   if (d.interestEnabled === undefined) d.interestEnabled = true;
   if (!d.interestLastDate) d.interestLastDate = {};
+  if (!d.holdBonusLastDate) d.holdBonusLastDate = {};
   if (!d.weeklyReportSeen) d.weeklyReportSeen = {};
   if (!d.stocks || d.stocks.length === 0) d.stocks = INIT.stocks;
   if (d.stocks && d.stocks[0] && !d.stocks[0].ticker) d.stocks = INIT.stocks;
@@ -4089,6 +4091,7 @@ function ChildScreen({
   // Apply interest on open
   useEffect(() => {
     applyInterest(data, update, child.id);
+    applyHoldingBonus(data, update, child.id);
     fetchRealStockPrices(data, update);
   }, []);
   const showFlash = (pts, emoji) => {
@@ -11753,6 +11756,46 @@ function applyInterest(data, update, cid) {
   }));
 }
 
+// ── Long-term Holding Bonus（30日以上保有で月3%） ─────
+function applyHoldingBonus(data, update, cid) {
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  if ((data.holdBonusLastDate || {})[cid] === thisMonth) return;
+  const holdings = (data.holdings || {})[cid] || [];
+  if (!holdings.length) return;
+  const stocks = data.stocks || [];
+  const toPts = (s, p) => s.currency === "USD" ? Math.max(1, Math.round(p * 1.5)) : Math.max(1, Math.round(p / 100));
+  const now = new Date();
+  let totalBonus = 0;
+  holdings.forEach(h => {
+    if (!h.firstBuyDate) return;
+    const days = (now - new Date(h.firstBuyDate)) / 86400000;
+    if (days < 30) return;
+    const st = stocks.find(x => x.id === h.stockId);
+    if (!st) return;
+    totalBonus += Math.floor(toPts(st, st.price) * h.qty * 0.03);
+  });
+  if (totalBonus <= 0) return;
+  update(d => ({
+    ...d,
+    logs: (() => {
+      const _e = {
+        id: uid(),
+        cid,
+        type: "interest",
+        label: `📦 長期保有ボーナス（30日以上×3%）`,
+        pts: totalBonus,
+        date: new Date().toISOString()
+      };
+      addLogToFirestore(_e);
+      return [_e, ...d.logs];
+    })(),
+    holdBonusLastDate: {
+      ...(d.holdBonusLastDate || {}),
+      [cid]: thisMonth
+    }
+  }));
+}
+
 // ── Stock News & Fetch ────────────────────────────────
 const STOCK_NEWS = {
   "7974.T": ["新作スイッチソフトが大ヒット！", "為替の影響で利益が変動", "海外市場での販売好調", "次世代機の噂が広まる", "人気IPの新作発表"],
@@ -13468,7 +13511,8 @@ function InvestTab({
   const [investTab, setInvestTab] = useState("stocks"); // stocks | forex
   const [selected, setSelected] = useState(null);
   const [mode, setMode] = useState("buy");
-  const [qty, setQty] = useState("1");
+  const [qty, setQty] = useState("0.1");
+  const [tradeComment, setTradeComment] = useState("");
   const [showChart, setShowChart] = useState(null);
   const myBal = bal(data.logs, child.id);
   const myHoldings = (data.holdings || {})[child.id] || [];
@@ -13484,19 +13528,20 @@ function InvestTab({
   const portfolioGain = portfolioVal - portfolioCost;
   const selStock = stocks.find(s => s.id === selected);
   const selHolding = myHoldings.find(h => h.stockId === selected);
-  const qtyN = parseInt(qty) || 1;
-  const basePrice = selStock ? toPts(selStock, selStock.price) * qtyN : 0;
+  const qtyN = Math.max(0.1, Math.round((parseFloat(qty) || 0.1) * 10) / 10);
+  const basePrice = selStock ? Math.round(toPts(selStock, selStock.price) * qtyN) : 0;
   const FEE_RATE = 0.10; // 10%手数料
   const costPts = Math.ceil(basePrice * (1 + FEE_RATE)); // 購入時：価格+10%手数料
   const sellPts = selStock && selHolding ? Math.floor(toPts(selStock, selStock.price) * qtyN * (1 - FEE_RATE)) : 0; // 売却時：価格-10%手数料
 
+  const fmtQty = q => q % 1 === 0 ? `${q}` : `${q.toFixed(1)}`;
   function doBuy() {
-    if (!selStock || qtyN < 1 || myBal < costPts) return;
+    if (!selStock || qtyN < 0.1 || myBal < costPts) return;
     update(d => {
       const existH = (d.holdings?.[child.id] || []).find(h => h.stockId === selStock.id);
       let newH;
+      const tq = Math.round(((existH?.qty || 0) + qtyN) * 10) / 10;
       if (existH) {
-        const tq = existH.qty + qtyN;
         newH = d.holdings[child.id].map(h => h.stockId === selStock.id ? {
           ...h,
           qty: tq,
@@ -13505,8 +13550,10 @@ function InvestTab({
       } else newH = [...(d.holdings?.[child.id] || []), {
         stockId: selStock.id,
         qty: qtyN,
-        avgPrice: Math.round(costPts / qtyN)
+        avgPrice: Math.round(costPts / qtyN),
+        firstBuyDate: new Date().toISOString()
       }];
+      const commentPart = tradeComment ? ` ・ ${tradeComment}` : "";
       return {
         ...d,
         holdings: {
@@ -13518,7 +13565,7 @@ function InvestTab({
             id: uid(),
             cid: child.id,
             type: "invest_buy",
-            label: `📈 ${selStock.emoji}${selStock.name} ${qtyN}株 購入`,
+            label: `📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 購入${commentPart}`,
             pts: -costPts,
             date: new Date().toISOString()
           };
@@ -13527,19 +13574,19 @@ function InvestTab({
         })()
       };
     });
-    setQty("1");
+    setQty("0.1");
     setSelected(null);
+    setTradeComment("");
   }
   function doSell() {
-    if (!selStock || !selHolding || qtyN < 1 || qtyN > selHolding.qty) return;
-    const profit = sellPts - selHolding.avgPrice * qtyN;
+    if (!selStock || !selHolding || qtyN < 0.1 || qtyN > selHolding.qty) return;
     update(d => ({
       ...d,
       holdings: {
         ...(d.holdings || {}),
         [child.id]: d.holdings[child.id].map(h => h.stockId === selStock.id ? {
           ...h,
-          qty: h.qty - qtyN
+          qty: Math.round((h.qty - qtyN) * 10) / 10
         } : h).filter(h => h.qty > 0)
       },
       logs: (() => {
@@ -13547,7 +13594,7 @@ function InvestTab({
           id: uid(),
           cid: child.id,
           type: "invest_sell",
-          label: `📉 ${selStock.emoji}${selStock.name} ${qtyN}株 売却（手数料10%引後）`,
+          label: `📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料10%引後）`,
           pts: sellPts,
           date: new Date().toISOString()
         };
@@ -13555,7 +13602,7 @@ function InvestTab({
         return [_e, ...d.logs];
       })()
     }));
-    setQty("1");
+    setQty("0.1");
     setSelected(null);
   }
   return /*#__PURE__*/React.createElement("div", {
@@ -13708,6 +13755,7 @@ function InvestTab({
       const st = stocks.find(x => x.id === h.stockId);
       if (!st) return null;
       const pct = Math.round(toPts(st, st.price) * h.qty / total * 100);
+      const fq = h.qty % 1 === 0 ? `${h.qty}` : `${h.qty.toFixed(1)}`;
       return /*#__PURE__*/React.createElement("div", {
         key: h.stockId,
         style: {
@@ -13727,7 +13775,7 @@ function InvestTab({
         style: {
           color: "#ccc"
         }
-      }, st.emoji, st.name, " ", h.qty, "\u682A ", pct, "%"));
+      }, st.emoji, st.name, " ", fq, "\u682A ", pct, "%"));
     })));
   })(), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13761,7 +13809,8 @@ function InvestTab({
       onClick: () => {
         setSelected(isSel ? null : s.id);
         setMode("buy");
-        setQty("1");
+        setQty("0.1");
+        setTradeComment("");
       },
       style: {
         width: "100%",
@@ -14017,7 +14066,8 @@ function InvestTab({
       key: m,
       onClick: () => {
         setMode(m);
-        setQty("1");
+        setQty("0.1");
+        setTradeComment("");
       },
       style: {
         flex: 1,
@@ -14038,7 +14088,7 @@ function InvestTab({
         marginBottom: 10
       }
     }, /*#__PURE__*/React.createElement("button", {
-      onClick: () => setQty(q => String(Math.max(1, parseInt(q || 1) - 1))),
+      onClick: () => setQty(q => String(Math.max(0.1, Math.round((parseFloat(q || 0.1) - 0.1) * 10) / 10))),
       style: {
         width: 40,
         height: 40,
@@ -14051,9 +14101,10 @@ function InvestTab({
       }
     }, "\u2212"), /*#__PURE__*/React.createElement("input", {
       value: qty,
-      onChange: e => setQty(e.target.value.replace(/[^0-9]/g, "")),
+      onChange: e => setQty(e.target.value.replace(/[^0-9.]/g, "")),
       type: "number",
-      min: "1",
+      min: "0.1",
+      step: "0.1",
       style: {
         flex: 1,
         textAlign: "center",
@@ -14067,7 +14118,7 @@ function InvestTab({
         fontFamily: F
       }
     }), /*#__PURE__*/React.createElement("button", {
-      onClick: () => setQty(q => String(parseInt(q || 1) + 1)),
+      onClick: () => setQty(q => String(Math.round((parseFloat(q || 0.1) + 0.1) * 10) / 10)),
       style: {
         width: 40,
         height: 40,
@@ -14084,7 +14135,7 @@ function InvestTab({
         gap: 6,
         marginBottom: 12
       }
-    }, [1, 3, 5, 10].map(v => /*#__PURE__*/React.createElement("button", {
+    }, [0.1, 0.5, 1, 3].map(v => /*#__PURE__*/React.createElement("button", {
       key: v,
       onClick: () => setQty(String(v)),
       style: {
@@ -14099,7 +14150,7 @@ function InvestTab({
         cursor: "pointer",
         fontFamily: F
       }
-    }, v, "\u682A"))), /*#__PURE__*/React.createElement("div", {
+    }, fmtQty(v), "\u682A"))), /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#0d0d1a",
         borderRadius: 10,
@@ -14158,7 +14209,30 @@ function InvestTab({
         margin: "6px 0 0",
         fontWeight: 700
       }
-    }, "\u6B8B\u9AD8\u304C\u8DB3\u308A\u306A\u3044\u3088")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    }, "\u6B8B\u9AD8\u304C\u8DB3\u308A\u306A\u3044\u3088"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        fontSize: 11,
+        color: "#aaa",
+        marginBottom: 4
+      }
+    }, "\uD83D\uDCAC \u306A\u305C\u8CB7\u3046\uFF1F\uFF08\u4EFB\u610F\uFF09"), /*#__PURE__*/React.createElement("input", {
+      value: tradeComment,
+      onChange: e => setTradeComment(e.target.value.slice(0, 30)),
+      placeholder: "\u4F8B\uFF1A\u4EFB\u5929\u5802\u597D\u304D\u3060\u304B\u3089",
+      maxLength: 30,
+      style: {
+        width: "100%",
+        background: "#0d0d1a",
+        border: "1px solid #333",
+        borderRadius: 8,
+        padding: "7px 10px",
+        color: "#fff",
+        fontSize: 13,
+        fontFamily: F,
+        boxSizing: "border-box"
+      }
+    })) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -14216,7 +14290,7 @@ function InvestTab({
       }
     }, "\u4FDD\u6709\u682A\u6570\u304C\u8DB3\u308A\u306A\u3044\uFF08", selHolding?.qty || 0, "\u682A\uFF09"))), /*#__PURE__*/React.createElement("button", {
       onClick: mode === "buy" ? doBuy : doSell,
-      disabled: mode === "buy" ? myBal < costPts || qtyN < 1 : !selHolding || qtyN > selHolding.qty || qtyN < 1,
+      disabled: mode === "buy" ? myBal < costPts || qtyN < 0.1 : !selHolding || qtyN > selHolding.qty || qtyN < 0.1,
       style: {
         width: "100%",
         background: mode === "buy" ? "#22c55e" : "#ef4444",
@@ -14228,9 +14302,9 @@ function InvestTab({
         fontSize: 14,
         cursor: "pointer",
         fontFamily: F,
-        opacity: (mode === "buy" ? myBal < costPts || qtyN < 1 : !selHolding || qtyN > selHolding.qty || qtyN < 1) ? 0.4 : 1
+        opacity: (mode === "buy" ? myBal < costPts || qtyN < 0.1 : !selHolding || qtyN > selHolding.qty || qtyN < 0.1) ? 0.4 : 1
       }
-    }, mode === "buy" ? `${qtyN}株 買う！（${costPts.toLocaleString()}pt）` : `${qtyN}株 売る！（${sellPts.toLocaleString()}pt受取）`)));
+    }, mode === "buy" ? `${fmtQty(qtyN)}株 買う！（${costPts.toLocaleString()}pt）` : `${fmtQty(qtyN)}株 売る！（${sellPts.toLocaleString()}pt受取）`)));
   })));
 }
 function calcBadgeStats(child, data) {
