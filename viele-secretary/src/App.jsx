@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, GoogleAuthProvider } from "firebase/auth";
 import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
@@ -590,37 +590,91 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
    ────────────────────────────────────────────────────────────── */
 const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他"];
 
-function Today({ items, source, status, error, count, onConnect, connecting, onSetCat }) {
-  const wd = new Date().getDay();
-  const list = items || [];
+// 予定1件の行（今日の予定／日別ビュー共通）
+function ScheduleRow({ e, source, onSetCat }) {
+  const isFamily = e.role === "family";
+  const canEdit = source === "calendar" && !!onSetCat && !isFamily;
   return (
-    <Panel title={`今日の予定（${WD[wd]}曜）`} accent={C.blue}>
-      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
-      {list.length === 0 ? (
-        <Empty>今日の予定はありません。</Empty>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
+      <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</span>
+      {canEdit ? (
+        <button
+          onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
+          style={{ flex: "0 0 auto", fontSize: 12, color: catColor(e.cat), background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+        >{e.cat} ⇄</button>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {list.map((e, i) => {
-            const isFamily = e.role === "family";
-            const canEdit = source === "calendar" && !!onSetCat && !isFamily;
-            return (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</span>
-                {canEdit ? (
-                  <button
-                    onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
-                    style={{ flex: "0 0 auto", fontSize: 12, color: catColor(e.cat), background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
-                  >{e.cat} ⇄</button>
-                ) : (
-                  <span style={{ fontSize: 12, color: catColor(e.cat), flex: "0 0 auto" }}>{e.cat}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <span style={{ fontSize: 12, color: catColor(e.cat), flex: "0 0 auto" }}>{e.cat}</span>
       )}
+    </div>
+  );
+}
+
+// 横スワイプで今日→明日→明後日…と切り替わる日別スケジュール
+function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat }) {
+  const scroller = useRef(null);
+  const [idx, setIdx] = useState(0);
+  const list = days || [];
+
+  const goTo = (i) => {
+    const n = Math.max(0, Math.min(list.length - 1, i));
+    const el = scroller.current;
+    if (el) el.scrollTo({ left: el.clientWidth * n, behavior: "smooth" });
+    setIdx(n);
+  };
+  const onScroll = () => {
+    const el = scroller.current;
+    if (el) setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
+
+  const cur = list[idx];
+  return (
+    <Panel title="予定（横スワイプで先の日へ）" accent={C.blue}>
+      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
+
+      {/* 日付ナビ */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前の日">‹</button>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>
+          {cur ? `${cur.label}（${cur.date.getMonth() + 1}/${cur.date.getDate()} ${WD[cur.date.getDay()]}）` : ""}
+        </div>
+        <button onClick={() => goTo(idx + 1)} disabled={idx >= list.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= list.length - 1 ? 0.3 : 1 }} aria-label="次の日">›</button>
+      </div>
+
+      {/* 横スクロール（スワイプでスナップ） */}
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
+      >
+        {list.map((day) => (
+          <div key={day.key} style={{ flex: "0 0 100%", minWidth: "100%", scrollSnapAlign: "start", boxSizing: "border-box" }}>
+            {day.items.length === 0 ? (
+              <Empty>予定はありません。</Empty>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {day.items.map((e, i) => (
+                  <ScheduleRow key={i} e={e} source={source} onSetCat={onSetCat} />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ドット */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 12 }}>
+        {list.map((day, i) => (
+          <button
+            key={day.key}
+            onClick={() => goTo(i)}
+            aria-label={day.label}
+            style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 4, border: "none", padding: 0, cursor: "pointer", background: i === idx ? C.blue : C.line }}
+          />
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: "center" }}>← 横スワイプ / 矢印で 今日・明日・明後日… →</div>
     </Panel>
   );
 }
@@ -1108,12 +1162,20 @@ export default function App() {
   const scheduleEntries = usingCal ? weekWork : LOG;
   const scheduleSource = usingCal ? "calendar" : "sample";
 
-  // 今日の予定：仕事＋家族（本日分）
+  // 今日の予定：仕事＋家族（本日分）／横スワイプで先の日も見られるよう数日分を用意
   const todayStart = startOfDay(today);
   const todayEnd = addDays(todayStart, 1);
-  const todayItems = usingCal
-    ? includedEntries.filter((e) => e.start >= todayStart && e.start < todayEnd).sort((a, b) => a.time.localeCompare(b.time))
-    : LOG.filter((e) => e.wd === today.getDay());
+  const DAYS_AHEAD = 7;
+  const dayBuckets = [];
+  for (let d = 0; d < DAYS_AHEAD; d++) {
+    const ds = addDays(todayStart, d);
+    const de = addDays(ds, 1);
+    const items = usingCal
+      ? includedEntries.filter((e) => e.start >= ds && e.start < de).sort((a, b) => a.time.localeCompare(b.time))
+      : LOG.filter((e) => e.wd === ds.getDay()).slice().sort((a, b) => a.time.localeCompare(b.time));
+    const label = d === 0 ? "今日" : d === 1 ? "明日" : d === 2 ? "明後日" : `${ds.getMonth() + 1}/${ds.getDate()}`;
+    dayBuckets.push({ key: d, date: ds, label, items });
+  }
 
   // 今後の予定（先2ヶ月）：家族は全件、仕事は重要イベント（出張/ライブ/終日 等）のみ
   const upcoming = includedEntries
@@ -1164,7 +1226,7 @@ export default function App() {
         />
         <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
         <TimeMeter entries={scheduleEntries} {...calProps} />
-        <Today items={todayItems} {...calProps} onSetCat={setEventCat} />
+        <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
         {usingCal && <Upcoming events={upcoming} />}
         {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} />}
 
