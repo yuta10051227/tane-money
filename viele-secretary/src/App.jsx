@@ -84,6 +84,28 @@ function deadlineSignal(dateISO) {
   return { color: C.green, dot: "🟢", label: `あと${diff}日` };
 }
 
+/* 「今日の要対応」集約：遅れ(late) と もうすぐ(soon) を抽出（取りこぼし防止） */
+function computeAlerts(data) {
+  const late = [];
+  const soon = [];
+  (data.trips || []).forEach((t) => {
+    (t.items || []).forEach((it) => {
+      if (it.done) return;
+      const diff = daysUntil(iso(addDays(new Date(t.date), -it.daysBefore)));
+      const e = { label: `${it.label}（${t.title}）`, diff };
+      if (diff < 0) late.push(e);
+      else if (diff <= 3) soon.push(e);
+    });
+  });
+  (data.deadlines || []).forEach((d) => {
+    const diff = daysUntil(d.date);
+    if (diff >= 0 && diff <= 7) soon.push({ label: d.title, diff });
+  });
+  late.sort((a, b) => a.diff - b.diff);
+  soon.sort((a, b) => a.diff - b.diff);
+  return { late, soon };
+}
+
 /* ──────────────────────────────────────────────────────────────
    逆算チェーンの型テンプレート（遠方登壇 / 日帰り / 海外実習）
    各項目: { label, daysBefore }  本番から daysBefore 日前が締切
@@ -897,6 +919,43 @@ function Empty({ children }) {
   return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
 }
 
+/* 今日の要対応（遅れ・締切間近の集約）。任意でブラウザ通知をオンにできる。 */
+function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
+  const { late, soon } = alerts;
+  const none = late.length === 0 && soon.length === 0;
+  const accent = late.length ? C.red : soon.length ? C.orange : C.green;
+  const Row = ({ dot, color, label, right }) => (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span style={{ flex: "0 0 auto" }}>{dot}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35 }}>{label}</span>
+      <span style={{ flex: "0 0 auto", fontSize: 12, color, fontWeight: 600 }}>{right}</span>
+    </div>
+  );
+  return (
+    <Panel
+      title="今日の要対応"
+      accent={accent}
+      help="締切が過ぎた『遅れ』と、3日以内に迫った『もうすぐ』を自動でまとめます。取りこぼし防止用です。"
+      right={notifySupported && !notify ? <button onClick={onEnableNotify} style={chipBtn}>通知オン</button> : (notify ? <span style={{ fontSize: 11, color: C.green }}>通知オン</span> : null)}
+    >
+      {none ? (
+        <div style={{ fontSize: 14, color: C.green }}>✅ 直近の遅れ・締切間近はありません。</div>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {late.slice(0, 5).map((e, i) => (
+            <Row key={"l" + i} dot="🔴" color={C.red} label={e.label} right={`${-e.diff}日遅れ`} />
+          ))}
+          {late.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか遅れ {late.length - 5}件</div>}
+          {soon.slice(0, 5).map((e, i) => (
+            <Row key={"s" + i} dot="🟠" color={C.orange} label={e.label} right={e.diff === 0 ? "今日" : `あと${e.diff}日`} />
+          ))}
+          {soon.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか間近 {soon.length - 5}件</div>}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* カレンダー連携の状態表示＋連携ボタン（時間メーター/今日の予定の上に出す） */
 function CalStatusNote({ source, status, error, count, onConnect, connecting }) {
   if (source === "calendar") {
@@ -1061,6 +1120,31 @@ export default function App() {
     signOut(auth);
   };
 
+  // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
+  const notifySupported = typeof Notification !== "undefined";
+  const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
+  const notifiedRef = useRef(false);
+  const enableNotify = async () => {
+    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
+    const p = await Notification.requestPermission();
+    if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
+    else alert("通知が許可されませんでした。端末の設定から許可できます。");
+  };
+  useEffect(() => {
+    if (notifiedRef.current || !notify || !data) return;
+    if (!notifySupported || Notification.permission !== "granted") return;
+    const { late, soon } = computeAlerts(data);
+    if (late.length + soon.length > 0) {
+      try {
+        new Notification("VIELE secretary｜今日の要対応", {
+          body: `遅れ ${late.length}件・もうすぐ ${soon.length}件`,
+          icon: "/icon-512.png",
+        });
+      } catch { /* ignore */ }
+    }
+    notifiedRef.current = true;
+  }, [notify, data, notifySupported]);
+
 
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
@@ -1212,6 +1296,8 @@ export default function App() {
     count: weekWork.length,
   };
 
+  const alerts = computeAlerts(data);
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif" }}>
       {/* ヘッダー */}
@@ -1235,6 +1321,7 @@ export default function App() {
             ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
           </div>
         )}
+        <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
         <TripChain
           trips={data.trips}
           onToggle={toggleTripItem}
