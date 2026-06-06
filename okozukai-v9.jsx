@@ -298,9 +298,9 @@ const INIT = {
   ],
   gacha: [
     { id: "gc1", emoji: "⚪", label: "ノーマル",     color: "#9a917a", rate: 60, min: 1,  max: 10  },
-    { id: "gc2", emoji: "🔵", label: "レア",         color: "#4a9eff", rate: 25, min: 11, max: 30  },
-    { id: "gc3", emoji: "🟡", label: "スーパーレア", color: "#f5c842", rate: 12, min: 31, max: 80  },
-    { id: "gc4", emoji: "🔴", label: "激レア",       color: "#f0605a", rate: 3,  min: 81, max: 150 },
+    { id: "gc2", emoji: "🔵", label: "レア",         color: "#4a9eff", rate: 25, min: 11, max: 25  },
+    { id: "gc3", emoji: "🟡", label: "スーパーレア", color: "#f5c842", rate: 12, min: 26, max: 40  },
+    { id: "gc4", emoji: "🔴", label: "激レア",       color: "#f0605a", rate: 3,  min: 41, max: 50  },
   ],
   cats: [
     { id: "cat1", emoji: "🍕", label: "食べもの",     color: "#f97316" },
@@ -372,6 +372,7 @@ const INIT = {
   interestEnabled: true,
   interestRate: 0.05,
   interestLastDate: {},
+  holdBonusLastDate: {},
   weeklyReportSeen: {},
   stocks: [
     {id:"s1",emoji:"🎮",name:"任天堂",ticker:"7974.T",sector:"ゲーム",price:8000,history:[8000],currency:"JPY"},
@@ -461,6 +462,7 @@ function migrate(d) {
   if(d.interestRate===undefined)     d.interestRate=0.05;
   if(d.interestEnabled===undefined)  d.interestEnabled=true;
   if(!d.interestLastDate)            d.interestLastDate={};
+  if(!d.holdBonusLastDate)           d.holdBonusLastDate={};
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
   if(!d.stocks||d.stocks.length===0) d.stocks=INIT.stocks;
   if(d.stocks&&d.stocks[0]&&!d.stocks[0].ticker) d.stocks=INIT.stocks;
@@ -869,8 +871,10 @@ function DailyTasks({ child, data, update }) {
   const bonus  = activeSet?.bonus ?? data.dailyBonus ?? 50;
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
+  const [justDone, setJustDone] = useState({});
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
+  const markJustDone = id => { setJustDone(p=>({...p,[id]:true})); setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550); };
 
   const isCheck   = t => t.type === "check";
   const isDone    = t => isCheck(t) ? !!prog[t.id] : (prog[t.id]||0) >= (t.target||1);
@@ -905,6 +909,7 @@ function DailyTasks({ child, data, update }) {
     if (isDone(t)) return;
     setProgress(t.id, true);
     showFlash(t.pts, t.emoji);
+    markJustDone(t.id);
     addLog(`✅ ${t.label}`, t.pts);
     // check if all done after this
     const newProg = { ...prog, [t.id]: true };
@@ -932,6 +937,7 @@ function DailyTasks({ child, data, update }) {
     const nxt = cur + 1;
     setProgress(t.id, nxt);
     showFlash(t.pts, t.emoji);
+    if(nxt>=(t.target||1)) markJustDone(t.id);
     addLog(`🔢 ${t.label}（${nxt}回目）`, t.pts);
   };
 
@@ -978,7 +984,7 @@ function DailyTasks({ child, data, update }) {
         const count = isCheck(t) ? null : (prog[t.id]||0);
         return (
           <div key={t.id}
-            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .2s"}}>
+            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.08)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 4px ${G}90`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
@@ -1635,7 +1641,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayKey()));
 
   // Apply interest on open
-  useEffect(()=>{ applyInterest(data,update,child.id); fetchRealStockPrices(data,update); },[]);
+  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
 
   const showFlash = (pts, emoji) => {
     setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1200);
@@ -1751,72 +1757,169 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     badges:"more", tips:"more", ranking:"more", gacha:"daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
+  const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
-    <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:80}}>
-      {/* Header — Teen Design */}
-      <div style={{background:BG,padding:"52px 20px 0 20px"}}>
-        {/* トップバー */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <button onClick={onBack}
-            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:TEXTS,boxShadow:SHADOW}}>
-            ‹
-          </button>
-          <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:GP,letterSpacing:0.5}}>Tane Money</div>
-          <button onClick={()=>setShowSettings(true)}
-            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:SHADOW,position:"relative"}}>
+    <div style={{minHeight:"100vh",background:darkBG?"#040810":BG,fontFamily:F,paddingBottom:80}}>
+      {/* ヒーローエリア */}
+      {isJunior ? (()=>{
+        const h=new Date().getHours();
+        const bg=h>=7&&h<11
+          ?"linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)"
+          :h>=11&&h<17
+          ?"linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)"
+          :h>=17&&h<20
+          ?"linear-gradient(180deg,#1a0a20 0%,#6b2d00 20%,#c25a1a 45%,#7b3a8a 65%,#1a4a28 100%)"
+          :h>=20&&h<22
+          ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"
+          :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
+        const starOpacity=h>=7&&h<17?0.2:0.6;
+        return(
+      <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
+        {[[10,15],[25,8],[70,12],[85,6],[50,22],[38,4],[62,18],[15,30]].map(([l,t],i)=>(
+          <div key={i} style={{position:"absolute",top:`${t}%`,left:`${l}%`,width:i%3===0?3:2,height:i%3===0?3:2,borderRadius:"50%",background:"#fff",opacity:(starOpacity+i*0.03),animation:`twinkle ${1.4+i*0.25}s ease-in-out infinite alternate`,pointerEvents:"none"}}/>
+        ))}
+        <div style={{position:"absolute",bottom:60,left:0,right:0,height:50,pointerEvents:"none"}}>
+          {[[5,40],[15,55],[82,48],[92,38]].map(([l,h],i)=>(
+            <div key={i} style={{position:"absolute",bottom:0,left:`${l}%`,width:18,height:h,background:"#0d2a14",borderRadius:"50% 50% 0 0"}}/>
+          ))}
+        </div>
+        <div style={{position:"absolute",bottom:0,left:0,right:0,height:36,background:"linear-gradient(0deg,#1a5c30 0%,#1f7038 60%,transparent 100%)",pointerEvents:"none"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"52px 20px 0",position:"relative",zIndex:2}}>
+          <button onClick={onBack} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:"#fff"}}>‹</button>
+          <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:"rgba(255,255,255,0.9)",letterSpacing:0.5}}>Tane Money</div>
+          <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#fff",position:"relative"}}>
             ⚙
-            {(data.pendingApprovals||[]).length>0&&(
-              <div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>
-                {(data.pendingApprovals||[]).length}
-              </div>
-            )}
+            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
           </button>
         </div>
-        {/* 残高カード + 種モンスター */}
-        <div style={{background:GP,borderRadius:22,padding:"16px 18px 18px",marginBottom:20,position:"relative",overflow:"visible"}}>
-          {/* 背景装飾（overflow:hiddenで内側クリップ） */}
-          <div style={{position:"absolute",inset:0,borderRadius:22,overflow:"hidden",pointerEvents:"none",zIndex:0}}>
-            <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
-            <div style={{position:"absolute",bottom:-30,left:-10,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}/>
-          </div>
-          <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-end",gap:10}}>
-            {/* 左：残高情報 */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <div style={{width:30,height:30,borderRadius:9,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
-                  {child.emoji}
-                </div>
-                <div>
-                  <div style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,letterSpacing:0.5}}>こんにちは、{child.name}</div>
-                  <div style={{color:"rgba(255,255,255,0.5)",fontSize:10}}>現在のタネ</div>
-                </div>
+        <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
+          <SeedMonster child={child} data={data} size={130} update={update}/>
+        </div>
+        {(()=>{
+          const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+          const stage=tDone<10?0:tDone<50?1:tDone<150?2:tDone<400?3:4;
+          if(stage>=4) return null;
+          const THRESH=[10,50,150,400];
+          const prev=stage===0?0:THRESH[stage-1];
+          const next=THRESH[stage];
+          const pct=Math.min(1,(tDone-prev)/(next-prev));
+          const remaining=next-tDone;
+          return(
+            <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700}}>✨ あと{remaining}回でしんか！</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>{tDone}/{next}</span>
               </div>
-              <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:8}}>
-                <div style={{color:"#fff",fontSize:34,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</div>
-                <div style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,marginBottom:3}}>pt</div>
+              <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#4ade80,#86efac)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px #4ade8070"}}/>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>今月</span>
-                <span style={{fontSize:13,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
-                {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 8px",borderRadius:999,fontWeight:600}}>🔥 {curStreak}日</span>}
-              </div>
-              <button onClick={()=>setShowTransfer(true)}
-                style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.35)",borderRadius:10,padding:"5px 13px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F,letterSpacing:0.3}}>
-                💸 おくる
-              </button>
             </div>
-            {/* 右：種モンスター（overflow:visibleなのでふきだしが上に出る） */}
-            <SeedMonster child={child} data={data}/>
+          );
+        })()}
+        <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2}}>{child.emoji} {child.name}</div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
+                <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
+                <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>今月</span>
+                <span style={{fontSize:12,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+                {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,200,0,0.2)",color:"#fde68a",padding:"2px 7px",borderRadius:999,fontWeight:700}}>🔥 {curStreak}日</span>}
+              </div>
+            </div>
+            <button onClick={()=>setShowTransfer(true)} style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
           </div>
+          {(()=>{
+            const rankable=[...data.children,...(data.parents||[])].filter(m=>m.visibility?.rankingParticipation!==false);
+            if(rankable.length<2) return null;
+            const sorted=[...rankable].sort((a,b)=>calcMonthlyActivity(b.id,data.logs)-calcMonthlyActivity(a.id,data.logs));
+            const rIdx=sorted.findIndex(m=>m.id===child.id);
+            if(rIdx<0) return null;
+            const medals=["🥇","🥈","🥉"];
+            return(
+              <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
+                <button onClick={()=>{setTab("more");setMoreOpen("ranking");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5,padding:0}}>
+                  <span style={{fontSize:16}}>{medals[rIdx]||"🏅"}</span>
+                  <span style={{fontSize:14,fontWeight:900,color:"rgba(255,255,255,0.9)"}}>{rIdx+1}位</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>›</span>
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+        <style>{`@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`}</style>
+      </div>
+        );
+      })() : (()=>{
+        // Teen: ダークダッシュボード
+        const ttd=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+        const myBadges=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="badge").length;
+        const stocks2=data.stocks||[];
+        const myH2=(data.holdings||{})[child.id]||[];
+        const toPts2=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
+        const portV2=myH2.reduce((s,h)=>{const st=stocks2.find(x=>x.id===h.stockId);return s+(st?toPts2(st,st.price)*h.qty:0);},0);
+        return(
+      <div style={{background:"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
+        {/* 背景グリッド */}
+        <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",backgroundSize:"32px 32px",pointerEvents:"none"}}/>
+        {/* アクセントライン */}
+        <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,rgba(74,158,255,0.4),transparent)",pointerEvents:"none"}}/>
+        {/* トップバー */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"52px 20px 0",position:"relative",zIndex:2}}>
+          <button onClick={onBack} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:"#e2e8f0"}}>‹</button>
+          <div style={{fontFamily:FB,fontWeight:800,fontSize:12,color:"rgba(74,158,255,0.7)",letterSpacing:2,textTransform:"uppercase"}}>Tane Money</div>
+          <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#e2e8f0",position:"relative"}}>
+            ⚙
+            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
+          </button>
+        </div>
+        {/* 残高表示 */}
+        <div style={{padding:"20px 20px 0",position:"relative",zIndex:2}}>
+          <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}>{child.emoji} {child.name}</div>
+          <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
+            <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
+            <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+            <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>今月</span>
+            <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+            <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
+          </div>
+        </div>
+        {/* 4ステータスグリッド */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
+          {[
+            ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう"],
+            ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう"],
+            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう"],
+            ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう"],
+          ].map(([e,l,v,c,tabTarget,hint])=>(
+            <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
+              style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
+              <div style={{fontSize:18,marginBottom:3}}>{e}</div>
+              <div style={{color:"rgba(255,255,255,0.35)",fontSize:9,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
+              {v ? (
+                <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
+              ) : (
+                <div style={{color:"rgba(74,158,255,0.6)",fontSize:10,lineHeight:1.4}}>{hint} →</div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
+        );
+      })()}
       {/* タブナビゲーション */}
-      <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`,overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 8px rgba(24,35,29,0.04)"}}>
+      <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
         {MAIN_TABS.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
-            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?GP:MUTED,fontWeight:effectiveTab===v?700:500,fontSize:10,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.45,transition:"opacity .15s"}}/>
+            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:10,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}}/>
             {l.replace(/^\S+\s+/,"")}
           </button>
         ))}
@@ -1905,15 +2008,22 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
-        {/* ── デイリーガチャ（最上部） ── */}
+        {/* Teen: タスクを先に表示（ガチャより優先） */}
+        {!isJunior && <>
+          <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
+          <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
+        </>}
+        {/* ── デイリーガチャ（Junior: 最上部 / Teen: タスクの下） ── */}
         <div style={{padding:"12px 16px 4px"}}>
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 DAILY GACHA</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
-              <div style={{background:todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`,border:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
                 <button onClick={doGacha} disabled={todayDone}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
@@ -1924,22 +2034,23 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </button>
                 <div style={{flex:1}}>
                   <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
-                  <div style={{fontWeight:800,fontSize:14,color:todayDone?MUTED:TEXT}}>
-                    {todayDone?"✅ 今日は引き済み！":"デイリーガチャ"}
+                  <div style={{fontWeight:800,fontSize:14,color:darkBG?(todayDone?"rgba(255,255,255,0.35)":"#fff"):(todayDone?MUTED:TEXT)}}>
+                    {todayDone?(darkBG?"CLAIMED":"✅ 今日は引き済み！"):"デイリーガチャ"}
                   </div>
-                  <div style={{fontSize:12,color:MUTED,marginTop:2}}>
-                    {todayDone?"また明日ね🌙":`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+                  <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
+                    {todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
                   </div>
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
+                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑残り{rem}体 · COLLECT THEM ALL</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>COLLECTION COMPLETE ★</div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                  <span style={{fontSize:10,color:MUTED,fontWeight:600}}>今月:</span>
+                  <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
                   {tierCounts.filter(t=>t.count>0).map(t=>(
-                    <span key={t.id} style={{fontSize:10,background:CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
+                    <span key={t.id} style={{fontSize:10,background:darkBG?"rgba(255,255,255,0.06)":CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
                   ))}
                 </div>
               )}
@@ -1949,30 +2060,30 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 const zukanCount=GACHA_ITEMS.filter(i=>coll[i.id]>0).length;
                 const tierColorMap=Object.fromEntries((data.gacha||[]).map(g=>[g.id,g.color]));
                 return(<div style={{marginTop:10}}>
-                  <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:CARDS,border:`1.5px solid ${BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
+                  <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:darkBG?"rgba(255,255,255,0.05)":CARDS,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:15}}>📖</span>
-                      <span style={{fontWeight:800,fontSize:13,color:TEXT}}>図鑑</span>
-                      <span style={{fontSize:11,color:MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
+                      <span style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.8)":TEXT}}>図鑑</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <div style={{height:5,width:60,background:BORDER,borderRadius:999,overflow:"hidden"}}>
                         <div style={{height:"100%",width:`${zukanCount/GACHA_ITEMS.length*100}%`,background:G,borderRadius:999}}/>
                       </div>
-                      <span style={{fontSize:11,color:MUTED}}>{showZukan?"▲":"▼"}</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{showZukan?"▲":"▼"}</span>
                     </div>
                   </button>
                   {showZukan&&(
-                    <div style={{background:CARDS,borderRadius:"0 0 14px 14px",padding:"10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,border:`1.5px solid ${BORDER}`,borderTop:"none"}}>
+                    <div style={{background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:"0 0 14px 14px",padding:"10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderTop:"none"}}>
                       {GACHA_ITEMS.map(item=>{
                         const cnt=coll[item.id]||0;
                         const tc=tierColorMap[item.tierId]||BORDER;
-                        return(<div key={item.id} style={{textAlign:"center",background:cnt>0?CARD:`rgba(0,0,0,0.04)`,borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:BORDER}`,transition:"all .2s"}}>
+                        return(<div key={item.id} style={{textAlign:"center",background:cnt>0?(darkBG?"rgba(255,255,255,0.08)":CARD):(darkBG?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.04)"),borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,transition:"all .2s"}}>
                           {cnt>0
                             ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.png`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
-                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?TEXT:MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
+                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
                           {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
                         </div>);
                       })}
@@ -1984,9 +2095,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
-        <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
-        <DailyTasks child={child} data={data} update={update}/>
+        {/* Junior: タスクはガチャの後 */}
         {isJunior && <>
+          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
           {/* やることへのショートカット */}
           <div style={{padding:"8px 16px 4px"}}>
             <button onClick={()=>setTab("tasks")}
@@ -2023,10 +2135,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── ACTIVITY サブナビ ── */}
       {effectiveTab==="activity"&&!isJunior&&!young&&(
-        <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`}}>
-          {[["tasks","✅ お手伝い"],["invest","📈 投資/為替"]].map(([v,l])=>(
+        <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
+          {[["tasks","✅ タスク"],["invest","📈 投資/為替"]].map(([v,l])=>(
             <button key={v} onClick={()=>setActTab(v)}
-              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:actTab===v?GP:MUTED,fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${darkBG?"#4a9eff":GP}`:"2.5px solid transparent",background:"none",color:actTab===v?(darkBG?"#4a9eff":GP):(darkBG?"rgba(255,255,255,0.4)":MUTED),fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
               {l}
             </button>
           ))}
@@ -4039,6 +4151,31 @@ function applyInterest(data,update,cid){
   }));
 }
 
+// ── Long-term Holding Bonus（30日以上保有で月3%） ─────
+function applyHoldingBonus(data,update,cid){
+  const thisMonth=new Date().toISOString().slice(0,7);
+  if((data.holdBonusLastDate||{})[cid]===thisMonth) return;
+  const holdings=(data.holdings||{})[cid]||[];
+  if(!holdings.length) return;
+  const stocks=data.stocks||[];
+  const toPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
+  const now=new Date();
+  let totalBonus=0;
+  holdings.forEach(h=>{
+    if(!h.firstBuyDate) return;
+    const days=(now-new Date(h.firstBuyDate))/86400000;
+    if(days<30) return;
+    const st=stocks.find(x=>x.id===h.stockId);
+    if(!st) return;
+    totalBonus+=Math.floor(toPts(st,st.price)*h.qty*0.03);
+  });
+  if(totalBonus<=0) return;
+  update(d=>({...d,
+    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`📦 長期保有ボーナス（30日以上×3%）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
+    holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:thisMonth},
+  }));
+}
+
 // ── Stock News & Fetch ────────────────────────────────
 const STOCK_NEWS={
   "7974.T":["新作スイッチソフトが大ヒット！","為替の影響で利益が変動","海外市場での販売好調","次世代機の噂が広まる","人気IPの新作発表"],
@@ -4206,9 +4343,11 @@ async function fetchRealStockPrices(data,update){
 }
 
 // ── Seed Monster ──────────────────────────────────────
-function SeedMonster({ child, data }) {
+function SeedMonster({ child, data, size=90, update }) {
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
+  const [editNick, setEditNick] = useState(false);
+  const [nickInput, setNickInput] = useState("");
 
   const myBal      = bal(data.logs, child.id);
   const curStreak  = data.streak?.[child.id]?.cur || 0;
@@ -4307,7 +4446,7 @@ function SeedMonster({ child, data }) {
           <img
             src={`/assets/monster_${stage}.png`}
             alt={NAMES[stage]}
-            style={{width:90,height:90,objectFit:"contain",display:"block"}}
+            style={{width:size,height:size,objectFit:"contain",display:"block"}}
           />
           {accessories.map((acc,i)=>(
             <div key={i} style={{
@@ -4326,10 +4465,28 @@ function SeedMonster({ child, data }) {
       {/* 影 */}
       <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
-      {/* 名前 */}
-      <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
-        {NAMES[stage]}{stage===4&&" 👑"}
-      </div>
+      {/* 名前（Juniorはニックネーム編集可） */}
+      {update ? (
+        editNick ? (
+          <div style={{marginTop:4}}>
+            <input value={nickInput} onChange={e=>setNickInput(e.target.value)}
+              onBlur={()=>{if(nickInput.trim())update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()}}));setEditNick(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"){if(nickInput.trim())update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()}}));setEditNick(false);}if(e.key==="Escape")setEditNick(false);}}
+              autoFocus maxLength={8}
+              style={{fontSize:12,border:"1.5px solid rgba(255,255,255,0.5)",borderRadius:8,padding:"3px 8px",textAlign:"center",width:80,fontFamily:"inherit",color:"#fff",background:"rgba(255,255,255,0.15)",outline:"none"}}
+            />
+          </div>
+        ) : (
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>{(data.monsterNickname||{})[child.id]||NAMES[stage]}{stage===4&&" 👑"}</div>
+            <button onClick={()=>{setNickInput((data.monsterNickname||{})[child.id]||NAMES[stage]);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
+          </div>
+        )
+      ) : (
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
+          {NAMES[stage]}{stage===4&&" 👑"}
+        </div>
+      )}
       {/* 進化バー */}
       {nextTask&&(
         <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"3px auto 0",overflow:"hidden"}}>
@@ -4852,8 +5009,11 @@ function InvestTab({child,data,update}){
   const [investTab,setInvestTab]=useState("stocks"); // stocks | forex
   const [selected,setSelected]=useState(null);
   const [mode,setMode]=useState("buy");
-  const [qty,setQty]=useState("1");
+  const [qty,setQty]=useState("0.1");
+  const [tradeComment,setTradeComment]=useState("");
   const [showChart,setShowChart]=useState(null);
+  const [showShare,setShowShare]=useState(false);
+  const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
   const stocks=data.stocks||[];
@@ -4865,31 +5025,101 @@ function InvestTab({child,data,update}){
   const portfolioGain=portfolioVal-portfolioCost;
   const selStock=stocks.find(s=>s.id===selected);
   const selHolding=myHoldings.find(h=>h.stockId===selected);
-  const qtyN=parseInt(qty)||1;
-  const basePrice=selStock?toPts(selStock,selStock.price)*qtyN:0;
+  const qtyN=Math.max(0.1,Math.round((parseFloat(qty)||0.1)*10)/10);
+  const basePrice=selStock?Math.round(toPts(selStock,selStock.price)*qtyN):0;
   const FEE_RATE = 0.10; // 10%手数料
   const costPts = Math.ceil(basePrice*(1+FEE_RATE)); // 購入時：価格+10%手数料
   const sellPts = selStock&&selHolding?Math.floor(toPts(selStock,selStock.price)*qtyN*(1-FEE_RATE)):0; // 売却時：価格-10%手数料
 
+  const fmtQty=q=>(q%1===0)?`${q}`:`${q.toFixed(1)}`;
   function doBuy(){
-    if(!selStock||qtyN<1||myBal<costPts) return;
+    if(!selStock||qtyN<0.1||myBal<costPts) return;
     update(d=>{
       const existH=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
       let newH;
-      if(existH){const tq=existH.qty+qtyN;newH=(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:tq,avgPrice:Math.round((existH.avgPrice*existH.qty+costPts)/tq)}:h);}
-      else newH=[...(d.holdings?.[child.id]||[]),{stockId:selStock.id,qty:qtyN,avgPrice:Math.round(costPts/qtyN)}];
-      return{...d,holdings:{...(d.holdings||{}),[child.id]:newH},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_buy",label:`📈 ${selStock.emoji}${selStock.name} ${qtyN}株 購入`,pts:-costPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()};
+      const tq=Math.round(((existH?.qty||0)+qtyN)*10)/10;
+      if(existH){newH=(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:tq,avgPrice:Math.round((existH.avgPrice*existH.qty+costPts)/tq)}:h);}
+      else newH=[...(d.holdings?.[child.id]||[]),{stockId:selStock.id,qty:qtyN,avgPrice:Math.round(costPts/qtyN),firstBuyDate:new Date().toISOString()}];
+      const commentPart=tradeComment?` ・ ${tradeComment}`:"";
+      return{...d,holdings:{...(d.holdings||{}),[child.id]:newH},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_buy",label:`📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 購入${commentPart}`,pts:-costPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()};
     });
-    setQty("1");setSelected(null);
+    setQty("0.1");setSelected(null);setTradeComment("");
   }
   function doSell(){
-    if(!selStock||!selHolding||qtyN<1||qtyN>selHolding.qty) return;
-    const profit=sellPts-selHolding.avgPrice*qtyN;
-    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:h.qty-qtyN}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${qtyN}株 売却（手数料10%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
-    setQty("1");setSelected(null);
+    if(!selStock||!selHolding||qtyN<0.1||qtyN>selHolding.qty) return;
+    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料10%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
+    setQty("0.1");setSelected(null);
   }
 
   return(<div style={{padding:"12px 16px",paddingBottom:32}}>
+    {/* ポートフォリオ シェアモーダル */}
+    {showShare&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowShare(false)}>
+        <div style={{background:"linear-gradient(160deg,#060d1a,#0f1a2e)",borderRadius:24,padding:24,maxWidth:340,width:"100%",color:"#fff",boxShadow:"0 24px 60px rgba(0,0,0,0.7)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+            <div style={{fontSize:11,color:"#4a9eff",fontWeight:800,letterSpacing:2}}>TANE MONEY</div>
+            <button onClick={()=>setShowShare(false)} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>✕</button>
+          </div>
+          <div style={{marginBottom:16}}>
+            <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,marginBottom:6}}>{child.emoji} {child.name} の投資ポートフォリオ</div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:4}}>
+              <span style={{fontSize:34,fontWeight:900,lineHeight:1}}>{portfolioVal.toLocaleString()}</span>
+              <span style={{fontSize:13,color:"#4a9eff",fontWeight:700,marginBottom:4}}>pt</span>
+            </div>
+            <div style={{display:"flex",gap:16}}>
+              <span style={{color:"rgba(255,255,255,0.4)",fontSize:11}}>投資額 <strong style={{color:"#fff"}}>{portfolioCost.toLocaleString()}pt</strong></span>
+              <span style={{fontSize:11,fontWeight:800,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"▲":"▼"} {Math.abs(portfolioGain).toLocaleString()}pt ({portfolioCost>0?(Math.abs(portfolioGain/portfolioCost)*100).toFixed(1):0}%)</span>
+            </div>
+          </div>
+          <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"0 0 16px"}}/>
+          {myHoldings.length>0?(
+            <div style={{marginBottom:16}}>
+              <div style={{color:"rgba(255,255,255,0.3)",fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:10}}>HOLDINGS</div>
+              {myHoldings.map(h=>{
+                const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;
+                const val=toPts(st,st.price)*h.qty;
+                const pct=portfolioVal>0?Math.round(val/portfolioVal*100):0;
+                const gain=val-h.avgPrice*h.qty;
+                const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;
+                return(
+                  <div key={h.stockId} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                    <span style={{fontSize:22}}>{st.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{st.name}</div>
+                      <div style={{color:"rgba(255,255,255,0.35)",fontSize:10}}>{fq}株 · {pct}%</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontWeight:700,fontSize:12}}>{val.toLocaleString()}pt</div>
+                      <div style={{fontSize:11,color:gain>=0?"#4ade80":"#f87171",fontWeight:700}}>{gain>=0?"+":""}{gain.toLocaleString()}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ):(
+            <div style={{background:"rgba(74,158,255,0.06)",border:"1px solid rgba(74,158,255,0.12)",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+              <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,fontWeight:700,marginBottom:6}}>📈 株ってなに？</div>
+              <div style={{color:"rgba(255,255,255,0.3)",fontSize:11,lineHeight:1.6}}>会社の一部を買うこと。価格が上がれば利益が出て、下がれば損になる。下のリストから気になる株をタップして買ってみよう。</div>
+            </div>
+          )}
+          {(()=>{const bc=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="badge").length;return bc>0&&(
+            <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+              <span style={{fontSize:18}}>🏅</span>
+              <span style={{color:"rgba(255,255,255,0.6)",fontSize:12}}>バッジ <strong style={{color:"#fbbf24"}}>{bc}個</strong> 獲得済み</span>
+            </div>
+          );})()}
+          <button onClick={async()=>{
+            const gainStr=portfolioGain>=0?`+${portfolioGain.toLocaleString()}`:portfolioGain.toLocaleString();
+            const txt=`${child.emoji} ${child.name}のポートフォリオ\n💰 ${portfolioVal.toLocaleString()}pt（損益: ${gainStr}pt）\n${myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);return st?`${st.emoji}${st.name}`:""}).filter(Boolean).join("・")}\n🌱 tane-money.vercel.app`;
+            if(navigator.share){try{await navigator.share({title:"TANE MONEY ポートフォリオ",text:txt});}catch(e){}}
+            else{navigator.clipboard?.writeText(txt);setShareCopied(true);setTimeout(()=>setShareCopied(false),2500);}
+          }} style={{width:"100%",background:shareCopied?"rgba(74,222,128,0.15)":"#4a9eff",border:shareCopied?"1px solid #4ade80":"none",borderRadius:14,padding:"12px",color:shareCopied?"#4ade80":"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,marginTop:8,transition:"all .3s"}}>
+            {shareCopied?"✓ コピーしました！":"📤 LINEで送る / シェア"}
+          </button>
+          <div style={{textAlign:"center",color:"rgba(255,255,255,0.12)",fontSize:9,letterSpacing:0.5,marginTop:8}}>🌱 tane-money.vercel.app</div>
+        </div>
+      </div>
+    )}
     {/* タブ切替：株 / 為替 */}
     <div style={{display:"flex",gap:0,background:"#1a1a2e",borderRadius:14,overflow:"hidden",marginBottom:14}}>
       {[["stocks","📈 株"],["forex","💱 為替"]].map(([v,l])=>(
@@ -4917,7 +5147,10 @@ function InvestTab({child,data,update}){
 
       {/* ポートフォリオ */}
       <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:20,padding:18,marginBottom:14,color:"#fff"}}>
-        <p style={{color:"#aaa",fontSize:12,fontWeight:700,margin:"0 0 4px"}}>📊 ポートフォリオ</p>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+          <p style={{color:"#aaa",fontSize:12,fontWeight:700,margin:0}}>📊 ポートフォリオ</p>
+          <button onClick={()=>setShowShare(true)} style={{background:"rgba(74,158,255,0.15)",border:"1px solid rgba(74,158,255,0.3)",borderRadius:8,padding:"3px 10px",color:"#4a9eff",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸 シェア</button>
+        </div>
         <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
@@ -4931,7 +5164,7 @@ function InvestTab({child,data,update}){
               {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=toPts(st,st.price)*h.qty/total*100;return<div key={h.stockId} style={{width:`${pct}%`,background:colors[st.ticker]||"#4a9eff",minWidth:3}}/>;  })}
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>
-              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:10}}><div style={{width:8,height:8,borderRadius:2,background:colors[st.ticker]||"#4a9eff"}}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {h.qty}株 {pct}%</span></div>);})}
+              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:10}}><div style={{width:8,height:8,borderRadius:2,background:colors[st.ticker]||"#4a9eff"}}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
             </div>
           </>);
         })()}
@@ -4946,7 +5179,7 @@ function InvestTab({child,data,update}){
         const isSel=selected===s.id;
         const showC=showChart===s.id;
         return(<div key={s.id} style={{marginBottom:10}}>
-          <button onClick={()=>{setSelected(isSel?null:s.id);setMode("buy");setQty("1");}}
+          <button onClick={()=>{setSelected(isSel?null:s.id);setMode("buy");setQty("0.1");setTradeComment("");}}
             style={{width:"100%",background:isSel?"#1a1a2e":CARD,border:`2px solid ${isSel?"#4a9eff":BORDER}`,borderRadius:18,padding:"12px 14px",cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .2s"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:26}}>{s.emoji}</span>
@@ -5019,15 +5252,15 @@ function InvestTab({child,data,update}){
               <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:"#aaa",fontSize:18,cursor:"pointer"}}>✕</button>
             </div>
             <div style={{display:"flex",gap:0,background:"#0d0d1a",borderRadius:10,overflow:"hidden",marginBottom:12}}>
-              {["buy","sell"].map(m=><button key={m} onClick={()=>{setMode(m);setQty("1");}} style={{flex:1,padding:"9px 0",border:"none",background:mode===m?(m==="buy"?"#22c55e":"#ef4444"):"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>{m==="buy"?"買う":"売る"}</button>)}
+              {["buy","sell"].map(m=><button key={m} onClick={()=>{setMode(m);setQty("0.1");setTradeComment("");}} style={{flex:1,padding:"9px 0",border:"none",background:mode===m?(m==="buy"?"#22c55e":"#ef4444"):"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>{m==="buy"?"買う":"売る"}</button>)}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <button onClick={()=>setQty(q=>String(Math.max(1,parseInt(q||1)-1)))} style={{width:40,height:40,borderRadius:"50%",border:"1px solid #333",background:"#0d0d1a",color:"#fff",fontSize:20,cursor:"pointer"}}>−</button>
-              <input value={qty} onChange={e=>setQty(e.target.value.replace(/[^0-9]/g,""))} type="number" min="1" style={{flex:1,textAlign:"center",fontSize:22,fontWeight:900,background:"#0d0d1a",border:"1px solid #333",borderRadius:10,padding:"7px 0",color:"#fff",fontFamily:F}}/>
-              <button onClick={()=>setQty(q=>String(parseInt(q||1)+1))} style={{width:40,height:40,borderRadius:"50%",border:"none",background:"#4a9eff",color:"#fff",fontSize:20,cursor:"pointer"}}>+</button>
+              <button onClick={()=>setQty(q=>String(Math.max(0.1,Math.round((parseFloat(q||0.1)-0.1)*10)/10)))} style={{width:40,height:40,borderRadius:"50%",border:"1px solid #333",background:"#0d0d1a",color:"#fff",fontSize:20,cursor:"pointer"}}>−</button>
+              <input value={qty} onChange={e=>setQty(e.target.value.replace(/[^0-9.]/g,""))} type="number" min="0.1" step="0.1" style={{flex:1,textAlign:"center",fontSize:22,fontWeight:900,background:"#0d0d1a",border:"1px solid #333",borderRadius:10,padding:"7px 0",color:"#fff",fontFamily:F}}/>
+              <button onClick={()=>setQty(q=>String(Math.round((parseFloat(q||0.1)+0.1)*10)/10))} style={{width:40,height:40,borderRadius:"50%",border:"none",background:"#4a9eff",color:"#fff",fontSize:20,cursor:"pointer"}}>+</button>
             </div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
-              {[1,3,5,10].map(v=><button key={v} onClick={()=>setQty(String(v))} style={{flex:1,padding:"6px 0",border:`1px solid ${qtyN===v?"#4a9eff":"#333"}`,borderRadius:8,background:qtyN===v?"#4a9eff20":"transparent",color:qtyN===v?"#4a9eff":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>{v}株</button>)}
+              {[0.1,0.5,1,3].map(v=><button key={v} onClick={()=>setQty(String(v))} style={{flex:1,padding:"6px 0",border:`1px solid ${qtyN===v?"#4a9eff":"#333"}`,borderRadius:8,background:qtyN===v?"#4a9eff20":"transparent",color:qtyN===v?"#4a9eff":"#aaa",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>{fmtQty(v)}株</button>)}
             </div>
             <div style={{background:"#0d0d1a",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
               {mode==="buy"?<>
@@ -5036,6 +5269,8 @@ function InvestTab({child,data,update}){
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#aaa",marginBottom:4}}><span>合計</span><span style={{color:"#fff",fontWeight:700}}>{costPts.toLocaleString()}pt</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>残高</span><span style={{color:myBal>=costPts?"#4ade80":"#f87171",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
                 {myBal<costPts&&<p style={{color:"#f87171",fontSize:11,margin:"6px 0 0",fontWeight:700}}>残高が足りないよ</p>}
+                <div style={{marginTop:8,fontSize:11,color:"#aaa",marginBottom:4}}>💬 なぜ買う？（任意）</div>
+                <input value={tradeComment} onChange={e=>setTradeComment(e.target.value.slice(0,30))} placeholder="例：任天堂好きだから" maxLength={30} style={{width:"100%",background:"#0d0d1a",border:"1px solid #333",borderRadius:8,padding:"7px 10px",color:"#fff",fontSize:13,fontFamily:F,boxSizing:"border-box"}}/>
               </>:<>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa",marginBottom:2}}><span>売却額</span><span style={{color:"#fff"}}>{Math.floor(toPts(selStock||{price:0},selStock?.price||0)*qtyN).toLocaleString()}pt</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>手数料(10%)</span><span>-{(Math.floor(toPts(selStock||{price:0},selStock?.price||0)*qtyN)-sellPts).toLocaleString()}pt</span></div>
@@ -5045,9 +5280,9 @@ function InvestTab({child,data,update}){
               </>}
             </div>
             <button onClick={mode==="buy"?doBuy:doSell}
-              disabled={mode==="buy"?(myBal<costPts||qtyN<1):(!selHolding||qtyN>selHolding.qty||qtyN<1)}
-              style={{width:"100%",background:mode==="buy"?"#22c55e":"#ef4444",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,opacity:(mode==="buy"?(myBal<costPts||qtyN<1):(!selHolding||qtyN>selHolding.qty||qtyN<1))?0.4:1}}>
-              {mode==="buy"?`${qtyN}株 買う！（${costPts.toLocaleString()}pt）`:`${qtyN}株 売る！（${sellPts.toLocaleString()}pt受取）`}
+              disabled={mode==="buy"?(myBal<costPts||qtyN<0.1):(!selHolding||qtyN>selHolding.qty||qtyN<0.1)}
+              style={{width:"100%",background:mode==="buy"?"#22c55e":"#ef4444",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,opacity:(mode==="buy"?(myBal<costPts||qtyN<0.1):(!selHolding||qtyN>selHolding.qty||qtyN<0.1))?0.4:1}}>
+              {mode==="buy"?`${fmtQty(qtyN)}株 買う！（${costPts.toLocaleString()}pt）`:`${fmtQty(qtyN)}株 売る！（${sellPts.toLocaleString()}pt受取）`}
             </button>
           </div>}
         </div>);
