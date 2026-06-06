@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="723c46a">
+<meta name="tane-version" content="936faeb">
 </head>
 <body>
   <div id="root"></div>
@@ -4358,13 +4358,9 @@ function ChildScreen({
       fontFamily: F,
       paddingBottom: 80
     }
-  }, (() => {
+  }, isJunior ? (() => {
     const h = new Date().getHours();
-    const bg = h >= 7 && h < 11 ? "linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)" // 朝焼け
-    : h >= 11 && h < 17 ? "linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)" // 昼
-    : h >= 17 && h < 20 ? "linear-gradient(180deg,#1a0a20 0%,#6b2d00 20%,#c25a1a 45%,#7b3a8a 65%,#1a4a28 100%)" // 夕焼け
-    : h >= 20 && h < 22 ? "linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)" // 夜
-    : "linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)"; // 深夜
+    const bg = h >= 7 && h < 11 ? "linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)" : h >= 11 && h < 17 ? "linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)" : h >= 17 && h < 20 ? "linear-gradient(180deg,#1a0a20 0%,#6b2d00 20%,#c25a1a 45%,#7b3a8a 65%,#1a4a28 100%)" : h >= 20 && h < 22 ? "linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)" : "linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
     const starOpacity = h >= 7 && h < 17 ? 0.2 : 0.6;
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4493,7 +4489,8 @@ function ChildScreen({
     }, /*#__PURE__*/React.createElement(SeedMonster, {
       child: child,
       data: data,
-      size: 130
+      size: 130,
+      update: update
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         position: "relative",
@@ -4583,17 +4580,224 @@ function ChildScreen({
         fontFamily: F
       }
     }, "\uD83D\uDCB8 \u304A\u304F\u308B"))), /*#__PURE__*/React.createElement("style", null, `@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`));
+  })() : (() => {
+    // Teen: ダークダッシュボード
+    const ttd = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
+    const myBadges = (data.logs || []).filter(l => l.cid === child.id && l.type === "badge").length;
+    const stocks2 = data.stocks || [];
+    const myH2 = (data.holdings || {})[child.id] || [];
+    const toPts2 = (s, p) => s.currency === "USD" ? Math.max(1, Math.round(p * 1.5)) : Math.max(1, Math.round(p / 100));
+    const portV2 = myH2.reduce((s, h) => {
+      const st = stocks2.find(x => x.id === h.stockId);
+      return s + (st ? toPts2(st, st.price) * h.qty : 0);
+    }, 0);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",
+        position: "relative",
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        inset: 0,
+        backgroundImage: "linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",
+        backgroundSize: "32px 32px",
+        pointerEvents: "none"
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 0,
+        left: "10%",
+        right: "10%",
+        height: 1,
+        background: "linear-gradient(90deg,transparent,rgba(74,158,255,0.4),transparent)",
+        pointerEvents: "none"
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "52px 20px 0",
+        position: "relative",
+        zIndex: 2
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: onBack,
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        fontSize: 18,
+        color: "#e2e8f0"
+      }
+    }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: FB,
+        fontWeight: 800,
+        fontSize: 12,
+        color: "rgba(74,158,255,0.7)",
+        letterSpacing: 2,
+        textTransform: "uppercase"
+      }
+    }, "Tane Money"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setShowSettings(true),
+      style: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        fontSize: 15,
+        color: "#e2e8f0",
+        position: "relative"
+      }
+    }, "\u2699", (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: -5,
+        right: -5,
+        minWidth: 17,
+        height: 17,
+        borderRadius: 999,
+        background: "#ef4444",
+        color: "#fff",
+        fontSize: 9,
+        fontWeight: 900,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 3px",
+        lineHeight: 1
+      }
+    }, (data.pendingApprovals || []).length))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "20px 20px 0",
+        position: "relative",
+        zIndex: 2
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "rgba(255,255,255,0.38)",
+        fontSize: 11,
+        fontWeight: 700,
+        marginBottom: 4,
+        letterSpacing: 0.5
+      }
+    }, child.emoji, " ", child.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 8,
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#fff",
+        fontSize: 38,
+        fontWeight: 900,
+        lineHeight: 1,
+        letterSpacing: -2
+      }
+    }, myBal.toLocaleString()), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#4a9eff",
+        fontSize: 15,
+        fontWeight: 700,
+        marginBottom: 5
+      }
+    }, "pt")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 18
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "rgba(255,255,255,0.3)",
+        fontSize: 11
+      }
+    }, "\u4ECA\u6708"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: monthDelta >= 0 ? "#4ade80" : "#f87171"
+      }
+    }, monthDelta >= 0 ? "+" : "", monthDelta.toLocaleString(), "pt"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setShowTransfer(true),
+      style: {
+        marginLeft: "auto",
+        background: "rgba(74,158,255,0.12)",
+        border: "1px solid rgba(74,158,255,0.25)",
+        borderRadius: 10,
+        padding: "5px 13px",
+        color: "#4a9eff",
+        fontSize: 11,
+        fontWeight: 800,
+        cursor: "pointer",
+        fontFamily: F
+      }
+    }, "\uD83D\uDCB8 \u304A\u304F\u308B"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8,
+        padding: "0 20px 24px",
+        position: "relative",
+        zIndex: 2
+      }
+    }, [["🔥", "連続", curStreak > 0 ? `${curStreak}日` : "--", "#fde68a"], ["⚡", "ミッション", `${ttd}回`, "#a78bfa"], ["📊", "ポートフォリオ", portV2 > 0 ? `${portV2.toLocaleString()}pt` : "--", "#4ade80"], ["🏅", "バッジ", myBadges > 0 ? `${myBadges}個` : "--", "#fbbf24"]].map(([e, l, v, c]) => /*#__PURE__*/React.createElement("div", {
+      key: l,
+      style: {
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 14,
+        padding: "12px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 18,
+        marginBottom: 3
+      }
+    }, e), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "rgba(255,255,255,0.35)",
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: 0.5,
+        marginBottom: 3
+      }
+    }, l), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: c,
+        fontSize: 17,
+        fontWeight: 900
+      }
+    }, v)))));
   })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      background: CARD,
-      borderBottom: `1px solid ${BORDER}`,
+      background: isJunior ? CARD : "#0f1a2e",
+      borderBottom: isJunior ? `1px solid ${BORDER}` : "1px solid rgba(74,158,255,0.12)",
       overflowX: "auto",
       scrollbarWidth: "none",
       position: "sticky",
       top: 0,
       zIndex: 100,
-      boxShadow: "0 2px 8px rgba(24,35,29,0.04)"
+      boxShadow: isJunior ? "0 2px 8px rgba(24,35,29,0.04)" : "0 2px 12px rgba(0,0,0,0.4)"
     }
   }, MAIN_TABS.map(([v, l]) => /*#__PURE__*/React.createElement("button", {
     key: v,
@@ -4602,9 +4806,9 @@ function ChildScreen({
       flex: 1,
       padding: "7px 4px 7px",
       border: "none",
-      borderBottom: effectiveTab === v ? `2.5px solid ${GP}` : "2.5px solid transparent",
+      borderBottom: effectiveTab === v ? `2.5px solid ${isJunior ? GP : "#4a9eff"}` : "2.5px solid transparent",
       background: "none",
-      color: effectiveTab === v ? GP : MUTED,
+      color: effectiveTab === v ? isJunior ? GP : "#4a9eff" : isJunior ? MUTED : "rgba(255,255,255,0.35)",
       fontWeight: effectiveTab === v ? 700 : 500,
       fontSize: 10,
       cursor: "pointer",
@@ -4624,7 +4828,8 @@ function ChildScreen({
       width: 22,
       height: 22,
       objectFit: "contain",
-      opacity: effectiveTab === v ? 1 : 0.45,
+      opacity: effectiveTab === v ? 1 : 0.4,
+      filter: !isJunior && effectiveTab !== v ? "brightness(0.6)" : "none",
       transition: "opacity .15s"
     }
   }), l.replace(/^\S+\s+/, "")))), curStreak >= 3 && !todayTaskDone && effectiveTab === "daily" && /*#__PURE__*/React.createElement("div", {
@@ -12013,10 +12218,13 @@ async function fetchRealStockPrices(data, update) {
 function SeedMonster({
   child,
   data,
-  size = 90
+  size = 90,
+  update
 }) {
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
+  const [editNick, setEditNick] = useState(false);
+  const [nickInput, setNickInput] = useState("");
   const myBal = bal(data.logs, child.id);
   const curStreak = data.streak?.[child.id]?.cur || 0;
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -12180,7 +12388,79 @@ function SeedMonster({
       margin: "-4px auto 0",
       animation: "monShadow 2.5s ease-in-out infinite"
     }
-  }), /*#__PURE__*/React.createElement("div", {
+  }), update ? editNick ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: nickInput,
+    onChange: e => setNickInput(e.target.value),
+    onBlur: () => {
+      if (nickInput.trim()) update(d => ({
+        ...d,
+        monsterNickname: {
+          ...(d.monsterNickname || {}),
+          [child.id]: nickInput.trim()
+        }
+      }));
+      setEditNick(false);
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        if (nickInput.trim()) update(d => ({
+          ...d,
+          monsterNickname: {
+            ...(d.monsterNickname || {}),
+            [child.id]: nickInput.trim()
+          }
+        }));
+        setEditNick(false);
+      }
+      if (e.key === "Escape") setEditNick(false);
+    },
+    autoFocus: true,
+    maxLength: 8,
+    style: {
+      fontSize: 12,
+      border: "1.5px solid rgba(255,255,255,0.5)",
+      borderRadius: 8,
+      padding: "3px 8px",
+      textAlign: "center",
+      width: 80,
+      fontFamily: "inherit",
+      color: "#fff",
+      background: "rgba(255,255,255,0.15)",
+      outline: "none"
+    }
+  })) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 3,
+      marginTop: 2
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "rgba(255,255,255,0.9)",
+      fontWeight: 800
+    }
+  }, (data.monsterNickname || {})[child.id] || NAMES[stage], stage === 4 && " 👑"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setNickInput((data.monsterNickname || {})[child.id] || NAMES[stage]);
+      setEditNick(true);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 9,
+      color: "rgba(255,255,255,0.45)",
+      padding: 0,
+      lineHeight: 1
+    }
+  }, "\u270F")) : /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "rgba(255,255,255,0.88)",
@@ -13521,6 +13801,7 @@ function InvestTab({
   const [qty, setQty] = useState("0.1");
   const [tradeComment, setTradeComment] = useState("");
   const [showChart, setShowChart] = useState(null);
+  const [showShare, setShowShare] = useState(false);
   const myBal = bal(data.logs, child.id);
   const myHoldings = (data.holdings || {})[child.id] || [];
   const stocks = data.stocks || [];
@@ -13617,7 +13898,220 @@ function InvestTab({
       padding: "12px 16px",
       paddingBottom: 32
     }
+  }, showShare && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.75)",
+      zIndex: 900,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    },
+    onClick: () => setShowShare(false)
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "linear-gradient(160deg,#060d1a,#0f1a2e)",
+      borderRadius: 24,
+      padding: 24,
+      maxWidth: 340,
+      width: "100%",
+      color: "#fff",
+      boxShadow: "0 24px 60px rgba(0,0,0,0.7)"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#4a9eff",
+      fontWeight: 800,
+      letterSpacing: 2
+    }
+  }, "TANE MONEY"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowShare(false),
+    style: {
+      background: "rgba(255,255,255,0.08)",
+      border: "none",
+      borderRadius: 8,
+      width: 28,
+      height: 28,
+      cursor: "pointer",
+      color: "rgba(255,255,255,0.6)",
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: F
+    }
+  }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "rgba(255,255,255,0.4)",
+      fontSize: 11,
+      marginBottom: 6
+    }
+  }, child.emoji, " ", child.name, " \u306E\u6295\u8CC7\u30DD\u30FC\u30C8\u30D5\u30A9\u30EA\u30AA"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 6,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 34,
+      fontWeight: 900,
+      lineHeight: 1
+    }
+  }, portfolioVal.toLocaleString()), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: "#4a9eff",
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "pt")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "rgba(255,255,255,0.4)",
+      fontSize: 11
+    }
+  }, "\u6295\u8CC7\u984D ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: "#fff"
+    }
+  }, portfolioCost.toLocaleString(), "pt")), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: portfolioGain >= 0 ? "#4ade80" : "#f87171"
+    }
+  }, portfolioGain >= 0 ? "▲" : "▼", " ", Math.abs(portfolioGain).toLocaleString(), "pt (", portfolioCost > 0 ? (Math.abs(portfolioGain / portfolioCost) * 100).toFixed(1) : 0, "%)"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 1,
+      background: "rgba(255,255,255,0.07)",
+      margin: "0 0 16px"
+    }
+  }), myHoldings.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "rgba(255,255,255,0.3)",
+      fontSize: 9,
+      fontWeight: 700,
+      letterSpacing: 1,
+      marginBottom: 10
+    }
+  }, "HOLDINGS"), myHoldings.map(h => {
+    const st = stocks.find(x => x.id === h.stockId);
+    if (!st) return null;
+    const val = toPts(st, st.price) * h.qty;
+    const pct = portfolioVal > 0 ? Math.round(val / portfolioVal * 100) : 0;
+    const gain = val - h.avgPrice * h.qty;
+    const fq = h.qty % 1 === 0 ? `${h.qty}` : `${h.qty.toFixed(1)}`;
+    return /*#__PURE__*/React.createElement("div", {
+      key: h.stockId,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 22
+      }
+    }, st.emoji), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13
+      }
+    }, st.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "rgba(255,255,255,0.35)",
+        fontSize: 10
+      }
+    }, fq, "\u682A \xB7 ", pct, "%")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "right"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12
+      }
+    }, val.toLocaleString(), "pt"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: gain >= 0 ? "#4ade80" : "#f87171",
+        fontWeight: 700
+      }
+    }, gain >= 0 ? "+" : "", gain.toLocaleString())));
+  })) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: "rgba(255,255,255,0.25)",
+      fontSize: 12,
+      textAlign: "center",
+      padding: "12px 0",
+      marginBottom: 16
+    }
+  }, "\u307E\u3060\u4FDD\u6709\u306A\u3057"), (() => {
+    const bc = (data.logs || []).filter(l => l.cid === child.id && l.type === "badge").length;
+    return bc > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 12,
+        padding: "8px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 18
+      }
+    }, "\uD83C\uDFC5"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "rgba(255,255,255,0.6)",
+        fontSize: 12
+      }
+    }, "\u30D0\u30C3\u30B8 ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: "#fbbf24"
+      }
+    }, bc, "\u500B"), " \u7372\u5F97\u6E08\u307F"));
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      color: "rgba(255,255,255,0.15)",
+      fontSize: 10,
+      letterSpacing: 0.5,
+      marginTop: 4
+    }
+  }, "\uD83C\uDF31 tane-money.vercel.app"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 0,
@@ -13682,14 +14176,34 @@ function InvestTab({
       marginBottom: 14,
       color: "#fff"
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 4
+    }
   }, /*#__PURE__*/React.createElement("p", {
     style: {
       color: "#aaa",
       fontSize: 12,
       fontWeight: 700,
-      margin: "0 0 4px"
+      margin: 0
     }
-  }, "\uD83D\uDCCA \u30DD\u30FC\u30C8\u30D5\u30A9\u30EA\u30AA"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDCCA \u30DD\u30FC\u30C8\u30D5\u30A9\u30EA\u30AA"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowShare(true),
+    style: {
+      background: "rgba(74,158,255,0.15)",
+      border: "1px solid rgba(74,158,255,0.3)",
+      borderRadius: 8,
+      padding: "3px 10px",
+      color: "#4a9eff",
+      fontSize: 10,
+      fontWeight: 800,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\uD83D\uDCF8 \u30B7\u30A7\u30A2")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 28,
       fontWeight: 900,
