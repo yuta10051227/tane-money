@@ -1756,17 +1756,43 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   return (
     <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:80}}>
-      {/* Header — Teen Design */}
-      <div style={{background:BG,padding:"52px 20px 0 20px"}}>
+      {/* ヒーローエリア（LINE Farm風・時間帯背景） */}
+      {(()=>{
+        const h=new Date().getHours();
+        const bg=h>=7&&h<11
+          ?"linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)"  // 朝焼け
+          :h>=11&&h<17
+          ?"linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)"              // 昼
+          :h>=17&&h<20
+          ?"linear-gradient(180deg,#1a0a20 0%,#6b2d00 20%,#c25a1a 45%,#7b3a8a 65%,#1a4a28 100%)" // 夕焼け
+          :h>=20&&h<22
+          ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"              // 夜
+          :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";              // 深夜
+        const starOpacity=h>=7&&h<17?0.2:0.6;
+        return(
+      <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
+        {/* 星（昼は薄く、夜は明るく） */}
+        {[[10,15],[25,8],[70,12],[85,6],[50,22],[38,4],[62,18],[15,30]].map(([l,t],i)=>(
+          <div key={i} style={{position:"absolute",top:`${t}%`,left:`${l}%`,width:i%3===0?3:2,height:i%3===0?3:2,borderRadius:"50%",background:"#fff",opacity:(starOpacity+i*0.03),animation:`twinkle ${1.4+i*0.25}s ease-in-out infinite alternate`,pointerEvents:"none"}}/>
+        ))}
+        {/* 遠景の木シルエット */}
+        <div style={{position:"absolute",bottom:60,left:0,right:0,height:50,pointerEvents:"none"}}>
+          {[[5,40],[15,55],[82,48],[92,38]].map(([l,h],i)=>(
+            <div key={i} style={{position:"absolute",bottom:0,left:`${l}%`,width:18,height:h,background:"#0d2a14",borderRadius:"50% 50% 0 0"}}/>
+          ))}
+        </div>
+        {/* 草地 */}
+        <div style={{position:"absolute",bottom:0,left:0,right:0,height:36,background:"linear-gradient(0deg,#1a5c30 0%,#1f7038 60%,transparent 100%)",pointerEvents:"none"}}/>
+
         {/* トップバー */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"52px 20px 0",position:"relative",zIndex:2}}>
           <button onClick={onBack}
-            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:TEXTS,boxShadow:SHADOW}}>
+            style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:"#fff"}}>
             ‹
           </button>
-          <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:GP,letterSpacing:0.5}}>Tane Money</div>
+          <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:"rgba(255,255,255,0.9)",letterSpacing:0.5}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)}
-            style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:SHADOW,position:"relative"}}>
+            style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#fff",position:"relative"}}>
             ⚙
             {(data.pendingApprovals||[]).length>0&&(
               <div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>
@@ -1775,44 +1801,39 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             )}
           </button>
         </div>
-        {/* 残高カード + 種モンスター */}
-        <div style={{background:GP,borderRadius:22,padding:"16px 18px 18px",marginBottom:20,position:"relative",overflow:"visible"}}>
-          {/* 背景装飾（overflow:hiddenで内側クリップ） */}
-          <div style={{position:"absolute",inset:0,borderRadius:22,overflow:"hidden",pointerEvents:"none",zIndex:0}}>
-            <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.07)"}}/>
-            <div style={{position:"absolute",bottom:-30,left:-10,width:80,height:80,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}/>
-          </div>
-          <div style={{position:"relative",zIndex:1,display:"flex",alignItems:"flex-end",gap:10}}>
-            {/* 左：残高情報 */}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <div style={{width:30,height:30,borderRadius:9,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
-                  {child.emoji}
-                </div>
-                <div>
-                  <div style={{color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:600,letterSpacing:0.5}}>こんにちは、{child.name}</div>
-                  <div style={{color:"rgba(255,255,255,0.5)",fontSize:10}}>現在のタネ</div>
-                </div>
+
+        {/* モンスター（中央・大） */}
+        <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
+          <SeedMonster child={child} data={data} size={130}/>
+        </div>
+
+        {/* 残高パネル（霜ガラス風） */}
+        <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2}}>{child.emoji} {child.name}</div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
+                <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
+                <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
               </div>
-              <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:8}}>
-                <div style={{color:"#fff",fontSize:34,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</div>
-                <div style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,marginBottom:3}}>pt</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>今月</span>
+                <span style={{fontSize:12,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+                {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,200,0,0.2)",color:"#fde68a",padding:"2px 7px",borderRadius:999,fontWeight:700}}>🔥 {curStreak}日</span>}
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                <span style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>今月</span>
-                <span style={{fontSize:13,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
-                {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 8px",borderRadius:999,fontWeight:600}}>🔥 {curStreak}日</span>}
-              </div>
-              <button onClick={()=>setShowTransfer(true)}
-                style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.35)",borderRadius:10,padding:"5px 13px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F,letterSpacing:0.3}}>
-                💸 おくる
-              </button>
             </div>
-            {/* 右：種モンスター（overflow:visibleなのでふきだしが上に出る） */}
-            <SeedMonster child={child} data={data}/>
+            <button onClick={()=>setShowTransfer(true)}
+              style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>
+              💸 おくる
+            </button>
           </div>
         </div>
+
+        {/* アニメCSS追加 */}
+        <style>{`@keyframes twinkle{0%{opacity:0.3;transform:scale(1)}100%{opacity:0.9;transform:scale(1.4)}}`}</style>
       </div>
+        );
+      })()}
       {/* タブナビゲーション */}
       <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`,overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 8px rgba(24,35,29,0.04)"}}>
         {MAIN_TABS.map(([v,l])=>(
@@ -4233,7 +4254,7 @@ async function fetchRealStockPrices(data,update){
 }
 
 // ── Seed Monster ──────────────────────────────────────
-function SeedMonster({ child, data }) {
+function SeedMonster({ child, data, size=90 }) {
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
 
@@ -4334,7 +4355,7 @@ function SeedMonster({ child, data }) {
           <img
             src={`/assets/monster_${stage}.png`}
             alt={NAMES[stage]}
-            style={{width:90,height:90,objectFit:"contain",display:"block"}}
+            style={{width:size,height:size,objectFit:"contain",display:"block"}}
           />
           {accessories.map((acc,i)=>(
             <div key={i} style={{
