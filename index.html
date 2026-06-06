@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="a9a6326">
+<meta name="tane-version" content="8848d3a">
 </head>
 <body>
   <div id="root"></div>
@@ -4511,7 +4511,56 @@ function ChildScreen({
       data: data,
       size: 130,
       update: update
-    })), /*#__PURE__*/React.createElement("div", {
+    })), (() => {
+      const tDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
+      const stage = tDone < 10 ? 0 : tDone < 50 ? 1 : tDone < 150 ? 2 : tDone < 400 ? 3 : 4;
+      if (stage >= 4) return null;
+      const THRESH = [10, 50, 150, 400];
+      const prev = stage === 0 ? 0 : THRESH[stage - 1];
+      const next = THRESH[stage];
+      const pct = Math.min(1, (tDone - prev) / (next - prev));
+      const remaining = next - tDone;
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          margin: "0 20px 6px",
+          position: "relative",
+          zIndex: 2
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 4
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "rgba(255,255,255,0.7)",
+          fontWeight: 700
+        }
+      }, "\u2728 \u3042\u3068", remaining, "\u56DE\u3067\u3057\u3093\u304B\uFF01"), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "rgba(255,255,255,0.4)"
+        }
+      }, tDone, "/", next)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: 6,
+          background: "rgba(255,255,255,0.15)",
+          borderRadius: 999,
+          overflow: "hidden"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          height: "100%",
+          width: `${pct * 100}%`,
+          background: "linear-gradient(90deg,#4ade80,#86efac)",
+          borderRadius: 999,
+          transition: "width .6s ease",
+          boxShadow: "0 0 8px #4ade8070"
+        }
+      })));
+    })(), /*#__PURE__*/React.createElement("div", {
       style: {
         position: "relative",
         zIndex: 2,

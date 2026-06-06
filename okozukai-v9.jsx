@@ -1796,6 +1796,27 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
           <SeedMonster child={child} data={data} size={130} update={update}/>
         </div>
+        {(()=>{
+          const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+          const stage=tDone<10?0:tDone<50?1:tDone<150?2:tDone<400?3:4;
+          if(stage>=4) return null;
+          const THRESH=[10,50,150,400];
+          const prev=stage===0?0:THRESH[stage-1];
+          const next=THRESH[stage];
+          const pct=Math.min(1,(tDone-prev)/(next-prev));
+          const remaining=next-tDone;
+          return(
+            <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700}}>✨ あと{remaining}回でしんか！</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>{tDone}/{next}</span>
+              </div>
+              <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#4ade80,#86efac)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px #4ade8070"}}/>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
