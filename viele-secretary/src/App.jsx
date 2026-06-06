@@ -1389,6 +1389,48 @@ function RevenueTab({ recurring, oneTime, fixedMonthly, fixedThisMonth, recOps, 
   }
   const maxRev = Math.max(1, ...months.map((x) => x.total));
 
+  // ── 秘書の自動分析（オンデバイス）：離脱検知・売上予測・トレンド ──
+  const curMK = y * 12 + m;
+  const onceMonth = (mk) => onces.filter((r) => { const d = new Date(r.date); return d.getFullYear() * 12 + d.getMonth() === mk; }).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+  const insights = useMemo(() => {
+    const ins = [];
+    // 1) 離脱・滞り検知：先々月・先月と続いた取引先/案件が、今月まだ無い
+    const byClient = {};
+    onces.forEach((r) => {
+      const key = (r.customer && r.customer.trim()) || r.title;
+      const d = new Date(r.date); const mk = d.getFullYear() * 12 + d.getMonth();
+      if (!byClient[key]) byClient[key] = { set: new Set(), amt: {} };
+      byClient[key].set.add(mk);
+      byClient[key].amt[mk] = (byClient[key].amt[mk] || 0) + (Number(r.amount) || 0);
+    });
+    Object.entries(byClient).forEach(([key, info]) => {
+      if (!info.set.has(curMK) && info.set.has(curMK - 1) && info.set.has(curMK - 2)) {
+        ins.push({ level: "alert", icon: "📌", text: `「${key}」は先々月・先月と売上が続いていましたが、今月はまだ計上がありません（先月 ${yen(info.amt[curMK - 1] || 0)}）。先方と連絡は取れていますか？` });
+      }
+    });
+    // 2) 手残りの健全性
+    if (revThisMonth > 0 && revThisMonth - fixedThisMonth < 0) {
+      ins.push({ level: "alert", icon: "⚠️", text: `今月は固定費（${yen(fixedThisMonth)}）が売上（${yen(revThisMonth)}）を上回り、手残りがマイナスです。` });
+    } else if (revThisMonth > 0 && fixedThisMonth / revThisMonth > 0.5) {
+      ins.push({ level: "warn", icon: "📊", text: `今月の固定費は売上の${Math.round((fixedThisMonth / revThisMonth) * 100)}%。固定費比率がやや高めです。` });
+    }
+    // 3) トレンド（確定済みの先月 vs 先々月）
+    const lastTotal = months[10].total, prevTotal = months[9].total;
+    if (prevTotal > 0) {
+      const pct = Math.round(((lastTotal - prevTotal) / prevTotal) * 100);
+      if (pct <= -15) ins.push({ level: "warn", icon: "📉", text: `先月の売上は ${yen(lastTotal)}（先々月比 ${pct}%）。下降傾向です。要因を確認しましょう。` });
+      else if (pct >= 15) ins.push({ level: "good", icon: "📈", text: `先月の売上は ${yen(lastTotal)}（先々月比 +${pct}%）。好調です。` });
+    }
+    // 4) 予測（来月見込み・年間着地）
+    const onceAvg = Math.round((onceMonth(curMK - 1) + onceMonth(curMK - 2) + onceMonth(curMK - 3)) / 3);
+    const nextForecast = mrr + onceAvg;
+    const runRate = Math.round(((months[10].total + months[9].total + months[8].total) / 3) * 12);
+    ins.push({ level: "info", icon: "🔮", text: `来月の売上見込みは約 ${yen(nextForecast)}（定期 ${yen(mrr)} ＋ 単発の直近3ヶ月平均 ${yen(onceAvg)}）。` });
+    ins.push({ level: "info", icon: "🗓️", text: `このペースなら年間着地は約 ${yen(runRate)} の見込みです。` });
+    return ins;
+  }, [onces, recActive, fixedThisMonth, revThisMonth, mrr]); // eslint-disable-line react-hooks/exhaustive-deps
+  const insLevelColor = (lv) => (lv === "alert" ? C.red : lv === "warn" ? C.orange : lv === "good" ? C.green : C.blue);
+
   // カテゴリ内訳（今月売上ベース）
   const catTotals = {};
   recActive.forEach((r) => { const a = billedInMonth(r, y, m); if (a) catTotals[r.category] = (catTotals[r.category] || 0) + a; });
@@ -1400,6 +1442,23 @@ function RevenueTab({ recurring, oneTime, fixedMonthly, fixedThisMonth, recOps, 
 
   return (
     <>
+      {/* 秘書からの気づき（自動分析） */}
+      <Panel title="秘書からの気づき" accent={C.accent} help="登録した売上データをこの端末内で自動分析し、離脱しかけている取引先の検知・売上予測・固定費とのバランスなどを毎回お知らせします。外部にデータは送信しません。">
+        <div style={{ display: "grid", gap: 8 }}>
+          {insights.length === 0 ? (
+            <Empty>分析できる売上データがまだありません。定期収入・単発売上を登録すると、予測や気づきをお知らせします。</Empty>
+          ) : (
+            insights.map((it, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", background: C.panel2, border: `1px solid ${C.line}`, borderLeft: `3px solid ${insLevelColor(it.level)}`, borderRadius: 10, padding: "10px 12px" }}>
+                <span style={{ fontSize: 16, flex: "0 0 auto", lineHeight: 1.4 }}>{it.icon}</span>
+                <span style={{ fontSize: 13, lineHeight: 1.5, color: it.level === "info" ? C.sub : C.text }}>{it.text}</span>
+              </div>
+            ))
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 10 }}>※ 端末内の自動分析です。会話形式で相談できるAI秘書は今後対応予定です。</div>
+      </Panel>
+
       {/* サマリー（手残りが主役） */}
       <Panel title="今月の売上と手残り" accent={C.green} help="「今月売上」は、登録した定期収入のうち今月発生する分と、今月の単発収入の合算です。定期収入は一度登録すれば毎月自動で計上されます。「今月の手残り」は今月売上から固定費（固定費タブの今月分）を引いた金額で、黒字は緑・赤字は赤で表示します。">
         <div style={{ background: C.panel2, border: `1px solid ${takeHome >= 0 ? C.green : C.red}`, borderRadius: 12, padding: "16px 18px", marginBottom: 12 }}>
