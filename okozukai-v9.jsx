@@ -1756,7 +1756,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
-    <div style={{minHeight:"100vh",background:darkBG?"#0a0f1a":BG,fontFamily:F,paddingBottom:80}}>
+    <div style={{minHeight:"100vh",background:darkBG?"#040810":BG,fontFamily:F,paddingBottom:80}}>
       {/* ヒーローエリア */}
       {isJunior ? (()=>{
         const h=new Date().getHours();
@@ -1967,6 +1967,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && <>
         {/* Teen: タスクを先に表示（ガチャより優先） */}
         {!isJunior && <>
+          <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
@@ -5052,7 +5053,10 @@ function InvestTab({child,data,update}){
               })}
             </div>
           ):(
-            <div style={{color:"rgba(255,255,255,0.25)",fontSize:12,textAlign:"center",padding:"12px 0",marginBottom:16}}>まだ保有なし</div>
+            <div style={{background:"rgba(74,158,255,0.06)",border:"1px solid rgba(74,158,255,0.12)",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+              <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,fontWeight:700,marginBottom:6}}>📈 株ってなに？</div>
+              <div style={{color:"rgba(255,255,255,0.3)",fontSize:11,lineHeight:1.6}}>会社の一部を買うこと。価格が上がれば利益が出て、下がれば損になる。下のリストから気になる株をタップして買ってみよう。</div>
+            </div>
           )}
           {(()=>{const bc=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="badge").length;return bc>0&&(
             <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
