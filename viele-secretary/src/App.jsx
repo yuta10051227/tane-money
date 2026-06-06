@@ -249,6 +249,13 @@ function makeSeed() {
       { id: "m2", title: "Academy 月額 入金確認", amount: 0, kind: "入金", done: false },
     ],
     tasks: [{ id: "k1", title: "確定申告まわりの資料整理", done: false }],
+    // まとめ(ニュース)の情報源（編集可）
+    feeds: [
+      { id: "f1", name: "Googleニュース", url: "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja" },
+      { id: "f2", name: "SNS集客・マーケ", url: "https://news.google.com/rss/search?q=SNS%20マーケティング%20集客&hl=ja&gl=JP&ceid=JP:ja" },
+      { id: "f3", name: "個人事業・フリーランス", url: "https://news.google.com/rss/search?q=個人事業主%20フリーランス&hl=ja&gl=JP&ceid=JP:ja" },
+    ],
+    digest: null,
     updatedAt: Date.now(),
   };
 }
@@ -751,6 +758,94 @@ function Upcoming({ events }) {
   );
 }
 
+/* 今日のまとめ（ニュースRSS集約＋任意でAI要約） */
+function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed }) {
+  const [showAll, setShowAll] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const items = (digest && digest.items) || [];
+  const shown = showAll ? items : items.slice(0, 12);
+  const briefLines = (digest && digest.briefing ? digest.briefing.split("\n") : []).filter((l) => l.trim());
+
+  return (
+    <Panel
+      title="今日のまとめ（ニュース）"
+      accent={C.blue}
+      help="登録した情報源(RSS)の新着をまとめて表示します。サーバーのGeminiキーを設定すると、見出しから『今日の3行ブリーフィング』をAIが自動生成します(未設定でも見出しは出ます)。"
+      right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "取得中…" : "更新"}</button>}
+    >
+      {error && (
+        <div style={{ fontSize: 12, color: C.red, background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, wordBreak: "break-word" }}>
+          取得に失敗：{String((error && error.message) || error)}
+        </div>
+      )}
+
+      {briefLines.length > 0 && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.accent, fontWeight: 700, marginBottom: 6 }}>🤖 今日の3行ブリーフィング</div>
+          {briefLines.map((l, i) => (
+            <div key={i} style={{ fontSize: 13, lineHeight: 1.6, color: C.text }}>{l.replace(/^[・\-*\s]+/, "・")}</div>
+          ))}
+        </div>
+      )}
+
+      {items.length === 0 && !loading && <Empty>まだ記事がありません。「更新」を押すか、情報源を追加してください。</Empty>}
+
+      <div style={{ display: "grid", gap: 10 }}>
+        {shown.map((it, i) => (
+          <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+            <div style={{ display: "grid", gap: 2 }}>
+              <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
+              <div style={{ fontSize: 11, color: C.faint }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+            </div>
+          </a>
+        ))}
+      </div>
+      {items.length > 12 && (
+        <button onClick={() => setShowAll((v) => !v)} style={{ ...chipBtn, marginTop: 12, justifySelf: "start" }}>
+          {showAll ? "閉じる" : `もっと見る（残り${items.length - 12}件）`}
+        </button>
+      )}
+
+      {digest && digest.aiEnabled === false && briefLines.length === 0 && (
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 12 }}>
+          ※ AI要約はオフ（GeminiキーをVercelに設定すると自動でオンになります）
+        </div>
+      )}
+
+      {/* 情報源の編集 */}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+        <button onClick={() => setOpen((o) => !o)} style={{ ...chipBtn, fontSize: 11 }}>{open ? "情報源を閉じる" : "情報源を編集"}</button>
+        {open && (
+          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+            {(feeds || []).map((f) => (
+              <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name || f.url}</span>
+                <button onClick={() => onRemoveFeed(f.id)} style={iconBtn} title="削除">✕</button>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前(任意)" style={{ ...inp, marginBottom: 0, width: 110 }} />
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="RSSのURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
+              <button onClick={() => { if (!url.trim()) return; onAddFeed({ name: name.trim(), url: url.trim() }); setName(""); setUrl(""); }} style={chipBtn}>追加</button>
+            </div>
+            <div style={{ fontSize: 11, color: C.faint }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+// ニュース日時の簡易表示
+function fmtNews(s) {
+  const t = Date.parse(s);
+  if (!t) return "";
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /* どのカレンダーを仕事/家族として取り込むかの設定 */
 function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect }) {
   const [open, setOpen] = useState(false);
@@ -1123,6 +1218,11 @@ export default function App() {
     signOut(auth);
   };
 
+  // ── 今日のまとめ（ニュース）状態 ──
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestError, setDigestError] = useState(null);
+  const digestRef = useRef(false);
+
   // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
   const notifySupported = typeof Notification !== "undefined";
   const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
@@ -1152,6 +1252,31 @@ export default function App() {
     }
     notifiedRef.current = true;
   }, [notify, data, notifySupported]);
+
+  // ── 今日のまとめ（ニュース）取得 ──
+  const refreshDigest = async () => {
+    if (!data) return;
+    setDigestLoading(true);
+    setDigestError(null);
+    try {
+      const fp = (data.feeds || []).map((f) => encodeURIComponent(f.url)).join(",");
+      const r = await fetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      update({ digest: { date: iso(new Date()), briefing: j.briefing || "", items: (j.items || []).slice(0, 40), aiEnabled: !!j.aiEnabled } });
+    } catch (e) {
+      setDigestError(e);
+    }
+    setDigestLoading(false);
+  };
+  // 1日1回、未取得なら自動取得
+  useEffect(() => {
+    if (!data || digestRef.current) return;
+    if (!data.digest || data.digest.date !== iso(new Date())) {
+      digestRef.current = true;
+      refreshDigest();
+    }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!firebaseEnabled) return; // ローカルモードは認証なし
@@ -1218,19 +1343,21 @@ export default function App() {
   const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   const removeDeadline = (id) => confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }));
 
-  // ── 汎用リスト操作（content / money / tasks）──
+  // ── 汎用リスト操作（content / money / tasks / feeds）──
+  // 既存ユーザーで未定義のキーでも落ちないよう (data[key] || []) で防御
   const makeListOps = (key) => ({
-    toggle: (id) => update({ [key]: data[key].map((x) => (x.id === id ? { ...x, done: !x.done } : x)) }),
+    toggle: (id) => update({ [key]: (data[key] || []).map((x) => (x.id === id ? { ...x, done: !x.done } : x)) }),
     add: (item) => {
       const base = typeof item === "string" ? { title: item } : item;
-      update({ [key]: [...data[key], { id: key[0] + Date.now(), done: false, ...base }] });
+      update({ [key]: [...(data[key] || []), { id: key[0] + Date.now(), done: false, ...base }] });
     },
-    edit: (id, patch) => update({ [key]: data[key].map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
-    remove: (id) => confirmDelete(() => update({ [key]: data[key].filter((x) => x.id !== id) })),
+    edit: (id, patch) => update({ [key]: (data[key] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
+    remove: (id) => confirmDelete(() => update({ [key]: (data[key] || []).filter((x) => x.id !== id) })),
   });
   const content = makeListOps("content");
   const money = makeListOps("money");
   const tasks = makeListOps("tasks");
+  const feedsOps = makeListOps("feeds");
 
   const today = new Date();
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
@@ -1340,6 +1467,16 @@ export default function App() {
         <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
         {usingCal && <Upcoming events={upcoming} />}
         {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+
+        <DigestPanel
+          digest={data.digest}
+          loading={digestLoading}
+          error={digestError}
+          onRefresh={refreshDigest}
+          feeds={data.feeds}
+          onAddFeed={(f) => feedsOps.add(f)}
+          onRemoveFeed={(id) => feedsOps.remove(id)}
+        />
 
         <CheckList
           title="コンテンツ制作サイクル"
