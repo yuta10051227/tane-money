@@ -727,7 +727,7 @@ function Upcoming({ events }) {
 }
 
 /* どのカレンダーを仕事/家族として取り込むかの設定 */
-function CalendarSettings({ calList, roleForCal, onSetRole }) {
+function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect }) {
   const [open, setOpen] = useState(false);
   const ROLES = [
     { v: "work", label: "仕事" },
@@ -760,6 +760,11 @@ function CalendarSettings({ calList, roleForCal, onSetRole }) {
               </div>
             );
           })}
+          {onDisconnect && (
+            <button onClick={onDisconnect} style={{ ...chipBtn, marginTop: 4, color: C.red, borderColor: C.line, justifySelf: "start" }}>
+              カレンダー連携を解除
+            </button>
+          )}
         </div>
       )}
     </Panel>
@@ -1040,7 +1045,23 @@ export default function App() {
     setConnecting(false);
   };
 
-  // Firebase設定があればクラウド同期、なければこの端末にローカル保存。
+  // カレンダー連携を解除（トークンを失効＝revoke＋破棄）
+  const disconnectCalendar = () => {
+    const t = calToken;
+    if (t) {
+      fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(t), { method: "POST", mode: "no-cors" }).catch(() => {});
+    }
+    sessionStorage.removeItem("viele-cal-token");
+    setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
+  };
+
+  // ログアウト時はカレンダートークンも破棄（共有端末対策）
+  const logout = () => {
+    sessionStorage.removeItem("viele-cal-token");
+    signOut(auth);
+  };
+
+
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
@@ -1078,7 +1099,7 @@ export default function App() {
 
   if (firebaseEnabled && user === undefined) return <Splash text="読み込み中…" />;
   if (firebaseEnabled && user === null) return <LoginGate onLogin={login} error={authError} />;
-  if (error) return <ErrorScreen error={error} onSignOut={() => signOut(auth)} />;
+  if (error) return <ErrorScreen error={error} onSignOut={logout} />;
   if (loading || !data) return <Splash text="読み込み中…" />;
 
   // ── trips 操作 ──
@@ -1203,7 +1224,7 @@ export default function App() {
           文字{fontLabel}
         </button>
         {firebaseEnabled && (
-          <button onClick={() => signOut(auth)} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
+          <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
         )}
       </header>
 
@@ -1228,7 +1249,7 @@ export default function App() {
         <TimeMeter entries={scheduleEntries} {...calProps} />
         <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
         {usingCal && <Upcoming events={upcoming} />}
-        {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} />}
+        {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
 
         <CheckList
           title="コンテンツ制作サイクル"
