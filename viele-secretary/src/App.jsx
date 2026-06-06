@@ -992,6 +992,7 @@ function MainTabs({ tab, onChange, dueCount }) {
     { v: "dashboard", label: "ホーム" },
     { v: "subscriptions", label: "固定費" },
     { v: "revenue", label: "売上" },
+    { v: "chat", label: "秘書" },
   ];
   return (
     <div style={{ display: "flex", gap: 4, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: 4, marginBottom: 16 }}>
@@ -1567,6 +1568,118 @@ function RevenueTab({ recurring, oneTime, fixedMonthly, fixedThisMonth, recOps, 
 }
 
 /* ──────────────────────────────────────────────────────────────
+   AI秘書（会話型）。財務データの要約を作って /api/chat に渡し、
+   Claude の回答をストリーミング表示する。APIキーはサーバ側のみ。
+   ────────────────────────────────────────────────────────────── */
+function buildFinanceContext(subs, recRev, oneRev) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const subA = (subs || []).filter((s) => s.active);
+  const fixedMonthly = subA.reduce((t, s) => t + toMonthly(s.amount, s.cycle), 0);
+  const fixedThis = subA.reduce((t, s) => t + billedInMonth(s, y, m), 0);
+  const recA = (recRev || []).filter((r) => r.active);
+  const mrr = recA.reduce((t, r) => t + toMonthly(r.amount, r.cycle), 0);
+  const recThis = recA.reduce((t, r) => t + billedInMonth(r, y, m), 0);
+  const onceThis = (oneRev || []).filter((r) => { const d = new Date(r.date); return d.getFullYear() === y && d.getMonth() === m; }).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+  const revThis = recThis + onceThis;
+  const recentOnce = [...(oneRev || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+  return [
+    `今日: ${iso(today)}`,
+    `今月: 売上 ${yen(revThis)}（定期 ${yen(recThis)}＋単発 ${yen(onceThis)}） / 固定費 ${yen(fixedThis)} / 手残り ${yen(revThis - fixedThis)}`,
+    `MRR(月次定期収入) ${yen(mrr)} / 固定費の月額換算合計 ${yen(fixedMonthly)}`,
+    "【定期収入】" + (recA.length ? recA.map((r) => `${r.name}${r.customer ? `(${r.customer})` : ""} ${yen(r.amount)}/${cycleShort(r.cycle)}`).join("、") : "なし"),
+    "【最近の単発売上】" + (recentOnce.length ? recentOnce.map((r) => `${r.date} ${r.title}${r.customer ? `(${r.customer})` : ""} ${yen(r.amount)}`).join("、") : "なし"),
+    "【固定費・サブスク】" + (subA.length ? subA.map((s) => `${s.name} ${yen(s.amount)}/${cycleShort(s.cycle)} 次回${iso(nextBilling(s))}`).join("、") : "なし"),
+  ].join("\n");
+}
+
+function ChatTab({ subs, recRev, oneRev }) {
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const scroller = useRef(null);
+  useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, streaming]);
+
+  const suggestions = ["今月の調子はどう？", "固定費で見直せるものある？", "先月と比べて売上はどう？", "来月の見込みを教えて"];
+
+  const send = async (text) => {
+    const q = (text ?? input).trim();
+    if (!q || busy) return;
+    setErr(null);
+    setInput("");
+    const next = [...msgs, { role: "user", content: q }];
+    setMsgs(next);
+    setBusy(true);
+    setStreaming("");
+    try {
+      const context = buildFinanceContext(subs, recRev, oneRev);
+      const resp = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next, context }) });
+      if (!resp.ok || !resp.body) {
+        let mErr = "エラーが発生しました";
+        try { const j = await resp.json(); mErr = j.error || mErr; } catch { /* ignore */ }
+        setErr(mErr);
+        setBusy(false);
+        return;
+      }
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        acc += dec.decode(value, { stream: true });
+        setStreaming(acc);
+      }
+      setMsgs((prev) => [...prev, { role: "assistant", content: acc }]);
+      setStreaming("");
+    } catch (e) {
+      setErr("通信に失敗しました：" + String(e?.message || e));
+    }
+    setBusy(false);
+  };
+
+  const bubble = (role, content, key) => (
+    <div key={key} style={{ display: "flex", justifyContent: role === "user" ? "flex-end" : "flex-start" }}>
+      <div style={{ maxWidth: "85%", whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 14, lineHeight: 1.55, padding: "10px 12px", borderRadius: 12, background: role === "user" ? C.green : C.panel2, color: role === "user" ? "#0B0D11" : C.text, border: role === "user" ? "none" : `1px solid ${C.line}` }}>{content}</div>
+    </div>
+  );
+
+  return (
+    <Panel title="AI秘書に相談" accent={C.green} help="あなたの売上・固定費・サブスクの要約をもとに、AI秘書が相談に乗ります。「今月どう？」のように話しかけてください。相談内容と財務サマリーはAI(Anthropic)に送信されます。">
+      <div ref={scroller} style={{ maxHeight: "52vh", overflowY: "auto", display: "grid", gap: 10, padding: "2px 2px 8px" }}>
+        {msgs.length === 0 && !streaming && (
+          <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6 }}>
+            こんにちは。今月の売上や固定費について、なんでも聞いてください。例えば下のボタンから👇
+          </div>
+        )}
+        {msgs.map((m, i) => bubble(m.role, m.content, i))}
+        {streaming && bubble("assistant", streaming, "stream")}
+        {busy && !streaming && <div style={{ fontSize: 13, color: C.faint }}>考えています…</div>}
+      </div>
+
+      {err && <div style={{ fontSize: 12, color: C.red, background: "#2A1715", border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>{err}</div>}
+
+      {msgs.length === 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {suggestions.map((s) => (
+            <button key={s} onClick={() => send(s)} disabled={busy} style={{ ...chipBtn, fontSize: 12 }}>{s}</button>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={(e) => { e.preventDefault(); send(); }} style={{ display: "flex", gap: 8 }}>
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="メッセージを入力…" style={{ ...inp, marginBottom: 0, flex: 1 }} />
+        <button type="submit" disabled={busy || !input.trim()} style={{ ...chipBtn, background: busy || !input.trim() ? "transparent" : C.green, color: busy || !input.trim() ? C.faint : "#0B0D11", borderColor: busy || !input.trim() ? C.line : C.green }}>送信</button>
+      </form>
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>※ 相談内容と財務サマリーはAI(Anthropic)に送信されます。会話はこの画面内のみで保存されません。</div>
+    </Panel>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
    ログインゲート
    ────────────────────────────────────────────────────────────── */
 function LoginGate({ onLogin, error }) {
@@ -1986,6 +2099,10 @@ export default function App() {
             recOps={recRevOps}
             onceOps={oneRevOps}
           />
+        )}
+
+        {mainTab === "chat" && (
+          <ChatTab subs={subsList} recRev={recRevList} oneRev={oneRevList} />
         )}
 
         <footer style={{ textAlign: "center", color: C.faint, fontSize: 11, padding: "12px 0 32px" }}>
