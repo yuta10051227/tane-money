@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="5d74624">
+<meta name="tane-version" content="d39e8d7">
 </head>
 <body>
   <div id="root"></div>
@@ -1812,27 +1812,22 @@ function GachaAnim({
   const theme = result.theme || getMonthTheme();
   const isSuper = result.rate <= 3;
   const isSR = result.rate <= 12;
-  const hasSuspense = isSR; // SR以上はタメ演出
-
-  useEffect(() => {
-    const spinMs = 1100;
-    const suspenseMs = isSuper ? 2200 : 1400;
+  const hasSuspense = isSR;
+  const revealResult = () => {
+    if (phase !== "tap") return;
     if (hasSuspense) {
-      const t1 = setTimeout(() => {
-        setPhase("suspense");
-        try {
-          if (isSuper) navigator.vibrate([150, 80, 150, 80, 300, 80, 500]);else navigator.vibrate([100, 60, 180]);
-        } catch (e) {}
-      }, spinMs);
-      const t2 = setTimeout(() => setPhase("show"), spinMs + suspenseMs);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-      };
+      setPhase("suspense");
+      try {
+        if (isSuper) navigator.vibrate([150, 80, 150, 80, 300, 80, 500]);else navigator.vibrate([100, 60, 180]);
+      } catch (e) {}
+      setTimeout(() => setPhase("show"), isSuper ? 2200 : 1400);
     } else {
-      const t = setTimeout(() => setPhase("show"), spinMs);
-      return () => clearTimeout(t);
+      setPhase("show");
     }
+  };
+  useEffect(() => {
+    const t = setTimeout(() => setPhase("tap"), 1100);
+    return () => clearTimeout(t);
   }, []);
   const starCount = isSuper ? 30 : isSR ? 15 : 0;
   return /*#__PURE__*/React.createElement("div", {
@@ -1869,7 +1864,42 @@ function GachaAnim({
       fontSize: 18,
       marginTop: 12
     }
-  }, "\u30AC\u30C1\u30E3\u4E2D\u2026")), phase === "suspense" && /*#__PURE__*/React.createElement("div", {
+  }, "\u30AC\u30C1\u30E3\u4E2D\u2026")), phase === "tap" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      cursor: "pointer"
+    },
+    onClick: revealResult
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 18,
+      color: "rgba(255,255,255,0.6)",
+      marginBottom: 16,
+      letterSpacing: 1
+    }
+  }, theme.emoji, " ", theme.name, "\u30AC\u30C1\u30E3"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 130,
+      height: 130,
+      borderRadius: "50%",
+      margin: "0 auto",
+      background: `radial-gradient(circle at 40% 35%,${theme.color}dd,${theme.color}55)`,
+      animation: "heartbeat .8s ease-in-out infinite",
+      boxShadow: `0 0 0 16px ${theme.color}22,0 0 50px ${theme.color}55`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 60
+    }
+  }, "\uD83C\uDF81"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 20,
+      marginTop: 20,
+      animation: "fadePulse .8s ease-in-out infinite"
+    }
+  }, "\u30BF\u30C3\u30D7\u3057\u3066\u958B\u3051\u308B\uFF01")), phase === "suspense" && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center"
     }

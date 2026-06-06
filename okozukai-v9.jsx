@@ -762,25 +762,22 @@ function GachaAnim({ result, onClose }) {
   const theme = result.theme || getMonthTheme();
   const isSuper = result.rate <= 3;
   const isSR    = result.rate <= 12;
-  const hasSuspense = isSR; // SR以上はタメ演出
+  const hasSuspense = isSR;
+
+  const revealResult = () => {
+    if(phase!=="tap") return;
+    if(hasSuspense){
+      setPhase("suspense");
+      try{ if(isSuper) navigator.vibrate([150,80,150,80,300,80,500]); else navigator.vibrate([100,60,180]); }catch(e){}
+      setTimeout(()=>setPhase("show"), isSuper?2200:1400);
+    } else {
+      setPhase("show");
+    }
+  };
 
   useEffect(()=>{
-    const spinMs = 1100;
-    const suspenseMs = isSuper ? 2200 : 1400;
-    if(hasSuspense){
-      const t1=setTimeout(()=>{
-        setPhase("suspense");
-        try{
-          if(isSuper) navigator.vibrate([150,80,150,80,300,80,500]);
-          else        navigator.vibrate([100,60,180]);
-        }catch(e){}
-      }, spinMs);
-      const t2=setTimeout(()=>setPhase("show"), spinMs+suspenseMs);
-      return()=>{clearTimeout(t1);clearTimeout(t2);};
-    } else {
-      const t=setTimeout(()=>setPhase("show"), spinMs);
-      return()=>clearTimeout(t);
-    }
+    const t=setTimeout(()=>setPhase("tap"), 1100);
+    return()=>clearTimeout(t);
   },[]);
 
   const starCount = isSuper ? 30 : isSR ? 15 : 0;
@@ -791,6 +788,13 @@ function GachaAnim({ result, onClose }) {
           <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:8,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
           <div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div>
           <p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p>
+        </div>
+      )}
+      {phase==="tap"&&(
+        <div style={{textAlign:"center",cursor:"pointer"}} onClick={revealResult}>
+          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:16,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
+          <div style={{width:130,height:130,borderRadius:"50%",margin:"0 auto",background:`radial-gradient(circle at 40% 35%,${theme.color}dd,${theme.color}55)`,animation:"heartbeat .8s ease-in-out infinite",boxShadow:`0 0 0 16px ${theme.color}22,0 0 50px ${theme.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:60}}>🎁</div>
+          <p style={{color:"#fff",fontWeight:900,fontSize:20,marginTop:20,animation:"fadePulse .8s ease-in-out infinite"}}>タップして開ける！</p>
         </div>
       )}
       {phase==="suspense"&&(
