@@ -947,6 +947,7 @@ function DailyTasks({ child, data, update }) {
         <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease"}}>
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
+          {flash.pts>0&&<div style={{fontSize:11,color:"rgba(255,255,255,0.9)",marginTop:5}}>✨ タネっちがよろこんだ！</div>}
         </div>
       )}
 
@@ -1808,8 +1809,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.7)",fontWeight:700}}>✨ あと{remaining}回でしんか！</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>{tDone}/{next}</span>
+                <span style={{fontSize:10,color:"#c4b5fd",fontWeight:700}}>✨ あと{remaining}回でしんか！</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{next}</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#4ade80,#86efac)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px #4ade8070"}}/>
@@ -1845,7 +1846,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
                 <button onClick={()=>{setTab("more");setMoreOpen("ranking");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5,padding:0}}>
                   <span style={{fontSize:16}}>{medals[rIdx]||"🏅"}</span>
-                  <span style={{fontSize:14,fontWeight:900,color:"rgba(255,255,255,0.9)"}}>{rIdx+1}位</span>
+                  <span style={{fontSize:14,fontWeight:900,color:rIdx===0?"#fde68a":rIdx===1?"#e2e8f0":rIdx===2?"#fed7aa":"rgba(255,255,255,0.8)"}}>{rIdx+1}位</span>
                   <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>›</span>
                 </button>
               </div>

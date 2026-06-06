@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="8848d3a">
+<meta name="tane-version" content="59d3003">
 </head>
 <body>
   <div id="root"></div>
@@ -2224,7 +2224,13 @@ function DailyTasks({
   }, flash.emoji), /*#__PURE__*/React.createElement(Yen, {
     v: flash.pts,
     sz: 20
-  })), /*#__PURE__*/React.createElement("div", {
+  }), flash.pts > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "rgba(255,255,255,0.9)",
+      marginTop: 5
+    }
+  }, "\u2728 \u30BF\u30CD\u3063\u3061\u304C\u3088\u308D\u3053\u3093\u3060\uFF01")), /*#__PURE__*/React.createElement("div", {
     style: {
       background: CARD,
       border: `2px solid ${allDone ? "#34c77b" : BORDER}`,
@@ -4535,13 +4541,13 @@ function ChildScreen({
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: "rgba(255,255,255,0.7)",
+          color: "#c4b5fd",
           fontWeight: 700
         }
       }, "\u2728 \u3042\u3068", remaining, "\u56DE\u3067\u3057\u3093\u304B\uFF01"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: "rgba(255,255,255,0.4)"
+          color: "rgba(255,255,255,0.45)"
         }
       }, tDone, "/", next)), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -4692,7 +4698,7 @@ function ChildScreen({
         style: {
           fontSize: 14,
           fontWeight: 900,
-          color: "rgba(255,255,255,0.9)"
+          color: rIdx === 0 ? "#fde68a" : rIdx === 1 ? "#e2e8f0" : rIdx === 2 ? "#fed7aa" : "rgba(255,255,255,0.8)"
         }
       }, rIdx + 1, "\u4F4D"), /*#__PURE__*/React.createElement("span", {
         style: {
