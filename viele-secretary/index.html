@@ -23,13 +23,21 @@
         function show(msg) {
           var r = document.getElementById("root");
           if (!r) return;
-          r.innerHTML =
-            '<div style="padding:20px;font-family:system-ui,sans-serif">' +
-            '<h2 style="color:#E2554B;font-size:16px">読み込みの問題</h2>' +
-            '<p style="color:#9AA1AC;font-size:13px">下の内容をコピーして共有してください。</p>' +
-            '<pre style="white-space:pre-wrap;word-break:break-word;font-size:12px;background:#171A21;padding:12px;border-radius:8px">' +
-            String(msg).replace(/</g, "&lt;") +
-            "</pre></div>";
+          // innerHTML連結を避け、DOM生成＋textContentで安全に表示（XSS対策）
+          r.textContent = "";
+          var box = document.createElement("div");
+          box.style.cssText = "padding:20px;font-family:system-ui,sans-serif";
+          var h = document.createElement("h2");
+          h.style.cssText = "color:#E2554B;font-size:16px";
+          h.textContent = "読み込みの問題";
+          var p = document.createElement("p");
+          p.style.cssText = "color:#9AA1AC;font-size:13px";
+          p.textContent = "下の内容をコピーして共有してください。";
+          var pre = document.createElement("pre");
+          pre.style.cssText = "white-space:pre-wrap;word-break:break-word;font-size:12px;background:#171A21;padding:12px;border-radius:8px";
+          pre.textContent = String(msg);
+          box.appendChild(h); box.appendChild(p); box.appendChild(pre);
+          r.appendChild(box);
         }
         // 実行エラー・スクリプト読込失敗(capture)・Promise例外をすべて捕捉
         window.addEventListener("error", function (e) {
