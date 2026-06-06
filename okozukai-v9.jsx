@@ -871,8 +871,10 @@ function DailyTasks({ child, data, update }) {
   const bonus  = activeSet?.bonus ?? data.dailyBonus ?? 50;
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
+  const [justDone, setJustDone] = useState({});
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
+  const markJustDone = id => { setJustDone(p=>({...p,[id]:true})); setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550); };
 
   const isCheck   = t => t.type === "check";
   const isDone    = t => isCheck(t) ? !!prog[t.id] : (prog[t.id]||0) >= (t.target||1);
@@ -907,6 +909,7 @@ function DailyTasks({ child, data, update }) {
     if (isDone(t)) return;
     setProgress(t.id, true);
     showFlash(t.pts, t.emoji);
+    markJustDone(t.id);
     addLog(`✅ ${t.label}`, t.pts);
     // check if all done after this
     const newProg = { ...prog, [t.id]: true };
@@ -934,6 +937,7 @@ function DailyTasks({ child, data, update }) {
     const nxt = cur + 1;
     setProgress(t.id, nxt);
     showFlash(t.pts, t.emoji);
+    if(nxt>=(t.target||1)) markJustDone(t.id);
     addLog(`🔢 ${t.label}（${nxt}回目）`, t.pts);
   };
 
@@ -980,7 +984,7 @@ function DailyTasks({ child, data, update }) {
         const count = isCheck(t) ? null : (prog[t.id]||0);
         return (
           <div key={t.id}
-            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .2s"}}>
+            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.04)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 3px ${G}40`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
@@ -1999,6 +2003,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   </div>
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
+                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑残り{rem}体 · COLLECT THEM ALL</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>COLLECTION COMPLETE ★</div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>

@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="986cd6d">
+<meta name="tane-version" content="612ffc8">
 </head>
 <body>
   <div id="root"></div>
@@ -2079,12 +2079,26 @@ function DailyTasks({
   const bonus = activeSet?.bonus ?? data.dailyBonus ?? 50;
   const prog = data.dailyProgress?.[child.id]?.[today] || {};
   const [flash, setFlash] = useState(null);
+  const [justDone, setJustDone] = useState({});
   const showFlash = (pts, emoji) => {
     setFlash({
       pts,
       emoji
     });
     setTimeout(() => setFlash(null), 1100);
+  };
+  const markJustDone = id => {
+    setJustDone(p => ({
+      ...p,
+      [id]: true
+    }));
+    setTimeout(() => setJustDone(p => {
+      const n = {
+        ...p
+      };
+      delete n[id];
+      return n;
+    }), 550);
   };
   const isCheck = t => t.type === "check";
   const isDone = t => isCheck(t) ? !!prog[t.id] : (prog[t.id] || 0) >= (t.target || 1);
@@ -2134,6 +2148,7 @@ function DailyTasks({
     if (isDone(t)) return;
     setProgress(t.id, true);
     showFlash(t.pts, t.emoji);
+    markJustDone(t.id);
     addLog(`✅ ${t.label}`, t.pts);
     // check if all done after this
     const newProg = {
@@ -2180,6 +2195,7 @@ function DailyTasks({
     const nxt = cur + 1;
     setProgress(t.id, nxt);
     showFlash(t.pts, t.emoji);
+    if (nxt >= (t.target || 1)) markJustDone(t.id);
     addLog(`🔢 ${t.label}（${nxt}回目）`, t.pts);
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -2308,7 +2324,9 @@ function DailyTasks({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        transition: "all .2s"
+        transition: "all .25s",
+        transform: justDone[t.id] ? "scale(1.04)" : "scale(1)",
+        boxShadow: justDone[t.id] ? `0 0 0 3px ${G}40` : "none"
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -5190,7 +5208,25 @@ function ChildScreen({
         color: R,
         fontWeight: 700
       }
-    }, "\uD83D\uDD25 ", curStreak, "\u65E5\u9023\u7D9A\u4E2D\uFF01")), !todayDone && /*#__PURE__*/React.createElement("div", {
+    }, "\uD83D\uDD25 ", curStreak, "\u65E5\u9023\u7D9A\u4E2D\uFF01"), todayDone && darkBG && (() => {
+      const coll = data.gachaCollection?.[child.id] || {};
+      const rem = GACHA_ITEMS.length - GACHA_ITEMS.filter(i => (coll[i.id] || 0) > 0).length;
+      return rem > 0 ? /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 5,
+          fontSize: 10,
+          color: "rgba(74,158,255,0.55)",
+          fontWeight: 700
+        }
+      }, "\u56F3\u9451\u6B8B\u308A", rem, "\u4F53 \xB7 COLLECT THEM ALL") : /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 5,
+          fontSize: 10,
+          color: "#fbbf24",
+          fontWeight: 700
+        }
+      }, "COLLECTION COMPLETE \u2605");
+    })()), !todayDone && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         background: mTheme.bg,
