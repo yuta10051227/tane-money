@@ -1980,7 +1980,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
-              <div style={{background:todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`,border:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
                 <button onClick={doGacha} disabled={todayDone}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
@@ -1991,11 +1991,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </button>
                 <div style={{flex:1}}>
                   <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
-                  <div style={{fontWeight:800,fontSize:14,color:todayDone?MUTED:TEXT}}>
-                    {todayDone?"✅ 今日は引き済み！":"デイリーガチャ"}
+                  <div style={{fontWeight:800,fontSize:14,color:darkBG?(todayDone?"rgba(255,255,255,0.35)":"#fff"):(todayDone?MUTED:TEXT)}}>
+                    {todayDone?(darkBG?"CLAIMED":"✅ 今日は引き済み！"):"デイリーガチャ"}
                   </div>
-                  <div style={{fontSize:12,color:MUTED,marginTop:2}}>
-                    {todayDone?"また明日ね🌙":`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+                  <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
+                    {todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
                   </div>
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
@@ -2006,7 +2006,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                   <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
                   {tierCounts.filter(t=>t.count>0).map(t=>(
-                    <span key={t.id} style={{fontSize:10,background:CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
+                    <span key={t.id} style={{fontSize:10,background:darkBG?"rgba(255,255,255,0.06)":CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
                   ))}
                 </div>
               )}
@@ -2016,30 +2016,30 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 const zukanCount=GACHA_ITEMS.filter(i=>coll[i.id]>0).length;
                 const tierColorMap=Object.fromEntries((data.gacha||[]).map(g=>[g.id,g.color]));
                 return(<div style={{marginTop:10}}>
-                  <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:CARDS,border:`1.5px solid ${BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
+                  <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:darkBG?"rgba(255,255,255,0.05)":CARDS,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:15}}>📖</span>
-                      <span style={{fontWeight:800,fontSize:13,color:TEXT}}>図鑑</span>
-                      <span style={{fontSize:11,color:MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
+                      <span style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.8)":TEXT}}>図鑑</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <div style={{height:5,width:60,background:BORDER,borderRadius:999,overflow:"hidden"}}>
                         <div style={{height:"100%",width:`${zukanCount/GACHA_ITEMS.length*100}%`,background:G,borderRadius:999}}/>
                       </div>
-                      <span style={{fontSize:11,color:MUTED}}>{showZukan?"▲":"▼"}</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{showZukan?"▲":"▼"}</span>
                     </div>
                   </button>
                   {showZukan&&(
-                    <div style={{background:CARDS,borderRadius:"0 0 14px 14px",padding:"10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,border:`1.5px solid ${BORDER}`,borderTop:"none"}}>
+                    <div style={{background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:"0 0 14px 14px",padding:"10px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderTop:"none"}}>
                       {GACHA_ITEMS.map(item=>{
                         const cnt=coll[item.id]||0;
                         const tc=tierColorMap[item.tierId]||BORDER;
-                        return(<div key={item.id} style={{textAlign:"center",background:cnt>0?CARD:`rgba(0,0,0,0.04)`,borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:BORDER}`,transition:"all .2s"}}>
+                        return(<div key={item.id} style={{textAlign:"center",background:cnt>0?(darkBG?"rgba(255,255,255,0.08)":CARD):(darkBG?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.04)"),borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,transition:"all .2s"}}>
                           {cnt>0
                             ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.png`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
-                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?TEXT:MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
+                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
                           {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
                         </div>);
                       })}

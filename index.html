@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="edff2ed">
+<meta name="tane-version" content="986cd6d">
 </head>
 <body>
   <div id="root"></div>
@@ -5130,8 +5130,8 @@ function ChildScreen({
     }));
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
-        background: todayDone ? CARD : `linear-gradient(135deg,${mTheme.bg},#fffbe6)`,
-        border: `2px solid ${todayDone ? BORDER : mTheme.color}`,
+        background: darkBG ? todayDone ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.07)" : todayDone ? CARD : `linear-gradient(135deg,${mTheme.bg},#fffbe6)`,
+        border: darkBG ? `1px solid ${todayDone ? "rgba(255,255,255,0.1)" : mTheme.color + "50"}` : `2px solid ${todayDone ? BORDER : mTheme.color}`,
         borderRadius: 20,
         padding: "16px 18px",
         display: "flex",
@@ -5168,15 +5168,15 @@ function ChildScreen({
       style: {
         fontWeight: 800,
         fontSize: 14,
-        color: todayDone ? MUTED : TEXT
+        color: darkBG ? todayDone ? "rgba(255,255,255,0.35)" : "#fff" : todayDone ? MUTED : TEXT
       }
-    }, todayDone ? "✅ 今日は引き済み！" : "デイリーガチャ"), /*#__PURE__*/React.createElement("div", {
+    }, todayDone ? darkBG ? "CLAIMED" : "✅ 今日は引き済み！" : "デイリーガチャ"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
-        color: MUTED,
+        color: darkBG ? "rgba(255,255,255,0.3)" : MUTED,
         marginTop: 2
       }
-    }, todayDone ? "また明日ね🌙" : `1日1回 · 最大${Math.max(...(data.gacha || []).map(g => g.max))}pt`), bonusLabel && !todayDone && /*#__PURE__*/React.createElement("div", {
+    }, todayDone ? darkBG ? "BACK TOMORROW" : "また明日ね🌙" : `1日1回 · 最大${Math.max(...(data.gacha || []).map(g => g.max))}pt`), bonusLabel && !todayDone && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 4,
         fontSize: 11,
@@ -5219,7 +5219,7 @@ function ChildScreen({
       key: t.id,
       style: {
         fontSize: 10,
-        background: CARD,
+        background: darkBG ? "rgba(255,255,255,0.06)" : CARD,
         border: `1px solid ${t.color}50`,
         borderRadius: 999,
         padding: "2px 8px",
@@ -5238,8 +5238,8 @@ function ChildScreen({
         onClick: () => setShowZukan(v => !v),
         style: {
           width: "100%",
-          background: CARDS,
-          border: `1.5px solid ${BORDER}`,
+          background: darkBG ? "rgba(255,255,255,0.05)" : CARDS,
+          border: `1.5px solid ${darkBG ? "rgba(255,255,255,0.1)" : BORDER}`,
           borderRadius: showZukan ? "14px 14px 0 0" : 14,
           padding: "9px 14px",
           display: "flex",
@@ -5262,12 +5262,12 @@ function ChildScreen({
         style: {
           fontWeight: 800,
           fontSize: 13,
-          color: TEXT
+          color: darkBG ? "rgba(255,255,255,0.8)" : TEXT
         }
       }, "\u56F3\u9451"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
-          color: MUTED
+          color: darkBG ? "rgba(255,255,255,0.3)" : MUTED
         }
       }, zukanCount, "/", GACHA_ITEMS.length, "\u30B3\u30F3\u30D7\u30EA\u30FC\u30C8")), /*#__PURE__*/React.createElement("div", {
         style: {
@@ -5293,17 +5293,17 @@ function ChildScreen({
       })), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 11,
-          color: MUTED
+          color: darkBG ? "rgba(255,255,255,0.3)" : MUTED
         }
       }, showZukan ? "▲" : "▼"))), showZukan && /*#__PURE__*/React.createElement("div", {
         style: {
-          background: CARDS,
+          background: darkBG ? "rgba(255,255,255,0.04)" : CARDS,
           borderRadius: "0 0 14px 14px",
           padding: "10px",
           display: "grid",
           gridTemplateColumns: "repeat(4,1fr)",
           gap: 7,
-          border: `1.5px solid ${BORDER}`,
+          border: `1.5px solid ${darkBG ? "rgba(255,255,255,0.1)" : BORDER}`,
           borderTop: "none"
         }
       }, GACHA_ITEMS.map(item => {
@@ -5313,10 +5313,10 @@ function ChildScreen({
           key: item.id,
           style: {
             textAlign: "center",
-            background: cnt > 0 ? CARD : `rgba(0,0,0,0.04)`,
+            background: cnt > 0 ? darkBG ? "rgba(255,255,255,0.08)" : CARD : darkBG ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.04)",
             borderRadius: 11,
             padding: "8px 3px",
-            border: `1.5px solid ${cnt > 0 ? tc : BORDER}`,
+            border: `1.5px solid ${cnt > 0 ? tc : darkBG ? "rgba(255,255,255,0.1)" : BORDER}`,
             transition: "all .2s"
           }
         }, cnt > 0 ? /*#__PURE__*/React.createElement("img", {
@@ -5339,7 +5339,7 @@ function ChildScreen({
           style: {
             fontSize: 8,
             fontWeight: 700,
-            color: cnt > 0 ? TEXT : MUTED,
+            color: cnt > 0 ? darkBG ? "rgba(255,255,255,0.8)" : TEXT : MUTED,
             marginTop: 3,
             lineHeight: 1.3
           }
