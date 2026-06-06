@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="936faeb">
+<meta name="tane-version" content="c69c308">
 </head>
 <body>
   <div id="root"></div>
@@ -4351,10 +4351,12 @@ function ChildScreen({
     gacha: "daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
+  const darkBG = !isJunior; // teen/adultはダークモード
+
   return /*#__PURE__*/React.createElement("div", {
     style: {
       minHeight: "100vh",
-      background: BG,
+      background: darkBG ? "#0a0f1a" : BG,
       fontFamily: F,
       paddingBottom: 80
     }
@@ -4759,13 +4761,18 @@ function ChildScreen({
         position: "relative",
         zIndex: 2
       }
-    }, [["🔥", "連続", curStreak > 0 ? `${curStreak}日` : "--", "#fde68a"], ["⚡", "ミッション", `${ttd}回`, "#a78bfa"], ["📊", "ポートフォリオ", portV2 > 0 ? `${portV2.toLocaleString()}pt` : "--", "#4ade80"], ["🏅", "バッジ", myBadges > 0 ? `${myBadges}個` : "--", "#fbbf24"]].map(([e, l, v, c]) => /*#__PURE__*/React.createElement("div", {
+    }, [["🔥", "連続", curStreak > 0 ? `${curStreak}日` : null, "#fde68a", "daily", "毎日開こう"], ["⚡", "ミッション", ttd > 0 ? `${ttd}回` : null, "#a78bfa", "activity", "タスクをやろう"], ["📊", "ポートフォリオ", portV2 > 0 ? `${portV2.toLocaleString()}pt` : null, "#4ade80", "activity", "株を買おう"], ["🏅", "バッジ", myBadges > 0 ? `${myBadges}個` : null, "#fbbf24", "more", "実績を稼ごう"]].map(([e, l, v, c, tabTarget, hint]) => /*#__PURE__*/React.createElement("div", {
       key: l,
+      onClick: () => {
+        if (!v) setTab(tabTarget);
+      },
       style: {
         background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        border: `1px solid ${!v ? "rgba(74,158,255,0.15)" : "rgba(255,255,255,0.07)"}`,
         borderRadius: 14,
-        padding: "12px 14px"
+        padding: "12px 14px",
+        cursor: !v ? "pointer" : "default",
+        transition: "background .15s"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4780,13 +4787,19 @@ function ChildScreen({
         letterSpacing: 0.5,
         marginBottom: 3
       }
-    }, l), /*#__PURE__*/React.createElement("div", {
+    }, l), v ? /*#__PURE__*/React.createElement("div", {
       style: {
         color: c,
         fontSize: 17,
         fontWeight: 900
       }
-    }, v)))));
+    }, v) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "rgba(74,158,255,0.6)",
+        fontSize: 10,
+        lineHeight: 1.4
+      }
+    }, hint, " \u2192")))));
   })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5173,7 +5186,7 @@ function ChildScreen({
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
-        color: MUTED,
+        color: darkBG ? "rgba(255,255,255,0.45)" : MUTED,
         fontWeight: 600
       }
     }, "\u4ECA\u6708:"), tierCounts.filter(t => t.count > 0).map(t => /*#__PURE__*/React.createElement("span", {
@@ -5414,19 +5427,19 @@ function ChildScreen({
   })))), effectiveTab === "activity" && !isJunior && !young && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      background: CARD,
-      borderBottom: `1px solid ${BORDER}`
+      background: darkBG ? "#0f1a2e" : CARD,
+      borderBottom: `1px solid ${darkBG ? "rgba(74,158,255,0.15)" : BORDER}`
     }
-  }, [["tasks", "✅ お手伝い"], ["invest", "📈 投資/為替"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+  }, [["tasks", "✅ ミッション"], ["invest", "📈 投資/為替"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
     key: v,
     onClick: () => setActTab(v),
     style: {
       flex: 1,
       padding: "10px 0",
       border: "none",
-      borderBottom: actTab === v ? `2.5px solid ${GP}` : "2.5px solid transparent",
+      borderBottom: actTab === v ? `2.5px solid ${darkBG ? "#4a9eff" : GP}` : "2.5px solid transparent",
       background: "none",
-      color: actTab === v ? GP : MUTED,
+      color: actTab === v ? darkBG ? "#4a9eff" : GP : darkBG ? "rgba(255,255,255,0.4)" : MUTED,
       fontWeight: actTab === v ? 700 : 500,
       fontSize: 12,
       cursor: "pointer",
@@ -13802,6 +13815,7 @@ function InvestTab({
   const [tradeComment, setTradeComment] = useState("");
   const [showChart, setShowChart] = useState(null);
   const [showShare, setShowShare] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const myBal = bal(data.logs, child.id);
   const myHoldings = (data.holdings || {})[child.id] || [];
   const stocks = data.stocks || [];
@@ -14103,13 +14117,47 @@ function InvestTab({
         color: "#fbbf24"
       }
     }, bc, "\u500B"), " \u7372\u5F97\u6E08\u307F"));
-  })(), /*#__PURE__*/React.createElement("div", {
+  })(), /*#__PURE__*/React.createElement("button", {
+    onClick: async () => {
+      const gainStr = portfolioGain >= 0 ? `+${portfolioGain.toLocaleString()}` : portfolioGain.toLocaleString();
+      const txt = `${child.emoji} ${child.name}のポートフォリオ\n💰 ${portfolioVal.toLocaleString()}pt（損益: ${gainStr}pt）\n${myHoldings.map(h => {
+        const st = stocks.find(x => x.id === h.stockId);
+        return st ? `${st.emoji}${st.name}` : "";
+      }).filter(Boolean).join("・")}\n🌱 tane-money.vercel.app`;
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "TANE MONEY ポートフォリオ",
+            text: txt
+          });
+        } catch (e) {}
+      } else {
+        navigator.clipboard?.writeText(txt);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2500);
+      }
+    },
+    style: {
+      width: "100%",
+      background: shareCopied ? "rgba(74,222,128,0.15)" : "#4a9eff",
+      border: shareCopied ? "1px solid #4ade80" : "none",
+      borderRadius: 14,
+      padding: "12px",
+      color: shareCopied ? "#4ade80" : "#fff",
+      fontWeight: 900,
+      fontSize: 14,
+      cursor: "pointer",
+      fontFamily: F,
+      marginTop: 8,
+      transition: "all .3s"
+    }
+  }, shareCopied ? "✓ コピーしました！" : "📤 LINEで送る / シェア"), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      color: "rgba(255,255,255,0.15)",
-      fontSize: 10,
+      color: "rgba(255,255,255,0.12)",
+      fontSize: 9,
       letterSpacing: 0.5,
-      marginTop: 4
+      marginTop: 8
     }
   }, "\uD83C\uDF31 tane-money.vercel.app"))), /*#__PURE__*/React.createElement("div", {
     style: {

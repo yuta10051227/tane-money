@@ -1753,9 +1753,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     badges:"more", tips:"more", ranking:"more", gacha:"daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
+  const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
-    <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:80}}>
+    <div style={{minHeight:"100vh",background:darkBG?"#0a0f1a":BG,fontFamily:F,paddingBottom:80}}>
       {/* ヒーローエリア */}
       {isJunior ? (()=>{
         const h=new Date().getHours();
@@ -1850,15 +1851,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 4ステータスグリッド */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
           {[
-            ["🔥","連続",curStreak>0?`${curStreak}日`:"--","#fde68a"],
-            ["⚡","ミッション",`${ttd}回`,"#a78bfa"],
-            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:"--","#4ade80"],
-            ["🏅","バッジ",myBadges>0?`${myBadges}個`:"--","#fbbf24"],
-          ].map(([e,l,v,c])=>(
-            <div key={l} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,padding:"12px 14px"}}>
+            ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう"],
+            ["⚡","ミッション",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう"],
+            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう"],
+            ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう"],
+          ].map(([e,l,v,c,tabTarget,hint])=>(
+            <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
+              style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
               <div style={{fontSize:18,marginBottom:3}}>{e}</div>
               <div style={{color:"rgba(255,255,255,0.35)",fontSize:9,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
-              <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
+              {v ? (
+                <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
+              ) : (
+                <div style={{color:"rgba(74,158,255,0.6)",fontSize:10,lineHeight:1.4}}>{hint} →</div>
+              )}
             </div>
           ))}
         </div>
@@ -1991,7 +1997,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               </div>
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                  <span style={{fontSize:10,color:MUTED,fontWeight:600}}>今月:</span>
+                  <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
                   {tierCounts.filter(t=>t.count>0).map(t=>(
                     <span key={t.id} style={{fontSize:10,background:CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
                   ))}
@@ -2077,10 +2083,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── ACTIVITY サブナビ ── */}
       {effectiveTab==="activity"&&!isJunior&&!young&&(
-        <div style={{display:"flex",background:CARD,borderBottom:`1px solid ${BORDER}`}}>
-          {[["tasks","✅ お手伝い"],["invest","📈 投資/為替"]].map(([v,l])=>(
+        <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
+          {[["tasks","✅ ミッション"],["invest","📈 投資/為替"]].map(([v,l])=>(
             <button key={v} onClick={()=>setActTab(v)}
-              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${GP}`:"2.5px solid transparent",background:"none",color:actTab===v?GP:MUTED,fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${darkBG?"#4a9eff":GP}`:"2.5px solid transparent",background:"none",color:actTab===v?(darkBG?"#4a9eff":GP):(darkBG?"rgba(255,255,255,0.4)":MUTED),fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
               {l}
             </button>
           ))}
@@ -4955,6 +4961,7 @@ function InvestTab({child,data,update}){
   const [tradeComment,setTradeComment]=useState("");
   const [showChart,setShowChart]=useState(null);
   const [showShare,setShowShare]=useState(false);
+  const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
   const stocks=data.stocks||[];
@@ -5046,7 +5053,15 @@ function InvestTab({child,data,update}){
               <span style={{color:"rgba(255,255,255,0.6)",fontSize:12}}>バッジ <strong style={{color:"#fbbf24"}}>{bc}個</strong> 獲得済み</span>
             </div>
           );})()}
-          <div style={{textAlign:"center",color:"rgba(255,255,255,0.15)",fontSize:10,letterSpacing:0.5,marginTop:4}}>🌱 tane-money.vercel.app</div>
+          <button onClick={async()=>{
+            const gainStr=portfolioGain>=0?`+${portfolioGain.toLocaleString()}`:portfolioGain.toLocaleString();
+            const txt=`${child.emoji} ${child.name}のポートフォリオ\n💰 ${portfolioVal.toLocaleString()}pt（損益: ${gainStr}pt）\n${myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);return st?`${st.emoji}${st.name}`:""}).filter(Boolean).join("・")}\n🌱 tane-money.vercel.app`;
+            if(navigator.share){try{await navigator.share({title:"TANE MONEY ポートフォリオ",text:txt});}catch(e){}}
+            else{navigator.clipboard?.writeText(txt);setShareCopied(true);setTimeout(()=>setShareCopied(false),2500);}
+          }} style={{width:"100%",background:shareCopied?"rgba(74,222,128,0.15)":"#4a9eff",border:shareCopied?"1px solid #4ade80":"none",borderRadius:14,padding:"12px",color:shareCopied?"#4ade80":"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,marginTop:8,transition:"all .3s"}}>
+            {shareCopied?"✓ コピーしました！":"📤 LINEで送る / シェア"}
+          </button>
+          <div style={{textAlign:"center",color:"rgba(255,255,255,0.12)",fontSize:9,letterSpacing:0.5,marginTop:8}}>🌱 tane-money.vercel.app</div>
         </div>
       </div>
     )}
