@@ -960,6 +960,32 @@ function BirthEditor({ birth, onSave }) {
   );
 }
 
+// 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
+function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab }) {
+  const t = (fortune && fortune.today) || {};
+  const h = new Date().getHours();
+  const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
+  const next = (today || [])[0];
+  const Row = ({ icon, label, color, onClick }) => (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
+      <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.4, color: color || C.text }}>{label}</span>
+      <span style={{ flex: "0 0 auto", color: C.sub, fontSize: 13 }}>›</span>
+    </button>
+  );
+  return (
+    <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
+      <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
+      {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 2px" }}>{t.theme}</div>}
+      <Row icon="🔮" label={`運気 ${t.score ? "★".repeat(t.score) : "—"}${t.action ? `／${t.action}` : ""}`} onClick={() => onTab(5)} />
+      <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab(0)} />
+      {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab(0)} />}
+      {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab(2)} />}
+      {brief && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab(4)} />}
+    </section>
+  );
+}
+
 function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth }) {
   const f = fortune || {};
   const t = f.today || {};
@@ -1693,6 +1719,8 @@ export default function App() {
   };
 
   const alerts = computeAlerts(data);
+  const moneyOutstanding = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const briefFirst = (data.digest && data.digest.briefing ? data.digest.briefing.split("\n").filter((l) => l.trim())[0] : "");
 
   // トップのタブ
   const TABS = ["ホーム", "仕事", "売上", "タスク", "ニュース", "運気"];
@@ -1745,6 +1773,7 @@ export default function App() {
 
         {tab === 0 && (
           <>
+            <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} />
             <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
             <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
             <TimeMeter entries={scheduleEntries} {...calProps} />
