@@ -2009,6 +2009,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
+        {data.firstActionPending&&(data.goodTasks||[]).length>0&&(
+          <div style={{background:GS,border:`2px solid ${G}`,borderRadius:16,padding:"14px 16px",marginBottom:16,position:"relative"}}>
+            <button onClick={()=>update(d=>({...d,firstActionPending:false}))} style={{position:"absolute",top:8,right:10,background:"none",border:"none",fontSize:16,cursor:"pointer",color:MUTED}}>✕</button>
+            <div style={{fontWeight:900,fontSize:14,color:GP,marginBottom:6}}>🌱 さあ、はじめよう！</div>
+            <div style={{color:TEXTS,fontSize:13,lineHeight:1.7,marginBottom:10}}>
+              「活動」タブを開いて、{(data.goodTasks||[])[0]?.emoji}{(data.goodTasks||[])[0]?.label}をタップしてみよう！
+            </div>
+            <button onClick={()=>{
+              update(d=>({...d,firstActionPending:false}));
+              setTab(isJunior?"tasks":"activity");
+            }} style={{background:GP,border:"none",borderRadius:10,padding:"8px 18px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              活動タブへ →
+            </button>
+          </div>
+        )}
         {/* Teen: タスクを先に表示（ガチャより優先） */}
         {!isJunior && <>
           <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
@@ -5557,30 +5572,124 @@ function TaskCustomizer({child,data,update,onClose}){
 }
 
 
+// ── Default Fallback Tasks (タスク未選択時のデフォルト) ──
+const DEFAULT_FALLBACK_TASKS = [
+  {id:"df01",emoji:"📝",label:"宿題をする",pts:50,over:{}},
+  {id:"df02",emoji:"🍽",label:"食器を洗う",pts:20,over:{}},
+  {id:"df03",emoji:"🧹",label:"掃除機をかける",pts:30,over:{}},
+  {id:"df04",emoji:"⏰",label:"決めた時間に起きる",pts:20,over:{}},
+  {id:"df05",emoji:"🗑",label:"ゴミを捨てる",pts:10,over:{}},
+  {id:"df06",emoji:"🧺",label:"洗濯物を畳む",pts:15,over:{}},
+  {id:"df07",emoji:"🛁",label:"お風呂掃除をする",pts:20,over:{}},
+  {id:"df08",emoji:"🌙",label:"決めた時間に寝る",pts:15,over:{}},
+];
+
+// ── Task Templates (初回セットアップ用) ──────────────
+const TASK_TEMPLATES = {
+  junior: [
+    { cat:"📚 勉強", tasks:[
+      {id:"tj01",emoji:"📝",label:"宿題をする",pts:50},
+      {id:"tj02",emoji:"📖",label:"音読をする（10分）",pts:20},
+      {id:"tj03",emoji:"✏",label:"ドリルを1ページやる",pts:30},
+      {id:"tj04",emoji:"🔤",label:"漢字練習をする",pts:25},
+      {id:"tj05",emoji:"🔢",label:"計算練習をする",pts:25},
+    ]},
+    { cat:"🏠 お手伝い", tasks:[
+      {id:"tj06",emoji:"🗑",label:"ゴミを捨てる",pts:10},
+      {id:"tj07",emoji:"🍽",label:"食器を洗う",pts:20},
+      {id:"tj08",emoji:"🧺",label:"洗濯物を畳む",pts:15},
+      {id:"tj09",emoji:"🛁",label:"お風呂掃除をする",pts:20},
+      {id:"tj10",emoji:"🍳",label:"ご飯の準備を手伝う",pts:25},
+      {id:"tj11",emoji:"🧹",label:"掃き掃除をする",pts:20},
+    ]},
+    { cat:"😴 生活習慣", tasks:[
+      {id:"tj12",emoji:"⏰",label:"自分で起きる",pts:15},
+      {id:"tj13",emoji:"🌙",label:"決めた時間に寝る",pts:15},
+      {id:"tj14",emoji:"🪥",label:"歯磨きをする",pts:10},
+      {id:"tj15",emoji:"👋",label:"あいさつをする",pts:5},
+    ]},
+  ],
+  teen: [
+    { cat:"📚 勉強", tasks:[
+      {id:"tt01",emoji:"📝",label:"宿題をする",pts:50},
+      {id:"tt02",emoji:"📖",label:"自主学習（30分）",pts:60},
+      {id:"tt03",emoji:"📒",label:"復習・予習をする",pts:60},
+      {id:"tt04",emoji:"🔤",label:"単語を10個覚える",pts:30},
+      {id:"tt05",emoji:"📐",label:"苦手科目を1時間勉強",pts:100},
+    ]},
+    { cat:"🏠 お手伝い", tasks:[
+      {id:"tt06",emoji:"🗑",label:"ゴミ出しをする",pts:15},
+      {id:"tt07",emoji:"🍽",label:"食器洗いをする",pts:20},
+      {id:"tt08",emoji:"🧹",label:"掃除機をかける",pts:30},
+      {id:"tt09",emoji:"🧺",label:"洗濯物を畳む",pts:15},
+      {id:"tt10",emoji:"🛁",label:"お風呂掃除をする",pts:20},
+      {id:"tt11",emoji:"🍳",label:"料理を手伝う",pts:35},
+    ]},
+    { cat:"😴 生活習慣", tasks:[
+      {id:"tt12",emoji:"⏰",label:"決めた時間に起きる",pts:20},
+      {id:"tt13",emoji:"🌙",label:"決めた時間に寝る",pts:20},
+      {id:"tt14",emoji:"📵",label:"スマホを指定時間に置く",pts:30},
+      {id:"tt15",emoji:"📚",label:"読書（30分）",pts:25},
+    ]},
+  ],
+  parent: [
+    { cat:"🏠 家事（親）", tasks:[
+      {id:"tp01",emoji:"🍳",label:"夕食を作る",pts:50,parentOnly:true},
+      {id:"tp02",emoji:"🧹",label:"掃除機をかける",pts:30,parentOnly:true},
+      {id:"tp03",emoji:"👔",label:"洗濯をする・干す",pts:30,parentOnly:true},
+      {id:"tp04",emoji:"🛒",label:"買い物をする",pts:20,parentOnly:true},
+      {id:"tp05",emoji:"🍽",label:"食器洗いをする",pts:20,parentOnly:true},
+      {id:"tp06",emoji:"🗑",label:"ゴミ出し",pts:10,parentOnly:true},
+    ]},
+    { cat:"💪 自己管理（親）", tasks:[
+      {id:"tp07",emoji:"🏃",label:"運動をする（30分）",pts:50,parentOnly:true},
+      {id:"tp08",emoji:"⏰",label:"早起きする（6時台）",pts:30,parentOnly:true},
+      {id:"tp09",emoji:"🏠",label:"残業せず定時退社",pts:100,parentOnly:true},
+      {id:"tp10",emoji:"📵",label:"寝る前スマホを控える",pts:30,parentOnly:true},
+    ]},
+  ],
+};
+
 // ── Setup Wizard ──────────────────────────────────────
 function SetupWizard({ data, update, onComplete }) {
-  const [step,          setStep]         = useState(0);
-  const [familyName,    setFamilyName]   = useState("");
-  const [childName,     setChildName]    = useState("");
-  const [childEmoji,    setChildEmoji]   = useState("⚡");
-  const [childMode,     setChildMode]    = useState("teen");
-  const [selectedTasks, setSelectedTasks]= useState([]);
-  const [goalEmoji,     setGoalEmoji]    = useState("🎮");
-  const [goalLabel,     setGoalLabel]    = useState("");
-  const [goalTarget,    setGoalTarget]   = useState("");
-  const [goalSkipped,   setGoalSkipped]  = useState(false);
+  const [step,        setStep]       = useState(0);
+  const [familyName,  setFamilyName] = useState("");
+  const [childName,   setChildName]  = useState("");
+  const [childEmoji,  setChildEmoji] = useState("⚡");
+  const [childMode,   setChildMode]  = useState("teen");
+  const [parentJoin,  setParentJoin] = useState(false);  // true/false
+  const [parentName,  setParentName] = useState("");
+  const [parentEmoji, setParentEmoji]= useState("👨");
+  const [tmplCat,     setTmplCat]    = useState(0);
+  const [selTasks,    setSelTasks]   = useState([]);    // task objects
+  const [goalEmoji,   setGoalEmoji]  = useState("🎮");
+  const [goalLabel,   setGoalLabel]  = useState("");
+  const [goalTarget,  setGoalTarget] = useState("");
+  const [goalSkipped, setGoalSkipped]= useState(false);
+  const [notifDone,   setNotifDone]  = useState(false);
 
   const [familyCode] = useState(()=>`TANE-${Math.random().toString(36).slice(2,6).toUpperCase()}`);
   const [joinMode, setJoinMode] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinErr,  setJoinErr]  = useState("");
 
-  const CHILD_EMOJIS = ["⚡","🌸","🌟","🦁","🐯","🐬","🦊","🐼","🐉","🌈","🎸","⚽","🚀","🎮","🦄","🐶","🐱","🍕"];
-  const GOAL_EMOJIS  = ["🎮","📱","🎵","🚴","✈","👟","📚","🎨","⚽","🍰","💻","🎸","🏊","🎀","🌍","🍜"];
-  const STARTER_TASKS = (data?.goodTasks||[]).slice(0,10);
+  const CHILD_EMOJIS  = ["⚡","🌸","🌟","🦁","🐯","🐬","🦊","🐼","🐉","🌈","🎸","⚽","🚀","🎮","🦄","🐶","🐱","🍕"];
+  const PARENT_EMOJIS = ["👨","👩","🧑","👨💼","👩💼","🧔","👴","👵","🦸","🧙","🎅","🦹"];
+  const GOAL_EMOJIS   = ["🎮","📱","🎵","🚴","✈","👟","📚","🎨","⚽","🍰","💻","🎸","🏊","🎀","🌍","🍜"];
+
+  const tmplGroups = [
+    ...TASK_TEMPLATES[childMode],
+    ...(parentJoin ? TASK_TEMPLATES.parent : []),
+  ];
+
+  const toggleTask = (task) => setSelTasks(prev =>
+    prev.some(t=>t.id===task.id) ? prev.filter(t=>t.id!==task.id) : [...prev, task]
+  );
 
   const handleComplete = (skipGoal=false, parentPin="0000") => {
-    const childId = uid();
+    const childId  = uid();
+    const parentId = uid();
+
     const newChild = {
       id:childId, name:childName.trim()||"こども", emoji:childEmoji,
       pin:"0000", displayMode:childMode, role:"child",
@@ -5589,6 +5698,21 @@ function SetupWizard({ data, update, onComplete }) {
       permissions:{canChangePin:true,canViewBalance:true,canCreateGoals:true,canRedeemRewards:true},
       visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
     };
+
+    const newParent = parentJoin && parentName.trim() ? {
+      id:parentId, name:parentName.trim(), emoji:parentEmoji,
+      pin:parentPin, displayMode:"adult", role:"parent", gradeLabel:"",
+      participationMode:"player_and_guardian",
+      permissions:{investment:"trade",forex:"trade",dailyBonus:true,ranking:true},
+      visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
+    } : null;
+
+    const goodTasksFromTmpl = selTasks.length > 0
+      ? selTasks.map(({parentOnly, ...rest}) => ({...rest, over:{}}))
+      : DEFAULT_FALLBACK_TASKS;
+
+    const childTaskIds = selTasks.filter(t=>!t.parentOnly).map(t=>t.id);
+
     const newGoal = !skipGoal && goalLabel.trim() && parseInt(goalTarget)>0
       ? {id:uid(),cid:childId,emoji:goalEmoji,label:goalLabel.trim(),target:parseInt(goalTarget),done:false}
       : null;
@@ -5599,14 +5723,18 @@ function SetupWizard({ data, update, onComplete }) {
 
     update(d=>({
       ...d,
-      children:[newChild], parents:[],
+      familyName: familyName.trim()||"わが家",
+      children:[newChild],
+      parents:newParent ? [newParent] : [],
+      goodTasks:goodTasksFromTmpl,
       goals:newGoal?[newGoal]:[],
-      myTaskIds:selectedTasks.length>0?{[childId]:selectedTasks}:{},
+      myTaskIds:childTaskIds.length>0?{[childId]:childTaskIds}:{},
       tutorialSeen:{[childId]:true},
       setupComplete:true,
-      parentPin: parentPin||"0000",
+      parentPin:parentPin||"0000",
       logs:[bonusLog],
       gachaDate:{}, streak:{},
+      firstActionPending:true,
     }));
     addLogToFirestore(bonusLog);
     onComplete();
@@ -5621,15 +5749,18 @@ function SetupWizard({ data, update, onComplete }) {
   return (
     <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${GS} 0%,#fff 50%,${GOLDS} 100%)`,fontFamily:F,display:"flex",flexDirection:"column",padding:"56px 24px 40px",maxWidth:480,margin:"0 auto",boxSizing:"border-box"}}>
 
-      {/* プログレスバー (step 1〜5) */}
-      {step>=1&&step<=5&&(
+      {/* プログレスバー (step 1〜6) ドット表示 */}
+      {step>=1&&step<=6&&(
         <div style={{marginBottom:28}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span style={{fontSize:11,color:MUTED,fontWeight:700}}>ステップ {step} / 5</span>
-            {step<5&&<button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:"none",color:GP,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>← もどる</button>}
-          </div>
-          <div style={{background:BORDER,borderRadius:999,height:6,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${step/5*100}%`,background:G,borderRadius:999,transition:"width .4s ease"}}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            {/* ドット */}
+            <div style={{display:"flex",gap:7}}>
+              {[1,2,3,4,5,6].map(i=>(
+                <div key={i} style={{width:i===step?20:8,height:8,borderRadius:999,background:i<=step?GP:BORDER,transition:"all .3s ease"}}/>
+              ))}
+            </div>
+            <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{step} / 6</span>
+            {step>1&&<button onClick={()=>setStep(s=>s-1)} style={{background:"none",border:"none",color:GP,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:F}}>← もどる</button>}
           </div>
         </div>
       )}
@@ -5688,7 +5819,7 @@ function SetupWizard({ data, update, onComplete }) {
             <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"12px 16px",marginBottom:22}}>
               <div style={{fontSize:11,color:MUTED,marginBottom:4}}>接続コード（家族でシェアして使います）</div>
               <div style={{fontWeight:900,fontSize:18,color:GP,letterSpacing:2}}>{familyCode}</div>
-              <div style={{fontSize:10,color:MUTED,marginTop:4}}>このコードを他の端末で入力すると同じデータを使えます</div>
+              <div style={{fontSize:10,color:MUTED,marginTop:4}}>家族に伝えると同じアプリを一緒に使えます。あとでも確認できます</div>
             </div>
           )}
           <button onClick={()=>setStep(2)} style={btnStyle(!!familyName.trim())} disabled={!familyName.trim()}>
@@ -5715,7 +5846,7 @@ function SetupWizard({ data, update, onComplete }) {
             placeholder="名前（例：かなと）"
             style={{...INP,fontSize:15,marginBottom:12}}/>
           <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>年代</div>
-          <div style={{display:"flex",gap:8,marginBottom:24}}>
+          <div style={{display:"flex",gap:8,marginBottom:28}}>
             {[["junior","小学生"],["teen","中学生・高校生"]].map(([v,l])=>(
               <button key={v} onClick={()=>setChildMode(v)} style={{flex:1,padding:"11px 0",border:`2px solid ${childMode===v?GP:BORDER}`,borderRadius:12,background:childMode===v?`${GP}15`:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,color:childMode===v?GP:MUTED,transition:"all .15s"}}>
                 {l}
@@ -5728,34 +5859,95 @@ function SetupWizard({ data, update, onComplete }) {
         </div>
       )}
 
-      {/* Step 3: お手伝いを選ぶ */}
+      {/* Step 3: 親参加 */}
       {step===3&&(
         <div style={{flex:1}}>
-          <div style={{fontSize:48,marginBottom:14}}>✅</div>
-          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>お手伝いを選ぼう</h2>
-          <p style={{color:MUTED,fontSize:13,margin:"0 0 16px"}}>やってみたいものを選んでね！（あとで変えられます）</p>
-          <div style={{marginBottom:20,maxHeight:340,overflowY:"auto"}}>
-            {STARTER_TASKS.map(t=>{
-              const sel=selectedTasks.includes(t.id);
+          <div style={{fontSize:48,marginBottom:14}}>🏆</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>親も参加しますか？</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 6px",lineHeight:1.6}}>
+            子どもと一緒にポイントを貯めてランキングで競えます
+          </p>
+          <p style={{color:MUTED,fontSize:11,margin:"0 0 18px"}}>参加しなくても管理機能はすべて使えます</p>
+          <div style={{display:"flex",gap:10,marginBottom:20}}>
+            <button onClick={()=>{setParentJoin(false);setTmplCat(0);setStep(4);}}
+              style={{flex:1,padding:"16px 0",border:`2.5px solid ${parentJoin===false?GP:BORDER}`,borderRadius:16,background:parentJoin===false?`${GP}12`:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F,color:parentJoin===false?GP:TEXT,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+              <span style={{fontSize:28}}>👀</span>
+              <span>管理のみ（見るだけ）</span>
+            </button>
+            <button onClick={()=>setParentJoin(true)}
+              style={{flex:1,padding:"16px 0",border:`2.5px solid ${parentJoin===true?B:BORDER}`,borderRadius:16,background:parentJoin===true?`${B}12`:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F,color:parentJoin===true?B:TEXT,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+              <span style={{fontSize:28}}>🙋</span>
+              <span>一緒に参加！</span>
+            </button>
+          </div>
+          {parentJoin===true&&(
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"16px",marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>絵文字を選ぼう</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:14}}>
+                {PARENT_EMOJIS.map(e=>(
+                  <button key={e} onClick={()=>setParentEmoji(e)} style={{width:42,height:42,borderRadius:11,border:`2.5px solid ${parentEmoji===e?B:BORDER}`,background:parentEmoji===e?`${B}18`:"#fff",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+              <input value={parentName} onChange={e=>setParentName(e.target.value)}
+                placeholder="名前（例：お父さん、ゆうた）"
+                style={{...INP,fontSize:15}}/>
+            </div>
+          )}
+          {parentJoin===true&&(
+            <button onClick={()=>{setTmplCat(0);setStep(4);}} style={btnStyle(!!parentName.trim())} disabled={!parentName.trim()}>
+              つぎへ →
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Step 4: タスクテンプレートを選ぶ */}
+      {step===4&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column"}}>
+          <div style={{fontSize:48,marginBottom:14}}>📋</div>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 4px"}}>タスクを選ぼう</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 6px",lineHeight:1.6}}>
+            ポイントを割り振りたい項目をチェック<br/>（あとで自由に編集できます）
+          </p>
+          <div style={{fontSize:11,color:MUTED,marginBottom:10}}>pt＝ポイント（お手伝いで貯まる単位）</div>
+          <div style={{display:"flex",gap:6,marginBottom:6,overflowX:"auto",paddingBottom:2}}>
+            {tmplGroups.map((g,i)=>(
+              <button key={i} onClick={()=>setTmplCat(i)} style={{flexShrink:0,padding:"7px 14px",border:`2px solid ${tmplCat===i?GP:BORDER}`,borderRadius:999,background:tmplCat===i?`${GP}12`:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,color:tmplCat===i?GP:MUTED,whiteSpace:"nowrap",transition:"all .15s"}}>
+                {g.cat}
+              </button>
+            ))}
+          </div>
+          {tmplGroups.length > 1 && (
+            <div style={{fontSize:13,color:MUTED,textAlign:"right",marginBottom:6}}>← スワイプで他のカテゴリを見る</div>
+          )}
+          <div style={{flex:1,overflowY:"auto",maxHeight:320,marginBottom:10}}>
+            {(tmplGroups[tmplCat]?.tasks||[]).map(t=>{
+              const sel=selTasks.some(s=>s.id===t.id);
+              const col=t.parentOnly?B:GP;
               return(
-                <button key={t.id} onClick={()=>setSelectedTasks(p=>sel?p.filter(x=>x!==t.id):[...p,t.id])}
-                  style={{width:"100%",marginBottom:8,background:sel?`${GP}12`:"#fff",border:`2px solid ${sel?GP:BORDER}`,borderRadius:13,padding:"10px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .15s"}}>
+                <button key={t.id} onClick={()=>toggleTask(t)}
+                  style={{width:"100%",marginBottom:8,background:sel?`${col}12`:"#fff",border:`2px solid ${sel?col:BORDER}`,borderRadius:13,padding:"11px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .15s"}}>
                   <span style={{fontSize:22,flexShrink:0}}>{t.emoji}</span>
-                  <span style={{flex:1,fontWeight:700,fontSize:13,color:TEXT}}>{t.label}</span>
-                  <span style={{fontSize:12,color:GP,fontWeight:800,flexShrink:0}}>+{t.pts}pt</span>
-                  {sel&&<span style={{color:GP,fontSize:16,fontWeight:900,flexShrink:0}}>✓</span>}
+                  <span style={{flex:1,fontWeight:700,fontSize:13,color:sel?col:TEXT}}>{t.label}</span>
+                  <span style={{fontSize:12,color:col,fontWeight:800,flexShrink:0}}>+{t.pts}pt</span>
+                  {sel&&<span style={{color:col,fontSize:16,fontWeight:900,flexShrink:0}}>✓</span>}
                 </button>
               );
             })}
           </div>
-          <button onClick={()=>setStep(4)} style={btnStyle(true)}>
-            {selectedTasks.length===0?"スキップ →":`${selectedTasks.length}個選択 → つぎへ`}
+          <div style={{fontSize:12,color:MUTED,textAlign:"center",marginBottom:10}}>
+            {selTasks.length > 0 ? `${selTasks.length}個を選択中` : "スキップするとあとで追加できます"}
+          </div>
+          <button onClick={()=>setStep(5)} style={btnStyle(true)}>
+            {selTasks.length===0?"スキップ →":`${selTasks.length}個で決定 → つぎへ`}
           </button>
         </div>
       )}
 
-      {/* Step 4: 最初の目標 */}
-      {step===4&&(
+      {/* Step 5: 最初の目標 */}
+      {step===5&&(
         <div style={{flex:1}}>
           <div style={{fontSize:48,marginBottom:14}}>🎯</div>
           <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>はじめての目標を決めよう</h2>
@@ -5774,25 +5966,46 @@ function SetupWizard({ data, update, onComplete }) {
               placeholder="目標pt（例：500）" style={{...INP,flex:1,fontSize:15}}/>
             <span style={{fontSize:13,color:MUTED,fontWeight:700,flexShrink:0}}>pt</span>
           </div>
-          <button onClick={()=>{setGoalSkipped(false);setStep(5);}} style={{...btnStyle(true),marginBottom:10,background:GP,boxShadow:`0 6px 20px ${GP}40`}}>
+          <button onClick={()=>{setGoalSkipped(false);setStep(6);}} style={{...btnStyle(true),marginBottom:10,background:GP,boxShadow:`0 6px 20px ${GP}40`}}>
             次へ → PIN設定
           </button>
-          <button onClick={()=>{setGoalSkipped(true);setStep(5);}} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"6px"}}>
+          <button onClick={()=>{setGoalSkipped(true);setStep(6);}} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"6px"}}>
             スキップしてPIN設定へ
           </button>
         </div>
       )}
 
-      {/* Step 5: おや用PIN設定 */}
-      {step===5&&(
+      {/* Step 6: おや用PIN設定 */}
+      {step===6&&(
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:16}}>🔐</div>
           <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 8px"}}>おや用PINを設定しよう</h2>
           <p style={{color:MUTED,fontSize:13,margin:"0 0 28px",lineHeight:1.7}}>子どもに見られないよう<br/>4けたの番号を決めよう</p>
+          {!notifDone&&"Notification" in window&&Notification.permission==="default"&&(
+            <div style={{width:"100%",background:GS,border:`1.5px solid ${G}`,borderRadius:16,padding:"14px 16px",marginBottom:20,textAlign:"left",boxSizing:"border-box"}}>
+              <div style={{fontWeight:800,fontSize:13,color:GP,marginBottom:6}}>🔔 毎日のリマインドを受け取る</div>
+              <div style={{color:TEXTS,fontSize:12,lineHeight:1.7,marginBottom:10}}>
+                「今日のお手伝いを忘れずに」などの通知を受け取れます
+              </div>
+              <button onClick={async()=>{
+                await Notification.requestPermission();
+                setNotifDone(true);
+              }} style={{background:GP,border:"none",borderRadius:10,padding:"9px 20px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>
+                通知を許可する
+              </button>
+              <button onClick={()=>setNotifDone(true)} style={{background:"none",border:"none",color:MUTED,fontSize:11,cursor:"pointer",fontFamily:F,marginLeft:12}}>スキップ</button>
+            </div>
+          )}
           <PinInput onDone={pin=>handleComplete(goalSkipped,pin)}/>
           <button onClick={()=>handleComplete(goalSkipped,"0000")} style={{width:"100%",background:"transparent",border:"none",color:MUTED,fontSize:12,cursor:"pointer",fontFamily:F,fontWeight:700,padding:"20px 0 0"}}>
             スキップして後で設定する
           </button>
+          <div style={{marginTop:24,background:GS,border:`1.5px solid ${G}`,borderRadius:16,padding:"14px 16px",textAlign:"left",width:"100%",boxSizing:"border-box"}}>
+            <div style={{fontWeight:800,fontSize:13,color:GP,marginBottom:6}}>📱 ホーム画面に追加すると便利！</div>
+            <div style={{color:TEXTS,fontSize:12,lineHeight:1.7}}>
+              ブラウザの「共有」→「ホーム画面に追加」でアプリのようにすぐ開けます
+            </div>
+          </div>
         </div>
       )}
     </div>
