@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="32cb40f">
+<meta name="tane-version" content="c58ccc1">
 </head>
 <body>
   <div id="root"></div>
@@ -976,7 +976,8 @@ const INIT = {
       target: 3000,
       reward: "週末に家族でアイスを選ぶ"
     },
-    requireApproval: false
+    requireApproval: false,
+    approvalNotification: false
   },
   pendingApprovals: []
 };
@@ -1001,6 +1002,8 @@ function migrate(d) {
     ...INIT.familySettings
   };
   if (d.familySettings.requireApproval === undefined) d.familySettings.requireApproval = false;
+  if (d.familySettings.approvalNotification === undefined) d.familySettings.approvalNotification = false;
+  if (!d.monsterEvolved) d.monsterEvolved = {};
   if (!d.onboardingChecks) d.onboardingChecks = {};
   if (!d.gachaCollection) d.gachaCollection = {};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
@@ -2115,7 +2118,7 @@ function DailyTasks({
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
-  const monStage = totalDoneMon < 10 ? 0 : totalDoneMon < 50 ? 1 : totalDoneMon < 150 ? 2 : totalDoneMon < 400 ? 3 : 4;
+  const monStage = (data.monsterEvolved || {})[child.id] || 0;
   const showFlash = (pts, emoji) => {
     setFlash({
       pts,
@@ -3791,7 +3794,7 @@ function SettingsModal({
         border: `1.5px solid ${BORDER}`,
         borderRadius: 14,
         padding: "14px 16px",
-        marginBottom: 16,
+        marginBottom: 12,
         display: "flex",
         alignItems: "center",
         gap: 12
@@ -3835,6 +3838,82 @@ function SettingsModal({
         position: "absolute",
         top: 3,
         left: fs.requireApproval ? 24 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s"
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, "\u627F\u8A8D\u901A\u77E5"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: MUTED,
+        fontSize: 11,
+        marginTop: 2
+      }
+    }, "\u7533\u8ACB\u304C\u5C4A\u3044\u305F\u3089\u30D6\u30E9\u30A6\u30B6\u901A\u77E5\u3067\u304A\u77E5\u3089\u305B"), "Notification" in window && Notification.permission === "denied" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: R,
+        fontSize: 10,
+        marginTop: 4
+      }
+    }, "\u901A\u77E5\u304C\u30D6\u30ED\u30C3\u30AF\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u30D6\u30E9\u30A6\u30B6\u8A2D\u5B9A\u304B\u3089\u8A31\u53EF\u3057\u3066\u304F\u3060\u3055\u3044")), /*#__PURE__*/React.createElement("button", {
+      onClick: async () => {
+        if (!fs.approvalNotification) {
+          if (!("Notification" in window)) return;
+          const perm = await Notification.requestPermission();
+          if (perm === "granted") update(d => ({
+            ...d,
+            familySettings: {
+              ...(d.familySettings || {}),
+              approvalNotification: true
+            }
+          }));
+        } else {
+          update(d => ({
+            ...d,
+            familySettings: {
+              ...(d.familySettings || {}),
+              approvalNotification: false
+            }
+          }));
+        }
+      },
+      style: {
+        position: "relative",
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        background: fs.approvalNotification ? G : BORDER,
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: fs.approvalNotification ? 24 : 3,
         width: 20,
         height: 20,
         borderRadius: "50%",
@@ -4210,6 +4289,12 @@ function ChildScreen({
         ...d,
         pendingApprovals: [...(d.pendingApprovals || []), entry]
       }));
+      if (fs.approvalNotification && "Notification" in window && Notification.permission === "granted") {
+        new Notification("承認リクエスト 📬", {
+          body: `${child.name}が「${task.label}」を完了しました（+${pts}pt）`,
+          icon: "/assets/tab_daily.png"
+        });
+      }
     } else {
       showFlash(pts, task.emoji);
       addLog({
@@ -4556,13 +4641,11 @@ function ChildScreen({
       update: update
     })), (() => {
       const tDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
-      const stage = tDone < 10 ? 0 : tDone < 50 ? 1 : tDone < 150 ? 2 : tDone < 400 ? 3 : 4;
-      if (stage >= 4) return null;
-      const THRESH = [10, 50, 150, 400];
-      const prev = stage === 0 ? 0 : THRESH[stage - 1];
-      const next = THRESH[stage];
-      const pct = Math.min(1, (tDone - prev) / (next - prev));
-      const remaining = next - tDone;
+      const EVO = 20;
+      const evolved = !!(data.monsterEvolved || {})[child.id];
+      if (evolved) return null;
+      const pct = Math.min(1, tDone / EVO);
+      const remaining = Math.max(0, EVO - tDone);
       return /*#__PURE__*/React.createElement("div", {
         style: {
           margin: "0 20px 6px",
@@ -4578,15 +4661,15 @@ function ChildScreen({
       }, /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
-          color: "#c4b5fd",
+          color: "#fde68a",
           fontWeight: 700
         }
-      }, "\u2728 \u3042\u3068", remaining, "\u56DE\u3067\u3057\u3093\u304B\uFF01"), /*#__PURE__*/React.createElement("span", {
+      }, "\uD83C\uDF1F \u3042\u3068", remaining, "\u56DE\u3067\u3057\u3093\u304B\u3067\u304D\u308B\u3088\uFF01"), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 10,
           color: "rgba(255,255,255,0.45)"
         }
-      }, tDone, "/", next)), /*#__PURE__*/React.createElement("div", {
+      }, tDone, "/", EVO)), /*#__PURE__*/React.createElement("div", {
         style: {
           height: 6,
           background: "rgba(255,255,255,0.15)",
@@ -4597,10 +4680,10 @@ function ChildScreen({
         style: {
           height: "100%",
           width: `${pct * 100}%`,
-          background: "linear-gradient(90deg,#4ade80,#86efac)",
+          background: "linear-gradient(90deg,#fde68a,#f59e0b)",
           borderRadius: 999,
           transition: "width .6s ease",
-          boxShadow: "0 0 8px #4ade8070"
+          boxShadow: "0 0 8px rgba(251,191,36,0.6)"
         }
       })));
     })(), /*#__PURE__*/React.createElement("div", {
@@ -4848,9 +4931,16 @@ function ChildScreen({
       }
     }, (data.pendingApprovals || []).length))), /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "20px 20px 0",
+        padding: "20px 20px 18px",
         position: "relative",
-        zIndex: 2
+        zIndex: 2,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4886,8 +4976,7 @@ function ChildScreen({
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        marginBottom: 18
+        gap: 10
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
@@ -4914,7 +5003,12 @@ function ChildScreen({
         cursor: "pointer",
         fontFamily: F
       }
-    }, "\uD83D\uDCB8 \u304A\u304F\u308B"))), /*#__PURE__*/React.createElement("div", {
+    }, "\uD83D\uDCB8 \u304A\u304F\u308B"))), /*#__PURE__*/React.createElement(SeedMonster, {
+      child: child,
+      data: data,
+      size: 100,
+      update: update
+    })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -12501,22 +12595,57 @@ function SeedMonster({
   const [speech, setSpeech] = useState(null);
   const [editNick, setEditNick] = useState(false);
   const [nickInput, setNickInput] = useState("");
+  const [evolving, setEvolving] = useState(false);
   const myBal = bal(data.logs, child.id);
   const curStreak = data.streak?.[child.id]?.cur || 0;
+  const maxStreak = (data.streak || {})[child.id]?.max || 0;
   const thisMonth = new Date().toISOString().slice(0, 7);
   const monthPts = (data.logs || []).filter(l => l.cid === child.id && (l.date || "").startsWith(thisMonth) && l.pts > 0).reduce((s, l) => s + l.pts, 0);
   const goalsDone = (data.goals || []).filter(g => g.cid === child.id && g.done).length;
   const todayDone = data.gachaDate?.[child.id] === todayKey();
-  const hour = new Date().getHours();
-  const isSleeping = hour >= 22 || hour < 7;
+  const myLogs = (data.logs || []).filter(l => l.cid === child.id);
+  const totalTasksDone = myLogs.filter(l => l.type === "good" || l.type === "daily").length;
+  const goodCount = myLogs.filter(l => l.type === "good").length;
+  const badgeCount = myLogs.filter(l => l.type === "badge").length;
+  const lifetimePts = myLogs.filter(l => l.pts > 0).reduce((s, l) => s + l.pts, 0);
 
-  // タスク累計回数でステージ決定（お手伝い＋デイリータスク）
-  const totalTasksDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
-  const stage = totalTasksDone < 10 ? 0 : totalTasksDone < 50 ? 1 : totalTasksDone < 150 ? 2 : totalTasksDone < 400 ? 3 : 4;
-  const NAMES = ["タネっち", "メっち", "ハっち", "サカっち", "キングタネ"];
+  // 進化システム：1回だけ、20タスク到達で解放
+  const EVO_THRESHOLD = 20;
+  const evolved = !!(data.monsterEvolved || {})[child.id];
+  const evolvedStage = (data.monsterEvolved || {})[child.id] || 1;
+  const canEvolve = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
+  const displayStage = evolved ? evolvedStage : 0;
+
+  // 進化先を最強指標で自動決定
+  const computeEvolvedStage = () => {
+    const scores = [{
+      stage: 1,
+      v: totalTasksDone
+    },
+    // がんばり屋
+    {
+      stage: 2,
+      v: maxStreak * 3
+    },
+    // 継続マスター
+    {
+      stage: 3,
+      v: badgeCount * 20 + goalsDone * 10
+    },
+    // コレクター
+    {
+      stage: 4,
+      v: Math.floor(lifetimePts / 20)
+    } // 大富豪
+    ];
+    return scores.sort((a, b) => b.v - a.v)[0].stage;
+  };
+  const NAMES = ["タネっち", "もりもりタネっち", "ほのおタネっち", "ほしタネっち", "キングタネ"];
+  const TYPE_LABEL = ["", "がんばり屋", "継続マスター", "ほしコレクター", "大富豪タネ"];
   const happyScore = Math.min(10, (curStreak >= 7 ? 3 : curStreak >= 3 ? 2 : curStreak >= 1 ? 1 : 0) + (monthPts >= 500 ? 3 : monthPts >= 200 ? 2 : monthPts >= 50 ? 1 : 0) + (goalsDone >= 2 ? 2 : goalsDone >= 1 ? 1 : 0) + (todayDone ? 1 : 0) + (myBal >= 1000 ? 1 : 0));
-  const tapMsgs = happyScore >= 7 ? ["わーい！✨", "うれしい〜！", "ありがとう！", "えへへ〜！"] : happyScore >= 4 ? ["いっしょにがんばろ！", "きょうもよろしく！", "タスクやってみよ！"] : ["さびしいな…", "がんばって！", "タッチしてくれた！"];
+  const tapMsgs = evolving ? ["しんかちゅう…！"] : happyScore >= 7 ? ["わーい！✨", "うれしい〜！", "ありがとう！", "えへへ〜！"] : happyScore >= 4 ? ["いっしょにがんばろ！", "きょうもよろしく！", "タスクやってみよ！"] : ["さびしいな…", "がんばって！", "タッチしてくれた！"];
   const handleTap = () => {
+    if (evolving) return;
     const id = Date.now();
     setSparkles(s => [...s, {
       id,
@@ -12527,17 +12656,28 @@ function SeedMonster({
     setSpeech(tapMsgs[Math.floor(Math.random() * tapMsgs.length)]);
     setTimeout(() => setSpeech(null), 1800);
   };
-
-  // 進化バー（タスク回数ベース）
-  const nextTask = stage === 0 ? 10 : stage === 1 ? 50 : stage === 2 ? 150 : stage === 3 ? 400 : null;
-  const prevTask = stage === 0 ? 0 : stage === 1 ? 10 : stage === 2 ? 50 : stage === 3 ? 150 : 400;
-  const evoPct = nextTask ? Math.min(100, Math.round((totalTasksDone - prevTask) / (nextTask - prevTask) * 100)) : 100;
-
-  // 獲得バッジによるアクセサリーステッカー（最大3個）
-  const logs4badge = (data.logs || []).filter(l => l.cid === child.id);
-  const goodCount = logs4badge.filter(l => l.type === "good").length;
-  const maxStreak4 = (data.streak || {})[child.id]?.max || 0;
-  const tipsRead4 = logs4badge.filter(l => l.type === "tips").length;
+  const doEvolve = () => {
+    if (!canEvolve || evolving) return;
+    setEvolving(true);
+    setSpeech(null);
+    const newStage = computeEvolvedStage();
+    // 1.6秒後にデータ更新（画像が切り替わる）
+    setTimeout(() => {
+      update(d => ({
+        ...d,
+        monsterEvolved: {
+          ...(d.monsterEvolved || {}),
+          [child.id]: newStage
+        }
+      }));
+    }, 1600);
+    // 2.4秒後にアニメ終了＋祝福メッセージ
+    setTimeout(() => {
+      setEvolving(false);
+      setSpeech("しんかしたよ！🌟");
+      setTimeout(() => setSpeech(null), 2500);
+    }, 2400);
+  };
   const accessories = [goodCount >= 100 ? {
     emoji: "🏆",
     bg: GOLDS,
@@ -12545,14 +12685,14 @@ function SeedMonster({
       top: -6,
       right: -6
     }
-  } : null, maxStreak4 >= 7 ? {
+  } : null, maxStreak >= 7 ? {
     emoji: "⚡",
     bg: BS,
     pos: {
       top: -6,
       left: -6
     }
-  } : null, tipsRead4 >= 10 ? {
+  } : null, badgeCount >= 5 ? {
     emoji: "📚",
     bg: PS,
     pos: {
@@ -12567,6 +12707,8 @@ function SeedMonster({
       right: -6
     }
   } : null].filter(Boolean).slice(0, 3);
+  const evoPct = evolved ? 100 : Math.min(100, Math.round(totalTasksDone / EVO_THRESHOLD * 100));
+  const nickname = (data.monsterNickname || {})[child.id];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
@@ -12585,7 +12727,25 @@ function SeedMonster({
       zIndex: 50,
       animation: "smSparkle 0.8s ease-out forwards"
     }
-  }, "\u2728")), speech && /*#__PURE__*/React.createElement("div", {
+  }, "\u2728")), evolving && [0, 45, 90, 135, 180, 225, 270, 315].map((deg, i) => /*#__PURE__*/React.createElement("div", {
+    key: deg,
+    style: {
+      position: "absolute",
+      top: "40%",
+      left: "50%",
+      width: 0,
+      height: 0,
+      pointerEvents: "none",
+      zIndex: 50
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      fontSize: i % 2 === 0 ? 16 : 12,
+      animation: `smSparkle ${0.5 + i * 0.06}s ease-out infinite`,
+      transform: `rotate(${deg}deg) translateY(${-40 - i * 4}px)`
+    }
+  }, ["⭐", "✨", "🌟"][i % 3]))), speech && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       bottom: "100%",
@@ -12619,20 +12779,22 @@ function SeedMonster({
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      animation: "monFloat 2.5s ease-in-out infinite"
+      animation: evolving ? "none" : "monFloat 2.5s ease-in-out infinite"
     },
     onClick: handleTap
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      animation: "monBreathe 3.5s ease-in-out infinite",
+      animation: evolving ? "evoFlash 0.35s ease-in-out infinite" : "monBreathe 3.5s ease-in-out infinite",
       cursor: "pointer",
       display: "inline-block",
       userSelect: "none",
-      position: "relative"
+      position: "relative",
+      filter: evolving ? "brightness(2.5) saturate(0.2)" : "none",
+      transition: "filter 0.4s"
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: `/assets/monster_${stage}.png`,
-    alt: NAMES[stage],
+    src: `/assets/monster_${displayStage}.png`,
+    alt: NAMES[displayStage],
     style: {
       width: size,
       height: size,
@@ -12722,9 +12884,15 @@ function SeedMonster({
       color: "rgba(255,255,255,0.9)",
       fontWeight: 800
     }
-  }, (data.monsterNickname || {})[child.id] || NAMES[stage], stage === 4 && " 👑"), /*#__PURE__*/React.createElement("button", {
+  }, nickname || NAMES[displayStage], evolved && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      color: "rgba(255,220,100,0.8)",
+      marginLeft: 3
+    }
+  }, TYPE_LABEL[evolvedStage])), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      setNickInput((data.monsterNickname || {})[child.id] || NAMES[stage]);
+      setNickInput(nickname || NAMES[displayStage]);
       setEditNick(true);
     },
     style: {
@@ -12744,36 +12912,63 @@ function SeedMonster({
       marginTop: 2,
       letterSpacing: 0.3
     }
-  }, NAMES[stage], stage === 4 && " 👑"), nextTask && /*#__PURE__*/React.createElement("div", {
+  }, nickname || NAMES[displayStage]), !evolved && /*#__PURE__*/React.createElement("div", {
     style: {
       width: 90,
       height: 3,
       background: "rgba(255,255,255,0.18)",
       borderRadius: 999,
-      margin: "3px auto 0",
+      margin: "4px auto 0",
       overflow: "hidden"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       height: "100%",
       width: `${evoPct}%`,
-      background: "rgba(255,255,255,0.72)",
+      background: canEvolve ? "linear-gradient(90deg,#fde68a,#f59e0b)" : "rgba(255,255,255,0.72)",
       borderRadius: 999,
       transition: "width 0.6s ease"
     }
-  })), !nextTask && /*#__PURE__*/React.createElement("div", {
+  })), evolved && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 9,
       color: "rgba(255,220,0,0.9)",
       fontWeight: 700,
-      marginTop: 2
+      marginTop: 3
     }
-  }, "MAX\u2728"), /*#__PURE__*/React.createElement("style", null, `
+  }, "\u2728 \u3057\u3093\u304B\u6E08\u307F"), canEvolve && !evolving && /*#__PURE__*/React.createElement("button", {
+    onClick: doEvolve,
+    style: {
+      display: "block",
+      margin: "8px auto 0",
+      background: "linear-gradient(135deg,#fde68a,#f59e0b)",
+      border: "none",
+      borderRadius: 999,
+      padding: "6px 16px",
+      color: "#7c2d12",
+      fontWeight: 900,
+      fontSize: 11,
+      cursor: "pointer",
+      fontFamily: F,
+      animation: "evoPulse 1.2s ease-in-out infinite",
+      boxShadow: "0 0 14px rgba(251,191,36,0.8)"
+    }
+  }, "\uD83C\uDF1F \u3057\u3093\u304B\u3067\u304D\u308B\u3088\uFF01"), evolving && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 8,
+      fontSize: 11,
+      fontWeight: 800,
+      color: "#fde68a",
+      animation: "evoFlash 0.35s ease-in-out infinite"
+    }
+  }, "\u3057\u3093\u304B\u3061\u3085\u3046\u2026\u2728"), /*#__PURE__*/React.createElement("style", null, `
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
         @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
         @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
+        @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
+        @keyframes evoFlash{0%,100%{opacity:1}50%{opacity:0.3}}
       `));
 }
 
