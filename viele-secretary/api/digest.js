@@ -3,6 +3,8 @@
 // GEMINI_API_KEY が設定されていれば、見出しから「今日の3行ブリーフィング」も生成。
 // キーが無ければ要約なしで見出しだけ返す（＝無料で動く）。
 
+import { geminiText } from "./_gemini.js";
+
 const DEFAULT_FEEDS = [
   "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
   "https://news.google.com/rss/search?q=SNS%20マーケティング%20集客&hl=ja&gl=JP&ceid=JP:ja",
@@ -39,18 +41,11 @@ function parseFeed(xml, sourceName) {
 }
 
 async function geminiBriefing(apiKey, items) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   const titles = items.slice(0, 20).map((it, i) => `${i + 1}. ${it.title}`).join("\n");
   const prompt =
     `あなたは一人社長の優秀な秘書です。次のニュース見出しから、今日おさえるべき要点を日本語で3つ、各1文で簡潔にまとめてください。` +
     `箇条書き（・）のみ、前置き・結びは不要。\n\n${titles}`;
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
-  );
-  if (!r.ok) throw new Error("gemini " + r.status);
-  const j = await r.json();
-  return (j?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+  return await geminiText(apiKey, prompt);
 }
 
 export default async function handler(req, res) {
