@@ -760,6 +760,7 @@ const NEWS_CATEGORIES = [
   { key: "beauty", label: "健康・美容", url: "https://news.google.com/rss/search?q=健康%20美容%20セルフケア&hl=ja&gl=JP&ceid=JP:ja" },
   { key: "tech", label: "テクノロジー", url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ja&gl=JP&ceid=JP:ja" },
   { key: "ent", label: "エンタメ", url: "https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "game", label: "ゲーム", url: "https://news.google.com/rss/search?q=ゲーム%20OR%20eSports%20OR%20任天堂%20OR%20PS5&hl=ja&gl=JP&ceid=JP:ja" },
   { key: "sports", label: "スポーツ", url: "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=ja&gl=JP&ceid=JP:ja" },
   { key: "science", label: "科学", url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=ja&gl=JP&ceid=JP:ja" },
   { key: "world", label: "国際", url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja" },
