@@ -4,7 +4,6 @@
 // 出典: 大久保占い研究室 (senjutsu.jp) — データのライセンスに従い明記。
 
 import { geminiText } from "./_gemini.js";
-import { computeChart } from "./_natal.js";
 
 export default async function handler(req, res) {
   try {
@@ -12,17 +11,12 @@ export default async function handler(req, res) {
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};
     const today = body.today || new Date().toISOString().slice(0, 10);
-
-    // 命式: 生年月日(birth)から自前エンジンで計算。後方互換で chart 文字列も可。
-    let chart = body.chart || "";
-    let natal = null;
-    if (!chart && body.birth) {
-      try { natal = computeChart(body.birth); chart = natal.text; } catch (e) { /* fallthrough */ }
-    }
+    // 命式テキストはクライアント側(自前エンジン)で計算済みのものを受け取る
+    const chart = body.chart || "";
 
     const key = process.env.GEMINI_API_KEY;
-    if (!key) { res.status(200).json({ aiEnabled: false, natal }); return; }
-    if (!chart) { res.status(200).json({ aiEnabled: true, error: "生年月日(命式)が未設定です" }); return; }
+    if (!key) { res.status(200).json({ aiEnabled: false }); return; }
+    if (!chart) { res.status(200).json({ aiEnabled: true, error: "命式が未設定です" }); return; }
 
     const d = new Date(today + "T00:00:00");
     const tomorrowD = new Date(d); tomorrowD.setDate(d.getDate() + 1);
@@ -55,7 +49,6 @@ export default async function handler(req, res) {
     res.status(200).json({
       aiEnabled: true,
       fortune,
-      natal,
       raw: fortune ? undefined : txt,
       source: "命式: 自前計算(astronomy-engine) / 鑑定: AI",
       generatedAt: Date.now(),
