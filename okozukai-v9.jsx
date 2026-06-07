@@ -228,33 +228,33 @@ const MONSTER_TREE = {
   egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b",
           desc:"秘められた力を持つ不思議な卵。何が生まれるか誰も知らない。", edu:"" },
   "1a": { id:"1a",  name:"ほのおっち",      rarity:1, line:"a", stage:1, evolveA:"2a1", evolveB:"2a2",
-          desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"炎は古来より文明の象徴。火を扱った人類最古の証拠は140万年前とされる。" },
+          desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"人類が火を使い始めたのは約140万年前ともいわれる。火のおかげで食べ物を加熱でき、夜も明るく安全に過ごせるようになった。火を手に入れたことは人類最大の発明の一つ。" },
   "1b": { id:"1b",  name:"もりっち",        rarity:1, line:"b", stage:1, evolveA:"2b1", evolveB:"2b2",
-          desc:"森の精霊の赤ちゃん。木の葉のベッドで眠るのが大好き。", edu:"日本の森林率は約68%。世界でも有数の森林大国だ。" },
+          desc:"森の精霊の赤ちゃん。木の葉のベッドで眠るのが大好き。", edu:"日本は国土の約3分の2（約68%）が森林で、世界でも有数の森林大国。木は光合成で二酸化炭素を吸い、酸素を作って地球の空気をきれいにしている。" },
   "2a1":{ id:"2a1", name:"ヒリュウ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"炎をまとった小さな竜。東洋の伝説に登場する火を司る存在。", edu:"ドラゴンの伝説は世界中に存在し、東洋では竜は水と天を司る神とされた。中国では皇帝の象徴。" },
+          desc:"炎をまとった東洋の小さな竜。空を飛び、天気をあやつるという。", edu:"東洋（中国・日本）の竜は水や天をつかさどる神聖な存在で、皇帝の象徴だった。竜を退治される悪役として描く西洋とは逆に、東洋では幸運をもたらす守り神とされる。" },
   "2a2":{ id:"2a2", name:"カグツチ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"日本神話の火の神。生まれながらにして炎を纏う。", edu:"カグツチ（迦具土神）は『古事記』に登場する火の神。その誕生が母・イザナミの命を奪い、怒った父・イザナギに斬られた。" },
+          desc:"日本神話の火の神。生まれながらにして炎を纏う。", edu:"カグツチは日本最古の歴史書『古事記』（約1300年前・712年成立）に登場する火の神。生まれたとき母イザナミを失わせ、怒った父イザナギに斬られたと伝わる。" },
   "2b1":{ id:"2b1", name:"ユニコーン",      rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"額に黄金の角を持つ白馬。純粋な心の者にしか近づかないという。", edu:"ユニコーンはヨーロッパの中世に広く信じられた幻獣。その角には解毒の力があると信じられていた。" },
+          desc:"額に黄金の角を持つ白馬。純粋な心の者にしか心を開かない。", edu:"ユニコーンは中世ヨーロッパで広く信じられた幻獣。角には毒を消す力があると信じられ高値で取引されたが、その正体は海の生き物イッカクの長い牙だったといわれる。" },
   "2b2":{ id:"2b2", name:"コダマ",          rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"古い木に宿る日本の精霊。山で聞こえるこだまはこの子のせい。", edu:"木霊（コダマ）は日本の民間信仰で樹木に宿る精霊。木を切ると祟りがあるとして大切にされてきた。" },
+          desc:"古い木に宿る日本の精霊。山びこはこの子の声だという。", edu:"木霊（コダマ）は樹木に宿るとされる日本の精霊。昔の人は大きな木を切ると祟りがあると考え自然を大切にした。自然のあらゆる物に魂が宿るという考え方をアニミズムという。" },
   "3a1":{ id:"3a1", name:"フェニックス",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"炎から蘇る不死の鳥。500年ごとに炎の中で再生するといわれる。", edu:"フェニックス（不死鳥）はエジプト・ギリシャ・中国など世界各地に類似の伝説がある。エジプトでは『ベヌウ』と呼ばれ太陽の化身とされた。" },
+          desc:"炎の中から生まれ変わる不死の鳥。500年ごとに若返るという。", edu:"フェニックス（不死鳥）はエジプト・ギリシャ・中国など世界各地に似た伝説がある。エジプトでは『ベヌウ』と呼ばれ太陽の象徴。今も『よみがえり・再生』の象徴として使われる。" },
   "3a2":{ id:"3a2", name:"カグツチ神将",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"鍛えられた炎の神将。剣を振るたびに炎の渦が生まれる。", edu:"日本の武将文化は世界でも珍しい。刀は武士の魂とされ、名刀には固有の名前が付けられ大切に受け継がれた。" },
+          desc:"鍛えられた炎の神将。剣をふるうたび炎の渦が生まれる。", edu:"日本の武士にとって刀は『武士の魂』とされ、名刀には名前が付けられ親から子へ受け継がれた。刀は玉鋼を熱しては何度も折り返して鍛える、世界でも高度な技術で作られる。" },
   "3b1":{ id:"3b1", name:"スフィンクス",    rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"謎かけを好む砂漠の守護者。問いに答えられぬ者は食べてしまう。", edu:"スフィンクスはエジプトとギリシャの両方に登場する。ギザの大スフィンクスは約4500年前に建造された世界最大の石造彫刻。" },
+          desc:"なぞかけを好む砂漠の守護者。問いに答えられぬ者を通さない。", edu:"スフィンクスはエジプトとギリシャ両方の伝説に登場する。エジプト・ギザの大スフィンクスは約4500年前に造られた世界最大級の石像で、全長は約73mもある。" },
   "3b2":{ id:"3b2", name:"アヌビス",        rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"ジャッカルの頭を持つ死者の神。魂の重さを羽根と量って判断する。", edu:"アヌビスは古代エジプトの死者の神。死者の心臓と正義の羽根を天秤で量り、来世への行方を決めると信じられた。" },
+          desc:"ジャッカルの頭を持つ死者の神。魂の重さを羽根とはかる。", edu:"古代エジプトでは死後、心臓を『正義の羽根』と天秤ではかり、軽ければ天国へ行けると信じた。だから人々は正しく生きようとした。ミイラ作りもアヌビスが守るとされた。" },
   "4a1":{ id:"4a1", name:"レッドドラゴン",  rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"西洋神話最強の竜。一息で城を焼き尽くす業火を吐く。", edu:"西洋のドラゴンは中世ヨーロッパの騎士物語に多く登場。聖ゲオルギウスがドラゴンを退治する伝説は英国の守護聖人として今も語り継がれる。" },
+          desc:"西洋神話で最強とされる竜。ひと息で城を焼きつくす。", edu:"西洋の竜は中世ヨーロッパの騎士物語の強敵。竜を倒した聖ゲオルギウスはイギリスの守護聖人として有名で、赤い竜はウェールズの国旗にも描かれている。" },
   "4a2":{ id:"4a2", name:"スサノオ",        rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"嵐と海の神。八岐大蛇を倒した英雄にして荒ぶる神。", edu:"スサノオノミコト（素戔嗚尊）は日本神話の英雄神。ヤマタノオロチを倒した際、その尾から草薙の剣（天叢雲剣）を発見したと伝わる。" },
+          desc:"嵐と海をつかさどる英雄神。八岐大蛇を倒した荒ぶる神。", edu:"スサノオは日本神話の英雄。八つの頭を持つ大蛇ヤマタノオロチを退治し、その尾から名剣『草薙剣』を見つけた。これは今も伝わる三種の神器の一つとされる。" },
   "4b1":{ id:"4b1", name:"ガネーシャ",      rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"象の頭を持つ知恵と繁栄の神。学問・商売・芸術の守護神。", edu:"ガネーシャはヒンドゥー教で最も人気の高い神の一つ。学問と知恵の神として日本でも「歓喜天」として信仰される。" },
+          desc:"象の頭を持つ知恵と商売の神。学問や芸術を見守る。", edu:"ガネーシャはヒンドゥー教で最も人気のある神の一つで、学問・商売・幸運の神。日本では『歓喜天』として信仰される。インドでは新しいことを始める前に祈られる。" },
   "4b2":{ id:"4b2", name:"ガルーダ",        rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"神々の乗り物となる黄金の翼を持つ神鳥。蛇の天敵にして天空の王者。", edu:"ガルーダはヒンドゥー・仏教の聖鳥でインドネシアの国章にも使われる。タイやカンボジアなど東南アジア各国でも重要な存在。" },
+          desc:"黄金の翼を持つ神鳥。神々を乗せ空をかける天空の王者。", edu:"ガルーダはヒンドゥー教・仏教の聖なる鳥で、ヘビの天敵。インドネシアの国の紋章になっており、同国を代表する航空会社の名前にもなっている。" },
 };
 
 // ═══════════════════════════════════════════════════════
@@ -1881,7 +1881,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
         {(()=>{
           const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-          const STAGE_GATES=[3,7,12,18];
+          const STAGE_GATES=[2,6,14,28];
           const rawId=(data.monsterEvolved||{})[child.id];
           const curId=(rawId&&MONSTER_TREE[rawId])?rawId:"egg";
           const def=MONSTER_TREE[curId];
@@ -4495,9 +4495,9 @@ function SeedMonster({ child, data, size=90, update }) {
   const badgeCount     = myLogs.filter(l=>l.type==="badge").length;
   const lifetimePts    = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
 
-  // 進化ツリー（ステージごとに必要な累計タスク数。子どもが1〜3日でクリアできる設定）
-  // index = 現在のステージ(0=タマゴ)。値 = そのステージから進化するのに必要な累計タスク数
-  const STAGE_GATES    = [3, 7, 12, 18];
+  // 進化ツリー（ステージごとに必要な累計タスク数。約1週間で最終形に到達する設定）
+  // 前半はやさしく(2→6)、後半はむずかしく(14→28)。index=現在のステージ(0=タマゴ)
+  const STAGE_GATES    = [2, 6, 14, 28];
   const rawStageId     = (data.monsterEvolved||{})[child.id] || null;
   // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
   const currentStageId = (rawStageId && MONSTER_TREE[rawStageId]) ? rawStageId : null;
@@ -4543,9 +4543,13 @@ function SeedMonster({ child, data, size=90, update }) {
   // 転生可能判定
   const evolvedAt     = (data.monsterEvolvedAt||{})[child.id] || null;
   const reincCount    = (data.reincarnationCount||{})[child.id] || 0;
-  const canReincarnate = isFinal && evolved && !evolving && evolvedAt
-    ? (new Date() - new Date(evolvedAt)) >= 3 * 24 * 60 * 60 * 1000
-    : false;
+  // 転生は最終進化後、3日経過＋さらにタスクを頑張ってから（少し努力させる）
+  const REINC_EXTRA    = 15;
+  const reincGoal      = STAGE_GATES[STAGE_GATES.length-1] + REINC_EXTRA; // 28+15=43
+  const reincDaysOk    = evolvedAt ? (new Date() - new Date(evolvedAt)) >= 3*24*60*60*1000 : false;
+  const reincTasksOk   = totalTasksDone >= reincGoal;
+  const canReincarnate = isFinal && evolved && !evolving && reincDaysOk && reincTasksOk;
+  const reincTaskRemain= isFinal ? Math.max(0, reincGoal - totalTasksDone) : 0;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -4725,6 +4729,12 @@ function SeedMonster({ child, data, size=90, update }) {
         <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
           🔄 転生する
         </button>
+      )}
+      {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
+      {isFinal && !canReincarnate && !evolving && (
+        <div style={{marginTop:6,fontSize:9,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
+          {reincTaskRemain>0 ? `🔄 転生まで あと${reincTaskRemain}回がんばろう` : "🔄 転生まで もう少し…"}
+        </div>
       )}
       {evolving && (
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
