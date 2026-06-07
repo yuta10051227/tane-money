@@ -257,6 +257,7 @@ function makeSeed() {
       { id: "f3", name: "個人事業・フリーランス", url: "https://news.google.com/rss/search?q=個人事業主%20フリーランス&hl=ja&gl=JP&ceid=JP:ja" },
     ],
     digest: null,
+    newsCats: ["top", "business", "marketing", "solo"],
     updatedAt: Date.now(),
   };
 }
@@ -749,15 +750,31 @@ function Upcoming({ events }) {
   );
 }
 
+/* ニュースのカテゴリ（Googleニュース RSS）。選んだものを取得する。 */
+const NEWS_CATEGORIES = [
+  { key: "top", label: "総合", url: "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "business", label: "ビジネス", url: "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "marketing", label: "SNS・集客", url: "https://news.google.com/rss/search?q=SNS%20マーケティング%20集客&hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "solo", label: "個人事業", url: "https://news.google.com/rss/search?q=個人事業主%20フリーランス&hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "money", label: "経済・お金", url: "https://news.google.com/rss/search?q=経済%20確定申告%20税金&hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "beauty", label: "健康・美容", url: "https://news.google.com/rss/search?q=健康%20美容%20セルフケア&hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "tech", label: "テクノロジー", url: "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "ent", label: "エンタメ", url: "https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "sports", label: "スポーツ", url: "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "science", label: "科学", url: "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "world", label: "国際", url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja" },
+  { key: "nation", label: "国内", url: "https://news.google.com/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja" },
+];
+const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
+
 /* 今日のまとめ（ニュースRSS集約＋任意でAI要約） */
-function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed }) {
-  const [showAll, setShowAll] = useState(false);
+function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed, selectedCats, onToggleCat }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const items = (digest && digest.items) || [];
-  const shown = showAll ? items : items.slice(0, 12);
   const briefLines = (digest && digest.briefing ? digest.briefing.split("\n") : []).filter((l) => l.trim());
+  const cats = selectedCats || DEFAULT_NEWS_CATS;
 
   return (
     <Panel
@@ -766,6 +783,21 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
       help="登録した情報源(RSS)の新着をまとめて表示します。サーバーのGeminiキーを設定すると、見出しから『今日の3行ブリーフィング』をAIが自動生成します(未設定でも見出しは出ます)。"
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "取得中…" : "更新"}</button>}
     >
+      {/* カテゴリ選択 */}
+      <div data-hscroll="1" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", marginBottom: 6, paddingBottom: 2 }}>
+        {NEWS_CATEGORIES.map((c) => {
+          const on = cats.includes(c.key);
+          return (
+            <button
+              key={c.key}
+              onClick={() => onToggleCat(c.key)}
+              style={{ flex: "0 0 auto", fontSize: 12, padding: "5px 11px", borderRadius: 999, border: `1px solid ${on ? C.blue : C.line}`, background: on ? C.blue : "transparent", color: on ? "#fff" : C.sub, cursor: "pointer", fontWeight: on ? 700 : 400 }}
+            >{c.label}</button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: C.faint, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
+
       {error && (
         <div style={{ fontSize: 12, color: C.red, background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, wordBreak: "break-word" }}>
           取得に失敗：{String((error && error.message) || error)}
@@ -1272,12 +1304,21 @@ export default function App() {
   }, [notify, data, notifySupported]);
 
   // ── 今日のまとめ（ニュース）取得 ──
+  const newsCats = data ? (data.newsCats || DEFAULT_NEWS_CATS) : DEFAULT_NEWS_CATS;
+  const toggleNewsCat = (key) => {
+    const cur = data.newsCats || DEFAULT_NEWS_CATS;
+    const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+    update({ newsCats: next });
+  };
   const refreshDigest = async () => {
     if (!data) return;
     setDigestLoading(true);
     setDigestError(null);
     try {
-      const fp = (data.feeds || []).map((f) => encodeURIComponent(f.url)).join(",");
+      const catUrls = NEWS_CATEGORIES.filter((c) => newsCats.includes(c.key)).map((c) => c.url);
+      const customUrls = (data.feeds || []).map((f) => f.url);
+      const urls = [...catUrls, ...customUrls];
+      const fp = urls.map((u) => encodeURIComponent(u)).join(",");
       const r = await fetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
       const j = await r.json();
       if (j.error) throw new Error(j.error);
@@ -1564,6 +1605,8 @@ export default function App() {
             feeds={data.feeds}
             onAddFeed={(f) => feedsOps.add(f)}
             onRemoveFeed={(id) => feedsOps.remove(id)}
+            selectedCats={newsCats}
+            onToggleCat={toggleNewsCat}
           />
         )}
 
