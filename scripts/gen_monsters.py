@@ -122,7 +122,12 @@ MONSTERS = {
     "4c2": dict(body=NAVY, light=LNAV,  accent=GOLD, r=10, crest="horns", whisker=True, wings=True, fierce=True), # 龍神
     # サンプル
     "mizuryu": dict(body=BLU, light=LBLU, accent=GOLD, r=8, crest="drop"),
+    # ── 隠しモンスター(マイルストーン解放) ──
+    "niji":   dict(body=(214,64,150,255),  light=(96,206,232,255),  accent=GOLD,                r=10, crest="crown", wings=True, fierce=True),  # ニジドラゴン
+    "kogane": dict(body=(232,184,62,255),  light=(255,232,150,255), accent=(255,255,255,255),   r=10, crest="crown", wings=True, fierce=True),  # コガネオウ
+    "hoshi":  dict(body=(86,86,176,255),   light=(150,150,232,255), accent=GOLD,                r=10, crest="horns", wings=True, whisker=True, fierce=True),  # ホシリュウ
 }
+HIDDEN_IDS = ["niji", "kogane", "hoshi"]
 
 def render(spec, path, bob=0):
     draw_creature(spec, bob).resize((G*SCALE, G*SCALE), Image.NEAREST).save(path)
@@ -257,6 +262,21 @@ def main():
     if "--sidesheet" in sys.argv:
         side_sheet(); return
     os.makedirs("assets", exist_ok=True)
+    if "--hidden" in sys.argv:                     # 隠しモンスター(前向き＋横向き)を生成
+        for mid in HIDDEN_IDS:
+            sp = MONSTERS[mid]
+            render(sp, f"assets/monster_{mid}_f0.png", 0)
+            render(sp, f"assets/monster_{mid}_f1.png", 1)
+            render_side(sp, f"assets/monster_{mid}_side_f0.png", 0)
+            render_side(sp, f"assets/monster_{mid}_side_f1.png", 1)
+            print(f"generated hidden {mid} (front+side)")
+        return
+    if "--hiddensheet" in sys.argv:
+        sh = Image.new("RGBA", (128*len(HIDDEN_IDS), 140), (238,238,238,255))
+        for i,mid in enumerate(HIDDEN_IDS):
+            sp = draw_creature(MONSTERS[mid]).resize((128,128), Image.NEAREST)
+            sh.paste(sp, (i*128, 6), sp)
+        sh.save("/tmp/hidden_sheet.png"); print("hidden sheet -> /tmp/hidden_sheet.png"); return
     if "--side" in sys.argv:                       # 全22体の横向きを生成
         for mid in ALL_IDS:
             sp = build_side_spec(mid)
