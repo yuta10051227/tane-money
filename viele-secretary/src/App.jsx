@@ -966,6 +966,10 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
   const next = (today || [])[0];
+  const sc = Number(t.score) || 0;
+  const mode = sc >= 4 ? { label: "攻めの日", color: C.green, tip: t.action }
+    : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
+      : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
   const Row = ({ icon, label, color, onClick }) => (
     <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
       <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
@@ -976,8 +980,14 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
   return (
     <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
       <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
-      {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 2px" }}>{t.theme}</div>}
-      <Row icon="🔮" label={`運気 ${t.score ? "★".repeat(t.score) : "—"}${t.action ? `／${t.action}` : ""}`} onClick={() => onTab(5)} />
+      {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 4px" }}>{t.theme}</div>}
+      {mode && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#0B0D11", background: mode.color, borderRadius: 999, padding: "2px 10px" }}>今日は{mode.label}</span>
+          {mode.tip && <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.sub, lineHeight: 1.4 }}>{mode.tip}</span>}
+        </div>
+      )}
+      <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab(5)} />
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab(0)} />
       {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab(0)} />}
       {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab(2)} />}
