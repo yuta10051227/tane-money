@@ -1881,16 +1881,22 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
         {(()=>{
           const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-          const EVO=20;
-          const evolved=!!((data.monsterEvolved||{})[child.id]);
-          if(evolved) return null;
-          const pct=Math.min(1,tDone/EVO);
-          const remaining=Math.max(0,EVO-tDone);
+          const STAGE_GATES=[3,7,12,18];
+          const rawId=(data.monsterEvolved||{})[child.id];
+          const curId=(rawId&&MONSTER_TREE[rawId])?rawId:"egg";
+          const def=MONSTER_TREE[curId];
+          if(!def.evolveA) return null;          // 最終形はヒント非表示
+          const st=def.stage||0;
+          const gate=STAGE_GATES[st];
+          const prev=st>0?(STAGE_GATES[st-1]||0):0;
+          const pct=Math.max(0,Math.min(1,(tDone-prev)/Math.max(1,gate-prev)));
+          const remaining=Math.max(0,gate-tDone);
+          const ready=remaining<=0;
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>🌟 あと{remaining}回でしんかできるよ！</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{EVO}</span>
+                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{ready?"🌟 いまならしんかできるよ！":`🌟 あと${remaining}回でしんかできるよ！`}</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{gate}</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
@@ -4489,15 +4495,20 @@ function SeedMonster({ child, data, size=90, update }) {
   const badgeCount     = myLogs.filter(l=>l.type==="badge").length;
   const lifetimePts    = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
 
-  // 進化ツリー
-  const EVO_THRESHOLD  = 20;
+  // 進化ツリー（ステージごとに必要な累計タスク数。子どもが1〜3日でクリアできる設定）
+  // index = 現在のステージ(0=タマゴ)。値 = そのステージから進化するのに必要な累計タスク数
+  const STAGE_GATES    = [3, 7, 12, 18];
   const rawStageId     = (data.monsterEvolved||{})[child.id] || null;
   // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
   const currentStageId = (rawStageId && MONSTER_TREE[rawStageId]) ? rawStageId : null;
   const evolved        = !!currentStageId;
   const monDef         = evolved ? MONSTER_TREE[currentStageId] : MONSTER_TREE["egg"];
-  const canEvolve      = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
   const monsterId      = evolved ? currentStageId : "egg";
+  const curStage       = monDef.stage || 0;
+  const isFinal        = !monDef.evolveA;                          // これ以上進化先がない最終形
+  const nextGate       = isFinal ? null : STAGE_GATES[curStage];    // 次の進化に必要な累計タスク数
+  const prevGate       = curStage > 0 ? (STAGE_GATES[curStage-1] || 0) : 0;
+  const canEvolve      = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
   const imgSrc         = `/assets/monster_${monsterId}_f${frame}.png`;
 
   // 進化先を分岐ルールで決定
@@ -4532,7 +4543,7 @@ function SeedMonster({ child, data, size=90, update }) {
   // 転生可能判定
   const evolvedAt     = (data.monsterEvolvedAt||{})[child.id] || null;
   const reincCount    = (data.reincarnationCount||{})[child.id] || 0;
-  const canReincarnate = evolved && !evolving && evolvedAt
+  const canReincarnate = isFinal && evolved && !evolving && evolvedAt
     ? (new Date() - new Date(evolvedAt)) >= 3 * 24 * 60 * 60 * 1000
     : false;
 
@@ -4615,7 +4626,9 @@ function SeedMonster({ child, data, size=90, update }) {
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
   ].filter(Boolean).slice(0,3);
 
-  const evoPct    = evolved ? 100 : Math.min(100, Math.round(totalTasksDone/EVO_THRESHOLD*100));
+  const evoPct    = isFinal ? 100
+    : Math.max(0, Math.min(100, Math.round((totalTasksDone - prevGate) / Math.max(1, nextGate - prevGate) * 100)));
+  const evoRemaining = isFinal ? 0 : Math.max(0, nextGate - totalTasksDone);
   const nickname  = (data.monsterNickname||{})[child.id];
   const dispName  = nickname || monDef.name;
   const rarityStr = "★".repeat(monDef.rarity||1);
@@ -4688,13 +4701,18 @@ function SeedMonster({ child, data, size=90, update }) {
         </div>
       )}
 
-      {/* 進化バー or 済みバッジ */}
-      {!evolved && (
-        <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
-          <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
-        </div>
+      {/* 進化バー or 最終形バッジ */}
+      {!isFinal && (
+        <>
+          <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
+          </div>
+          {!canEvolve && evoRemaining>0 && (
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>あと{evoRemaining}回でしんか✨</div>
+          )}
+        </>
       )}
-      {evolved && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>✨ しんか済み</div>}
+      {isFinal && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
       {/* 進化ボタン */}
       {canEvolve && !evolving && (
