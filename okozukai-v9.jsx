@@ -222,6 +222,42 @@ function startLogsRealtimeSync(updateFn) {
 
 
 // ═══════════════════════════════════════════════════════
+// MONSTER TREE
+// ═══════════════════════════════════════════════════════
+const MONSTER_TREE = {
+  egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b",
+          desc:"秘められた力を持つ不思議な卵。何が生まれるか誰も知らない。", edu:"" },
+  "1a": { id:"1a",  name:"ほのおっち",      rarity:1, line:"a", stage:1, evolveA:"2a1", evolveB:"2a2",
+          desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"炎は古来より文明の象徴。火を扱った人類最古の証拠は140万年前とされる。" },
+  "1b": { id:"1b",  name:"もりっち",        rarity:1, line:"b", stage:1, evolveA:"2b1", evolveB:"2b2",
+          desc:"森の精霊の赤ちゃん。木の葉のベッドで眠るのが大好き。", edu:"日本の森林率は約68%。世界でも有数の森林大国だ。" },
+  "2a1":{ id:"2a1", name:"ヒリュウ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
+          desc:"炎をまとった小さな竜。東洋の伝説に登場する火を司る存在。", edu:"ドラゴンの伝説は世界中に存在し、東洋では竜は水と天を司る神とされた。中国では皇帝の象徴。" },
+  "2a2":{ id:"2a2", name:"カグツチ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
+          desc:"日本神話の火の神。生まれながらにして炎を纏う。", edu:"カグツチ（迦具土神）は『古事記』に登場する火の神。その誕生が母・イザナミの命を奪い、怒った父・イザナギに斬られた。" },
+  "2b1":{ id:"2b1", name:"ユニコーン",      rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
+          desc:"額に黄金の角を持つ白馬。純粋な心の者にしか近づかないという。", edu:"ユニコーンはヨーロッパの中世に広く信じられた幻獣。その角には解毒の力があると信じられていた。" },
+  "2b2":{ id:"2b2", name:"コダマ",          rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
+          desc:"古い木に宿る日本の精霊。山で聞こえるこだまはこの子のせい。", edu:"木霊（コダマ）は日本の民間信仰で樹木に宿る精霊。木を切ると祟りがあるとして大切にされてきた。" },
+  "3a1":{ id:"3a1", name:"フェニックス",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
+          desc:"炎から蘇る不死の鳥。500年ごとに炎の中で再生するといわれる。", edu:"フェニックス（不死鳥）はエジプト・ギリシャ・中国など世界各地に類似の伝説がある。エジプトでは『ベヌウ』と呼ばれ太陽の化身とされた。" },
+  "3a2":{ id:"3a2", name:"カグツチ神将",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
+          desc:"鍛えられた炎の神将。剣を振るたびに炎の渦が生まれる。", edu:"日本の武将文化は世界でも珍しい。刀は武士の魂とされ、名刀には固有の名前が付けられ大切に受け継がれた。" },
+  "3b1":{ id:"3b1", name:"スフィンクス",    rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
+          desc:"謎かけを好む砂漠の守護者。問いに答えられぬ者は食べてしまう。", edu:"スフィンクスはエジプトとギリシャの両方に登場する。ギザの大スフィンクスは約4500年前に建造された世界最大の石造彫刻。" },
+  "3b2":{ id:"3b2", name:"アヌビス",        rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
+          desc:"ジャッカルの頭を持つ死者の神。魂の重さを羽根と量って判断する。", edu:"アヌビスは古代エジプトの死者の神。死者の心臓と正義の羽根を天秤で量り、来世への行方を決めると信じられた。" },
+  "4a1":{ id:"4a1", name:"レッドドラゴン",  rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
+          desc:"西洋神話最強の竜。一息で城を焼き尽くす業火を吐く。", edu:"西洋のドラゴンは中世ヨーロッパの騎士物語に多く登場。聖ゲオルギウスがドラゴンを退治する伝説は英国の守護聖人として今も語り継がれる。" },
+  "4a2":{ id:"4a2", name:"スサノオ",        rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
+          desc:"嵐と海の神。八岐大蛇を倒した英雄にして荒ぶる神。", edu:"スサノオノミコト（素戔嗚尊）は日本神話の英雄神。ヤマタノオロチを倒した際、その尾から草薙の剣（天叢雲剣）を発見したと伝わる。" },
+  "4b1":{ id:"4b1", name:"ガネーシャ",      rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
+          desc:"象の頭を持つ知恵と繁栄の神。学問・商売・芸術の守護神。", edu:"ガネーシャはヒンドゥー教で最も人気の高い神の一つ。学問と知恵の神として日本でも「歓喜天」として信仰される。" },
+  "4b2":{ id:"4b2", name:"ガルーダ",        rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
+          desc:"神々の乗り物となる黄金の翼を持つ神鳥。蛇の天敵にして天空の王者。", edu:"ガルーダはヒンドゥー・仏教の聖鳥でインドネシアの国章にも使われる。タイやカンボジアなど東南アジア各国でも重要な存在。" },
+};
+
+// ═══════════════════════════════════════════════════════
 const INIT = {
   parentPin: "0000",
   children: [
@@ -422,6 +458,19 @@ function migrate(d) {
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
   if(!d.monsterEvolved) d.monsterEvolved={};
+  if(!d.monsterIV) d.monsterIV={};
+  if(!d.monsterDiscovered) d.monsterDiscovered={};
+  if(!d.monsterEvolvedAt) d.monsterEvolvedAt={};
+  if(!d.reincarnationCount) d.reincarnationCount={};
+  if(!d.reincarnationBonus) d.reincarnationBonus={};
+  // 全子供に egg を図鑑登録（初期値）
+  (d.children||[]).forEach(c=>{
+    if(!d.monsterDiscovered[c.id]) d.monsterDiscovered[c.id]=["egg"];
+    else if(!d.monsterDiscovered[c.id].includes("egg")) d.monsterDiscovered[c.id]=["egg",...d.monsterDiscovered[c.id]];
+    // 既に進化済みの場合は進化先も図鑑に追加
+    const evo=d.monsterEvolved[c.id];
+    if(evo && !d.monsterDiscovered[c.id].includes(evo)) d.monsterDiscovered[c.id]=[...d.monsterDiscovered[c.id],evo];
+  });
   if(!d.onboardingChecks) d.onboardingChecks={};
   if(!d.gachaCollection) d.gachaCollection={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
@@ -883,7 +932,7 @@ function DailyTasks({ child, data, update }) {
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const monStage = ((data.monsterEvolved||{})[child.id]) || 0;
+  const monStageId = ((data.monsterEvolved||{})[child.id]) || "egg";
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -947,7 +996,7 @@ function DailyTasks({ child, data, update }) {
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
-            <img src={`/assets/monster_${monStage}.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
+            <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ タネっちがよろこんだ！</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
@@ -1678,7 +1727,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doTask = task => {
-    const pts = taskPts(task, child.id);
+    const basePts = taskPts(task, child.id);
+    // 転生ボーナス適用
+    const reincBonus = data.reincarnationBonus?.[child.id];
+    const reincActive = reincBonus && new Date().toISOString() < reincBonus.until;
+    const pts = (reincActive && basePts > 0) ? Math.round(basePts * (1 + reincBonus.rate)) : basePts;
     const fs = data.familySettings || INIT.familySettings;
     const needApproval = fs.requireApproval && pts > 0;
     const alreadyPending = (data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);
@@ -2398,6 +2451,26 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{marginTop:14,background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:"11px 14px"}}>
             <p style={{margin:0,fontSize:13,fontWeight:700}}>💰 いまの残高: <span style={{fontSize:16,color:G}}>{myBal.toLocaleString()}pt</span></p>
           </div>
+        </div>
+      )}
+
+      {/* ── 図鑑セクション ── */}
+      {effectiveTab==="more" && (
+        <div style={{padding:"0 16px 0"}}>
+          <div onClick={()=>setMoreOpen(o=>o==="zukan"?null:"zukan")}
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>📖</span>
+              <span style={{fontSize:13,fontWeight:700,color:TEXT}}>モンスター図鑑</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
+                {(data.monsterDiscovered?.[child.id]||[]).length}/15
+              </span>
+              <span style={{fontSize:11,color:MUTED}}>{moreOpen==="zukan"?"▲":"▼"}</span>
+            </div>
+          </div>
+          {moreOpen==="zukan" && <MonsterZukan data={data} child={child}/>}
         </div>
       )}
 
@@ -4394,6 +4467,12 @@ function SeedMonster({ child, data, size=90, update }) {
   const [editNick, setEditNick] = useState(false);
   const [nickInput, setNickInput] = useState("");
   const [evolving, setEvolving] = useState(false);
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setFrame(f => 1 - f), 500);
+    return () => clearInterval(t);
+  }, []);
 
   const myBal      = bal(data.logs, child.id);
   const curStreak  = data.streak?.[child.id]?.cur || 0;
@@ -4403,32 +4482,56 @@ function SeedMonster({ child, data, size=90, update }) {
   const goalsDone  = (data.goals||[]).filter(g=>g.cid===child.id&&g.done).length;
   const todayDone  = data.gachaDate?.[child.id] === todayKey();
 
-  const myLogs        = (data.logs||[]).filter(l=>l.cid===child.id);
+  const myLogs         = (data.logs||[]).filter(l=>l.cid===child.id);
   const totalTasksDone = myLogs.filter(l=>l.type==="good"||l.type==="daily").length;
-  const goodCount     = myLogs.filter(l=>l.type==="good").length;
-  const badgeCount    = myLogs.filter(l=>l.type==="badge").length;
-  const lifetimePts   = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
+  const goodCount      = myLogs.filter(l=>l.type==="good").length;
+  const badgeCount     = myLogs.filter(l=>l.type==="badge").length;
+  const lifetimePts    = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
 
-  // 進化システム：1回だけ、20タスク到達で解放
-  const EVO_THRESHOLD = 20;
-  const evolved       = !!((data.monsterEvolved||{})[child.id]);
-  const evolvedStage  = (data.monsterEvolved||{})[child.id] || 1;
-  const canEvolve     = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
-  const displayStage  = evolved ? evolvedStage : 0;
+  // 進化ツリー
+  const EVO_THRESHOLD  = 20;
+  const currentStageId = (data.monsterEvolved||{})[child.id] || null;
+  const evolved        = !!currentStageId;
+  const monDef         = evolved ? (MONSTER_TREE[currentStageId] || MONSTER_TREE["egg"]) : MONSTER_TREE["egg"];
+  const canEvolve      = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
+  const monsterId      = evolved ? currentStageId : "egg";
+  const imgSrc         = `/assets/monster_${monsterId}_f${frame}.png`;
 
-  // 進化先を最強指標で自動決定
-  const computeEvolvedStage = () => {
-    const scores = [
-      {stage:1, v:totalTasksDone},       // がんばり屋
-      {stage:2, v:maxStreak*3},          // 継続マスター
-      {stage:3, v:badgeCount*20+goalsDone*10}, // コレクター
-      {stage:4, v:Math.floor(lifetimePts/20)}, // 大富豪
-    ];
-    return scores.sort((a,b)=>b.v-a.v)[0].stage;
+  // 進化先を分岐ルールで決定
+  const computeNextStageId = () => {
+    const cur = currentStageId || "egg";
+    const def = MONSTER_TREE[cur] || MONSTER_TREE["egg"];
+    if (!def.evolveA) return null;
+    let scoreA = 0, scoreB = 0;
+    const stage = def.stage;
+    if (cur === "egg") {
+      scoreA = totalTasksDone;
+      scoreB = curStreak * 2;
+    } else if (stage === 1) {
+      scoreA = badgeCount * 20;
+      scoreB = Math.floor(lifetimePts / 20);
+    } else if (stage === 2 && def.line === "a") {
+      scoreA = badgeCount * 20;
+      scoreB = Math.floor(lifetimePts / 20);
+    } else if (stage === 2 && def.line === "b") {
+      scoreA = goalsDone * 15;
+      scoreB = badgeCount * 20;
+    } else if (stage === 3 && def.line === "a") {
+      scoreA = Math.floor(totalTasksDone / 5);
+      scoreB = curStreak * 5;
+    } else if (stage === 3 && def.line === "b") {
+      scoreA = Math.floor(lifetimePts / 30);
+      scoreB = badgeCount * 10;
+    }
+    return scoreA >= scoreB ? def.evolveA : def.evolveB;
   };
 
-  const NAMES      = ["タネっち","もりもりタネっち","ほのおタネっち","ほしタネっち","キングタネ"];
-  const TYPE_LABEL = ["","がんばり屋","継続マスター","ほしコレクター","大富豪タネ"];
+  // 転生可能判定
+  const evolvedAt     = (data.monsterEvolvedAt||{})[child.id] || null;
+  const reincCount    = (data.reincarnationCount||{})[child.id] || 0;
+  const canReincarnate = evolved && !evolving && evolvedAt
+    ? (new Date() - new Date(evolvedAt)) >= 3 * 24 * 60 * 60 * 1000
+    : false;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -4445,30 +4548,61 @@ function SeedMonster({ child, data, size=90, update }) {
     ? ["いっしょにがんばろ！","きょうもよろしく！","タスクやってみよ！"]
     : ["さびしいな…","がんばって！","タッチしてくれた！"];
 
-  const handleTap = ()=>{
-    if(evolving) return;
-    const id=Date.now();
+  const handleTap = () => {
+    if (evolving) return;
+    const id = Date.now();
     setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
     setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
     setSpeech(tapMsgs[Math.floor(Math.random()*tapMsgs.length)]);
     setTimeout(()=>setSpeech(null),1800);
   };
 
-  const doEvolve = ()=>{
-    if(!canEvolve||evolving) return;
+  const genIV = () => ({
+    hp:  Math.floor(Math.random()*10)+1,
+    atk: Math.floor(Math.random()*10)+1,
+    def: Math.floor(Math.random()*10)+1,
+    spd: Math.floor(Math.random()*10)+1,
+  });
+
+  const doEvolve = () => {
+    if (!canEvolve || evolving) return;
     setEvolving(true);
     setSpeech(null);
-    const newStage = computeEvolvedStage();
-    // 1.6秒後にデータ更新（画像が切り替わる）
-    setTimeout(()=>{
-      update(d=>({...d,monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:newStage}}));
+    const nextId = computeNextStageId();
+    if (!nextId) { setEvolving(false); return; }
+    const iv = genIV();
+    const now = new Date().toISOString();
+    setTimeout(() => {
+      update(d => {
+        const disc = [...new Set([...(d.monsterDiscovered?.[child.id]||[]), nextId])];
+        return {
+          ...d,
+          monsterEvolved:    {...(d.monsterEvolved||{}),    [child.id]: nextId},
+          monsterEvolvedAt:  {...(d.monsterEvolvedAt||{}),  [child.id]: now},
+          monsterIV:         {...(d.monsterIV||{}),         [child.id]: iv},
+          monsterDiscovered: {...(d.monsterDiscovered||{}), [child.id]: disc},
+        };
+      });
     }, 1600);
-    // 2.4秒後にアニメ終了＋祝福メッセージ
-    setTimeout(()=>{
+    setTimeout(() => {
       setEvolving(false);
       setSpeech("しんかしたよ！🌟");
       setTimeout(()=>setSpeech(null),2500);
     }, 2400);
+  };
+
+  const doReincarnate = () => {
+    if (!canReincarnate || evolving) return;
+    const until = new Date(Date.now() + 7*24*60*60*1000).toISOString();
+    update(d => ({
+      ...d,
+      monsterEvolved:       {...(d.monsterEvolved||{}),       [child.id]: null},
+      monsterEvolvedAt:     {...(d.monsterEvolvedAt||{}),     [child.id]: null},
+      reincarnationCount:   {...(d.reincarnationCount||{}),   [child.id]: ((d.reincarnationCount||{})[child.id]||0)+1},
+      reincarnationBonus:   {...(d.reincarnationBonus||{}),   [child.id]: {until, rate:0.05}},
+    }));
+    setSpeech("てんせい！また始まるよ✨");
+    setTimeout(()=>setSpeech(null),2500);
   };
 
   const accessories = [
@@ -4478,8 +4612,10 @@ function SeedMonster({ child, data, size=90, update }) {
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
   ].filter(Boolean).slice(0,3);
 
-  const evoPct = evolved ? 100 : Math.min(100, Math.round(totalTasksDone/EVO_THRESHOLD*100));
-  const nickname = (data.monsterNickname||{})[child.id];
+  const evoPct    = evolved ? 100 : Math.min(100, Math.round(totalTasksDone/EVO_THRESHOLD*100));
+  const nickname  = (data.monsterNickname||{})[child.id];
+  const dispName  = nickname || monDef.name;
+  const rarityStr = "★".repeat(monDef.rarity||1);
 
   return (
     <div style={{position:"relative",flexShrink:0,textAlign:"center"}}>
@@ -4512,7 +4648,7 @@ function SeedMonster({ child, data, size=90, update }) {
           filter:evolving?"brightness(2.5) saturate(0.2)":"none",
           transition:"filter 0.4s",
         }}>
-          <img src={`/assets/monster_${displayStage}.png`} alt={NAMES[displayStage]} style={{width:size,height:size,objectFit:"contain",display:"block"}}/>
+          <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}/>
           {accessories.map((acc,i)=>(
             <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
           ))}
@@ -4520,7 +4656,7 @@ function SeedMonster({ child, data, size=90, update }) {
       </div>
       <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
-      {/* 名前 */}
+      {/* 名前＋レア度 */}
       {update ? (
         editNick ? (
           <div style={{marginTop:4}}>
@@ -4534,15 +4670,17 @@ function SeedMonster({ child, data, size=90, update }) {
         ) : (
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
-              {nickname||NAMES[displayStage]}
-              {evolved&&<span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{TYPE_LABEL[evolvedStage]}</span>}
+              {dispName}
+              <span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
+              {reincCount>0&&<span style={{fontSize:8,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
             </div>
-            <button onClick={()=>{setNickInput(nickname||NAMES[displayStage]);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
+            <button onClick={()=>{setNickInput(dispName);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
           </div>
         )
       ) : (
         <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
-          {nickname||NAMES[displayStage]}
+          {dispName}
+          <span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
         </div>
       )}
 
@@ -4560,6 +4698,12 @@ function SeedMonster({ child, data, size=90, update }) {
           🌟 しんかできるよ！
         </button>
       )}
+      {/* 転生ボタン */}
+      {canReincarnate && !evolving && (
+        <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
+          🔄 転生する
+        </button>
+      )}
       {evolving && (
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
       )}
@@ -4573,6 +4717,50 @@ function SeedMonster({ child, data, size=90, update }) {
         @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
         @keyframes evoFlash{0%,100%{opacity:1}50%{opacity:0.3}}
       `}</style>
+    </div>
+  );
+}
+
+// ── Monster Zukan ──────────────────────────────────────
+function MonsterZukan({ data, child }) {
+  const [expandId, setExpandId] = useState(null);
+  const discovered = data.monsterDiscovered?.[child.id] || [];
+  const allIds = ["egg","1a","1b","2a1","2a2","2b1","2b2","3a1","3a2","3b1","3b2","4a1","4a2","4b1","4b2"];
+  const foundCount = allIds.filter(id => discovered.includes(id)).length;
+
+  return (
+    <div style={{padding:"0 0 8px"}}>
+      <div style={{fontSize:11,color:MUTED,fontWeight:700,marginBottom:10}}>
+        発見済み {foundCount} / {allIds.length}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+        {allIds.map(id => {
+          const def = MONSTER_TREE[id];
+          const found = discovered.includes(id) || id === "egg";
+          const isOpen = expandId === id;
+          return (
+            <div key={id}
+              onClick={()=>found ? setExpandId(isOpen?null:id) : null}
+              style={{background:found?CARD:CARDS,border:`1.5px solid ${found?BORDER:BORDER}`,borderRadius:14,padding:"10px 6px",textAlign:"center",cursor:found?"pointer":"default",transition:"transform .15s",transform:isOpen?"scale(1.04)":"scale(1)"}}>
+              <img
+                src={`/assets/monster_${id}_f0.png`}
+                alt={found?def.name:"???"}
+                style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",filter:found?"none":"brightness(0)"}}
+              />
+              <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {found ? def.name : "???"}
+              </div>
+              <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
+              {isOpen && found && (
+                <div style={{marginTop:6,fontSize:9,color:TEXTS,textAlign:"left",lineHeight:1.5,borderTop:`1px solid ${BORDER}`,paddingTop:6}}>
+                  <div style={{marginBottom:3}}>{def.desc}</div>
+                  {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
