@@ -4496,6 +4496,21 @@ function SeedMonster({ child, data, size=90, update }) {
     return () => clearInterval(t);
   }, []);
 
+  // デジモン風: 横にウロウロ歩く（前向き絵のまま左右移動＋進む向きに反転）
+  const [walkX, setWalkX] = useState(0);
+  const [face, setFace] = useState(1);
+  const walkRef = useRef(0);
+  useEffect(() => {
+    if (evolving) { setWalkX(0); walkRef.current = 0; return; }
+    const id = setInterval(() => {
+      const nx = Math.round((Math.random() * 2 - 1) * 34);
+      setFace(nx >= walkRef.current ? 1 : -1);
+      walkRef.current = nx;
+      setWalkX(nx);
+    }, 2200);
+    return () => clearInterval(id);
+  }, [evolving]);
+
   const myBal      = bal(data.logs, child.id);
   const curStreak  = data.streak?.[child.id]?.cur || 0;
   const maxStreak  = (data.streak||{})[child.id]?.max || 0;
@@ -4685,22 +4700,24 @@ function SeedMonster({ child, data, size=90, update }) {
         </div>
       )}
 
-      {/* モンスター画像 */}
-      <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
-        <div style={{
-          animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
-          cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
-          filter:evolving?"brightness(2.5) saturate(0.2)":"none",
-          transition:"filter 0.4s",
-        }}>
-          <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
-            onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
-          {accessories.map((acc,i)=>(
-            <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
-          ))}
+      {/* モンスター画像（デジモン風に横移動） */}
+      <div style={{transform:`translateX(${walkX}px) scaleX(${face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
+        <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
+          <div style={{
+            animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
+            cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
+            filter:evolving?"brightness(2.5) saturate(0.2)":"none",
+            transition:"filter 0.4s",
+          }}>
+            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
+              onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
+            {accessories.map((acc,i)=>(
+              <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
+            ))}
+          </div>
         </div>
+        <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
       </div>
-      <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
       {/* 名前＋レア度 */}
       {update ? (
