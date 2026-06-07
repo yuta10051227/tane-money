@@ -225,7 +225,7 @@ function startLogsRealtimeSync(updateFn) {
 // MONSTER TREE
 // ═══════════════════════════════════════════════════════
 const MONSTER_TREE = {
-  egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b",
+  egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b", evolveC:"1c",
           desc:"秘められた力を持つ不思議な卵。何が生まれるか誰も知らない。", edu:"" },
   "1a": { id:"1a",  name:"ほのおっち",      rarity:1, line:"a", stage:1, evolveA:"2a1", evolveB:"2a2",
           desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"人類が火を使い始めたのは約140万年前ともいわれる。火のおかげで食べ物を加熱でき、夜も明るく安全に過ごせるようになった。火を手に入れたことは人類最大の発明の一つ。" },
@@ -255,7 +255,34 @@ const MONSTER_TREE = {
           desc:"象の頭を持つ知恵と商売の神。学問や芸術を見守る。", edu:"ガネーシャはヒンドゥー教で最も人気のある神の一つで、学問・商売・幸運の神。日本では『歓喜天』として信仰される。インドでは新しいことを始める前に祈られる。" },
   "4b2":{ id:"4b2", name:"ガルーダ",        rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
           desc:"黄金の翼を持つ神鳥。神々を乗せ空をかける天空の王者。", edu:"ガルーダはヒンドゥー教・仏教の聖なる鳥で、ヘビの天敵。インドネシアの国の紋章になっており、同国を代表する航空会社の名前にもなっている。" },
+  // ── 水ライン（c）──
+  "1c": { id:"1c",  name:"みずっち",        rarity:1, line:"c", stage:1, evolveA:"2c1", evolveB:"2c2",
+          desc:"水の精霊の赤ちゃん。きれいな水辺が大好きで、ぷかぷか浮かぶ。", edu:"地球の表面の約7割は海などの水でおおわれている。でも飲める『真水』はそのうちごくわずか。水は雲→雨→川→海とぐるぐる循環している。" },
+  "2c1":{ id:"2c1", name:"カッパ",          rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
+          desc:"頭の皿に水をたくわえる日本の妖怪。相撲ときゅうりが大好き。", edu:"河童（かっぱ）は日本各地に伝わる水辺の妖怪。頭の皿の水がかわくと力が出ないとされた。川の事故への注意を伝える昔の人の知恵ともいわれる。" },
+  "2c2":{ id:"2c2", name:"シーサーペント",  rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
+          desc:"大海をうねる巨大な海蛇。船乗りたちに恐れられた。", edu:"シーサーペント（大海蛇）は世界中の海の伝説に登場する。北欧神話の大蛇ヨルムンガンドは世界をぐるりと囲むほど巨大だと語られた。" },
+  "3c1":{ id:"3c1", name:"リヴァイアサン",  rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
+          desc:"海の底にひそむ伝説の大怪物。ひとのみで嵐を起こす。", edu:"リヴァイアサンは旧約聖書に出てくる海の巨大な怪物。手のつけられない強大な力の象徴とされ、英語では『巨大なもの』の意味でも使われる。" },
+  "3c2":{ id:"3c2", name:"クラーケン",      rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
+          desc:"無数の触手で船をしずめる海の魔物。深海の王者。", edu:"クラーケンは北欧（ノルウェー沖）の伝承の巨大なイカ・タコの怪物。実在するダイオウイカ（最大十数mとされる）が伝説のもとになったとも考えられている。" },
+  "4c1":{ id:"4c1", name:"ポセイドン",      rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
+          desc:"三叉のほこを持つ海の神。ひと振りで嵐と大波を起こす。", edu:"ポセイドンはギリシャ神話の海の神で、三叉の銛トライデントが象徴。海だけでなく地震や馬も司るとされ、オリンポス十二神の一柱として恐れられた。" },
+  "4c2":{ id:"4c2", name:"龍神",            rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
+          desc:"海をおさめる日本の龍の神。竜宮城のあるじ。", edu:"龍神（リュウジン）は日本で海をつかさどる神。海の底の龍宮城の伝説は『浦島太郎』の物語にもつながる。雨ごいの神として各地の神社でまつられてきた。" },
 };
+
+// ═══════════════════════════════════════════════════════
+// 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
+const BG_THEMES = [
+  { id:"auto",   name:"じかんたい", emoji:"🕒", need:0,   grad:null, stars:false },
+  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false },
+  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false },
+  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true },
+  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true },
+  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true },
+  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true },
+];
 
 // ═══════════════════════════════════════════════════════
 const INIT = {
@@ -934,6 +961,12 @@ function DailyTasks({ child, data, update }) {
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _rawMonStage = ((data.monsterEvolved||{})[child.id]) || "egg";
   const monStageId = MONSTER_TREE[_rawMonStage] ? _rawMonStage : "egg";
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _bgTid = (data.bgTheme||{})[child.id] || "auto";
+  const _bgTheme = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
+  const _bgUnlocked = (_bgTheme.need||0) <= totalDoneMon;
+  const heroGrad = (_bgUnlocked && _bgTheme.grad) ? _bgTheme.grad : null;
+  const heroStars = _bgUnlocked && _bgTheme.stars;
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -1847,7 +1880,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ヒーローエリア */}
       {isJunior ? (()=>{
         const h=new Date().getHours();
-        const bg=h>=7&&h<11
+        const bgAuto=h>=7&&h<11
           ?"linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)"
           :h>=11&&h<17
           ?"linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)"
@@ -1856,6 +1889,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           :h>=20&&h<22
           ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"
           :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
+        const bg = heroGrad || bgAuto;
         const starOpacity=h>=7&&h<17?0.2:0.6;
         return(
       <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
@@ -1951,9 +1985,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const toPts2=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
         const portV2=myH2.reduce((s,h)=>{const st=stocks2.find(x=>x.id===h.stockId);return s+(st?toPts2(st,st.price)*h.qty:0);},0);
         return(
-      <div style={{background:"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
+      <div style={{background:heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
         {/* 背景グリッド */}
         <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",backgroundSize:"32px 32px",pointerEvents:"none"}}/>
+        {/* 背景テーマの星(うちゅう/よぞら等) */}
+        {heroStars && [[10,12],[24,7],[68,10],[84,16],[46,20],[33,5],[58,24],[16,28],[78,30],[90,9],[40,33],[63,38]].map(([l,t],i)=>(
+          <div key={"st"+i} style={{position:"absolute",top:`${t}%`,left:`${l}%`,width:i%3===0?3:2,height:i%3===0?3:2,borderRadius:"50%",background:"#fff",opacity:0.45+(i%5)*0.08,pointerEvents:"none"}}/>
+        ))}
         {/* アクセントライン */}
         <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,rgba(74,158,255,0.4),transparent)",pointerEvents:"none"}}/>
         {/* トップバー */}
@@ -2472,12 +2510,54 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
-                {(data.monsterDiscovered?.[child.id]||[]).length}/15
+                {(data.monsterDiscovered?.[child.id]||[]).length}/22
               </span>
               <span style={{fontSize:11,color:MUTED}}>{moreOpen==="zukan"?"▲":"▼"}</span>
             </div>
           </div>
           {moreOpen==="zukan" && <MonsterZukan data={data} child={child}/>}
+        </div>
+      )}
+
+      {/* ── 背景きせかえ ── */}
+      {effectiveTab==="more" && (
+        <div style={{padding:"0 16px 8px"}}>
+          <div onClick={()=>setMoreOpen(o=>o==="bg"?null:"bg")}
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🖼</span>
+              <span style={{fontSize:13,fontWeight:700,color:TEXT}}>はいけい きせかえ</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
+                {BG_THEMES.filter(t=>(t.need||0)<=totalDoneMon).length}/{BG_THEMES.length}
+              </span>
+              <span style={{fontSize:11,color:MUTED}}>{moreOpen==="bg"?"▲":"▼"}</span>
+            </div>
+          </div>
+          {moreOpen==="bg" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:4}}>
+              {BG_THEMES.map(t=>{
+                const unlocked=(t.need||0)<=totalDoneMon;
+                const selected=_bgTid===t.id;
+                return (
+                  <div key={t.id}
+                    onClick={()=>{ if(unlocked) update(d=>({...d,bgTheme:{...(d.bgTheme||{}),[child.id]:t.id}})); }}
+                    style={{borderRadius:12,overflow:"hidden",cursor:unlocked?"pointer":"default",border:selected?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,opacity:unlocked?1:0.5}}>
+                    <div style={{height:44,background:t.grad||"linear-gradient(180deg,#1a5c8a,#1f7038)"}}/>
+                    <div style={{padding:"4px 4px",background:CARD,textAlign:"center"}}>
+                      <div style={{fontSize:10,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
+                      {!unlocked
+                        ? <div style={{fontSize:8,color:MUTED,fontWeight:700}}>🔒 あと{(t.need||0)-totalDoneMon}回</div>
+                        : selected
+                        ? <div style={{fontSize:8,color:GP,fontWeight:800}}>えらび中</div>
+                        : <div style={{fontSize:8,color:MUTED}}>タップで変更</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -4481,6 +4561,21 @@ function SeedMonster({ child, data, size=90, update }) {
     return () => clearInterval(t);
   }, []);
 
+  // デジモン風: 横にウロウロ歩く（前向き絵のまま左右移動＋進む向きに反転）
+  const [walkX, setWalkX] = useState(0);
+  const [face, setFace] = useState(1);
+  const walkRef = useRef(0);
+  useEffect(() => {
+    if (evolving) { setWalkX(0); walkRef.current = 0; return; }
+    const id = setInterval(() => {
+      const nx = Math.round((Math.random() * 2 - 1) * 34);
+      setFace(nx >= walkRef.current ? 1 : -1);
+      walkRef.current = nx;
+      setWalkX(nx);
+    }, 2200);
+    return () => clearInterval(id);
+  }, [evolving]);
+
   const myBal      = bal(data.logs, child.id);
   const curStreak  = data.streak?.[child.id]?.cur || 0;
   const maxStreak  = (data.streak||{})[child.id]?.max || 0;
@@ -4519,8 +4614,12 @@ function SeedMonster({ child, data, size=90, update }) {
     let scoreA = 0, scoreB = 0;
     const stage = def.stage;
     if (cur === "egg") {
-      scoreA = totalTasksDone;
-      scoreB = curStreak * 2;
+      // タマゴは3分岐: 火(タスク量)/森(継続)/水(目標達成)の一番得意なものへ
+      const fire   = goodCount;
+      const forest = curStreak * 3;
+      const water  = goalsDone * 4 + Math.floor(lifetimePts / 100);
+      const top = Math.max(fire, forest, water);
+      return water === top ? def.evolveC : forest === top ? def.evolveB : def.evolveA;
     } else if (stage === 1) {
       scoreA = badgeCount * 20;
       scoreB = Math.floor(lifetimePts / 20);
@@ -4536,6 +4635,12 @@ function SeedMonster({ child, data, size=90, update }) {
     } else if (stage === 3 && def.line === "b") {
       scoreA = Math.floor(lifetimePts / 30);
       scoreB = badgeCount * 10;
+    } else if (stage === 2 && def.line === "c") {
+      scoreA = goodCount;
+      scoreB = curStreak * 4;
+    } else if (stage === 3 && def.line === "c") {
+      scoreA = Math.floor(lifetimePts / 30);
+      scoreB = goalsDone * 10;
     }
     return scoreA >= scoreB ? def.evolveA : def.evolveB;
   };
@@ -4660,22 +4765,24 @@ function SeedMonster({ child, data, size=90, update }) {
         </div>
       )}
 
-      {/* モンスター画像 */}
-      <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
-        <div style={{
-          animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
-          cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
-          filter:evolving?"brightness(2.5) saturate(0.2)":"none",
-          transition:"filter 0.4s",
-        }}>
-          <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
-            onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
-          {accessories.map((acc,i)=>(
-            <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
-          ))}
+      {/* モンスター画像（デジモン風に横移動） */}
+      <div style={{transform:`translateX(${walkX}px) scaleX(${face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
+        <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
+          <div style={{
+            animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
+            cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
+            filter:evolving?"brightness(2.5) saturate(0.2)":"none",
+            transition:"filter 0.4s",
+          }}>
+            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
+              onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
+            {accessories.map((acc,i)=>(
+              <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
+            ))}
+          </div>
         </div>
+        <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
       </div>
-      <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
       {/* 名前＋レア度 */}
       {update ? (
@@ -4757,7 +4864,7 @@ function SeedMonster({ child, data, size=90, update }) {
 function MonsterZukan({ data, child }) {
   const [expandId, setExpandId] = useState(null);
   const discovered = data.monsterDiscovered?.[child.id] || [];
-  const allIds = ["egg","1a","1b","2a1","2a2","2b1","2b2","3a1","3a2","3b1","3b2","4a1","4a2","4b1","4b2"];
+  const allIds = ["egg","1a","1b","1c","2a1","2a2","2b1","2b2","2c1","2c2","3a1","3a2","3b1","3b2","3c1","3c2","4a1","4a2","4b1","4b2","4c1","4c2"];
   const foundCount = allIds.filter(id => discovered.includes(id)).length;
 
   return (
