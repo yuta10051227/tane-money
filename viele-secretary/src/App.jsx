@@ -774,6 +774,20 @@ const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
 /* 既定の出生データ（運気の命式計算に使用。data.birth があればそちら優先） */
 const DEFAULT_BIRTH = { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 };
 
+/* 都道府県→緯度経度（県庁所在地）。出生地選択で命式の精度を確保 */
+const PREFS = [
+  ["北海道", 43.06, 141.35], ["青森", 40.82, 140.74], ["岩手", 39.70, 141.15], ["宮城", 38.27, 140.87], ["秋田", 39.72, 140.10],
+  ["山形", 38.24, 140.36], ["福島", 37.75, 140.47], ["茨城", 36.34, 140.45], ["栃木", 36.57, 139.88], ["群馬", 36.39, 139.06],
+  ["埼玉", 35.86, 139.65], ["千葉", 35.61, 140.12], ["東京", 35.69, 139.69], ["神奈川", 35.45, 139.64], ["新潟", 37.90, 139.02],
+  ["富山", 36.70, 137.21], ["石川", 36.59, 136.63], ["福井", 36.07, 136.22], ["山梨", 35.66, 138.57], ["長野", 36.65, 138.18],
+  ["岐阜", 35.39, 136.72], ["静岡", 34.98, 138.38], ["愛知", 35.18, 136.91], ["三重", 34.73, 136.51], ["滋賀", 35.00, 135.87],
+  ["京都", 35.02, 135.76], ["大阪", 34.69, 135.52], ["兵庫", 34.69, 135.18], ["奈良", 34.69, 135.83], ["和歌山", 34.23, 135.17],
+  ["鳥取", 35.50, 134.24], ["島根", 35.47, 133.05], ["岡山", 34.66, 133.93], ["広島", 34.40, 132.46], ["山口", 34.19, 131.47],
+  ["徳島", 34.07, 134.56], ["香川", 34.34, 134.04], ["愛媛", 33.84, 132.77], ["高知", 33.56, 133.53], ["福岡", 33.61, 130.42],
+  ["佐賀", 33.25, 130.30], ["長崎", 32.74, 129.87], ["熊本", 32.79, 130.74], ["大分", 33.24, 131.61], ["宮崎", 31.91, 131.42],
+  ["鹿児島", 31.56, 130.56], ["沖縄", 26.21, 127.68],
+];
+
 /* 今日のまとめ（ニュースRSS集約＋任意でAI要約） */
 function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed, selectedCats, onToggleCat }) {
   const [open, setOpen] = useState(false);
@@ -901,7 +915,52 @@ function FortuneBars({ values, highlight, color }) {
   );
 }
 
-function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
+// 折りたたみセクション（タップで開閉）
+function Acc({ title, color, badge, defaultOpen, children }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, marginBottom: 12, overflow: "hidden" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", color: C.text, padding: "12px 14px", cursor: "pointer", textAlign: "left", font: "inherit" }}>
+        <strong style={{ fontSize: 14, color: color || C.text }}>{title}</strong>
+        {badge}
+        <span style={{ flex: 1 }} />
+        <span style={{ color: C.sub, fontSize: 12 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div style={{ padding: "0 14px 14px" }}>{children}</div>}
+    </div>
+  );
+}
+
+// 出生情報エディタ（1回入力すれば保存され毎回反映）
+function BirthEditor({ birth, onSave }) {
+  const b = birth || {};
+  const [name, setName] = useState(b.name || "");
+  const [date, setDate] = useState(b.date || "");
+  const [time, setTime] = useState(b.time || "");
+  const [pref, setPref] = useState(b.place || "東京");
+  const save = () => {
+    const p = PREFS.find((x) => x[0] === pref) || PREFS.find((x) => x[0] === "東京");
+    if (!date) { alert("生年月日を入れてください"); return; }
+    onSave({ name: name.trim(), date, time: time || "12:00", place: pref, lat: p[1], lon: p[2], utcOffset: 9 });
+  };
+  return (
+    <Acc title="出生情報の編集" color={C.sub}>
+      <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前（任意）" style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>生年月日</label>
+      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生時刻（分かれば。不明は12:00でも可）</label>
+      <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生地（都道府県）</label>
+      <select value={pref} onChange={(e) => setPref(e.target.value)} style={inp}>
+        {PREFS.map((p) => <option key={p[0]}>{p[0]}</option>)}
+      </select>
+      <button onClick={save} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存して占う</button>
+    </Acc>
+  );
+}
+
+function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth }) {
   const f = fortune || {};
   const t = f.today || {};
   const tm = f.tomorrow || {};
@@ -919,20 +978,16 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
     <Panel
       title="運気（年・月・日）"
       accent={C.purple}
-      help="あなたの命式データ（四柱推命・西洋占星術・インド占星術）を根拠に、AIが年・月・日の運勢を鑑定します。占いとして参考程度に。"
+      help="あなたの命式（四柱推命・西洋占星術・インド占星術）を根拠に、AIが年・月・日の運勢を鑑定します。各項目はタップで開閉。占いとして参考程度に。"
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
     >
       {aiOff && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>※ AI(Gemini)キーが未設定です。Vercelに設定すると運気が出ます。</div>}
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
-      {!fortune && !loading && !error && <Empty>「更新」を押すと今日の運気が出ます。</Empty>}
+      {!fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
 
       {t.theme && (
-        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <strong style={{ fontSize: 14 }}>今日</strong>
-            <span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>
-          </div>
+        <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
           <Line label="仕事運" value={t.work} color={C.green} />
           <Line label="金運" value={t.money} color={C.accent} />
@@ -940,28 +995,23 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
           <Line label="やるべき" value={t.action} color={C.purple} />
           <Line label="戒め" value={t.caution} color={C.red} />
           <Line label="ラッキー" value={t.color} color={C.sub} />
-        </div>
+        </Acc>
       )}
 
       {tm.theme && (
-        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-            <strong style={{ fontSize: 14 }}>明日</strong>
-            <span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>
-          </div>
+        <Acc title="明日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
           <Line label="仕事運" value={tm.work} color={C.green} />
           <Line label="金運" value={tm.money} color={C.accent} />
           <Line label="対人運" value={tm.social} color={C.blue} />
           <Line label="やるべき" value={tm.action} color={C.purple} />
           <Line label="ラッキー" value={tm.color} color={C.sub} />
-        </div>
+        </Acc>
       )}
 
       {m.theme && (
-        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <strong style={{ fontSize: 14, color: C.blue }}>今月 ・ {m.theme}</strong>
-          <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{m.flow}</div>
+        <Acc title={`今月 ・ ${m.theme}`} color={C.blue}>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{m.flow}</div>
           {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
           {Array.isArray(m.days) && m.days.length > 0 && (
             <>
@@ -971,13 +1021,12 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
               </div>
             </>
           )}
-        </div>
+        </Acc>
       )}
 
       {y.theme && (
-        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <strong style={{ fontSize: 14, color: C.purple }}>今年 ・ {y.theme}</strong>
-          <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{y.flow}</div>
+        <Acc title={`今年 ・ ${y.theme}`} color={C.purple}>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{y.flow}</div>
           {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
           {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
           {Array.isArray(y.months) && y.months.length === 12 && (
@@ -988,8 +1037,10 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
               </div>
             </>
           )}
-        </div>
+        </Acc>
       )}
+
+      <BirthEditor birth={birth} onSave={onSaveBirth} />
 
       <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
         命式：自前エンジン（astronomy-engine）で計算 ・ 鑑定はAIによる参考です
@@ -1463,12 +1514,12 @@ export default function App() {
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 運気 ──
-  const refreshFortune = async () => {
+  const refreshFortune = async (birthOverride) => {
     if (!data) return;
     setFortuneLoading(true);
     setFortuneError(null);
     try {
-      const chartText = computeChart(data.birth || DEFAULT_BIRTH).text; // 命式はブラウザ側で計算
+      const chartText = computeChart(birthOverride || data.birth || DEFAULT_BIRTH).text; // 命式はブラウザ側で計算
       const r = await fetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1772,7 +1823,9 @@ export default function App() {
             loading={fortuneLoading}
             error={fortuneError}
             aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
-            onRefresh={refreshFortune}
+            onRefresh={() => refreshFortune()}
+            birth={data.birth || DEFAULT_BIRTH}
+            onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
           />
         )}
 
