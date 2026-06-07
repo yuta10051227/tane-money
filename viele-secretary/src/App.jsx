@@ -3,7 +3,8 @@ import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectRes
 import { auth, googleProvider, firebaseEnabled } from "./firebase";
 import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
-import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
+import { fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
+import { getAccessToken, revokeToken } from "./gauth";
 
 const STORE_KEY = "viele-secretary";
 
@@ -1165,14 +1166,33 @@ export default function App() {
   const fontLabel = fontScale >= 1.3 ? "特大" : fontScale > 1 ? "大" : "標準";
   const seed = useMemo(() => makeSeed(), []);
 
-  // ── Googleカレンダー連携（任意・クライアント側・複数カレンダー）──
-  const [calToken, setCalToken] = useState(() => localStorage.getItem("viele-cal-token") || null);
-  const [calList, setCalList] = useState([]);   // 利用可能なカレンダー一覧
-  const [calEvents, setCalEvents] = useState([]); // 全カレンダーの生イベント（calendarId付き）
+  // ── Googleカレンダー連携（GISで自動取得・複数カレンダー）──
+  const [calToken, setCalToken] = useState(null); // メモリ保持（永続化しない＝安全）
+  const [calList, setCalList] = useState([]);
+  const [calEvents, setCalEvents] = useState([]);
   const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
   const [calError, setCalError] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const calRefreshing = useRef(false);
 
+  // 起動時：以前連携済みなら無音でトークン取得（完全自動）
+  useEffect(() => {
+    if (localStorage.getItem("viele-cal-on") !== "1") return;
+    getAccessToken({ interactive: false }).then((t) => setCalToken(t)).catch(() => { /* 無音失敗時は手動「連携」を出す */ });
+  }, []);
+
+  // 前面復帰時にも無音でトークン更新（失効対策）
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (localStorage.getItem("viele-cal-on") !== "1") return;
+      getAccessToken({ interactive: false }).then((t) => setCalToken(t)).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  // トークンが取れたら今週〜約2ヶ月分を取得
   useEffect(() => {
     if (!calToken) return;
     let cancelled = false;
@@ -1186,15 +1206,20 @@ export default function App() {
         const now = new Date();
         const timeMin = startOfWeekMonday(now).toISOString();
         const timeMax = addDays(now, 62).toISOString();
-        const all = (
-          await Promise.all(list.map((c) => fetchEvents(calToken, c.id, timeMin, timeMax).catch(() => [])))
-        ).flat();
+        const all = (await Promise.all(list.map((c) => fetchEvents(calToken, c.id, timeMin, timeMax).catch(() => [])))).flat();
         if (cancelled) return;
         setCalEvents(all);
         setCalStatus("ok");
       } catch (err) {
         if (cancelled) return;
-        if (err.status === 401) { localStorage.removeItem("viele-cal-token"); setCalToken(null); }
+        // 失効(401)なら無音で取り直して自動リトライ
+        if (err.status === 401 && !calRefreshing.current && localStorage.getItem("viele-cal-on") === "1") {
+          calRefreshing.current = true;
+          getAccessToken({ interactive: false })
+            .then((t) => { calRefreshing.current = false; setCalToken(t); })
+            .catch((e) => { calRefreshing.current = false; setCalError(e); setCalStatus("error"); setCalToken(null); });
+          return;
+        }
         setCalError(err);
         setCalStatus("error");
       }
@@ -1202,17 +1227,14 @@ export default function App() {
     return () => { cancelled = true; };
   }, [calToken]);
 
-  // 連携（カレンダー読み取り権限を追加要求して再認証→アクセストークン取得）
+  // 「連携」：初回のみ同意画面。以後は起動時に自動取得される。
   const connectCalendar = async () => {
     setConnecting(true);
     setCalError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope(CALENDAR_SCOPE);
-      const result = await signInWithPopup(auth, provider);
-      const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
-      if (token) { localStorage.setItem("viele-cal-token", token); setCalToken(token); }
-      else { setCalError(new Error("アクセストークンを取得できませんでした")); setCalStatus("error"); }
+      const token = await getAccessToken({ interactive: true });
+      localStorage.setItem("viele-cal-on", "1");
+      setCalToken(token);
     } catch (e) {
       setCalError(e);
       setCalStatus("error");
@@ -1220,19 +1242,17 @@ export default function App() {
     setConnecting(false);
   };
 
-  // カレンダー連携を解除（トークンを失効＝revoke＋破棄）
+  // カレンダー連携を解除（トークン失効＝revoke＋自動取得フラグ解除）
   const disconnectCalendar = () => {
-    const t = calToken;
-    if (t) {
-      fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(t), { method: "POST", mode: "no-cors" }).catch(() => {});
-    }
-    localStorage.removeItem("viele-cal-token");
+    revokeToken(calToken);
+    localStorage.removeItem("viele-cal-on");
     setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
   };
 
-  // ログアウト時はカレンダートークンも破棄（共有端末対策）
+  // ログアウト（カレンダーの自動取得も止める＝共有端末対策）
   const logout = () => {
-    localStorage.removeItem("viele-cal-token");
+    revokeToken(calToken);
+    localStorage.removeItem("viele-cal-on");
     signOut(auth);
   };
 
