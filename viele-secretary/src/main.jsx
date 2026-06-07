@@ -46,8 +46,10 @@ if ("serviceWorker" in navigator) {
     refreshing = true;
     window.location.reload();
   });
-  // アプリを開いている間、定期的に更新をチェック
-  setInterval(() => {
-    navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
-  }, 60 * 1000);
+  const checkUpdate = () => navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+  // 起動時・アプリを前面に戻したとき・定期的に更新チェック（iOS PWAで確実に）
+  checkUpdate();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkUpdate(); });
+  window.addEventListener("focus", checkUpdate);
+  setInterval(checkUpdate, 60 * 1000);
 }
