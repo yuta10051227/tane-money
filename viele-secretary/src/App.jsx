@@ -768,6 +768,15 @@ const NEWS_CATEGORIES = [
 ];
 const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
 
+/* 命式エッセンシャル（本人が取得した鑑定データの要約。出典: 大久保占い研究室 senjutsu.jp） */
+const CHART_ESSENTIALS = [
+  "生年月日: 1990-10-05 01:24 / 鹿児島 / 男性",
+  "四柱推命: 年柱 庚午 / 月柱 乙酉 / 日柱 癸卯 / 時柱 癸丑 ・ 日主 癸(陰水)",
+  "西洋占星術: 太陽 天秤座(3室) / 月 牡羊座(9室) / ASC 獅子座 / 水星 乙女座 / 金星 天秤座 / 火星 双子座 / 木星 獅子座(1室) / 土星 山羊座(6室)",
+  "特殊配置: ステリウム(山羊座=土星・天王星・海王星) / Tスクエア(太陽・月・海王星) / ヨッド(火星・木星・海王星)",
+  "インド占星術 大運(ダシャー): 金星期(2010-2030) の 土星サブ期(2023.6-2026.8)",
+].join("\n");
+
 /* 今日のまとめ（ニュースRSS集約＋任意でAI要約） */
 function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed, selectedCats, onToggleCat }) {
   const [open, setOpen] = useState(false);
@@ -875,6 +884,71 @@ function fmtNews(s) {
   if (!t) return "";
   const d = new Date(t);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/* 運気（年運・月運・日運）。命式データを根拠にAIが鑑定。 */
+function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
+  const f = fortune || {};
+  const t = f.today || {};
+  const m = f.month || {};
+  const y = f.year || {};
+  const stars = (n) => "★★★★★".slice(0, Math.max(0, Math.min(5, Number(n) || 0))) + "☆☆☆☆☆".slice(0, 5 - Math.max(0, Math.min(5, Number(n) || 0)));
+  const Line = ({ label, value, color }) => value ? (
+    <div style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.5, padding: "2px 0" }}>
+      <span style={{ flex: "0 0 auto", color: color || C.sub, width: 64 }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>{value}</span>
+    </div>
+  ) : null;
+  return (
+    <Panel
+      title="運気（年・月・日）"
+      accent={C.purple}
+      help="あなたの命式データ（四柱推命・西洋占星術・インド占星術）を根拠に、AIが年・月・日の運勢を鑑定します。占いとして参考程度に。"
+      right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
+    >
+      {aiOff && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>※ AI(Gemini)キーが未設定です。Vercelに設定すると運気が出ます。</div>}
+      {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
+
+      {!fortune && !loading && !error && <Empty>「更新」を押すと今日の運気が出ます。</Empty>}
+
+      {t.theme && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <strong style={{ fontSize: 14 }}>今日</strong>
+            <span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
+          <Line label="仕事運" value={t.work} color={C.green} />
+          <Line label="金運" value={t.money} color={C.accent} />
+          <Line label="対人運" value={t.social} color={C.blue} />
+          <Line label="やるべき" value={t.action} color={C.purple} />
+          <Line label="戒め" value={t.caution} color={C.red} />
+          <Line label="ラッキー" value={t.color} color={C.sub} />
+        </div>
+      )}
+
+      {m.theme && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <strong style={{ fontSize: 14, color: C.blue }}>今月 ・ {m.theme}</strong>
+          <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{m.flow}</div>
+          {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
+        </div>
+      )}
+
+      {y.theme && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <strong style={{ fontSize: 14, color: C.purple }}>今年 ・ {y.theme}</strong>
+          <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{y.flow}</div>
+          {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
+          {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
+        出典データ：<a href="https://www.senjutsu.jp/horoscope/" target="_blank" rel="noopener noreferrer" style={{ color: C.sub }}>大久保占い研究室</a> ・ 鑑定はAIによる参考です
+      </div>
+    </Panel>
+  );
 }
 
 /* どのカレンダーを仕事/家族として取り込むかの設定 */
@@ -1273,6 +1347,9 @@ export default function App() {
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestError, setDigestError] = useState(null);
   const digestRef = useRef(false);
+  const [fortuneLoading, setFortuneLoading] = useState(false);
+  const [fortuneError, setFortuneError] = useState(null);
+  const fortuneRef = useRef(false);
 
   // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
   const notifySupported = typeof Notification !== "undefined";
@@ -1335,6 +1412,33 @@ export default function App() {
     if (!data.digest || data.digest.date !== iso(new Date())) {
       digestRef.current = true;
       refreshDigest();
+    }
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 運気 ──
+  const refreshFortune = async () => {
+    if (!data) return;
+    setFortuneLoading(true);
+    setFortuneError(null);
+    try {
+      const r = await fetch("/api/fortune", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chart: CHART_ESSENTIALS, today: iso(new Date()) }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
+    } catch (e) {
+      setFortuneError(e);
+    }
+    setFortuneLoading(false);
+  };
+  useEffect(() => {
+    if (!data || fortuneRef.current) return;
+    if (!data.fortune || data.fortune.date !== iso(new Date())) {
+      fortuneRef.current = true;
+      refreshFortune();
     }
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1489,7 +1593,7 @@ export default function App() {
   const alerts = computeAlerts(data);
 
   // トップのタブ
-  const TABS = ["ホーム", "仕事", "売上", "タスク", "ニュース"];
+  const TABS = ["ホーム", "仕事", "売上", "タスク", "ニュース", "運気"];
   const onTouchStart = (ev) => {
     if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
     const t = ev.touches[0];
@@ -1608,6 +1712,16 @@ export default function App() {
             onRemoveFeed={(id) => feedsOps.remove(id)}
             selectedCats={newsCats}
             onToggleCat={toggleNewsCat}
+          />
+        )}
+
+        {tab === 5 && (
+          <FortunePanel
+            fortune={data.fortune}
+            loading={fortuneLoading}
+            error={fortuneError}
+            aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
+            onRefresh={refreshFortune}
           />
         )}
 
