@@ -5,6 +5,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
+import { computeChart } from "./natal";
 
 const STORE_KEY = "viele-secretary";
 
@@ -1467,13 +1468,17 @@ export default function App() {
     setFortuneLoading(true);
     setFortuneError(null);
     try {
+      const chartText = computeChart(data.birth || DEFAULT_BIRTH).text; // 命式はブラウザ側で計算
       const r = await fetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ birth: data.birth || DEFAULT_BIRTH, today: iso(new Date()) }),
+        body: JSON.stringify({ chart: chartText, today: iso(new Date()) }),
       });
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
+      const text = await r.text();
+      let j;
+      try { j = JSON.parse(text); }
+      catch { throw new Error(`サーバー応答が不正(HTTP ${r.status}): ${text.slice(0, 200)}`); }
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
       update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
     } catch (e) {
       setFortuneError(e);
