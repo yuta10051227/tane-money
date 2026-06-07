@@ -477,12 +477,55 @@ function AddTrip({ onAdd }) {
 /* ──────────────────────────────────────────────────────────────
    締切の逆算（二段ローンチ）
    ────────────────────────────────────────────────────────────── */
+// 告知文の下書き（LINE/SNS/メール）をAIで生成して表示
+function DraftPanel({ context }) {
+  const [loading, setLoading] = useState(true);
+  const [drafts, setDrafts] = useState(null);
+  const [err, setErr] = useState(null);
+  const [copied, setCopied] = useState("");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true); setErr(null);
+      try {
+        const r = await fetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) });
+        const text = await r.text();
+        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+        if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEYを設定）");
+        if (!cancel) setDrafts(j.drafts || (j.raw ? { line: j.raw } : {}));
+      } catch (e) { if (!cancel) setErr(e); }
+      if (!cancel) setLoading(false);
+    })();
+    return () => { cancel = true; };
+  }, [context]);
+  const copy = (t) => { try { navigator.clipboard.writeText(t); setCopied(t.slice(0, 10)); setTimeout(() => setCopied(""), 1500); } catch { /* ignore */ } };
+  const labels = { line: "公式LINE", sns: "SNS投稿", mail: "メール" };
+  return (
+    <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginTop: 8 }}>
+      {loading && <div style={{ fontSize: 12, color: C.sub }}>✍️ 下書きを作成中…</div>}
+      {err && <div style={{ fontSize: 12, color: C.red, wordBreak: "break-word" }}>失敗：{String(err.message || err)}</div>}
+      {drafts && ["line", "sns", "mail"].map((k) => drafts[k] && (
+        <div key={k} style={{ marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{labels[k] || k}</span>
+            <span style={{ flex: 1 }} />
+            <button onClick={() => copy(drafts[k])} style={{ ...chipBtn, fontSize: 11, padding: "3px 10px" }}>{copied === drafts[k].slice(0, 10) ? "コピー済✓" : "コピー"}</button>
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", color: C.text, background: C.panel2, borderRadius: 8, padding: "8px 10px" }}>{drafts[k]}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
   const sorted = [...(deadlines || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
   const [mode, setMode] = useState(null); // null | "single" | "template"
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
   const [editId, setEditId] = useState(null);
+  const [draftId, setDraftId] = useState(null);
   const [e, setE] = useState(blank);
   const [tpl, setTpl] = useState(Object.keys(LAUNCH_TEMPLATES)[0]);
   const [anchor, setAnchor] = useState(iso(addDays(new Date(), 21)));
@@ -552,17 +595,21 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
           }
           const sig = deadlineSignal(d.date);
           return (
-            <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
-              <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
-                {i + 1}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15 }}>{d.title}</div>
-                <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
+            <div key={d.id}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
+                <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
+                  {i + 1}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15 }}>{d.title}</div>
+                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
+                </div>
+                <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
+                <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
+                <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
+                <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
               </div>
-              <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
-              <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
-              <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
+              {draftId === d.id && <DraftPanel context={`${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`} />}
             </div>
           );
         })}
