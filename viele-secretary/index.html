@@ -39,19 +39,32 @@
           box.appendChild(h); box.appendChild(p); box.appendChild(pre);
           r.appendChild(box);
         }
-        // 実行エラー・スクリプト読込失敗(capture)・Promise例外をすべて捕捉
+        // アプリが既に描画済みなら乗っ取らない／拡張機能(MetaMask等)由来は無視
+        function appMounted() {
+          var r = document.getElementById("root");
+          return !!(r && r.childElementCount > 0);
+        }
+        function isNoise(s) {
+          return /chrome-extension:\/\/|moz-extension:\/\/|safari-extension:\/\/|MetaMask|inpage\.js/i.test(String(s || ""));
+        }
+        // 起動前の致命的エラー（白画面防止）のみ画面表示。描画後や拡張のノイズは無視。
         window.addEventListener("error", function (e) {
-          show((e.error && e.error.stack) || e.message || ("リソース読込失敗: " + (e.target && e.target.src || e.target && e.target.href || e)));
+          var msg = (e.error && e.error.stack) || e.message ||
+            ("リソース読込失敗: " + ((e.target && e.target.src) || (e.target && e.target.href) || ""));
+          if (isNoise(msg) || (e.target && isNoise((e.target.src) || (e.target.href)))) return;
+          if (appMounted()) return;
+          show(msg);
         }, true);
         window.addEventListener("unhandledrejection", function (e) {
-          show("UnhandledRejection: " + ((e.reason && e.reason.stack) || e.reason));
+          var reason = (e.reason && e.reason.stack) || e.reason;
+          if (isNoise(reason) || appMounted()) return;
+          show("UnhandledRejection: " + reason);
         });
 
         // 5秒たっても描画されない場合は状況を表示（無限ローディング防止）
         setTimeout(function () {
-          var r = document.getElementById("root");
-          if (r && r.childElementCount === 0) {
-            show("アプリのJavaScriptが実行されていません。\n古いキャッシュ/Service Workerの可能性が高いです。\nSafariのプライベートタブで開くか、ページを数回リロードしてください。");
+          if (!appMounted()) {
+            show("アプリのJavaScriptが実行されていません。\n古いキャッシュ/Service Workerの可能性が高いです。\nプライベートタブで開くか、ページを数回リロードしてください。");
           }
         }, 5000);
       })();
