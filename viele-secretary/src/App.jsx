@@ -644,13 +644,12 @@ function ScheduleRow({ e, source, onSetCat }) {
 }
 
 // 横スワイプで今日→明日→明後日…と切り替わる日別スケジュール
-function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat }) {
+// 汎用の横スワイプ表示（slides = [{key,label,content}]）
+function SwipeView({ slides, accent = C.blue, hint }) {
   const scroller = useRef(null);
   const [idx, setIdx] = useState(0);
-  const list = days || [];
-
   const goTo = (i) => {
-    const n = Math.max(0, Math.min(list.length - 1, i));
+    const n = Math.max(0, Math.min(slides.length - 1, i));
     const el = scroller.current;
     if (el) el.scrollTo({ left: el.clientWidth * n, behavior: "smooth" });
     setIdx(n);
@@ -659,54 +658,45 @@ function Schedule({ days, source, status, error, count, onConnect, connecting, o
     const el = scroller.current;
     if (el) setIdx(Math.round(el.scrollLeft / el.clientWidth));
   };
+  if (!slides.length) return null;
+  const cur = slides[Math.min(idx, slides.length - 1)];
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前へ">‹</button>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{cur.label}</div>
+        <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
+      </div>
+      <div ref={scroller} onScroll={onScroll} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+        {slides.map((s) => (
+          <div key={s.key} style={{ flex: "0 0 100%", minWidth: "100%", scrollSnapAlign: "start", boxSizing: "border-box" }}>{s.content}</div>
+        ))}
+      </div>
+      {slides.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 12 }}>
+          {slides.map((s, i) => (
+            <button key={s.key} onClick={() => goTo(i)} aria-label={String(s.label)} style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 4, border: "none", padding: 0, cursor: "pointer", background: i === idx ? accent : C.line }} />
+          ))}
+        </div>
+      )}
+      {hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: "center" }}>{hint}</div>}
+    </>
+  );
+}
 
-  const cur = list[idx];
+function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat }) {
+  const list = days || [];
+  const slides = list.map((day) => ({
+    key: day.key,
+    label: `${day.label}（${day.date.getMonth() + 1}/${day.date.getDate()} ${WD[day.date.getDay()]}）`,
+    content: day.items.length === 0
+      ? <Empty>予定はありません。</Empty>
+      : <div style={{ display: "grid", gap: 10 }}>{day.items.map((e, i) => <ScheduleRow key={i} e={e} source={source} onSetCat={onSetCat} />)}</div>,
+  }));
   return (
     <Panel title="予定（横スワイプで先の日へ）" accent={C.blue}>
       <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
-
-      {/* 日付ナビ */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前の日">‹</button>
-        <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>
-          {cur ? `${cur.label}（${cur.date.getMonth() + 1}/${cur.date.getDate()} ${WD[cur.date.getDay()]}）` : ""}
-        </div>
-        <button onClick={() => goTo(idx + 1)} disabled={idx >= list.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= list.length - 1 ? 0.3 : 1 }} aria-label="次の日">›</button>
-      </div>
-
-      {/* 横スクロール（スワイプでスナップ） */}
-      <div
-        ref={scroller}
-        onScroll={onScroll}
-        style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
-      >
-        {list.map((day) => (
-          <div key={day.key} style={{ flex: "0 0 100%", minWidth: "100%", scrollSnapAlign: "start", boxSizing: "border-box" }}>
-            {day.items.length === 0 ? (
-              <Empty>予定はありません。</Empty>
-            ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {day.items.map((e, i) => (
-                  <ScheduleRow key={i} e={e} source={source} onSetCat={onSetCat} />
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* ドット */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 12 }}>
-        {list.map((day, i) => (
-          <button
-            key={day.key}
-            onClick={() => goTo(i)}
-            aria-label={day.label}
-            style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 4, border: "none", padding: 0, cursor: "pointer", background: i === idx ? C.blue : C.line }}
-          />
-        ))}
-      </div>
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: "center" }}>← 横スワイプ / 矢印で 今日・明日・明後日… →</div>
+      <SwipeView slides={slides} accent={C.blue} hint="← 横スワイプ / 矢印で 今日・明日・明後日… →" />
     </Panel>
   );
 }
@@ -792,21 +782,28 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
 
       {items.length === 0 && !loading && <Empty>まだ記事がありません。「更新」を押すか、情報源を追加してください。</Empty>}
 
-      <div style={{ display: "grid", gap: 10 }}>
-        {shown.map((it, i) => (
-          <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-            <div style={{ display: "grid", gap: 2 }}>
-              <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
-              <div style={{ fontSize: 11, color: C.faint }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+      {items.length > 0 && (() => {
+        const renderItems = (arr) => (
+          arr.length === 0 ? <Empty>記事がありません。</Empty> : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {arr.slice(0, 25).map((it, i) => (
+                <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
+                    <div style={{ fontSize: 11, color: C.faint }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+                  </div>
+                </a>
+              ))}
             </div>
-          </a>
-        ))}
-      </div>
-      {items.length > 12 && (
-        <button onClick={() => setShowAll((v) => !v)} style={{ ...chipBtn, marginTop: 12, justifySelf: "start" }}>
-          {showAll ? "閉じる" : `もっと見る（残り${items.length - 12}件）`}
-        </button>
-      )}
+          )
+        );
+        const sources = Array.from(new Set(items.map((it) => it.source).filter(Boolean)));
+        const slides = [
+          { key: "all", label: `すべて(${items.length})`, content: renderItems(items) },
+          ...sources.map((s) => { const arr = items.filter((it) => it.source === s); return { key: s, label: `${s}(${arr.length})`, content: renderItems(arr) }; }),
+        ];
+        return <SwipeView slides={slides} accent={C.blue} hint="← 横スワイプで 情報源を切替 →" />;
+      })()}
 
       {digest && digest.aiEnabled === false && briefLines.length === 0 && (
         <div style={{ fontSize: 11, color: C.faint, marginTop: 12 }}>
@@ -964,40 +961,61 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, amount: it.amount || "", kind: it.kind || "請求" }); };
   const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), amount: Number(e.amount) || 0, kind: e.kind }); setEditId(null); };
   const kindColor = (k) => (k === "入金" ? C.green : k === "支払" ? C.red : C.accent);
+  const sum = (arr) => arr.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+
+  const renderRow = (it) => (
+    <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <Check done={it.done} onClick={() => onToggle(it.id)} />
+      {editId === it.id ? (
+        <>
+          <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="項目" style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 80 }} />
+          <input value={e.amount} onChange={(ev) => setE({ ...e, amount: ev.target.value })} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+          <select value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 70 }}>
+            {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
+          </select>
+          <button onClick={saveEdit} style={chipBtn}>保存</button>
+          <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+        </>
+      ) : (
+        <>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
+          {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
+          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind) }}>{it.kind}</span>}
+          <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
+          <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+        </>
+      )}
+    </div>
+  );
+
+  const tabs = [
+    { key: "all", label: "すべて", filter: () => true, note: (a) => `未処理 ${yen(sum(a.filter((x) => !x.done)))}` },
+    { key: "請求", label: "請求(未回収)", filter: (x) => x.kind === "請求", note: (a) => `未回収 ${yen(sum(a.filter((x) => !x.done)))}` },
+    { key: "入金", label: "売上(入金)", filter: (x) => x.kind === "入金", note: (a) => `合計 ${yen(sum(a))}` },
+    { key: "支払", label: "経費(支払)", filter: (x) => x.kind === "支払", note: (a) => `合計 ${yen(sum(a))}` },
+  ];
+  const slides = tabs.map((t) => {
+    const arr = list.filter(t.filter);
+    return {
+      key: t.key,
+      label: t.label,
+      content: (
+        <div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>{t.note(arr)}{arr.length ? ` ・ ${arr.length}件` : ""}</div>
+          {arr.length === 0 ? <Empty>項目はありません。</Empty> : <div style={{ display: "grid", gap: 8 }}>{arr.map(renderRow)}</div>}
+        </div>
+      ),
+    };
+  });
 
   return (
     <Panel
-      title="請求・お金"
+      title="売上・経費"
       accent={C.accent}
+      help="横スワイプで「すべて / 請求(未回収) / 売上(入金) / 経費(支払)」を切替。各タブに合計が出ます。下のフォームから追加できます。"
       right={<span style={{ fontSize: 12, color: outstanding > 0 ? C.accent : C.sub }}>未処理 {yen(outstanding)}</span>}
     >
-      <div style={{ display: "grid", gap: 8 }}>
-        {list.length === 0 && <Empty>項目はありません。</Empty>}
-        {list.map((it) => (
-          <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Check done={it.done} onClick={() => onToggle(it.id)} />
-            {editId === it.id ? (
-              <>
-                <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="項目" style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 80 }} />
-                <input value={e.amount} onChange={(ev) => setE({ ...e, amount: ev.target.value })} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
-                <select value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 70 }}>
-                  {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
-                </select>
-                <button onClick={saveEdit} style={chipBtn}>保存</button>
-                <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
-              </>
-            ) : (
-              <>
-                <span style={{ flex: 1, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
-                {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
-                {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind) }}>{it.kind}</span>}
-                <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
-                <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
+      <SwipeView slides={slides} accent={C.accent} hint="← 横スワイプで すべて / 請求 / 売上 / 経費 →" />
       <form
         onSubmit={(ev) => { ev.preventDefault(); if (!title.trim()) return; onAdd({ title: title.trim(), amount: Number(amount) || 0, kind }); setTitle(""); setAmount(""); }}
         style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}

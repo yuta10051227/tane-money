@@ -39,7 +39,7 @@ function parseFeed(xml, sourceName) {
 }
 
 async function geminiBriefing(apiKey, items) {
-  const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   const titles = items.slice(0, 20).map((it, i) => `${i + 1}. ${it.title}`).join("\n");
   const prompt =
     `あなたは一人社長の優秀な秘書です。次のニュース見出しから、今日おさえるべき要点を日本語で3つ、各1文で簡潔にまとめてください。` +
