@@ -887,11 +887,30 @@ function fmtNews(s) {
 }
 
 /* 運気（年運・月運・日運）。命式データを根拠にAIが鑑定。 */
+// 運気の波グラフ（1〜5スコアの棒）
+function FortuneBars({ values, highlight, color }) {
+  const arr = Array.isArray(values) ? values : [];
+  if (!arr.length) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: arr.length > 16 ? 1 : 3, height: 56, marginTop: 8 }}>
+      {arr.map((v, i) => {
+        const s = Math.max(1, Math.min(5, Number(v) || 1));
+        const on = i === highlight;
+        return (
+          <div key={i} title={`${i + 1}: ${s}`} style={{ flex: 1, height: `${(s / 5) * 100}%`, background: on ? color : C.line, borderRadius: 2, minWidth: 2 }} />
+        );
+      })}
+    </div>
+  );
+}
+
 function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
   const f = fortune || {};
   const t = f.today || {};
+  const tm = f.tomorrow || {};
   const m = f.month || {};
   const y = f.year || {};
+  const now = new Date();
   const stars = (n) => "★★★★★".slice(0, Math.max(0, Math.min(5, Number(n) || 0))) + "☆☆☆☆☆".slice(0, 5 - Math.max(0, Math.min(5, Number(n) || 0)));
   const Line = ({ label, value, color }) => value ? (
     <div style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.5, padding: "2px 0" }}>
@@ -927,11 +946,34 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
         </div>
       )}
 
+      {tm.theme && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <strong style={{ fontSize: 14 }}>明日</strong>
+            <span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
+          <Line label="仕事運" value={tm.work} color={C.green} />
+          <Line label="金運" value={tm.money} color={C.accent} />
+          <Line label="対人運" value={tm.social} color={C.blue} />
+          <Line label="やるべき" value={tm.action} color={C.purple} />
+          <Line label="ラッキー" value={tm.color} color={C.sub} />
+        </div>
+      )}
+
       {m.theme && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
           <strong style={{ fontSize: 14, color: C.blue }}>今月 ・ {m.theme}</strong>
           <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{m.flow}</div>
           {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
+          {Array.isArray(m.days) && m.days.length > 0 && (
+            <>
+              <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
+              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -941,6 +983,14 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
           <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 6 }}>{y.flow}</div>
           {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
           {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
+          {Array.isArray(y.months) && y.months.length === 12 && (
+            <>
+              <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
+              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                <span>1月</span><span>今月</span><span>12月</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
