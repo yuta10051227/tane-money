@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="9155bb4">
+<meta name="tane-version" content="32cb40f">
 </head>
 <body>
   <div id="root"></div>
@@ -5252,7 +5252,64 @@ function ChildScreen({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u3053\u3046\u304B\u3093\uD83C\uDF89")))), effectiveTab === "daily" && /*#__PURE__*/React.createElement(React.Fragment, null, !isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\u3053\u3046\u304B\u3093\uD83C\uDF89")))), effectiveTab === "daily" && /*#__PURE__*/React.createElement(React.Fragment, null, data.firstActionPending && (data.goodTasks || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: GS,
+      border: `2px solid ${G}`,
+      borderRadius: 16,
+      padding: "14px 16px",
+      marginBottom: 16,
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => update(d => ({
+      ...d,
+      firstActionPending: false
+    })),
+    style: {
+      position: "absolute",
+      top: 8,
+      right: 10,
+      background: "none",
+      border: "none",
+      fontSize: 16,
+      cursor: "pointer",
+      color: MUTED
+    }
+  }, "\u2715"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 900,
+      fontSize: 14,
+      color: GP,
+      marginBottom: 6
+    }
+  }, "\uD83C\uDF31 \u3055\u3042\u3001\u306F\u3058\u3081\u3088\u3046\uFF01"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: TEXTS,
+      fontSize: 13,
+      lineHeight: 1.7,
+      marginBottom: 10
+    }
+  }, "\u300C\u6D3B\u52D5\u300D\u30BF\u30D6\u3092\u958B\u3044\u3066\u3001", (data.goodTasks || [])[0]?.emoji, (data.goodTasks || [])[0]?.label, "\u3092\u30BF\u30C3\u30D7\u3057\u3066\u307F\u3088\u3046\uFF01"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      update(d => ({
+        ...d,
+        firstActionPending: false
+      }));
+      setTab(isJunior ? "tasks" : "activity");
+    },
+    style: {
+      background: GP,
+      border: "none",
+      borderRadius: 10,
+      padding: "8px 18px",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u6D3B\u52D5\u30BF\u30D6\u3078 \u2192")), !isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       color: "rgba(255,255,255,0.25)",
       fontSize: 10,
@@ -16279,6 +16336,298 @@ function TaskCustomizer({
   }, "\u2705 \u3053\u306E\u30EA\u30B9\u30C8\u3067\u6C7A\u5B9A\uFF01"))));
 }
 
+// ── Default Fallback Tasks (タスク未選択時のデフォルト) ──
+const DEFAULT_FALLBACK_TASKS = [{
+  id: "df01",
+  emoji: "📝",
+  label: "宿題をする",
+  pts: 50,
+  over: {}
+}, {
+  id: "df02",
+  emoji: "🍽",
+  label: "食器を洗う",
+  pts: 20,
+  over: {}
+}, {
+  id: "df03",
+  emoji: "🧹",
+  label: "掃除機をかける",
+  pts: 30,
+  over: {}
+}, {
+  id: "df04",
+  emoji: "⏰",
+  label: "決めた時間に起きる",
+  pts: 20,
+  over: {}
+}, {
+  id: "df05",
+  emoji: "🗑",
+  label: "ゴミを捨てる",
+  pts: 10,
+  over: {}
+}, {
+  id: "df06",
+  emoji: "🧺",
+  label: "洗濯物を畳む",
+  pts: 15,
+  over: {}
+}, {
+  id: "df07",
+  emoji: "🛁",
+  label: "お風呂掃除をする",
+  pts: 20,
+  over: {}
+}, {
+  id: "df08",
+  emoji: "🌙",
+  label: "決めた時間に寝る",
+  pts: 15,
+  over: {}
+}];
+
+// ── Task Templates (初回セットアップ用) ──────────────
+const TASK_TEMPLATES = {
+  junior: [{
+    cat: "📚 勉強",
+    tasks: [{
+      id: "tj01",
+      emoji: "📝",
+      label: "宿題をする",
+      pts: 50
+    }, {
+      id: "tj02",
+      emoji: "📖",
+      label: "音読をする（10分）",
+      pts: 20
+    }, {
+      id: "tj03",
+      emoji: "✏",
+      label: "ドリルを1ページやる",
+      pts: 30
+    }, {
+      id: "tj04",
+      emoji: "🔤",
+      label: "漢字練習をする",
+      pts: 25
+    }, {
+      id: "tj05",
+      emoji: "🔢",
+      label: "計算練習をする",
+      pts: 25
+    }]
+  }, {
+    cat: "🏠 お手伝い",
+    tasks: [{
+      id: "tj06",
+      emoji: "🗑",
+      label: "ゴミを捨てる",
+      pts: 10
+    }, {
+      id: "tj07",
+      emoji: "🍽",
+      label: "食器を洗う",
+      pts: 20
+    }, {
+      id: "tj08",
+      emoji: "🧺",
+      label: "洗濯物を畳む",
+      pts: 15
+    }, {
+      id: "tj09",
+      emoji: "🛁",
+      label: "お風呂掃除をする",
+      pts: 20
+    }, {
+      id: "tj10",
+      emoji: "🍳",
+      label: "ご飯の準備を手伝う",
+      pts: 25
+    }, {
+      id: "tj11",
+      emoji: "🧹",
+      label: "掃き掃除をする",
+      pts: 20
+    }]
+  }, {
+    cat: "😴 生活習慣",
+    tasks: [{
+      id: "tj12",
+      emoji: "⏰",
+      label: "自分で起きる",
+      pts: 15
+    }, {
+      id: "tj13",
+      emoji: "🌙",
+      label: "決めた時間に寝る",
+      pts: 15
+    }, {
+      id: "tj14",
+      emoji: "🪥",
+      label: "歯磨きをする",
+      pts: 10
+    }, {
+      id: "tj15",
+      emoji: "👋",
+      label: "あいさつをする",
+      pts: 5
+    }]
+  }],
+  teen: [{
+    cat: "📚 勉強",
+    tasks: [{
+      id: "tt01",
+      emoji: "📝",
+      label: "宿題をする",
+      pts: 50
+    }, {
+      id: "tt02",
+      emoji: "📖",
+      label: "自主学習（30分）",
+      pts: 60
+    }, {
+      id: "tt03",
+      emoji: "📒",
+      label: "復習・予習をする",
+      pts: 60
+    }, {
+      id: "tt04",
+      emoji: "🔤",
+      label: "単語を10個覚える",
+      pts: 30
+    }, {
+      id: "tt05",
+      emoji: "📐",
+      label: "苦手科目を1時間勉強",
+      pts: 100
+    }]
+  }, {
+    cat: "🏠 お手伝い",
+    tasks: [{
+      id: "tt06",
+      emoji: "🗑",
+      label: "ゴミ出しをする",
+      pts: 15
+    }, {
+      id: "tt07",
+      emoji: "🍽",
+      label: "食器洗いをする",
+      pts: 20
+    }, {
+      id: "tt08",
+      emoji: "🧹",
+      label: "掃除機をかける",
+      pts: 30
+    }, {
+      id: "tt09",
+      emoji: "🧺",
+      label: "洗濯物を畳む",
+      pts: 15
+    }, {
+      id: "tt10",
+      emoji: "🛁",
+      label: "お風呂掃除をする",
+      pts: 20
+    }, {
+      id: "tt11",
+      emoji: "🍳",
+      label: "料理を手伝う",
+      pts: 35
+    }]
+  }, {
+    cat: "😴 生活習慣",
+    tasks: [{
+      id: "tt12",
+      emoji: "⏰",
+      label: "決めた時間に起きる",
+      pts: 20
+    }, {
+      id: "tt13",
+      emoji: "🌙",
+      label: "決めた時間に寝る",
+      pts: 20
+    }, {
+      id: "tt14",
+      emoji: "📵",
+      label: "スマホを指定時間に置く",
+      pts: 30
+    }, {
+      id: "tt15",
+      emoji: "📚",
+      label: "読書（30分）",
+      pts: 25
+    }]
+  }],
+  parent: [{
+    cat: "🏠 家事（親）",
+    tasks: [{
+      id: "tp01",
+      emoji: "🍳",
+      label: "夕食を作る",
+      pts: 50,
+      parentOnly: true
+    }, {
+      id: "tp02",
+      emoji: "🧹",
+      label: "掃除機をかける",
+      pts: 30,
+      parentOnly: true
+    }, {
+      id: "tp03",
+      emoji: "👔",
+      label: "洗濯をする・干す",
+      pts: 30,
+      parentOnly: true
+    }, {
+      id: "tp04",
+      emoji: "🛒",
+      label: "買い物をする",
+      pts: 20,
+      parentOnly: true
+    }, {
+      id: "tp05",
+      emoji: "🍽",
+      label: "食器洗いをする",
+      pts: 20,
+      parentOnly: true
+    }, {
+      id: "tp06",
+      emoji: "🗑",
+      label: "ゴミ出し",
+      pts: 10,
+      parentOnly: true
+    }]
+  }, {
+    cat: "💪 自己管理（親）",
+    tasks: [{
+      id: "tp07",
+      emoji: "🏃",
+      label: "運動をする（30分）",
+      pts: 50,
+      parentOnly: true
+    }, {
+      id: "tp08",
+      emoji: "⏰",
+      label: "早起きする（6時台）",
+      pts: 30,
+      parentOnly: true
+    }, {
+      id: "tp09",
+      emoji: "🏠",
+      label: "残業せず定時退社",
+      pts: 100,
+      parentOnly: true
+    }, {
+      id: "tp10",
+      emoji: "📵",
+      label: "寝る前スマホを控える",
+      pts: 30,
+      parentOnly: true
+    }]
+  }]
+};
+
 // ── Setup Wizard ──────────────────────────────────────
 function SetupWizard({
   data,
@@ -16290,20 +16639,28 @@ function SetupWizard({
   const [childName, setChildName] = useState("");
   const [childEmoji, setChildEmoji] = useState("⚡");
   const [childMode, setChildMode] = useState("teen");
-  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [parentJoin, setParentJoin] = useState(false); // true/false
+  const [parentName, setParentName] = useState("");
+  const [parentEmoji, setParentEmoji] = useState("👨");
+  const [tmplCat, setTmplCat] = useState(0);
+  const [selTasks, setSelTasks] = useState([]); // task objects
   const [goalEmoji, setGoalEmoji] = useState("🎮");
   const [goalLabel, setGoalLabel] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
   const [goalSkipped, setGoalSkipped] = useState(false);
+  const [notifDone, setNotifDone] = useState(false);
   const [familyCode] = useState(() => `TANE-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
   const [joinMode, setJoinMode] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinErr, setJoinErr] = useState("");
   const CHILD_EMOJIS = ["⚡", "🌸", "🌟", "🦁", "🐯", "🐬", "🦊", "🐼", "🐉", "🌈", "🎸", "⚽", "🚀", "🎮", "🦄", "🐶", "🐱", "🍕"];
+  const PARENT_EMOJIS = ["👨", "👩", "🧑", "👨💼", "👩💼", "🧔", "👴", "👵", "🦸", "🧙", "🎅", "🦹"];
   const GOAL_EMOJIS = ["🎮", "📱", "🎵", "🚴", "✈", "👟", "📚", "🎨", "⚽", "🍰", "💻", "🎸", "🏊", "🎀", "🌍", "🍜"];
-  const STARTER_TASKS = (data?.goodTasks || []).slice(0, 10);
+  const tmplGroups = [...TASK_TEMPLATES[childMode], ...(parentJoin ? TASK_TEMPLATES.parent : [])];
+  const toggleTask = task => setSelTasks(prev => prev.some(t => t.id === task.id) ? prev.filter(t => t.id !== task.id) : [...prev, task]);
   const handleComplete = (skipGoal = false, parentPin = "0000") => {
     const childId = uid();
+    const parentId = uid();
     const newChild = {
       id: childId,
       name: childName.trim() || "こども",
@@ -16328,6 +16685,38 @@ function SetupWizard({
         rankingMetric: "approved_activity_points"
       }
     };
+    const newParent = parentJoin && parentName.trim() ? {
+      id: parentId,
+      name: parentName.trim(),
+      emoji: parentEmoji,
+      pin: parentPin,
+      displayMode: "adult",
+      role: "parent",
+      gradeLabel: "",
+      participationMode: "player_and_guardian",
+      permissions: {
+        investment: "trade",
+        forex: "trade",
+        dailyBonus: true,
+        ranking: true
+      },
+      visibility: {
+        balanceToFamily: "hidden",
+        goalToFamily: "progress_only",
+        investmentResultToFamily: "ranking_only",
+        rankingParticipation: true,
+        operationRankingParticipation: true,
+        rankingMetric: "approved_activity_points"
+      }
+    } : null;
+    const goodTasksFromTmpl = selTasks.length > 0 ? selTasks.map(({
+      parentOnly,
+      ...rest
+    }) => ({
+      ...rest,
+      over: {}
+    })) : DEFAULT_FALLBACK_TASKS;
+    const childTaskIds = selTasks.filter(t => !t.parentOnly).map(t => t.id);
     const newGoal = !skipGoal && goalLabel.trim() && parseInt(goalTarget) > 0 ? {
       id: uid(),
       cid: childId,
@@ -16350,11 +16739,13 @@ function SetupWizard({
     _familyCode = familyCode;
     update(d => ({
       ...d,
+      familyName: familyName.trim() || "わが家",
       children: [newChild],
-      parents: [],
+      parents: newParent ? [newParent] : [],
+      goodTasks: goodTasksFromTmpl,
       goals: newGoal ? [newGoal] : [],
-      myTaskIds: selectedTasks.length > 0 ? {
-        [childId]: selectedTasks
+      myTaskIds: childTaskIds.length > 0 ? {
+        [childId]: childTaskIds
       } : {},
       tutorialSeen: {
         [childId]: true
@@ -16363,7 +16754,8 @@ function SetupWizard({
       parentPin: parentPin || "0000",
       logs: [bonusLog],
       gachaDate: {},
-      streak: {}
+      streak: {},
+      firstActionPending: true
     }));
     addLogToFirestore(bonusLog);
     onComplete();
@@ -16393,7 +16785,7 @@ function SetupWizard({
       margin: "0 auto",
       boxSizing: "border-box"
     }
-  }, step >= 1 && step <= 5 && /*#__PURE__*/React.createElement("div", {
+  }, step >= 1 && step <= 6 && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 28
     }
@@ -16402,15 +16794,29 @@ function SetupWizard({
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 8
+      marginBottom: 12
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7
+    }
+  }, [1, 2, 3, 4, 5, 6].map(i => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      width: i === step ? 20 : 8,
+      height: 8,
+      borderRadius: 999,
+      background: i <= step ? GP : BORDER,
+      transition: "all .3s ease"
+    }
+  }))), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: MUTED,
       fontWeight: 700
     }
-  }, "\u30B9\u30C6\u30C3\u30D7 ", step, " / 5"), step < 5 && /*#__PURE__*/React.createElement("button", {
+  }, step, " / 6"), step > 1 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setStep(s => s - 1),
     style: {
       background: "none",
@@ -16421,22 +16827,7 @@ function SetupWizard({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u2190 \u3082\u3069\u308B")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: BORDER,
-      borderRadius: 999,
-      height: 6,
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: "100%",
-      width: `${step / 5 * 100}%`,
-      background: G,
-      borderRadius: 999,
-      transition: "width .4s ease"
-    }
-  }))), step === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u2190 \u3082\u3069\u308B"))), step === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
@@ -16638,7 +17029,7 @@ function SetupWizard({
       color: MUTED,
       marginTop: 4
     }
-  }, "\u3053\u306E\u30B3\u30FC\u30C9\u3092\u4ED6\u306E\u7AEF\u672B\u3067\u5165\u529B\u3059\u308B\u3068\u540C\u3058\u30C7\u30FC\u30BF\u3092\u4F7F\u3048\u307E\u3059")), /*#__PURE__*/React.createElement("button", {
+  }, "\u5BB6\u65CF\u306B\u4F1D\u3048\u308B\u3068\u540C\u3058\u30A2\u30D7\u30EA\u3092\u4E00\u7DD2\u306B\u4F7F\u3048\u307E\u3059\u3002\u3042\u3068\u3067\u3082\u78BA\u8A8D\u3067\u304D\u307E\u3059")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setStep(2),
     style: btnStyle(!!familyName.trim()),
     disabled: !familyName.trim()
@@ -16714,7 +17105,7 @@ function SetupWizard({
     style: {
       display: "flex",
       gap: 8,
-      marginBottom: 24
+      marginBottom: 28
     }
   }, [["junior", "小学生"], ["teen", "中学生・高校生"]].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
     key: v,
@@ -16745,37 +17136,218 @@ function SetupWizard({
       fontSize: 48,
       marginBottom: 14
     }
-  }, "\u2705"), /*#__PURE__*/React.createElement("h2", {
+  }, "\uD83C\uDFC6"), /*#__PURE__*/React.createElement("h2", {
     style: {
       fontWeight: 900,
       fontSize: 22,
       color: TEXT,
       margin: "0 0 6px"
     }
-  }, "\u304A\u624B\u4F1D\u3044\u3092\u9078\u307C\u3046"), /*#__PURE__*/React.createElement("p", {
+  }, "\u89AA\u3082\u53C2\u52A0\u3057\u307E\u3059\u304B\uFF1F"), /*#__PURE__*/React.createElement("p", {
     style: {
       color: MUTED,
       fontSize: 13,
-      margin: "0 0 16px"
+      margin: "0 0 6px",
+      lineHeight: 1.6
     }
-  }, "\u3084\u3063\u3066\u307F\u305F\u3044\u3082\u306E\u3092\u9078\u3093\u3067\u306D\uFF01\uFF08\u3042\u3068\u3067\u5909\u3048\u3089\u308C\u307E\u3059\uFF09"), /*#__PURE__*/React.createElement("div", {
+  }, "\u5B50\u3069\u3082\u3068\u4E00\u7DD2\u306B\u30DD\u30A4\u30F3\u30C8\u3092\u8CAF\u3081\u3066\u30E9\u30F3\u30AD\u30F3\u30B0\u3067\u7AF6\u3048\u307E\u3059"), /*#__PURE__*/React.createElement("p", {
     style: {
-      marginBottom: 20,
-      maxHeight: 340,
-      overflowY: "auto"
+      color: MUTED,
+      fontSize: 11,
+      margin: "0 0 18px"
     }
-  }, STARTER_TASKS.map(t => {
-    const sel = selectedTasks.includes(t.id);
+  }, "\u53C2\u52A0\u3057\u306A\u304F\u3066\u3082\u7BA1\u7406\u6A5F\u80FD\u306F\u3059\u3079\u3066\u4F7F\u3048\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setParentJoin(false);
+      setTmplCat(0);
+      setStep(4);
+    },
+    style: {
+      flex: 1,
+      padding: "16px 0",
+      border: `2.5px solid ${parentJoin === false ? GP : BORDER}`,
+      borderRadius: 16,
+      background: parentJoin === false ? `${GP}12` : "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: F,
+      color: parentJoin === false ? GP : TEXT,
+      transition: "all .15s",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 28
+    }
+  }, "\uD83D\uDC40"), /*#__PURE__*/React.createElement("span", null, "\u7BA1\u7406\u306E\u307F\uFF08\u898B\u308B\u3060\u3051\uFF09")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setParentJoin(true),
+    style: {
+      flex: 1,
+      padding: "16px 0",
+      border: `2.5px solid ${parentJoin === true ? B : BORDER}`,
+      borderRadius: 16,
+      background: parentJoin === true ? `${B}12` : "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: F,
+      color: parentJoin === true ? B : TEXT,
+      transition: "all .15s",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 28
+    }
+  }, "\uD83D\uDE4B"), /*#__PURE__*/React.createElement("span", null, "\u4E00\u7DD2\u306B\u53C2\u52A0\uFF01"))), parentJoin === true && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: CARD,
+      border: `1.5px solid ${BORDER}`,
+      borderRadius: 16,
+      padding: "16px",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: MUTED,
+      marginBottom: 8
+    }
+  }, "\u7D75\u6587\u5B57\u3092\u9078\u307C\u3046"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 7,
+      marginBottom: 14
+    }
+  }, PARENT_EMOJIS.map(e => /*#__PURE__*/React.createElement("button", {
+    key: e,
+    onClick: () => setParentEmoji(e),
+    style: {
+      width: 42,
+      height: 42,
+      borderRadius: 11,
+      border: `2.5px solid ${parentEmoji === e ? B : BORDER}`,
+      background: parentEmoji === e ? `${B}18` : "#fff",
+      fontSize: 22,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, e))), /*#__PURE__*/React.createElement("input", {
+    value: parentName,
+    onChange: e => setParentName(e.target.value),
+    placeholder: "\u540D\u524D\uFF08\u4F8B\uFF1A\u304A\u7236\u3055\u3093\u3001\u3086\u3046\u305F\uFF09",
+    style: {
+      ...INP,
+      fontSize: 15
+    }
+  })), parentJoin === true && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setTmplCat(0);
+      setStep(4);
+    },
+    style: btnStyle(!!parentName.trim()),
+    disabled: !parentName.trim()
+  }, "\u3064\u304E\u3078 \u2192")), step === 4 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 48,
+      marginBottom: 14
+    }
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontWeight: 900,
+      fontSize: 22,
+      color: TEXT,
+      margin: "0 0 4px"
+    }
+  }, "\u30BF\u30B9\u30AF\u3092\u9078\u307C\u3046"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: MUTED,
+      fontSize: 13,
+      margin: "0 0 6px",
+      lineHeight: 1.6
+    }
+  }, "\u30DD\u30A4\u30F3\u30C8\u3092\u5272\u308A\u632F\u308A\u305F\u3044\u9805\u76EE\u3092\u30C1\u30A7\u30C3\u30AF", /*#__PURE__*/React.createElement("br", null), "\uFF08\u3042\u3068\u3067\u81EA\u7531\u306B\u7DE8\u96C6\u3067\u304D\u307E\u3059\uFF09"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: MUTED,
+      marginBottom: 10
+    }
+  }, "pt\uFF1D\u30DD\u30A4\u30F3\u30C8\uFF08\u304A\u624B\u4F1D\u3044\u3067\u8CAF\u307E\u308B\u5358\u4F4D\uFF09"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6,
+      overflowX: "auto",
+      paddingBottom: 2
+    }
+  }, tmplGroups.map((g, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    onClick: () => setTmplCat(i),
+    style: {
+      flexShrink: 0,
+      padding: "7px 14px",
+      border: `2px solid ${tmplCat === i ? GP : BORDER}`,
+      borderRadius: 999,
+      background: tmplCat === i ? `${GP}12` : "#fff",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F,
+      color: tmplCat === i ? GP : MUTED,
+      whiteSpace: "nowrap",
+      transition: "all .15s"
+    }
+  }, g.cat))), tmplGroups.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: MUTED,
+      textAlign: "right",
+      marginBottom: 6
+    }
+  }, "\u2190 \u30B9\u30EF\u30A4\u30D7\u3067\u4ED6\u306E\u30AB\u30C6\u30B4\u30EA\u3092\u898B\u308B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      overflowY: "auto",
+      maxHeight: 320,
+      marginBottom: 10
+    }
+  }, (tmplGroups[tmplCat]?.tasks || []).map(t => {
+    const sel = selTasks.some(s => s.id === t.id);
+    const col = t.parentOnly ? B : GP;
     return /*#__PURE__*/React.createElement("button", {
       key: t.id,
-      onClick: () => setSelectedTasks(p => sel ? p.filter(x => x !== t.id) : [...p, t.id]),
+      onClick: () => toggleTask(t),
       style: {
         width: "100%",
         marginBottom: 8,
-        background: sel ? `${GP}12` : "#fff",
-        border: `2px solid ${sel ? GP : BORDER}`,
+        background: sel ? `${col}12` : "#fff",
+        border: `2px solid ${sel ? col : BORDER}`,
         borderRadius: 13,
-        padding: "10px 14px",
+        padding: "11px 14px",
         display: "flex",
         alignItems: "center",
         gap: 12,
@@ -16794,27 +17366,34 @@ function SetupWizard({
         flex: 1,
         fontWeight: 700,
         fontSize: 13,
-        color: TEXT
+        color: sel ? col : TEXT
       }
     }, t.label), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
-        color: GP,
+        color: col,
         fontWeight: 800,
         flexShrink: 0
       }
     }, "+", t.pts, "pt"), sel && /*#__PURE__*/React.createElement("span", {
       style: {
-        color: GP,
+        color: col,
         fontSize: 16,
         fontWeight: 900,
         flexShrink: 0
       }
     }, "\u2713"));
-  })), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setStep(4),
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: MUTED,
+      textAlign: "center",
+      marginBottom: 10
+    }
+  }, selTasks.length > 0 ? `${selTasks.length}個を選択中` : "スキップするとあとで追加できます"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setStep(5),
     style: btnStyle(true)
-  }, selectedTasks.length === 0 ? "スキップ →" : `${selectedTasks.length}個選択 → つぎへ`)), step === 4 && /*#__PURE__*/React.createElement("div", {
+  }, selTasks.length === 0 ? "スキップ →" : `${selTasks.length}個で決定 → つぎへ`)), step === 5 && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -16896,7 +17475,7 @@ function SetupWizard({
   }, "pt")), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setGoalSkipped(false);
-      setStep(5);
+      setStep(6);
     },
     style: {
       ...btnStyle(true),
@@ -16907,7 +17486,7 @@ function SetupWizard({
   }, "\u6B21\u3078 \u2192 PIN\u8A2D\u5B9A"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setGoalSkipped(true);
-      setStep(5);
+      setStep(6);
     },
     style: {
       width: "100%",
@@ -16920,7 +17499,7 @@ function SetupWizard({
       fontWeight: 700,
       padding: "6px"
     }
-  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066PIN\u8A2D\u5B9A\u3078")), step === 5 && /*#__PURE__*/React.createElement("div", {
+  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066PIN\u8A2D\u5B9A\u3078")), step === 6 && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       display: "flex",
@@ -16947,7 +17526,59 @@ function SetupWizard({
       margin: "0 0 28px",
       lineHeight: 1.7
     }
-  }, "\u5B50\u3069\u3082\u306B\u898B\u3089\u308C\u306A\u3044\u3088\u3046", /*#__PURE__*/React.createElement("br", null), "4\u3051\u305F\u306E\u756A\u53F7\u3092\u6C7A\u3081\u3088\u3046"), /*#__PURE__*/React.createElement(PinInput, {
+  }, "\u5B50\u3069\u3082\u306B\u898B\u3089\u308C\u306A\u3044\u3088\u3046", /*#__PURE__*/React.createElement("br", null), "4\u3051\u305F\u306E\u756A\u53F7\u3092\u6C7A\u3081\u3088\u3046"), !notifDone && "Notification" in window && Notification.permission === "default" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      background: GS,
+      border: `1.5px solid ${G}`,
+      borderRadius: 16,
+      padding: "14px 16px",
+      marginBottom: 20,
+      textAlign: "left",
+      boxSizing: "border-box"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 13,
+      color: GP,
+      marginBottom: 6
+    }
+  }, "\uD83D\uDD14 \u6BCE\u65E5\u306E\u30EA\u30DE\u30A4\u30F3\u30C9\u3092\u53D7\u3051\u53D6\u308B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: TEXTS,
+      fontSize: 12,
+      lineHeight: 1.7,
+      marginBottom: 10
+    }
+  }, "\u300C\u4ECA\u65E5\u306E\u304A\u624B\u4F1D\u3044\u3092\u5FD8\u308C\u305A\u306B\u300D\u306A\u3069\u306E\u901A\u77E5\u3092\u53D7\u3051\u53D6\u308C\u307E\u3059"), /*#__PURE__*/React.createElement("button", {
+    onClick: async () => {
+      await Notification.requestPermission();
+      setNotifDone(true);
+    },
+    style: {
+      background: GP,
+      border: "none",
+      borderRadius: 10,
+      padding: "9px 20px",
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u901A\u77E5\u3092\u8A31\u53EF\u3059\u308B"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNotifDone(true),
+    style: {
+      background: "none",
+      border: "none",
+      color: MUTED,
+      fontSize: 11,
+      cursor: "pointer",
+      fontFamily: F,
+      marginLeft: 12
+    }
+  }, "\u30B9\u30AD\u30C3\u30D7")), /*#__PURE__*/React.createElement(PinInput, {
     onDone: pin => handleComplete(goalSkipped, pin)
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => handleComplete(goalSkipped, "0000"),
@@ -16962,7 +17593,31 @@ function SetupWizard({
       fontWeight: 700,
       padding: "20px 0 0"
     }
-  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066\u5F8C\u3067\u8A2D\u5B9A\u3059\u308B")));
+  }, "\u30B9\u30AD\u30C3\u30D7\u3057\u3066\u5F8C\u3067\u8A2D\u5B9A\u3059\u308B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 24,
+      background: GS,
+      border: `1.5px solid ${G}`,
+      borderRadius: 16,
+      padding: "14px 16px",
+      textAlign: "left",
+      width: "100%",
+      boxSizing: "border-box"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      fontSize: 13,
+      color: GP,
+      marginBottom: 6
+    }
+  }, "\uD83D\uDCF1 \u30DB\u30FC\u30E0\u753B\u9762\u306B\u8FFD\u52A0\u3059\u308B\u3068\u4FBF\u5229\uFF01"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: TEXTS,
+      fontSize: 12,
+      lineHeight: 1.7
+    }
+  }, "\u30D6\u30E9\u30A6\u30B6\u306E\u300C\u5171\u6709\u300D\u2192\u300C\u30DB\u30FC\u30E0\u753B\u9762\u306B\u8FFD\u52A0\u300D\u3067\u30A2\u30D7\u30EA\u306E\u3088\u3046\u306B\u3059\u3050\u958B\u3051\u307E\u3059"))));
 }
 
 // ── Tutorial ──────────────────────────────────────────
