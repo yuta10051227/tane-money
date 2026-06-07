@@ -879,6 +879,8 @@ function DailyTasks({ child, data, update }) {
   const [justDone, setJustDone] = useState({});
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
+  const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+  const monStage = totalDoneMon<10?0:totalDoneMon<50?1:totalDoneMon<150?2:totalDoneMon<400?3:4;
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -895,49 +897,29 @@ function DailyTasks({ child, data, update }) {
   const allDone   = doneCount === tasks.length && tasks.length > 0;
   const bonusAlreadyGiven = !!prog["__bonus__"];
 
-  const setProgress = (taskId, val) => {
-    update(d => ({
-      ...d,
-      dailyProgress: {
-        ...d.dailyProgress,
-        [child.id]: { ...(d.dailyProgress?.[child.id]||{}), [today]: { ...((d.dailyProgress?.[child.id]?.[today])||{}), [taskId]: val } }
-      }
-    }));
-  };
-
-  const addLog = (labelOrObj, ptsArg) => {
-    // 2つの呼び方に対応:
-    // addLog("ラベル", pts) または addLog({cid, type, label, pts, ...})
-    const entry = typeof labelOrObj === "object"
-      ? { id:uid(), date:new Date().toISOString(), ...labelOrObj }
-      : { id:uid(), cid:child.id, type:"daily", label:labelOrObj, pts:ptsArg, date:new Date().toISOString() };
-
-    // 1. ローカルstateに即反映
-    update(d => ({ ...d, logs: [entry, ...d.logs] }));
-    // 2. Firestoreのlogsコレクションに追記（上書きなし）
-    addLogToFirestore(entry);
-  };
+  const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
+  const setDailyProg = (d, extra) => ({
+    ...d,
+    dailyProgress: {
+      ...d.dailyProgress,
+      [child.id]: { ...(d.dailyProgress?.[child.id]||{}), [today]: { ...((d.dailyProgress?.[child.id]?.[today])||{}), ...extra } }
+    }
+  });
 
   const handleCheck = t => {
     if (isDone(t)) return;
-    setProgress(t.id, true);
     showFlash(t.pts, t.emoji);
     markJustDone(t.id);
-    addLog(`✅ ${t.label}`, t.pts);
-    // check if all done after this
+    const entry = mkEntry(`✅ ${t.label}`, t.pts);
+    update(d => ({ ...setDailyProg(d, {[t.id]:true}), logs:[entry,...d.logs] }));
+    addLogToFirestore(entry);
     const newProg = { ...prog, [t.id]: true };
     const nowAllDone = tasks.every(tt => tt.type==="check" ? !!newProg[tt.id] : (newProg[tt.id]||0)>=(tt.target||1));
     if (nowAllDone && bonus > 0 && !bonusAlreadyGiven) {
       setTimeout(() => {
-        setProgress("__bonus__", true);
-        update(d => ({
-          ...d,
-          logs: [{ id:uid(), cid:child.id, type:"daily", label:"🌟 全タスク達成ボーナス！", pts:bonus, date:new Date().toISOString() }, ...d.logs],
-          dailyProgress: {
-            ...d.dailyProgress,
-            [child.id]: { ...(d.dailyProgress?.[child.id]||{}), [today]: { ...((d.dailyProgress?.[child.id]?.[today])||{}), [t.id]:true, "__bonus__":true } }
-          }
-        }));
+        const bonusEntry = mkEntry("🌟 全タスク達成ボーナス！", bonus);
+        update(d => ({ ...setDailyProg(d, {[t.id]:true,"__bonus__":true}), logs:[bonusEntry,...d.logs] }));
+        addLogToFirestore(bonusEntry);
         setFlash({ pts:bonus, emoji:"🌟" });
         setTimeout(()=>setFlash(null),1400);
       }, 600);
@@ -948,10 +930,11 @@ function DailyTasks({ child, data, update }) {
     const cur = prog[t.id] || 0;
     if (cur >= (t.target||1) && isDone(t)) return;
     const nxt = cur + 1;
-    setProgress(t.id, nxt);
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t.id);
-    addLog(`🔢 ${t.label}（${nxt}回目）`, t.pts);
+    const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
+    update(d => ({ ...setDailyProg(d, {[t.id]:nxt}), logs:[entry,...d.logs] }));
+    addLogToFirestore(entry);
   };
 
   return (
@@ -960,7 +943,10 @@ function DailyTasks({ child, data, update }) {
         <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease"}}>
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
-          {flash.pts>0&&<div style={{fontSize:11,color:"rgba(255,255,255,0.9)",marginTop:5}}>✨ タネっちがよろこんだ！</div>}
+          {flash.pts>0&&<>
+            <img src={`/assets/monster_${monStage}.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ タネっちがよろこんだ！</div>
+          </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
       )}
