@@ -398,6 +398,7 @@ const INIT = {
     operationRanking: { enabled: true, defaultTab: "total", rankingBasis: "return_rate", includeFees: true, allowParents: true },
     familyMission: { enabled: true, label: "みんなの活動で 3,000 pt を育てよう", target: 3000, reward: "週末に家族でアイスを選ぶ" },
     requireApproval: false,
+    approvalNotification: false,
   },
   pendingApprovals: [],
 };
@@ -419,6 +420,8 @@ function migrate(d) {
   if(!d.pendingApprovals) d.pendingApprovals=[];
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
+  if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
+  if(!d.monsterEvolved) d.monsterEvolved={};
   if(!d.onboardingChecks) d.onboardingChecks={};
   if(!d.gachaCollection) d.gachaCollection={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
@@ -880,7 +883,7 @@ function DailyTasks({ child, data, update }) {
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const monStage = totalDoneMon<10?0:totalDoneMon<50?1:totalDoneMon<150?2:totalDoneMon<400?3:4;
+  const monStage = ((data.monsterEvolved||{})[child.id]) || 0;
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -1513,7 +1516,7 @@ settingsTab==="members"&&(
             };
             return(<div>
               {/* 承認モード切り替え */}
-              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:14,color:TEXT}}>タスク承認が必要</div>
                   <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、子どものお手伝い記録を親が承認</div>
@@ -1521,6 +1524,28 @@ settingsTab==="members"&&(
                 <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),requireApproval:!fs.requireApproval}}))}
                   style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.requireApproval?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
                   <div style={{position:"absolute",top:3,left:fs.requireApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
+              {/* 承認通知 */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>承認通知</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>申請が届いたらブラウザ通知でお知らせ</div>
+                  {"Notification" in window && Notification.permission==="denied" && (
+                    <div style={{color:R,fontSize:10,marginTop:4}}>通知がブロックされています。ブラウザ設定から許可してください</div>
+                  )}
+                </div>
+                <button onClick={async()=>{
+                  if(!fs.approvalNotification){
+                    if(!("Notification" in window)) return;
+                    const perm = await Notification.requestPermission();
+                    if(perm==="granted") update(d=>({...d,familySettings:{...(d.familySettings||{}),approvalNotification:true}}));
+                  } else {
+                    update(d=>({...d,familySettings:{...(d.familySettings||{}),approvalNotification:false}}));
+                  }
+                }}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.approvalNotification?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:fs.approvalNotification?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
               {/* 承認待ちキュー */}
@@ -1666,6 +1691,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       setTimeout(()=>setFlash(null),1400);
       const entry={id:uid(),cid:child.id,taskId:task.id,taskLabel:task.label,taskEmoji:task.emoji,pts,date:new Date().toISOString()};
       update(d=>({...d,pendingApprovals:[...(d.pendingApprovals||[]),entry]}));
+      if(fs.approvalNotification && "Notification" in window && Notification.permission==="granted"){
+        new Notification("承認リクエスト 📬",{body:`${child.name}が「${task.label}」を完了しました（+${pts}pt）`,icon:"/assets/tab_daily.png"});
+      }
     } else {
       showFlash(pts, task.emoji);
       addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
@@ -1799,21 +1827,19 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
         {(()=>{
           const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-          const stage=tDone<10?0:tDone<50?1:tDone<150?2:tDone<400?3:4;
-          if(stage>=4) return null;
-          const THRESH=[10,50,150,400];
-          const prev=stage===0?0:THRESH[stage-1];
-          const next=THRESH[stage];
-          const pct=Math.min(1,(tDone-prev)/(next-prev));
-          const remaining=next-tDone;
+          const EVO=20;
+          const evolved=!!((data.monsterEvolved||{})[child.id]);
+          if(evolved) return null;
+          const pct=Math.min(1,tDone/EVO);
+          const remaining=Math.max(0,EVO-tDone);
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"#c4b5fd",fontWeight:700}}>✨ あと{remaining}回でしんか！</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{next}</span>
+                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>🌟 あと{remaining}回でしんかできるよ！</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{EVO}</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#4ade80,#86efac)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px #4ade8070"}}/>
+                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
               </div>
             </div>
           );
@@ -1880,17 +1906,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
         </div>
         {/* 残高表示 */}
-        <div style={{padding:"20px 20px 0",position:"relative",zIndex:2}}>
-          <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}>{child.emoji} {child.name}</div>
-          <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
-            <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
-            <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
+        <div style={{padding:"20px 20px 18px",position:"relative",zIndex:2,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{flex:1}}>
+            <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}>{child.emoji} {child.name}</div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
+              <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
+              <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>今月</span>
+              <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+              <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
+            </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
-            <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>今月</span>
-            <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
-            <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
-          </div>
+          <SeedMonster child={child} data={data} size={100} update={update}/>
         </div>
         {/* 4ステータスグリッド */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
@@ -4364,20 +4393,42 @@ function SeedMonster({ child, data, size=90, update }) {
   const [speech, setSpeech] = useState(null);
   const [editNick, setEditNick] = useState(false);
   const [nickInput, setNickInput] = useState("");
+  const [evolving, setEvolving] = useState(false);
 
   const myBal      = bal(data.logs, child.id);
   const curStreak  = data.streak?.[child.id]?.cur || 0;
+  const maxStreak  = (data.streak||{})[child.id]?.max || 0;
   const thisMonth  = new Date().toISOString().slice(0,7);
   const monthPts   = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)&&l.pts>0).reduce((s,l)=>s+l.pts,0);
   const goalsDone  = (data.goals||[]).filter(g=>g.cid===child.id&&g.done).length;
   const todayDone  = data.gachaDate?.[child.id] === todayKey();
-  const hour       = new Date().getHours();
-  const isSleeping = hour >= 22 || hour < 7;
 
-  // タスク累計回数でステージ決定（お手伝い＋デイリータスク）
-  const totalTasksDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const stage  = totalTasksDone<10?0:totalTasksDone<50?1:totalTasksDone<150?2:totalTasksDone<400?3:4;
-  const NAMES  = ["タネっち","メっち","ハっち","サカっち","キングタネ"];
+  const myLogs        = (data.logs||[]).filter(l=>l.cid===child.id);
+  const totalTasksDone = myLogs.filter(l=>l.type==="good"||l.type==="daily").length;
+  const goodCount     = myLogs.filter(l=>l.type==="good").length;
+  const badgeCount    = myLogs.filter(l=>l.type==="badge").length;
+  const lifetimePts   = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
+
+  // 進化システム：1回だけ、20タスク到達で解放
+  const EVO_THRESHOLD = 20;
+  const evolved       = !!((data.monsterEvolved||{})[child.id]);
+  const evolvedStage  = (data.monsterEvolved||{})[child.id] || 1;
+  const canEvolve     = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
+  const displayStage  = evolved ? evolvedStage : 0;
+
+  // 進化先を最強指標で自動決定
+  const computeEvolvedStage = () => {
+    const scores = [
+      {stage:1, v:totalTasksDone},       // がんばり屋
+      {stage:2, v:maxStreak*3},          // 継続マスター
+      {stage:3, v:badgeCount*20+goalsDone*10}, // コレクター
+      {stage:4, v:Math.floor(lifetimePts/20)}, // 大富豪
+    ];
+    return scores.sort((a,b)=>b.v-a.v)[0].stage;
+  };
+
+  const NAMES      = ["タネっち","もりもりタネっち","ほのおタネっち","ほしタネっち","キングタネ"];
+  const TYPE_LABEL = ["","がんばり屋","継続マスター","ほしコレクター","大富豪タネ"];
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -4386,13 +4437,16 @@ function SeedMonster({ child, data, size=90, update }) {
     (todayDone?1:0) + (myBal>=1000?1:0)
   );
 
-  const tapMsgs = happyScore>=7
+  const tapMsgs = evolving
+    ? ["しんかちゅう…！"]
+    : happyScore>=7
     ? ["わーい！✨","うれしい〜！","ありがとう！","えへへ〜！"]
     : happyScore>=4
     ? ["いっしょにがんばろ！","きょうもよろしく！","タスクやってみよ！"]
     : ["さびしいな…","がんばって！","タッチしてくれた！"];
 
   const handleTap = ()=>{
+    if(evolving) return;
     const id=Date.now();
     setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
     setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
@@ -4400,88 +4454,73 @@ function SeedMonster({ child, data, size=90, update }) {
     setTimeout(()=>setSpeech(null),1800);
   };
 
-  // 進化バー（タスク回数ベース）
-  const nextTask = stage===0?10:stage===1?50:stage===2?150:stage===3?400:null;
-  const prevTask = stage===0?0:stage===1?10:stage===2?50:stage===3?150:400;
-  const evoPct   = nextTask ? Math.min(100,Math.round((totalTasksDone-prevTask)/(nextTask-prevTask)*100)) : 100;
+  const doEvolve = ()=>{
+    if(!canEvolve||evolving) return;
+    setEvolving(true);
+    setSpeech(null);
+    const newStage = computeEvolvedStage();
+    // 1.6秒後にデータ更新（画像が切り替わる）
+    setTimeout(()=>{
+      update(d=>({...d,monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:newStage}}));
+    }, 1600);
+    // 2.4秒後にアニメ終了＋祝福メッセージ
+    setTimeout(()=>{
+      setEvolving(false);
+      setSpeech("しんかしたよ！🌟");
+      setTimeout(()=>setSpeech(null),2500);
+    }, 2400);
+  };
 
-  // 獲得バッジによるアクセサリーステッカー（最大3個）
-  const logs4badge = (data.logs||[]).filter(l=>l.cid===child.id);
-  const goodCount  = logs4badge.filter(l=>l.type==="good").length;
-  const maxStreak4 = (data.streak||{})[child.id]?.max||0;
-  const tipsRead4  = logs4badge.filter(l=>l.type==="tips").length;
   const accessories = [
     goodCount>=100   ? {emoji:"🏆",bg:GOLDS,pos:{top:-6,right:-6}}  : null,
-    maxStreak4>=7    ? {emoji:"⚡",bg:BS,   pos:{top:-6,left:-6}}   : null,
-    tipsRead4>=10    ? {emoji:"📚",bg:PS,   pos:{bottom:6,left:-6}} : null,
+    maxStreak>=7     ? {emoji:"⚡",bg:BS,   pos:{top:-6,left:-6}}   : null,
+    badgeCount>=5    ? {emoji:"📚",bg:PS,   pos:{bottom:6,left:-6}} : null,
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
   ].filter(Boolean).slice(0,3);
+
+  const evoPct = evolved ? 100 : Math.min(100, Math.round(totalTasksDone/EVO_THRESHOLD*100));
+  const nickname = (data.monsterNickname||{})[child.id];
 
   return (
     <div style={{position:"relative",flexShrink:0,textAlign:"center"}}>
       {/* スパークル */}
       {sparkles.map(sp=>(
-        <div key={sp.id} style={{
-          position:"absolute",top:"40%",left:"50%",
-          transform:`translate(${sp.x}px,${sp.y}px)`,
-          fontSize:12,pointerEvents:"none",zIndex:50,
-          animation:"smSparkle 0.8s ease-out forwards",
-        }}>✨</div>
+        <div key={sp.id} style={{position:"absolute",top:"40%",left:"50%",transform:`translate(${sp.x}px,${sp.y}px)`,fontSize:12,pointerEvents:"none",zIndex:50,animation:"smSparkle 0.8s ease-out forwards"}}>✨</div>
+      ))}
+      {/* 進化バーストエフェクト */}
+      {evolving && [0,45,90,135,180,225,270,315].map((deg,i)=>(
+        <div key={deg} style={{position:"absolute",top:"40%",left:"50%",width:0,height:0,pointerEvents:"none",zIndex:50}}>
+          <div style={{position:"absolute",fontSize:i%2===0?16:12,animation:`smSparkle ${0.5+i*0.06}s ease-out infinite`,transform:`rotate(${deg}deg) translateY(${-40-i*4}px)`}}>
+            {["⭐","✨","🌟"][i%3]}
+          </div>
+        </div>
       ))}
 
       {/* ふきだし */}
       {speech&&(
-        <div style={{
-          position:"absolute",bottom:"100%",left:"50%",
-          transform:"translateX(-50%)",
-          marginBottom:6,
-          background:"#fff",
-          border:`2px solid ${G}`,
-          borderRadius:14,padding:"6px 12px",
-          fontSize:12,fontWeight:800,color:TEXT,
-          whiteSpace:"nowrap",
-          boxShadow:"0 4px 18px rgba(24,35,29,0.18)",
-          zIndex:10,
-          animation:"smPop .25s cubic-bezier(.34,1.56,.64,1)",
-          pointerEvents:"none",
-        }}>
+        <div style={{position:"absolute",bottom:"100%",left:"50%",transform:"translateX(-50%)",marginBottom:6,background:"#fff",border:`2px solid ${G}`,borderRadius:14,padding:"6px 12px",fontSize:12,fontWeight:800,color:TEXT,whiteSpace:"nowrap",boxShadow:"0 4px 18px rgba(24,35,29,0.18)",zIndex:10,animation:"smPop .25s cubic-bezier(.34,1.56,.64,1)",pointerEvents:"none"}}>
           {speech}
-          <div style={{
-            position:"absolute",top:"100%",left:"50%",
-            transform:"translateX(-50%)",
-            width:0,height:0,
-            borderLeft:"7px solid transparent",borderRight:"7px solid transparent",
-            borderTop:`8px solid ${G}`,
-          }}/>
+          <div style={{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"7px solid transparent",borderRight:"7px solid transparent",borderTop:`8px solid ${G}`}}/>
         </div>
       )}
 
-      {/* モンスター画像＋アクセサリー（浮遊アニメ） */}
-      <div style={{animation:"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
-        <div style={{animation:"monBreathe 3.5s ease-in-out infinite",cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative"}}>
-          <img
-            src={`/assets/monster_${stage}.png`}
-            alt={NAMES[stage]}
-            style={{width:size,height:size,objectFit:"contain",display:"block"}}
-          />
+      {/* モンスター画像 */}
+      <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
+        <div style={{
+          animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
+          cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
+          filter:evolving?"brightness(2.5) saturate(0.2)":"none",
+          transition:"filter 0.4s",
+        }}>
+          <img src={`/assets/monster_${displayStage}.png`} alt={NAMES[displayStage]} style={{width:size,height:size,objectFit:"contain",display:"block"}}/>
           {accessories.map((acc,i)=>(
-            <div key={i} style={{
-              position:"absolute",...acc.pos,
-              background:acc.bg,
-              borderRadius:"50%",
-              width:20,height:20,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:11,
-              boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
-              border:"1.5px solid rgba(255,255,255,0.9)",
-            }}>{acc.emoji}</div>
+            <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
           ))}
         </div>
       </div>
-      {/* 影 */}
       <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
 
-      {/* 名前（Juniorはニックネーム編集可） */}
+      {/* 名前 */}
       {update ? (
         editNick ? (
           <div style={{marginTop:4}}>
@@ -4494,30 +4533,45 @@ function SeedMonster({ child, data, size=90, update }) {
           </div>
         ) : (
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>{(data.monsterNickname||{})[child.id]||NAMES[stage]}{stage===4&&" 👑"}</div>
-            <button onClick={()=>{setNickInput((data.monsterNickname||{})[child.id]||NAMES[stage]);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
+              {nickname||NAMES[displayStage]}
+              {evolved&&<span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{TYPE_LABEL[evolvedStage]}</span>}
+            </div>
+            <button onClick={()=>{setNickInput(nickname||NAMES[displayStage]);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
           </div>
         )
       ) : (
         <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
-          {NAMES[stage]}{stage===4&&" 👑"}
+          {nickname||NAMES[displayStage]}
         </div>
       )}
-      {/* 進化バー */}
-      {nextTask&&(
-        <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"3px auto 0",overflow:"hidden"}}>
-          <div style={{height:"100%",width:`${evoPct}%`,background:"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
-        </div>
-      )}
-      {!nextTask&&<div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:2}}>MAX✨</div>}
 
-      {/* アニメCSS */}
+      {/* 進化バー or 済みバッジ */}
+      {!evolved && (
+        <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
+        </div>
+      )}
+      {evolved && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>✨ しんか済み</div>}
+
+      {/* 進化ボタン */}
+      {canEvolve && !evolving && (
+        <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
+          🌟 しんかできるよ！
+        </button>
+      )}
+      {evolving && (
+        <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
+      )}
+
       <style>{`
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
         @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
         @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
+        @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
+        @keyframes evoFlash{0%,100%{opacity:1}50%{opacity:0.3}}
       `}</style>
     </div>
   );
