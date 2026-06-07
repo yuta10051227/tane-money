@@ -1166,7 +1166,7 @@ export default function App() {
   const seed = useMemo(() => makeSeed(), []);
 
   // ── Googleカレンダー連携（任意・クライアント側・複数カレンダー）──
-  const [calToken, setCalToken] = useState(() => sessionStorage.getItem("viele-cal-token") || null);
+  const [calToken, setCalToken] = useState(() => localStorage.getItem("viele-cal-token") || null);
   const [calList, setCalList] = useState([]);   // 利用可能なカレンダー一覧
   const [calEvents, setCalEvents] = useState([]); // 全カレンダーの生イベント（calendarId付き）
   const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
@@ -1194,7 +1194,7 @@ export default function App() {
         setCalStatus("ok");
       } catch (err) {
         if (cancelled) return;
-        if (err.status === 401) { sessionStorage.removeItem("viele-cal-token"); setCalToken(null); }
+        if (err.status === 401) { localStorage.removeItem("viele-cal-token"); setCalToken(null); }
         setCalError(err);
         setCalStatus("error");
       }
@@ -1211,7 +1211,7 @@ export default function App() {
       provider.addScope(CALENDAR_SCOPE);
       const result = await signInWithPopup(auth, provider);
       const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
-      if (token) { sessionStorage.setItem("viele-cal-token", token); setCalToken(token); }
+      if (token) { localStorage.setItem("viele-cal-token", token); setCalToken(token); }
       else { setCalError(new Error("アクセストークンを取得できませんでした")); setCalStatus("error"); }
     } catch (e) {
       setCalError(e);
@@ -1226,13 +1226,13 @@ export default function App() {
     if (t) {
       fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(t), { method: "POST", mode: "no-cors" }).catch(() => {});
     }
-    sessionStorage.removeItem("viele-cal-token");
+    localStorage.removeItem("viele-cal-token");
     setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
   };
 
   // ログアウト時はカレンダートークンも破棄（共有端末対策）
   const logout = () => {
-    sessionStorage.removeItem("viele-cal-token");
+    localStorage.removeItem("viele-cal-token");
     signOut(auth);
   };
 
