@@ -1126,7 +1126,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       <BirthEditor birth={birth} onSave={onSaveBirth} />
 
       <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
-        命式：自前エンジン（astronomy-engine）で計算 ・ 鑑定はAIによる参考です
+        VIELE オリジナル鑑定AIを採用しています ・ 占いとして参考に
       </div>
     </Panel>
   );
