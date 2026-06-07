@@ -284,6 +284,9 @@ const BG_THEMES = [
   { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true },
 ];
 
+// モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
+const LINE_UNLOCK = { "":0, a:0, b:0, c:15 };
+
 // ═══════════════════════════════════════════════════════
 const INIT = {
   parentPin: "0000",
@@ -4615,11 +4618,13 @@ function SeedMonster({ child, data, size=90, update }) {
     const stage = def.stage;
     if (cur === "egg") {
       // タマゴは3分岐: 火(タスク量)/森(継続)/水(目標達成)の一番得意なものへ
+      // 水ラインはクリア(累計タスク)で解放されるまで選ばれない
+      const waterOpen = totalTasksDone >= (LINE_UNLOCK.c || 0);
       const fire   = goodCount;
       const forest = curStreak * 3;
-      const water  = goalsDone * 4 + Math.floor(lifetimePts / 100);
+      const water  = waterOpen ? (goalsDone * 4 + Math.floor(lifetimePts / 100)) : -1;
       const top = Math.max(fire, forest, water);
-      return water === top ? def.evolveC : forest === top ? def.evolveB : def.evolveA;
+      return (waterOpen && water === top) ? def.evolveC : forest === top ? def.evolveB : def.evolveA;
     } else if (stage === 1) {
       scoreA = badgeCount * 20;
       scoreB = Math.floor(lifetimePts / 20);
@@ -4864,6 +4869,7 @@ function SeedMonster({ child, data, size=90, update }) {
 function MonsterZukan({ data, child }) {
   const [expandId, setExpandId] = useState(null);
   const discovered = data.monsterDiscovered?.[child.id] || [];
+  const tDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const allIds = ["egg","1a","1b","1c","2a1","2a2","2b1","2b2","2c1","2c2","3a1","3a2","3b1","3b2","3c1","3c2","4a1","4a2","4b1","4b2","4c1","4c2"];
   const foundCount = allIds.filter(id => discovered.includes(id)).length;
 
@@ -4876,6 +4882,8 @@ function MonsterZukan({ data, child }) {
         {allIds.map(id => {
           const def = MONSTER_TREE[id];
           const found = discovered.includes(id) || id === "egg";
+          const lineNeed = LINE_UNLOCK[def.line] || 0;
+          const lineLocked = !found && tDone < lineNeed;   // 未発見かつ系統が未解放
           const isOpen = expandId === id;
           return (
             <div key={id}
@@ -4888,7 +4896,7 @@ function MonsterZukan({ data, child }) {
                 onError={e=>{e.target.style.visibility="hidden"}}
               />
               <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {found ? def.name : "???"}
+                {found ? def.name : lineLocked ? `🔒 あと${lineNeed-tDone}回` : "???"}
               </div>
               <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
               {isOpen && found && (
