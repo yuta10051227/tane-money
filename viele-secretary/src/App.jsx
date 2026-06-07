@@ -668,7 +668,7 @@ function SwipeView({ slides, accent = C.blue, hint }) {
         <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{cur.label}</div>
         <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
       </div>
-      <div ref={scroller} onScroll={onScroll} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+      <div ref={scroller} onScroll={onScroll} data-hscroll="1" style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {slides.map((s) => (
           <div key={s.key} style={{ flex: "0 0 100%", minWidth: "100%", scrollSnapAlign: "start", boxSizing: "border-box" }}>{s.content}</div>
         ))}
@@ -1173,6 +1173,8 @@ export default function App() {
   const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
   const [calError, setCalError] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [tab, setTab] = useState(0); // トップのタブ（ホーム/仕事/売上/タスク/ニュース）
+  const tabTouch = useRef(null);
 
   // トークンが取れたら今週〜約2ヶ月分を取得
   useEffect(() => {
@@ -1444,91 +1446,129 @@ export default function App() {
 
   const alerts = computeAlerts(data);
 
+  // トップのタブ
+  const TABS = ["ホーム", "仕事", "売上", "タスク", "ニュース"];
+  const onTouchStart = (ev) => {
+    if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
+    const t = ev.touches[0];
+    tabTouch.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (ev) => {
+    if (!tabTouch.current) return;
+    const t = ev.changedTouches[0];
+    const dx = t.clientX - tabTouch.current.x;
+    const dy = t.clientY - tabTouch.current.y;
+    tabTouch.current = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      setTab((v) => Math.max(0, Math.min(TABS.length - 1, v + (dx < 0 ? 1 : -1))));
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif" }}>
-      {/* ヘッダー */}
-      <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(15,17,21,0.85)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}`, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: C.accent }}>VIELE</div>
-        <strong style={{ fontSize: 15 }}>secretary</strong>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
-        <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>
-          文字{fontLabel}
-        </button>
-        {firebaseEnabled && (
-          <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 10px", width: "auto" }}>ログアウト</button>
-        )}
+      {/* ヘッダー＋タブバー */}
+      <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(15,17,21,0.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, letterSpacing: 3, color: C.accent }}>VIELE</div>
+          <strong style={{ fontSize: 15 }}>secretary</strong>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: C.sub }}>{dateLabel}</span>
+          <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
+          {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
+        </div>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
+          {TABS.map((t, i) => (
+            <button
+              key={t}
+              onClick={() => setTab(i)}
+              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.sub, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
+            >{t}</button>
+          ))}
+        </div>
       </header>
 
-      <main style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
+      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
             ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
           </div>
         )}
-        <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
-        <TripChain
-          trips={data.trips}
-          onToggle={toggleTripItem}
-          onAdd={addTrip}
-          onRemove={removeTrip}
-          onEditTrip={editTrip}
-          onAddItem={addTripItem}
-          onEditItem={editTripItem}
-          onRemoveItem={removeTripItem}
-        />
-        <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
-        <TimeMeter entries={scheduleEntries} {...calProps} />
-        <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
-        {usingCal && <Upcoming events={upcoming} />}
-        {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
 
-        <DigestPanel
-          digest={data.digest}
-          loading={digestLoading}
-          error={digestError}
-          onRefresh={refreshDigest}
-          feeds={data.feeds}
-          onAddFeed={(f) => feedsOps.add(f)}
-          onRemoveFeed={(id) => feedsOps.remove(id)}
-        />
+        {tab === 0 && (
+          <>
+            <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
+            <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
+            <TimeMeter entries={scheduleEntries} {...calProps} />
+            {usingCal && <Upcoming events={upcoming} />}
+            {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+          </>
+        )}
 
-        <CheckList
-          title="コンテンツ制作サイクル"
-          accent={C.blue}
-          items={data.content}
-          onToggle={content.toggle}
-          onAdd={content.add}
-          onEdit={content.edit}
-          onRemove={content.remove}
-          placeholder="制作物を追加…"
-          renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
-        />
+        {tab === 1 && (
+          <>
+            <TripChain
+              trips={data.trips}
+              onToggle={toggleTripItem}
+              onAdd={addTrip}
+              onRemove={removeTrip}
+              onEditTrip={editTrip}
+              onAddItem={addTripItem}
+              onEditItem={editTripItem}
+              onRemoveItem={removeTripItem}
+            />
+            <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <CheckList
+              title="コンテンツ制作サイクル"
+              accent={C.blue}
+              items={data.content}
+              onToggle={content.toggle}
+              onAdd={content.add}
+              onEdit={content.edit}
+              onRemove={content.remove}
+              placeholder="制作物を追加…"
+              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
+            />
+          </>
+        )}
 
-        <MoneyList
-          items={data.money}
-          onToggle={money.toggle}
-          onAdd={money.add}
-          onEdit={money.edit}
-          onRemove={money.remove}
-        />
+        {tab === 2 && (
+          <MoneyList
+            items={data.money}
+            onToggle={money.toggle}
+            onAdd={money.add}
+            onEdit={money.edit}
+            onRemove={money.remove}
+          />
+        )}
 
-        <CheckList
-          title="追加タスク"
-          accent={C.purple}
-          items={data.tasks}
-          onToggle={tasks.toggle}
-          onAdd={tasks.add}
-          onEdit={tasks.edit}
-          onRemove={tasks.remove}
-          placeholder="タスクを追加…"
-        />
+        {tab === 3 && (
+          <CheckList
+            title="追加タスク"
+            accent={C.purple}
+            items={data.tasks}
+            onToggle={tasks.toggle}
+            onAdd={tasks.add}
+            onEdit={tasks.edit}
+            onRemove={tasks.remove}
+            placeholder="タスクを追加…"
+          />
+        )}
+
+        {tab === 4 && (
+          <DigestPanel
+            digest={data.digest}
+            loading={digestLoading}
+            error={digestError}
+            onRefresh={refreshDigest}
+            feeds={data.feeds}
+            onAddFeed={(f) => feedsOps.add(f)}
+            onRemoveFeed={(id) => feedsOps.remove(id)}
+          />
+        )}
 
         <footer style={{ textAlign: "center", color: C.faint, fontSize: 11, padding: "12px 0 32px" }}>
-          {firebaseEnabled
-            ? `${user?.displayName ? user.displayName + " として" : ""}ログイン中 ・ 全端末でFirestore同期`
-            : "ローカルモード ・ この端末に保存"}
+          ← 横スワイプ / 上のタブで切替 ・ {firebaseEnabled ? "全端末で同期" : "ローカル保存"}
         </footer>
       </main>
     </div>
