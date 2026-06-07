@@ -4614,40 +4614,33 @@ function SeedMonster({ child, data, size=90, update }) {
     const cur = currentStageId || "egg";
     const def = MONSTER_TREE[cur] || MONSTER_TREE["egg"];
     if (!def.evolveA) return null;
-    let scoreA = 0, scoreB = 0;
-    const stage = def.stage;
+    // 子ごとに違う進化先になるようchild.id+やり直し回数のハッシュで分岐(ワクワク重視)。
+    // 遊び方(継続/目標/バッジ)は少しだけ寄せる。タスク数は誰でも多いので加点しない=全員同じを防ぐ
+    const reroll = ((data.reincarnationCount||{})[child.id]||0) + ((data.rehatchCount||{})[child.id]||0);
+    // 兄弟の並び順。兄弟どうしは必ず違う系統に寄るようローテーションの基準にする
+    const sibIdx = Math.max(0, (data.children||[]).findIndex(c => c.id === child.id));
+    const hashStr = (s) => { let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); };
+    const jit = (key) => hashStr(child.id + "|" + key + "|" + reroll) % 100;
     if (cur === "egg") {
-      // タマゴは3分岐: 火(タスク量)/森(継続)/水(目標達成)の一番得意なものへ
-      // 水ラインはクリア(累計タスク)で解放されるまで選ばれない
+      // 火/森/水の3分岐。水はクリア(累計タスク)で解放されるまで対象外
       const waterOpen = totalTasksDone >= (LINE_UNLOCK.c || 0);
-      const fire   = goodCount;
-      const forest = curStreak * 3;
-      const water  = waterOpen ? (goalsDone * 4 + Math.floor(lifetimePts / 100)) : -1;
-      const top = Math.max(fire, forest, water);
-      return (waterOpen && water === top) ? def.evolveC : forest === top ? def.evolveB : def.evolveA;
-    } else if (stage === 1) {
-      scoreA = badgeCount * 20;
-      scoreB = Math.floor(lifetimePts / 20);
-    } else if (stage === 2 && def.line === "a") {
-      scoreA = badgeCount * 20;
-      scoreB = Math.floor(lifetimePts / 20);
-    } else if (stage === 2 && def.line === "b") {
-      scoreA = goalsDone * 15;
-      scoreB = badgeCount * 20;
-    } else if (stage === 3 && def.line === "a") {
-      scoreA = Math.floor(totalTasksDone / 5);
-      scoreB = curStreak * 5;
-    } else if (stage === 3 && def.line === "b") {
-      scoreA = Math.floor(lifetimePts / 30);
-      scoreB = badgeCount * 10;
-    } else if (stage === 2 && def.line === "c") {
-      scoreA = goodCount;
-      scoreB = curStreak * 4;
-    } else if (stage === 3 && def.line === "c") {
-      scoreA = Math.floor(lifetimePts / 30);
-      scoreB = goalsDone * 10;
+      const cands = [
+        { id: def.evolveA, w: jit("egg_a") },                                  // 火
+        { id: def.evolveB, w: jit("egg_b") + Math.min(22, curStreak * 5) },    // 森(継続が得意なら寄る)
+      ];
+      if (waterOpen) cands.push({ id: def.evolveC, w: jit("egg_c") + Math.min(22, goalsDone * 8) }); // 水(目標達成が得意なら寄る)
+      // 兄弟ごとに必ず違う系統に(やり直しで順に変わる)。全員同じを確実に防ぐ
+      const pref = (sibIdx + reroll) % cands.length;
+      cands[pref].w += 1000;
+      cands.sort((a, b) => b.w - a.w);
+      return cands[0].id;
     }
-    return scoreA >= scoreB ? def.evolveA : def.evolveB;
+    // 以降のA/B分岐も兄弟＋段＋やり直しで変える(同じ道をたどらせない)
+    const pref = (sibIdx + reroll + hashStr(cur)) % 2;
+    let a = jit(cur + "_a") + Math.min(16, badgeCount * 3);
+    let b = jit(cur + "_b") + Math.min(16, curStreak * 3 + goalsDone * 5);
+    if (pref === 0) a += 1000; else b += 1000;
+    return a >= b ? def.evolveA : def.evolveB;
   };
 
   // 転生可能判定
@@ -4731,6 +4724,19 @@ function SeedMonster({ child, data, size=90, update }) {
     }));
     setSpeech("てんせい！また始まるよ✨");
     setTimeout(()=>setSpeech(null),2500);
+  };
+
+  // タマゴからやり直す(別の進化を試せる。やり直し回数で分岐が変わる)
+  const doRehatch = () => {
+    if (evolving) return;
+    update(d => ({
+      ...d,
+      monsterEvolved:   {...(d.monsterEvolved||{}),   [child.id]: null},
+      monsterEvolvedAt: {...(d.monsterEvolvedAt||{}), [child.id]: null},
+      rehatchCount:     {...(d.rehatchCount||{}),     [child.id]: ((d.rehatchCount||{})[child.id]||0)+1},
+    }));
+    setSpeech("タマゴにもどったよ！🥚");
+    setTimeout(()=>setSpeech(null),2200);
   };
 
   const accessories = [
@@ -4850,6 +4856,13 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
       {evolving && (
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
+      )}
+      {/* タマゴからやり直す(別の進化を試せる) */}
+      {evolved && !evolving && update && (
+        <button onClick={()=>{ if(typeof window!=="undefined" && window.confirm("タマゴからやり直す？\nずかんはそのまま。ちがう進化を試せるよ！")) doRehatch(); }}
+          style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:9,cursor:"pointer",fontFamily:F}}>
+          🥚 タマゴからやり直す
+        </button>
       )}
 
       <style>{`
