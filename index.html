@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="9f5b0b4">
+<meta name="tane-version" content="a1da13e">
 </head>
 <body>
   <div id="root"></div>
@@ -13170,7 +13170,8 @@ function SeedMonster({
   const nextGate = isFinal ? null : STAGE_GATES[curStage]; // 次の進化に必要な累計タスク数
   const prevGate = curStage > 0 ? STAGE_GATES[curStage - 1] || 0 : 0;
   const canEvolve = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
-  const imgSrc = `/assets/monster_${monsterId}_f${frame}.png`;
+  // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
+  const imgSrc = `/assets/monster_${monsterId}_side_f${frame}.png`;
 
   // 進化先を分岐ルールで決定
   const computeNextStageId = () => {
@@ -13476,11 +13477,16 @@ function SeedMonster({
       display: "block"
     },
     onError: e => {
-      if (!e.target.dataset.fb) {
-        e.target.dataset.fb = "1";
-        e.target.src = "/assets/monster_egg_f0.png";
+      const t = e.target;
+      const s = t.dataset.fb || "0";
+      if (s === "0") {
+        t.dataset.fb = "1";
+        t.src = `/assets/monster_${monsterId}_f${frame}.png`;
+      } else if (s === "1") {
+        t.dataset.fb = "2";
+        t.src = "/assets/monster_egg_f0.png";
       } else {
-        e.target.style.visibility = "hidden";
+        t.style.visibility = "hidden";
       }
     }
   }), accessories.map((acc, i) => /*#__PURE__*/React.createElement("div", {

@@ -127,6 +127,122 @@ MONSTERS = {
 def render(spec, path, bob=0):
     draw_creature(spec, bob).resize((G*SCALE, G*SCALE), Image.NEAREST).save(path)
 
+# ════════════════════════════════════════════════════════════
+# 横向き(側面)ビュー — デジモン風の歩く専用スプライト
+# 既存15体は前向きPNGから主要色をサンプリングして色を合わせる
+# ════════════════════════════════════════════════════════════
+ALL_IDS = ["egg","1a","1b","1c","2a1","2a2","2b1","2b2","2c1","2c2",
+           "3a1","3a2","3b1","3b2","3c1","3c2","4a1","4a2","4b1","4b2","4c1","4c2"]
+
+def stage_of(mid):
+    return 0 if mid == "egg" else int(mid[0])
+
+def lighten(c, f=0.4):
+    return tuple([min(255, int(c[i] + (255 - c[i]) * f)) for i in range(3)] + [255])
+
+def sample_colors(mid):
+    """前向きPNGから本体色を推定（外枠/白おなか/透明を除外して最頻色）"""
+    import collections
+    p = f"assets/monster_{mid}_f0.png"
+    if not os.path.exists(p):
+        return (90, 140, 200, 255)
+    im = Image.open(p).convert("RGBA"); w, h = im.size; px = im.load()
+    cnt = collections.Counter()
+    for y in range(0, h, 4):
+        for x in range(0, w, 4):
+            c = px[x, y]
+            if c[3] < 200: continue
+            if max(c[:3]) < 45: continue          # 外枠(黒)を除外
+            if min(c[:3]) > 225: continue         # 白(おなか/光)を除外
+            cnt[c] += 1
+    if not cnt:
+        return (90, 140, 200, 255)
+    return cnt.most_common(1)[0][0]
+
+def build_side_spec(mid):
+    """側面用スペック。水系/サンプルは定義済みパレット、他は色サンプリング"""
+    st = stage_of(mid)
+    r = {0: 7, 1: 7, 2: 8, 3: 9, 4: 10}[st]
+    if mid in MONSTERS:
+        base = dict(MONSTERS[mid]); base["r"] = r
+        return base
+    body = sample_colors(mid)
+    spec = dict(body=body, light=lighten(body, 0.4), accent=GOLD, r=r)
+    spec["wings"]  = st >= 3
+    spec["horns"]  = st >= 4
+    spec["fierce"] = st >= 3
+    return spec
+
+def draw_side(s, frame=0):
+    """右向きの歩く側面チビ。frameで足を交互に動かす"""
+    img = Image.new("RGBA", (G, G), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    body = s["body"]; light = s["light"]; belly = s.get("belly", WHITE); accent = s["accent"]
+    r = s.get("r", 8)
+    cx = 15; cy = 29 - r
+
+    # しっぽ(後ろ=左)
+    d.polygon([(cx - r + 1, cy), (cx - r - 5, cy - 4), (cx - r - 4, cy + 3)], fill=OUTLINE)
+    d.polygon([(cx - r + 1, cy), (cx - r - 4, cy - 3), (cx - r - 3, cy + 2)], fill=body)
+
+    # ツバサ/ヒレ(背中=上後ろ)
+    if s.get("wings"):
+        d.polygon([(cx - 2, cy - r + 2), (cx - 9, cy - r - 3), (cx - 8, cy + 1)], fill=OUTLINE)
+        d.polygon([(cx - 3, cy - r + 2), (cx - 8, cy - r - 1), (cx - 7, cy + 0)], fill=light)
+
+    # 足(2本・歩行で前後)
+    sw = 2 if frame == 0 else -2
+    for fx, dx in ((cx - 3, -sw), (cx + 3, sw)):
+        OE(d, (fx + dx, cy + r - 3, fx + dx + 2, cy + r + 1), body)
+
+    # 体
+    OE(d, (cx - r, cy - r, cx + r, cy + r), body)
+    d.ellipse((cx - r + 2, cy + 1, cx + r - 1, cy + r - 1), fill=light)        # 前下を明るく
+    d.ellipse((cx + 0, cy + 1, cx + r - 1, cy + r - 1), fill=belly)            # おなか(前)
+
+    # 角(頭の上=前寄り)
+    if s.get("crest") == "horns" or s.get("horns"):
+        for hx in (cx + 2, cx + r - 2):
+            d.polygon([(hx, cy - r + 2), (hx + 2, cy - r - 4), (hx + 3, cy - r + 2)], fill=OUTLINE)
+            d.polygon([(hx + 1, cy - r + 1), (hx + 2, cy - r - 2), (hx + 2, cy - r + 1)], fill=accent)
+    elif s.get("crest") == "drop":
+        d.polygon([(cx + 2, cy - r - 5), (cx - 1, cy - r + 1), (cx + 5, cy - r + 1)], fill=OUTLINE)
+        OE(d, (cx + 0, cy - r - 2, cx + 5, cy - r + 3), s.get("accent2", light))
+    elif s.get("crest") == "crown":
+        for dx in (1, 4, 7):
+            d.polygon([(cx + dx - 1, cy - r + 1), (cx + dx, cy - r - 4), (cx + dx + 1, cy - r + 1)], fill=OUTLINE)
+        d.rectangle((cx + 0, cy - r - 1, cx + 8, cy - r + 1), fill=accent)
+
+    # 鼻先(前=右に小さな出っぱり)
+    d.ellipse((cx + r - 2, cy - 1, cx + r + 2, cy + 3), fill=body)
+    d.ellipse((cx + r - 2, cy - 1, cx + r + 2, cy + 3), outline=OUTLINE)
+
+    # 目(前寄り・1つ)
+    ex, ey = cx + r - 4, cy - 3
+    d.ellipse((ex - 1, ey - 1, ex + 3, ey + 3), fill=WHITE)
+    d.ellipse((ex + 0, ey + 0, ex + 2, ey + 2), fill=OUTLINE)
+    img.putpixel((ex + 1, ey + 0), WHITE)
+    if s.get("fierce"):
+        d.line((ex - 1, ey - 1, ex + 3, ey + 0), fill=OUTLINE)
+
+    # ほっぺ
+    d.point((cx + r - 2, cy + 2), fill=accent)
+    return img
+
+def render_side(spec, path, frame=0):
+    draw_side(spec, frame).resize((G*SCALE, G*SCALE), Image.NEAREST).save(path)
+
+def side_sheet():
+    cols = 11; rows = 2
+    sh = Image.new("RGBA", (96*cols, 110*rows + 8), (238,238,238,255))
+    d = ImageDraw.Draw(sh)
+    for i, mid in enumerate(ALL_IDS):
+        sp = draw_side(build_side_spec(mid)).resize((96,96), Image.NEAREST)
+        x = (i % cols) * 96; y = (i // cols) * 110 + 4
+        sh.paste(sp, (x, y), sp)
+        d.text((x + 2, y + 96), mid, fill=(40,40,40))
+    sh.save("/tmp/side_sheet.png"); print("side sheet -> /tmp/side_sheet.png")
+
 def sheet():
     ids = ["1c","2c1","2c2","3c1","3c2","4c1","4c2"]
     sh = Image.new("RGBA", (128*len(ids), 140), (240,240,240,255))
@@ -138,7 +254,16 @@ def sheet():
 def main():
     if "--sheet" in sys.argv:
         sheet(); return
+    if "--sidesheet" in sys.argv:
+        side_sheet(); return
     os.makedirs("assets", exist_ok=True)
+    if "--side" in sys.argv:                       # 全22体の横向きを生成
+        for mid in ALL_IDS:
+            sp = build_side_spec(mid)
+            render_side(sp, f"assets/monster_{mid}_side_f0.png", 0)
+            render_side(sp, f"assets/monster_{mid}_side_f1.png", 1)
+            print(f"generated monster_{mid}_side")
+        return
     targets = [a for a in sys.argv[1:] if not a.startswith("-")] or list(MONSTERS.keys())
     for mid in targets:
         if mid not in MONSTERS: print(f"skip {mid}"); continue

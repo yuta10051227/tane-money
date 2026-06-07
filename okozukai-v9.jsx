@@ -4607,7 +4607,8 @@ function SeedMonster({ child, data, size=90, update }) {
   const nextGate       = isFinal ? null : STAGE_GATES[curStage];    // 次の進化に必要な累計タスク数
   const prevGate       = curStage > 0 ? (STAGE_GATES[curStage-1] || 0) : 0;
   const canEvolve      = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
-  const imgSrc         = `/assets/monster_${monsterId}_f${frame}.png`;
+  // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
+  const imgSrc         = `/assets/monster_${monsterId}_side_f${frame}.png`;
 
   // 進化先を分岐ルールで決定
   const computeNextStageId = () => {
@@ -4786,7 +4787,7 @@ function SeedMonster({ child, data, size=90, update }) {
             transition:"filter 0.4s",
           }}>
             <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
-              onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
+              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${monsterId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
