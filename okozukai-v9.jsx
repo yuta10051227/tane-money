@@ -273,6 +273,18 @@ const MONSTER_TREE = {
 };
 
 // ═══════════════════════════════════════════════════════
+// 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
+const BG_THEMES = [
+  { id:"auto",   name:"じかんたい", emoji:"🕒", need:0,   grad:null, stars:false },
+  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false },
+  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false },
+  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true },
+  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true },
+  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true },
+  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true },
+];
+
+// ═══════════════════════════════════════════════════════
 const INIT = {
   parentPin: "0000",
   children: [
@@ -949,6 +961,12 @@ function DailyTasks({ child, data, update }) {
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _rawMonStage = ((data.monsterEvolved||{})[child.id]) || "egg";
   const monStageId = MONSTER_TREE[_rawMonStage] ? _rawMonStage : "egg";
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _bgTid = (data.bgTheme||{})[child.id] || "auto";
+  const _bgTheme = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
+  const _bgUnlocked = (_bgTheme.need||0) <= totalDoneMon;
+  const heroGrad = (_bgUnlocked && _bgTheme.grad) ? _bgTheme.grad : null;
+  const heroStars = _bgUnlocked && _bgTheme.stars;
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -1862,7 +1880,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ヒーローエリア */}
       {isJunior ? (()=>{
         const h=new Date().getHours();
-        const bg=h>=7&&h<11
+        const bgAuto=h>=7&&h<11
           ?"linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)"
           :h>=11&&h<17
           ?"linear-gradient(180deg,#0a2a4a 0%,#1a5c8a 30%,#2a8a5a 65%,#1f7038 100%)"
@@ -1871,6 +1889,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           :h>=20&&h<22
           ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"
           :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
+        const bg = heroGrad || bgAuto;
         const starOpacity=h>=7&&h<17?0.2:0.6;
         return(
       <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
@@ -1966,9 +1985,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const toPts2=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
         const portV2=myH2.reduce((s,h)=>{const st=stocks2.find(x=>x.id===h.stockId);return s+(st?toPts2(st,st.price)*h.qty:0);},0);
         return(
-      <div style={{background:"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
+      <div style={{background:heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
         {/* 背景グリッド */}
         <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",backgroundSize:"32px 32px",pointerEvents:"none"}}/>
+        {/* 背景テーマの星(うちゅう/よぞら等) */}
+        {heroStars && [[10,12],[24,7],[68,10],[84,16],[46,20],[33,5],[58,24],[16,28],[78,30],[90,9],[40,33],[63,38]].map(([l,t],i)=>(
+          <div key={"st"+i} style={{position:"absolute",top:`${t}%`,left:`${l}%`,width:i%3===0?3:2,height:i%3===0?3:2,borderRadius:"50%",background:"#fff",opacity:0.45+(i%5)*0.08,pointerEvents:"none"}}/>
+        ))}
         {/* アクセントライン */}
         <div style={{position:"absolute",top:0,left:"10%",right:"10%",height:1,background:"linear-gradient(90deg,transparent,rgba(74,158,255,0.4),transparent)",pointerEvents:"none"}}/>
         {/* トップバー */}
@@ -2493,6 +2516,48 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           </div>
           {moreOpen==="zukan" && <MonsterZukan data={data} child={child}/>}
+        </div>
+      )}
+
+      {/* ── 背景きせかえ ── */}
+      {effectiveTab==="more" && (
+        <div style={{padding:"0 16px 8px"}}>
+          <div onClick={()=>setMoreOpen(o=>o==="bg"?null:"bg")}
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🖼</span>
+              <span style={{fontSize:13,fontWeight:700,color:TEXT}}>はいけい きせかえ</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
+                {BG_THEMES.filter(t=>(t.need||0)<=totalDoneMon).length}/{BG_THEMES.length}
+              </span>
+              <span style={{fontSize:11,color:MUTED}}>{moreOpen==="bg"?"▲":"▼"}</span>
+            </div>
+          </div>
+          {moreOpen==="bg" && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:4}}>
+              {BG_THEMES.map(t=>{
+                const unlocked=(t.need||0)<=totalDoneMon;
+                const selected=_bgTid===t.id;
+                return (
+                  <div key={t.id}
+                    onClick={()=>{ if(unlocked) update(d=>({...d,bgTheme:{...(d.bgTheme||{}),[child.id]:t.id}})); }}
+                    style={{borderRadius:12,overflow:"hidden",cursor:unlocked?"pointer":"default",border:selected?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,opacity:unlocked?1:0.5}}>
+                    <div style={{height:44,background:t.grad||"linear-gradient(180deg,#1a5c8a,#1f7038)"}}/>
+                    <div style={{padding:"4px 4px",background:CARD,textAlign:"center"}}>
+                      <div style={{fontSize:10,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
+                      {!unlocked
+                        ? <div style={{fontSize:8,color:MUTED,fontWeight:700}}>🔒 あと{(t.need||0)-totalDoneMon}回</div>
+                        : selected
+                        ? <div style={{fontSize:8,color:GP,fontWeight:800}}>えらび中</div>
+                        : <div style={{fontSize:8,color:MUTED}}>タップで変更</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
