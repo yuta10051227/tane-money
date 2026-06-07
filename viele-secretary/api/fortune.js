@@ -1,27 +1,30 @@
-// VIELE secretary — 今日の運気API（Vercelサーバーレス関数）
-// 生年月日時・出生地と本日の日付から、算命学/四柱推命テイストの運勢をGeminiで生成。
-// 外部占いサイトの内容は使わない（オリジナル生成）。GEMINI_API_KEY 必須。
+// VIELE secretary — 運気API（年運・月運・日運）
+// ユーザー自身が取得した命式データ(西洋占星術/四柱推命/インドダシャー)を根拠に、
+// Geminiが「断定的で愛ある厳しさ(細木数子風)」で鑑定。外部占い文は再配信しない。
+// 出典: 大久保占い研究室 (senjutsu.jp) — データのライセンスに従い明記。
 
 export default async function handler(req, res) {
   try {
-    const u = new URL(req.url, "http://localhost");
-    const birth = u.searchParams.get("birth") || "";   // 生年月日 YYYY-MM-DD
-    const time = u.searchParams.get("time") || "";       // 出生時刻 HH:MM
-    const place = u.searchParams.get("place") || "";     // 出生地
-    const name = u.searchParams.get("name") || "";
-    const today = u.searchParams.get("today") || new Date().toISOString().slice(0, 10);
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
+    body = body || {};
+    const chart = body.chart || "";
+    const today = body.today || new Date().toISOString().slice(0, 10);
 
     const key = process.env.GEMINI_API_KEY;
     if (!key) { res.status(200).json({ aiEnabled: false }); return; }
-    if (!birth) { res.status(200).json({ aiEnabled: true, error: "生年月日が未設定です" }); return; }
+    if (!chart) { res.status(200).json({ aiEnabled: true, error: "命式データが未設定です" }); return; }
 
     const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
     const prompt =
-      `あなたは算命学・四柱推命に通じた占い師兼・一人社長の秘書です。次の人物の【${today} の運勢】を日本語で占ってください。\n` +
-      `生年月日:${birth} 出生時刻:${time || "不明"} 出生地:${place || "不明"} 名前:${name || "（非公開）"}\n` +
-      `施術業・コンテンツ発信の一人社長という前提で、仕事に活かせる実用的な助言にしてください。\n` +
-      `出力は必ず次のJSONのみ（前置き・説明・コードフェンスは一切不要）:\n` +
-      `{"score":1から5の整数,"theme":"今日のテーマを一言","work":"仕事運1〜2文","money":"金運1〜2文","social":"対人運1〜2文","action":"今日とると良い行動を1文","color":"ラッキーカラー","caution":"気をつける点を1文"}`;
+      `あなたは断定的で歯切れがよく、愛のある厳しさで導く占い師です（細木数子の六星占術のような毅然とした口調）。` +
+      `相手は施術業＋コンテンツ発信の一人社長。実用的で背中を押す助言にしてください。\n` +
+      `次の命式データと本日(${today})を根拠に、年・月・日の運勢を占ってください。\n【命式】\n${chart}\n` +
+      `口調は言い切る（例:「〜しなさい」「〜は禁物」「〜が吉」）。ただし脅さない、前向きに。\n` +
+      `出力は必ず次のJSONのみ（前置き・説明・コードフェンス不要）:\n` +
+      `{"today":{"score":1から5の整数,"theme":"今日の一言","work":"仕事運1〜2文","money":"金運1〜2文","social":"対人運1〜2文","action":"今日とるべき行動1文","caution":"戒め1文","color":"ラッキーカラー"},` +
+      `"month":{"theme":"今月のテーマ","flow":"今月の流れ2〜3文","advice":"今月の指針1文"},` +
+      `"year":{"theme":"今年のテーマ","flow":"今年の大きな流れ2〜3文","peak":"好機の時期","caution":"慎むべき時期"}}`;
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -36,10 +39,16 @@ export default async function handler(req, res) {
     let txt = (j?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
     txt = txt.replace(/^```json/i, "").replace(/^```/, "").replace(/```$/, "").trim();
     let fortune = null;
-    try { fortune = JSON.parse(txt); } catch { /* JSONでなければraw */ }
+    try { fortune = JSON.parse(txt); } catch { /* ignore */ }
 
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
-    res.status(200).json({ aiEnabled: true, fortune, raw: fortune ? undefined : txt, generatedAt: Date.now() });
+    res.status(200).json({
+      aiEnabled: true,
+      fortune,
+      raw: fortune ? undefined : txt,
+      source: "大久保占い研究室 (senjutsu.jp)",
+      generatedAt: Date.now(),
+    });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e) });
   }
