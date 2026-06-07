@@ -258,6 +258,8 @@ function makeSeed() {
     ],
     digest: null,
     newsCats: ["top", "business", "marketing", "solo"],
+    birth: { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 },
+    fortune: null,
     updatedAt: Date.now(),
   };
 }
@@ -768,14 +770,8 @@ const NEWS_CATEGORIES = [
 ];
 const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
 
-/* 命式エッセンシャル（本人が取得した鑑定データの要約。出典: 大久保占い研究室 senjutsu.jp） */
-const CHART_ESSENTIALS = [
-  "生年月日: 1990-10-05 01:24 / 鹿児島 / 男性",
-  "四柱推命: 年柱 庚午 / 月柱 乙酉 / 日柱 癸卯 / 時柱 癸丑 ・ 日主 癸(陰水)",
-  "西洋占星術: 太陽 天秤座(3室) / 月 牡羊座(9室) / ASC 獅子座 / 水星 乙女座 / 金星 天秤座 / 火星 双子座 / 木星 獅子座(1室) / 土星 山羊座(6室)",
-  "特殊配置: ステリウム(山羊座=土星・天王星・海王星) / Tスクエア(太陽・月・海王星) / ヨッド(火星・木星・海王星)",
-  "インド占星術 大運(ダシャー): 金星期(2010-2030) の 土星サブ期(2023.6-2026.8)",
-].join("\n");
+/* 既定の出生データ（運気の命式計算に使用。data.birth があればそちら優先） */
+const DEFAULT_BIRTH = { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 };
 
 /* 今日のまとめ（ニュースRSS集約＋任意でAI要約） */
 function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRemoveFeed, selectedCats, onToggleCat }) {
@@ -995,7 +991,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh }) {
       )}
 
       <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
-        出典データ：<a href="https://www.senjutsu.jp/horoscope/" target="_blank" rel="noopener noreferrer" style={{ color: C.sub }}>大久保占い研究室</a> ・ 鑑定はAIによる参考です
+        命式：自前エンジン（astronomy-engine）で計算 ・ 鑑定はAIによる参考です
       </div>
     </Panel>
   );
@@ -1474,7 +1470,7 @@ export default function App() {
       const r = await fetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chart: CHART_ESSENTIALS, today: iso(new Date()) }),
+        body: JSON.stringify({ birth: data.birth || DEFAULT_BIRTH, today: iso(new Date()) }),
       });
       const j = await r.json();
       if (j.error) throw new Error(j.error);
