@@ -932,7 +932,8 @@ function DailyTasks({ child, data, update }) {
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const monStageId = ((data.monsterEvolved||{})[child.id]) || "egg";
+  const _rawMonStage = ((data.monsterEvolved||{})[child.id]) || "egg";
+  const monStageId = MONSTER_TREE[_rawMonStage] ? _rawMonStage : "egg";
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
@@ -4490,9 +4491,11 @@ function SeedMonster({ child, data, size=90, update }) {
 
   // 進化ツリー
   const EVO_THRESHOLD  = 20;
-  const currentStageId = (data.monsterEvolved||{})[child.id] || null;
+  const rawStageId     = (data.monsterEvolved||{})[child.id] || null;
+  // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
+  const currentStageId = (rawStageId && MONSTER_TREE[rawStageId]) ? rawStageId : null;
   const evolved        = !!currentStageId;
-  const monDef         = evolved ? (MONSTER_TREE[currentStageId] || MONSTER_TREE["egg"]) : MONSTER_TREE["egg"];
+  const monDef         = evolved ? MONSTER_TREE[currentStageId] : MONSTER_TREE["egg"];
   const canEvolve      = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
   const monsterId      = evolved ? currentStageId : "egg";
   const imgSrc         = `/assets/monster_${monsterId}_f${frame}.png`;
@@ -4648,7 +4651,8 @@ function SeedMonster({ child, data, size=90, update }) {
           filter:evolving?"brightness(2.5) saturate(0.2)":"none",
           transition:"filter 0.4s",
         }}>
-          <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}/>
+          <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
+            onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/monster_egg_f0.png"; } else { e.target.style.visibility="hidden"; } }}/>
           {accessories.map((acc,i)=>(
             <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
           ))}
@@ -4746,6 +4750,7 @@ function MonsterZukan({ data, child }) {
                 src={`/assets/monster_${id}_f0.png`}
                 alt={found?def.name:"???"}
                 style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",filter:found?"none":"brightness(0)"}}
+                onError={e=>{e.target.style.visibility="hidden"}}
               />
               <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {found ? def.name : "???"}

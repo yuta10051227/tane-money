@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="cc001a1">
+<meta name="tane-version" content="d39024a">
 </head>
 <body>
   <div id="root"></div>
@@ -2301,7 +2301,8 @@ function DailyTasks({
   const [combo, setCombo] = useState(0);
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
-  const monStageId = (data.monsterEvolved || {})[child.id] || "egg";
+  const _rawMonStage = (data.monsterEvolved || {})[child.id] || "egg";
+  const monStageId = MONSTER_TREE[_rawMonStage] ? _rawMonStage : "egg";
   const showFlash = (pts, emoji) => {
     setFlash({
       pts,
@@ -12856,9 +12857,11 @@ function SeedMonster({
 
   // 進化ツリー
   const EVO_THRESHOLD = 20;
-  const currentStageId = (data.monsterEvolved || {})[child.id] || null;
+  const rawStageId = (data.monsterEvolved || {})[child.id] || null;
+  // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
+  const currentStageId = rawStageId && MONSTER_TREE[rawStageId] ? rawStageId : null;
   const evolved = !!currentStageId;
-  const monDef = evolved ? MONSTER_TREE[currentStageId] || MONSTER_TREE["egg"] : MONSTER_TREE["egg"];
+  const monDef = evolved ? MONSTER_TREE[currentStageId] : MONSTER_TREE["egg"];
   const canEvolve = totalTasksDone >= EVO_THRESHOLD && !evolved && !!update;
   const monsterId = evolved ? currentStageId : "egg";
   const imgSrc = `/assets/monster_${monsterId}_f${frame}.png`;
@@ -13110,6 +13113,14 @@ function SeedMonster({
       height: size,
       objectFit: "contain",
       display: "block"
+    },
+    onError: e => {
+      if (!e.target.dataset.fb) {
+        e.target.dataset.fb = "1";
+        e.target.src = "/assets/monster_egg_f0.png";
+      } else {
+        e.target.style.visibility = "hidden";
+      }
     }
   }), accessories.map((acc, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
@@ -13363,6 +13374,9 @@ function MonsterZukan({
         display: "block",
         margin: "0 auto 4px",
         filter: found ? "none" : "brightness(0)"
+      },
+      onError: e => {
+        e.target.style.visibility = "hidden";
       }
     }), /*#__PURE__*/React.createElement("div", {
       style: {
