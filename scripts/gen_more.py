@@ -71,7 +71,7 @@ def draw_garuda():
     dd.polygon([(24, 12), (29, 13), (27, 16), (24, 15)], fill=OUT)
     dd.point((26, 13), fill=W); dd.point((26, 14), fill=BLL)
     dd.line((23, 11, 28, 12), fill=OUT)
-    return img.resize((G * SCALE, G * SCALE), Image.NEAREST)
+    return img  # 論理48x48を返す(書き出し側でスケール)
 
 
 # ───────── コインの妖精マメコ (32x32) cute ─────────
@@ -106,12 +106,13 @@ def draw_mameko():
     dd.point((9, 16), fill=PINK); dd.point((10, 16), fill=PINK)
     dd.point((22, 16), fill=PINK); dd.point((23, 16), fill=PINK)
     dd.arc((14, 15, 18, 19), 20, 160, fill=OUT)
-    return img.resize((G * SCALE, G * SCALE), Image.NEAREST)
+    return img  # 論理32x32を返す(書き出し側でスケール)
 
 
 if __name__ == "__main__":
     os.makedirs("/tmp/spike", exist_ok=True)
-    g = draw_garuda(); m = draw_mameko()
+    g = draw_garuda().resize((48 * SCALE, 48 * SCALE), Image.NEAREST)
+    m = draw_mameko().resize((32 * SCALE, 32 * SCALE), Image.NEAREST)
     pad = 18; h = max(g.height, m.height)
     sheet = Image.new("RGBA", (g.width + m.width + pad * 3, h + pad + 24), (40, 42, 48, 255))
     sheet.alpha_composite(g, (pad, pad))
