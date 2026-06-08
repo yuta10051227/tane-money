@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     const today = body.today || new Date().toISOString().slice(0, 10);
     // 命式テキストはクライアント側(自前エンジン)で計算済みのものを受け取る
     const chart = body.chart || "";
+    const situation = body.situation || "";
 
     const key = process.env.GEMINI_API_KEY;
     if (!key) { res.status(200).json({ aiEnabled: false }); return; }
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
       `あなたは断定的で歯切れがよく、愛のある厳しさで導く占い師です（細木数子の六星占術のような毅然とした口調）。` +
       `相手は施術業＋コンテンツ発信の一人社長。実用的で背中を押す助言にしてください。\n` +
       `次の命式データを根拠に、本日(${today})・明日(${tomorrow})・${mm}月(${dim}日間)・${yy}年の運勢を占ってください。\n【命式】\n${chart}\n` +
+      (situation ? `【今のあなたの状況（事業の実データ）】\n${situation}\nこの状況を強く踏まえ、today.work / today.action / month.advice は“今のこの人”に刺さる具体的な助言にすること。\n` : "") +
       `口調は言い切る（例:「〜しなさい」「〜は禁物」「〜が吉」）。ただし脅さない、前向きに。\n` +
       `スコアは1〜5の整数。月の日別・年の月別は運気の波が分かるよう変化をつけること。\n` +
       `出力は必ず次のJSONのみ（前置き・説明・コードフェンス不要）:\n` +
