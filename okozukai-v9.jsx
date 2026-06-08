@@ -1736,6 +1736,12 @@ settingsTab==="members"&&(
 
 function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+  const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
+  const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
+  const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
+  const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [gachaRes, setGachaRes] = useState(null);

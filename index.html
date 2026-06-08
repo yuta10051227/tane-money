@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="4052aa8">
+<meta name="tane-version" content="3d75907">
 </head>
 <body>
   <div id="root"></div>
@@ -4554,6 +4554,12 @@ function ChildScreen({
   onFamily
 }) {
   const [tab, setTab] = useState("daily");
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _cTotalDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
+  const _cBgTheme = BG_THEMES.find(t => t.id === ((data.bgTheme || {})[child.id] || "auto")) || BG_THEMES[0];
+  const _cBgUnlock = (_cBgTheme.need || 0) <= _cTotalDone;
+  const heroGrad = _cBgUnlock && _cBgTheme.grad ? _cBgTheme.grad : null;
+  const heroStars = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [gachaRes, setGachaRes] = useState(null);
