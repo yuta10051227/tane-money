@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="d166da2">
+<meta name="tane-version" content="f129428">
 </head>
 <body>
   <div id="root"></div>
@@ -61,6 +61,7 @@ let _db = null,
   _pendingSave = null,
   _unsubscribe = null,
   _lastSyncTime = null;
+const _processedApprovalIds = new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode = null; // ファミリーコードのキャッシュ
 
 function getDB() {
@@ -223,6 +224,23 @@ function startRealtimeSync(updateFn) {
             }
             if (prev.streak) merged.streak = prev.streak;
             if (prev.dailyProgress) merged.dailyProgress = prev.dailyProgress;
+            // pendingApprovals: 承認/却下済みentryをリモートから復活させない
+            if (_processedApprovalIds.size > 0) {
+              merged.pendingApprovals = (merged.pendingApprovals || []).filter(p => !_processedApprovalIds.has(p.id));
+            }
+            // 新しいpendingApprovalsがあれば親デバイスで通知
+            const _prevIds = new Set((prev.pendingApprovals || []).map(p => p.id));
+            const _newPending = (merged.pendingApprovals || []).filter(p => !_prevIds.has(p.id) && !_processedApprovalIds.has(p.id));
+            if (_newPending.length > 0 && (prev.familySettings || {}).approvalNotification && "Notification" in window && Notification.permission === "granted") {
+              _newPending.forEach(p => {
+                try {
+                  new Notification("承認リクエスト 📬", {
+                    body: `${p.taskLabel}（+${p.pts}pt）`,
+                    icon: "/assets/tab_daily.png"
+                  });
+                } catch (e) {}
+              });
+            }
             return merged;
           });
           console.log("Realtime sync:", t);
@@ -4327,6 +4345,7 @@ function SettingsModal({
     const fs = data.familySettings || INIT.familySettings;
     const pending = data.pendingApprovals || [];
     const approve = entry => {
+      _processedApprovalIds.add(entry.id);
       const log = {
         id: uid(),
         cid: entry.cid,
@@ -4344,6 +4363,7 @@ function SettingsModal({
       }));
     };
     const reject = entry => {
+      _processedApprovalIds.add(entry.id);
       update(d => ({
         ...d,
         pendingApprovals: (d.pendingApprovals || []).filter(p => p.id !== entry.id)

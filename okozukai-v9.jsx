@@ -24,6 +24,7 @@ const FIREBASE_CONFIG = {
   appId: "1:168102674534:web:691b66d776ed0d60b5ada7"
 };
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
+const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode=null; // ファミリーコードのキャッシュ
 
 function getDB(){
@@ -143,6 +144,16 @@ function startRealtimeSync(updateFn){
             if(prev.gachaDate){merged.gachaDate={...(merged.gachaDate||{})};const _td=todayKey();Object.keys(prev.gachaDate).forEach(cid=>{if(prev.gachaDate[cid]===_td)merged.gachaDate[cid]=_td;});}
             if(prev.streak) merged.streak=prev.streak;
             if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
+            // pendingApprovals: 承認/却下済みentryをリモートから復活させない
+            if(_processedApprovalIds.size>0){
+              merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
+            }
+            // 新しいpendingApprovalsがあれば親デバイスで通知
+            const _prevIds=new Set((prev.pendingApprovals||[]).map(p=>p.id));
+            const _newPending=(merged.pendingApprovals||[]).filter(p=>!_prevIds.has(p.id)&&!_processedApprovalIds.has(p.id));
+            if(_newPending.length>0&&(prev.familySettings||{}).approvalNotification&&"Notification"in window&&Notification.permission==="granted"){
+              _newPending.forEach(p=>{try{new Notification("承認リクエスト 📬",{body:`${p.taskLabel}（+${p.pts}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}});
+            }
             return merged;
           });
           console.log("Realtime sync:",t);
@@ -1654,11 +1665,13 @@ settingsTab==="members"&&(
             const fs=data.familySettings||INIT.familySettings;
             const pending=data.pendingApprovals||[];
             const approve=(entry)=>{
+              _processedApprovalIds.add(entry.id);
               const log={id:uid(),cid:entry.cid,type:"good",label:entry.taskLabel,pts:entry.pts,date:new Date().toISOString(),rid:entry.taskId};
               addLogToFirestore(log);
               update(d=>({...d,logs:[log,...d.logs],pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             const reject=(entry)=>{
+              _processedApprovalIds.add(entry.id);
               update(d=>({...d,pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             return(<div>
