@@ -111,6 +111,23 @@ function computeAlerts(data) {
   return { late, soon };
 }
 
+/* 運気AIへ渡す「今の事業状況」サマリ（実データ反映） */
+function buildSituation(data) {
+  const lines = [];
+  const { late, soon } = computeAlerts(data);
+  if (late.length) lines.push(`遅れている手配: ${late.slice(0, 3).map((x) => x.label).join("、")}`);
+  if (soon.length) lines.push(`間近の締切: ${soon.slice(0, 3).map((x) => `${x.label}(あと${x.diff}日)`).join("、")}`);
+  const out = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  if (out > 0) lines.push(`未処理の請求/支払: 約¥${out.toLocaleString("ja-JP")}`);
+  const c = (data.content || []).filter((x) => !x.done).map((x) => x.title);
+  if (c.length) lines.push(`制作中のコンテンツ: ${c.slice(0, 3).join("、")}`);
+  const tk = (data.tasks || []).filter((x) => !x.done);
+  if (tk.length) lines.push(`未完タスク${tk.length}件: ${tk.slice(0, 2).map((x) => x.title).join("、")}`);
+  const trip = (data.trips || []).map((t) => ({ t, d: daysUntil(t.date) })).filter((x) => x.d >= 0).sort((a, b) => a.d - b.d)[0];
+  if (trip) lines.push(`次の遠征/イベント: ${trip.t.title}(あと${trip.d}日)`);
+  return lines.join("\n");
+}
+
 /* ──────────────────────────────────────────────────────────────
    逆算チェーンの型テンプレート（遠方登壇 / 日帰り / 海外実習）
    各項目: { label, daysBefore }  本番から daysBefore 日前が締切
@@ -1606,7 +1623,7 @@ export default function App() {
       const r = await fetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chart: chartText, today: iso(new Date()) }),
+        body: JSON.stringify({ chart: chartText, situation: buildSituation(data), today: iso(new Date()) }),
       });
       const text = await r.text();
       let j;
