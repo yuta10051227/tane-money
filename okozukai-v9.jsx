@@ -1909,10 +1909,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
   // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
+  const totalDoneMon = _cTotalDone;   // もっとタブ(背景/隠しモンスター)の解放判定で使用
+  const _bgTid      = (data.bgTheme||{})[child.id] || "auto";   // 背景きせかえの選択中判定で使用
+  const _cBgTheme   = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
   const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
-  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
-  const _bgTid = (data.bgTheme||{})[child.id]||"auto"; // more タブで使用
   const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
