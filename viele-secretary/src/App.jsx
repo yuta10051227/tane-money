@@ -278,6 +278,7 @@ function makeSeed() {
     newsCats: ["top", "business", "marketing", "solo"],
     birth: { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 },
     fortune: null,
+    manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     updatedAt: Date.now(),
   };
 }
@@ -1024,6 +1025,43 @@ function BirthEditor({ birth, onSave }) {
   );
 }
 
+// 画像を縮小してdataURL化（アップロード軽量化）
+function downscaleImage(file, maxW, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("画像の読み込みに失敗")); };
+    img.src = url;
+  });
+}
+
+// 予定の取り込み（スクショ→AI読取）
+function ScheduleImport({ importing, msg, count, onPick, onClear }) {
+  const ref = useRef(null);
+  return (
+    <Panel title="予定の取り込み（TimeTree等）" accent={FAMILY_COLOR} help="TimeTree等のカレンダーのスクショを選ぶと、AIが予定を読み取って『家族レーン』として今日/今後の予定に反映します。Googleカレンダーは不要。">
+      <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; onPick(f); }} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button onClick={() => ref.current && ref.current.click()} disabled={importing} style={{ ...chipBtn, background: importing ? "transparent" : C.text, color: importing ? C.sub : "#0B0D11", borderColor: importing ? C.line : C.text, fontWeight: 700 }}>
+          {importing ? "読み取り中…" : "📷 スクショから取り込む"}
+        </button>
+        {count > 0 && <button onClick={onClear} style={chipBtn}>取り込み{count}件を消去</button>}
+      </div>
+      {msg && <div style={{ fontSize: 12, color: C.sub, marginTop: 8, wordBreak: "break-word" }}>{msg}</div>}
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
+    </Panel>
+  );
+}
+
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
 function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab }) {
   const t = (fortune && fortune.today) || {};
@@ -1548,6 +1586,8 @@ export default function App() {
   const [fortuneLoading, setFortuneLoading] = useState(false);
   const [fortuneError, setFortuneError] = useState(null);
   const fortuneRef = useRef(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
 
   // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
   const notifySupported = typeof Notification !== "undefined";
@@ -1636,6 +1676,33 @@ export default function App() {
     }
     setFortuneLoading(false);
   };
+
+  // 予定スクショの取り込み（TimeTree等→AI読取→家族レーン）
+  const importSchedule = async (file) => {
+    if (!file || !data) return;
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const dataUrl = await downscaleImage(file, 1280, 0.7);
+      const r = await fetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
+      const text = await r.text();
+      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEY）");
+      const ev = (j.events || []).map((e, i) => ({ id: "mv" + Date.now() + "_" + i, date: e.date, time: e.time || "終日", title: e.title }));
+      const existing = data.manualEvents || [];
+      const keyOf = (e) => `${e.date}|${e.time}|${e.title}`;
+      const seen = new Set(existing.map(keyOf));
+      const merged = [...existing, ...ev.filter((e) => !seen.has(keyOf(e)))];
+      update({ manualEvents: merged });
+      setImportMsg(ev.length ? `${ev.length}件読み取り（新規${merged.length - existing.length}件を追加）` : "予定を読み取れませんでした。別のスクショで再試行を。");
+    } catch (e) {
+      setImportMsg("失敗：" + String((e && e.message) || e));
+    }
+    setImporting(false);
+  };
+  const clearManual = () => { if (window.confirm("取り込んだ予定をすべて消去しますか？")) update({ manualEvents: [] }); };
+
   useEffect(() => {
     if (!data || fortuneRef.current) return;
     if (!data.fortune || data.fortune.date !== iso(new Date())) {
@@ -1756,30 +1823,39 @@ export default function App() {
   };
   const includedEntries = calEvents.filter((ev) => roleForCal(ev.calendarId) !== "off").map(buildEntry);
 
-  // 今週の時間メーター：仕事カレンダーの時間指定予定のみ（家族は除外）
+  // 取り込んだ予定(TimeTree等のスクショ由来) → 家族レーンとして合流
+  const manualEntries = (data.manualEvents || []).map((ev) => {
+    const allDay = ev.time === "終日" || !/^\d/.test(ev.time || "");
+    const start = new Date(`${ev.date}T${allDay ? "00:00" : ev.time}:00`);
+    return { id: ev.id, title: ev.title, allDay, startISO: start.toISOString(), start, wd: start.getDay(), time: allDay ? "終日" : ev.time, hours: 0, cat: "家族", axis: "家族", role: "family", manual: true };
+  });
+
+  // 今週の時間メーター：仕事カレンダーの時間指定予定のみ（家族・取り込みは除外）
   const weekStart = startOfWeekMonday(today);
   const weekEnd = addDays(weekStart, 7);
   const weekWork = includedEntries.filter((e) => e.role === "work" && !e.allDay && e.start >= weekStart && e.start < weekEnd);
   const scheduleEntries = usingCal ? weekWork : LOG;
   const scheduleSource = usingCal ? "calendar" : "sample";
 
-  // 今日の予定：仕事＋家族（本日分）／横スワイプで先の日も見られるよう数日分を用意
+  // 今日の予定：仕事＋家族＋取り込み（本日分）／横スワイプで先の日も
   const todayStart = startOfDay(today);
   const todayEnd = addDays(todayStart, 1);
+  const pool = [...(usingCal ? includedEntries : []), ...manualEntries];
+  const usePool = pool.length > 0;
   const DAYS_AHEAD = 7;
   const dayBuckets = [];
   for (let d = 0; d < DAYS_AHEAD; d++) {
     const ds = addDays(todayStart, d);
     const de = addDays(ds, 1);
-    const items = usingCal
-      ? includedEntries.filter((e) => e.start >= ds && e.start < de).sort((a, b) => a.time.localeCompare(b.time))
+    const items = usePool
+      ? pool.filter((e) => e.start >= ds && e.start < de).sort((a, b) => a.time.localeCompare(b.time))
       : LOG.filter((e) => e.wd === ds.getDay()).slice().sort((a, b) => a.time.localeCompare(b.time));
     const label = d === 0 ? "今日" : d === 1 ? "明日" : d === 2 ? "明後日" : `${ds.getMonth() + 1}/${ds.getDate()}`;
     dayBuckets.push({ key: d, date: ds, label, items });
   }
 
-  // 今後の予定（先2ヶ月）：家族は全件、仕事は重要イベント（出張/ライブ/終日 等）のみ
-  const upcoming = includedEntries
+  // 今後の予定（先2ヶ月）：家族・取り込みは全件、仕事は重要イベントのみ
+  const upcoming = pool
     .filter((e) => e.start >= todayEnd && e.start < addDays(today, 62) && (e.role === "family" || isNotable(e)))
     .sort((a, b) => a.start - b.start);
 
@@ -1851,7 +1927,8 @@ export default function App() {
             <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
             <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
             <TimeMeter entries={scheduleEntries} {...calProps} />
-            {usingCal && <Upcoming events={upcoming} />}
+            {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} />}
+            <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
             {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
           </>
         )}

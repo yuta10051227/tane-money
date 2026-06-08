@@ -12,11 +12,11 @@ function candidates() {
   ].filter(Boolean);
 }
 
-async function tryModel(key, model, prompt) {
+async function tryModel(key, model, parts) {
   const r = await fetch(`${BASE}/models/${model}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    body: JSON.stringify({ contents: [{ parts }] }),
   });
   if (r.ok) {
     const j = await r.json();
@@ -32,16 +32,15 @@ function isModelError(status, msg) {
   return status === 404 || /not found|not available|is not supported|unknown name|models\//i.test(msg || "");
 }
 
-export async function geminiText(key, prompt) {
+// parts（テキスト＋画像など）でGemini生成。モデル廃止に強い。
+export async function geminiParts(key, parts) {
   let last = "";
   for (const model of candidates()) {
-    const res = await tryModel(key, model, prompt);
+    const res = await tryModel(key, model, parts);
     if (res.text !== undefined) return res.text;
     last = `${res.error.status} ${res.error.msg}`;
-    // モデル系以外（429 quota / 403 等）は即中断
     if (!isModelError(res.error.status, res.error.msg)) throw new Error("Gemini " + last);
   }
-  // 候補全滅 → 利用可能モデルを自動検出
   try {
     const lr = await fetch(`${BASE}/models?key=${key}&pageSize=200`);
     if (lr.ok) {
@@ -50,11 +49,15 @@ export async function geminiText(key, prompt) {
         .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /flash/i.test(m.name || ""))
         .map((m) => (m.name || "").replace(/^models\//, ""));
       for (const model of found) {
-        const res = await tryModel(key, model, prompt);
+        const res = await tryModel(key, model, parts);
         if (res.text !== undefined) return res.text;
         last = `${res.error.status} ${res.error.msg}`;
       }
     }
   } catch { /* ignore */ }
   throw new Error("Gemini 利用可能なモデルが見つかりません (" + last + ")");
+}
+
+export async function geminiText(key, prompt) {
+  return geminiParts(key, [{ text: prompt }]);
 }
