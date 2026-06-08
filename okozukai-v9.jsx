@@ -1626,7 +1626,7 @@ settingsTab==="members"&&(
                 </button>
               </div>
               {/* 承認通知 */}
-              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:14,color:TEXT}}>承認通知</div>
                   <div style={{color:MUTED,fontSize:11,marginTop:2}}>申請が届いたらブラウザ通知でお知らせ</div>
@@ -1647,6 +1647,15 @@ settingsTab==="members"&&(
                   <div style={{position:"absolute",top:3,left:fs.approvalNotification?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
+              {fs.approvalNotification && "Notification" in window && Notification.permission==="granted" && (
+                <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:18}}>✅</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:12,color:GP}}>通知の準備ができました！</div>
+                    <div style={{fontSize:10,color:MUTED,marginTop:1}}>子どもが申請するとスマホに通知が届きます</div>
+                  </div>
+                </div>
+              )}
               {/* 承認待ちキュー */}
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>承認待ち（{pending.length}件）</p>
               {pending.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
@@ -4915,17 +4924,27 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
       {isFinal && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
-      {/* 進化ボタン */}
-      {canEvolve && !evolving && (
-        <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
-          🌟 しんかできるよ！
-        </button>
-      )}
-      {/* 転生ボタン */}
+      {/* 進化ボタン＋進化先ヒント */}
+      {canEvolve && !evolving && (()=>{
+        const nextId = computeNextStageId();
+        const nextDef = nextId ? MONSTER_TREE[nextId] : null;
+        return(
+          <>
+            <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
+              🌟 しんかできるよ！
+            </button>
+            {nextDef&&<div style={{fontSize:9,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}になりそう！</div>}
+          </>
+        );
+      })()}
+      {/* 転生ボタン＋説明 */}
       {canReincarnate && !evolving && (
-        <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
-          🔄 転生する
-        </button>
+        <>
+          <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
+            🔄 転生する
+          </button>
+          <div style={{fontSize:9,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
+        </>
       )}
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (
@@ -6292,10 +6311,10 @@ function SetupWizard({ data, update, onComplete }) {
       {step===1&&(
         <div style={{flex:1}}>
           <div style={{fontSize:48,marginBottom:14}}>🏠</div>
-          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>ファミリー名を決めよう</h2>
-          <p style={{color:MUTED,fontSize:13,margin:"0 0 22px",lineHeight:1.6}}>あとで変えることもできます</p>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>かぞくのなまえを決めよう！</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 22px",lineHeight:1.6}}>みんなで使うグループの名前です。あとで変えることもできます</p>
           <input value={familyName} onChange={e=>setFamilyName(e.target.value)}
-            placeholder="例：田中家、くるりんファミリー"
+            placeholder="例：田中家、スマイルファミリー"
             style={{...INP,fontSize:15,marginBottom:14}}/>
           {familyName.trim()&&(
             <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"12px 16px",marginBottom:22}}>

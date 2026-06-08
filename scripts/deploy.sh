@@ -42,8 +42,9 @@ echo "✅ ビルド OK (埋め込みバージョン: $EXPECTED_VER)"
 # 4. Git commit & push（ビルド済みindex.htmlを含む）
 echo ""
 echo "▶ [4/5] GitHub へ push 中..."
-git add index.html "$JSX" okozukai-v9-stable.jsx 2>/dev/null || true
+git add index.html "$JSX" okozukai-v9-stable.jsx manifest.json sw.js icon.svg vercel.json 2>/dev/null || true
 git add index.html "$JSX"
+git add assets/ 2>/dev/null || true
 git commit -m "$MSG
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
