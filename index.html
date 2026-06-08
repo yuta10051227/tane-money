@@ -19,7 +19,7 @@
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
 <<<<<<< HEAD
-<meta name="tane-version" content="7c3a15a">
+<meta name="tane-version" content="2beb05c">
 =======
 <meta name="tane-version" content="d28461f">
 >>>>>>> 7ea96ac (fix: もっとタブのtotalDoneMon/_bgTid未定義エラーを修正)
@@ -2675,6 +2675,7 @@ function DailyTasks({
       objectFit: "contain",
       display: "block",
       margin: "5px auto 2px",
+      imageRendering: "pixelated",
       animation: "heartbeat .6s ease-in-out"
     },
     onError: e => {
@@ -8361,6 +8362,7 @@ function ChildScreen({
         objectFit: "contain",
         display: "block",
         margin: "0 auto 3px",
+        imageRendering: "pixelated",
         filter: unlocked ? "none" : "brightness(0)"
       },
       onError: e => {
@@ -14641,7 +14643,8 @@ function SeedMonster({
       width: size,
       height: size,
       objectFit: "contain",
-      display: "block"
+      display: "block",
+      imageRendering: "pixelated"
     },
     onError: e => {
       const t = e.target;
@@ -14958,6 +14961,7 @@ function MonsterZukan({
         objectFit: "contain",
         display: "block",
         margin: "0 auto 4px",
+        imageRendering: "pixelated",
         filter: found ? "none" : "brightness(0)"
       },
       onError: e => {

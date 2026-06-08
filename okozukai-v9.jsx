@@ -1080,7 +1080,7 @@ function DailyTasks({ child, data, update }) {
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
-            <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
+            <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ タネっちがよろこんだ！</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
@@ -2886,7 +2886,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       onClick={()=>{ if(unlocked) update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:equipped?null:h.id}})); }}
                       style={{borderRadius:12,padding:"8px 4px",textAlign:"center",background:equipped?GS:CARD,border:equipped?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.85}}>
                       <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
-                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",filter:unlocked?"none":"brightness(0)"}}
+                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
                         onError={e=>{e.target.style.visibility="hidden"}}/>
                       <div style={{fontSize:9,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                         {unlocked?h.name:"???"}
@@ -5147,7 +5147,7 @@ function SeedMonster({ child, data, size=90, update }) {
             filter:evolving?"brightness(2.5) saturate(0.2)":"none",
             transition:"filter 0.4s",
           }}>
-            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
+            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block",imageRendering:"pixelated"}}
               onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
@@ -5277,7 +5277,7 @@ function MonsterZukan({ data, child }) {
               <img
                 src={`/assets/monster_${id}_f0.png`}
                 alt={found?def.name:"???"}
-                style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",filter:found?"none":"brightness(0)"}}
+                style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",imageRendering:"pixelated",filter:found?"none":"brightness(0)"}}
                 onError={e=>{e.target.style.visibility="hidden"}}
               />
               <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
