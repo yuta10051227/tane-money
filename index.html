@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="3d75907">
+<meta name="tane-version" content="85d7b08">
 </head>
 <body>
   <div id="root"></div>
@@ -61,6 +61,7 @@ let _db = null,
   _pendingSave = null,
   _unsubscribe = null,
   _lastSyncTime = null;
+const _processedApprovalIds = new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode = null; // ファミリーコードのキャッシュ
 
 function getDB() {
@@ -223,6 +224,23 @@ function startRealtimeSync(updateFn) {
             }
             if (prev.streak) merged.streak = prev.streak;
             if (prev.dailyProgress) merged.dailyProgress = prev.dailyProgress;
+            // pendingApprovals: 承認/却下済みentryをリモートから復活させない
+            if (_processedApprovalIds.size > 0) {
+              merged.pendingApprovals = (merged.pendingApprovals || []).filter(p => !_processedApprovalIds.has(p.id));
+            }
+            // 新しいpendingApprovalsがあれば親デバイスで通知
+            const _prevIds = new Set((prev.pendingApprovals || []).map(p => p.id));
+            const _newPending = (merged.pendingApprovals || []).filter(p => !_prevIds.has(p.id) && !_processedApprovalIds.has(p.id));
+            if (_newPending.length > 0 && (prev.familySettings || {}).approvalNotification && "Notification" in window && Notification.permission === "granted") {
+              _newPending.forEach(p => {
+                try {
+                  new Notification("承認リクエスト 📬", {
+                    body: `${p.taskLabel || "タスク"}（+${p.pts || 0}pt）`,
+                    icon: "/assets/tab_daily.png"
+                  });
+                } catch (e) {}
+              });
+            }
             return merged;
           });
           console.log("Realtime sync:", t);
@@ -1312,9 +1330,11 @@ const INIT = {
       reward: "週末に家族でアイスを選ぶ"
     },
     requireApproval: false,
-    approvalNotification: false
+    approvalNotification: false,
+    rewardApproval: false
   },
-  pendingApprovals: []
+  pendingApprovals: [],
+  pendingRedemptions: []
 };
 function migrate(d) {
   if (!d) return {
@@ -1333,11 +1353,16 @@ function migrate(d) {
   if (!d.claimedBadges) d.claimedBadges = {};
   if (!d.noPinIds) d.noPinIds = {};
   if (!d.pendingApprovals) d.pendingApprovals = [];
+  if (!d.pendingRedemptions) d.pendingRedemptions = [];
   if (!d.familySettings) d.familySettings = {
     ...INIT.familySettings
   };
   if (d.familySettings.requireApproval === undefined) d.familySettings.requireApproval = false;
   if (d.familySettings.approvalNotification === undefined) d.familySettings.approvalNotification = false;
+  if (d.familySettings.rewardApproval === undefined) d.familySettings.rewardApproval = false;
+  if (!d.familySettings.familyMission) d.familySettings.familyMission = {
+    ...INIT.familySettings.familyMission
+  };
   if (!d.monsterEvolved) d.monsterEvolved = {};
   if (!d.monsterIV) d.monsterIV = {};
   if (!d.monsterDiscovered) d.monsterDiscovered = {};
@@ -1352,6 +1377,8 @@ function migrate(d) {
     if (evo && !d.monsterDiscovered[c.id].includes(evo)) d.monsterDiscovered[c.id] = [...d.monsterDiscovered[c.id], evo];
   });
   if (!d.onboardingChecks) d.onboardingChecks = {};
+  if (!d.claimedMissions) d.claimedMissions = {};
+  if (!d.beginnerMissionDone) d.beginnerMissionDone = {};
   if (!d.gachaCollection) d.gachaCollection = {};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms = {
@@ -3080,6 +3107,12 @@ function SettingsModal({
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [smEditReward, setSmEditReward] = useState(null);
+  const [smAddOpen, setSmAddOpen] = useState(false);
+  const [smREmoji, setSmREmoji] = useState("🎁");
+  const [smRLabel, setSmRLabel] = useState("");
+  const [smRCost, setSmRCost] = useState("5");
+  const [smRUnit, setSmRUnit] = useState("");
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G = "#34c77b",
     Y = "#f5c842",
@@ -3128,7 +3161,7 @@ function SettingsModal({
     }
   };
   const QUICK_TABS = [["grant", "🎁 pt付与"], ["approval", "✅ 承認"]];
-  const ADV_TABS = [["tasks", "📋 タスク"], ["assign", "👤 割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "🔐 PIN"], ["transfer", "🔄 引継"]];
+  const ADV_TABS = [["tasks", "📋 タスク"], ["assign", "👤 割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["family", "🏆 家族目標"], ["members", "🔐 PIN"], ["transfer", "🔄 引継"]];
   const SETTING_TABS = settingsGroup === "quick" ? QUICK_TABS : ADV_TABS;
   if (!authed) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3344,7 +3377,7 @@ function SettingsModal({
       fontFamily: F,
       whiteSpace: "nowrap"
     }
-  }, l, v === "approval" && (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("span", {
+  }, l, v === "approval" && (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length > 0 && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 5,
       background: R,
@@ -3354,7 +3387,7 @@ function SettingsModal({
       fontSize: 10,
       fontWeight: 900
     }
-  }, (data.pendingApprovals || []).length)))), /*#__PURE__*/React.createElement("div", {
+  }, (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length)))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflowY: "auto",
@@ -3683,7 +3716,108 @@ function SettingsModal({
       margin: "0 0 12px"
     }
   }, "\u3053\u3046\u304B\u3093\u30A2\u30A4\u30C6\u30E0\u306E\u7BA1\u7406"), (data.rewards || []).map(r => /*#__PURE__*/React.createElement("div", {
-    key: r.id,
+    key: r.id
+  }, smEditReward?.id === r.id ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: BG,
+      border: `1.5px solid ${B}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.emoji,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      emoji: e.target.value
+    })),
+    style: {
+      ...INP,
+      width: 52,
+      textAlign: "center"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.label,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      label: e.target.value
+    })),
+    placeholder: "\u7279\u5178\u540D",
+    style: INP
+  })), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.cost,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      cost: e.target.value
+    })),
+    type: "number",
+    placeholder: "\u5FC5\u8981pt",
+    style: {
+      ...INP,
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.unit,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      unit: e.target.value
+    })),
+    placeholder: "\u5185\u5BB9\u8AAC\u660E\uFF08\u4F8B: 30\u5206\u5EF6\u9577\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const cost = parseInt(smEditReward.cost);
+      if (!smEditReward.label || isNaN(cost) || cost <= 0) return;
+      update(d => ({
+        ...d,
+        rewards: d.rewards.map(x => x.id === smEditReward.id ? {
+          ...smEditReward,
+          cost
+        } : x)
+      }));
+      setSmEditReward(null);
+    },
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: G,
+      border: "none",
+      borderRadius: 10,
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u4FDD\u5B58"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmEditReward(null),
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: BORDER,
+      border: "none",
+      borderRadius: 10,
+      color: MUTED,
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"))) : /*#__PURE__*/React.createElement("div", {
     style: {
       background: CARD,
       border: `1.5px solid ${BORDER}`,
@@ -3723,6 +3857,23 @@ function SettingsModal({
       fontSize: 11
     }
   }, r.cost, "pt \xB7 ", r.unit)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmEditReward({
+      ...r,
+      cost: String(r.cost)
+    }),
+    style: {
+      padding: "4px 10px",
+      background: `${B}15`,
+      border: `1.5px solid ${B}`,
+      borderRadius: 8,
+      color: B,
+      fontWeight: 700,
+      fontSize: 11,
+      cursor: "pointer",
+      fontFamily: F,
+      marginRight: 4
+    }
+  }, "\u7DE8\u96C6"), /*#__PURE__*/React.createElement("button", {
     onClick: () => update(d => ({
       ...d,
       rewards: d.rewards.filter(x => x.id !== r.id)
@@ -3738,25 +3889,103 @@ function SettingsModal({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u524A\u9664"))), /*#__PURE__*/React.createElement("button", {
+  }, "\u524A\u9664")))), smAddOpen ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: BG,
+      border: `1.5px solid ${G}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: smREmoji,
+    onChange: e => setSmREmoji(e.target.value),
+    style: {
+      ...INP,
+      width: 52,
+      textAlign: "center"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smRLabel,
+    onChange: e => setSmRLabel(e.target.value),
+    placeholder: "\u7279\u5178\u540D",
+    style: INP
+  })), /*#__PURE__*/React.createElement("input", {
+    value: smRCost,
+    onChange: e => setSmRCost(e.target.value),
+    type: "number",
+    placeholder: "\u5FC5\u8981pt\uFF08\u4F8B: 5\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smRUnit,
+    onChange: e => setSmRUnit(e.target.value),
+    placeholder: "\u5185\u5BB9\u8AAC\u660E\uFF08\u4F8B: 1\u56DE\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      const label = prompt("ご褒美名");
-      if (!label) return;
-      const cost = parseInt(prompt("必要pt"));
-      if (isNaN(cost)) return;
-      const emoji = prompt("絵文字", "🎁") || "🎁";
-      const unit = prompt("単位（例：1回）", "1回") || "1回";
+      const cost = parseInt(smRCost);
+      if (!smRLabel || isNaN(cost) || cost <= 0) return;
       update(d => ({
         ...d,
         rewards: [...d.rewards, {
           id: uid(),
-          emoji,
-          label,
+          emoji: smREmoji,
+          label: smRLabel,
           cost,
-          unit
+          unit: smRUnit || "1回"
         }]
       }));
+      setSmRLabel("");
+      setSmREmoji("🎁");
+      setSmRCost("5");
+      setSmRUnit("");
+      setSmAddOpen(false);
     },
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: G,
+      border: "none",
+      borderRadius: 10,
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u8FFD\u52A0"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmAddOpen(false),
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: BORDER,
+      border: "none",
+      borderRadius: 10,
+      color: MUTED,
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"))) : /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmAddOpen(true),
     style: {
       width: "100%",
       padding: "12px",
@@ -3926,7 +4155,7 @@ function SettingsModal({
         color: interest > 0 ? G : MUTED
       }
     }, interest > 0 ? `+${interest}pt` : "−"));
-  }))), "settingsTab===\"members\"&&(", /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }))), settingsTab === "members" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       color: MUTED,
       fontSize: 12,
@@ -4116,10 +4345,11 @@ function SettingsModal({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), ")}", settingsTab === "approval" && (() => {
+  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), settingsTab === "approval" && (() => {
     const fs = data.familySettings || INIT.familySettings;
     const pending = data.pendingApprovals || [];
     const approve = entry => {
+      _processedApprovalIds.add(entry.id);
       const log = {
         id: uid(),
         cid: entry.cid,
@@ -4137,6 +4367,7 @@ function SettingsModal({
       }));
     };
     const reject = entry => {
+      _processedApprovalIds.add(entry.id);
       update(d => ({
         ...d,
         pendingApprovals: (d.pendingApprovals || []).filter(p => p.id !== entry.id)
@@ -4204,7 +4435,7 @@ function SettingsModal({
         border: `1.5px solid ${BORDER}`,
         borderRadius: 14,
         padding: "14px 16px",
-        marginBottom: 16,
+        marginBottom: fs.approvalNotification ? 8 : 16,
         display: "flex",
         alignItems: "center",
         gap: 12
@@ -4274,6 +4505,89 @@ function SettingsModal({
         background: "#fff",
         transition: "left .2s"
       }
+    }))), fs.approvalNotification && "Notification" in window && Notification.permission === "granted" && /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: GS,
+        border: `1.5px solid ${G}`,
+        borderRadius: 12,
+        padding: "10px 14px",
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 18
+      }
+    }, "\u2705"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: GP
+      }
+    }, "\u901A\u77E5\u306E\u6E96\u5099\u304C\u3067\u304D\u307E\u3057\u305F\uFF01"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: MUTED,
+        marginTop: 1
+      }
+    }, "\u5B50\u3069\u3082\u304C\u7533\u8ACB\u3059\u308B\u3068\u30B9\u30DE\u30DB\u306B\u901A\u77E5\u304C\u5C4A\u304D\u307E\u3059"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, "\u4EA4\u63DB\u627F\u8A8D\u304C\u5FC5\u8981"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: MUTED,
+        fontSize: 11,
+        marginTop: 2
+      }
+    }, "ON\u306B\u3059\u308B\u3068\u3001\u5831\u916C\u306E\u4EA4\u63DB\u3092\u89AA\u304C\u627F\u8A8D\u3057\u3066\u304B\u3089pt\u3092\u6D88\u8CBB")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => update(d => ({
+        ...d,
+        familySettings: {
+          ...(d.familySettings || {}),
+          rewardApproval: !fs.rewardApproval
+        }
+      })),
+      style: {
+        position: "relative",
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        background: fs.rewardApproval ? G : BORDER,
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: fs.rewardApproval ? 24 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s"
+      }
     }))), /*#__PURE__*/React.createElement("p", {
       style: {
         color: MUTED,
@@ -4281,10 +4595,10 @@ function SettingsModal({
         fontWeight: 800,
         margin: "0 0 10px"
       }
-    }, "\u627F\u8A8D\u5F85\u3061\uFF08", pending.length, "\u4EF6\uFF09"), pending.length === 0 && /*#__PURE__*/React.createElement("div", {
+    }, "\u30BF\u30B9\u30AF\u627F\u8A8D\u5F85\u3061\uFF08", pending.length, "\u4EF6\uFF09"), pending.length === 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
-        padding: "24px 0",
+        padding: "16px 0",
         color: MUTED,
         fontSize: 13
       }
@@ -4359,7 +4673,296 @@ function SettingsModal({
           fontFamily: F
         }
       }, "\u274C \u5374\u4E0B")));
+    }), (() => {
+      const pendingR = data.pendingRedemptions || [];
+      const approveR = entry => {
+        const log = {
+          id: uid(),
+          cid: entry.cid,
+          type: "reward",
+          label: `${entry.rewardLabel}（${entry.rewardUnit}）`,
+          pts: -entry.cost,
+          rid: entry.rewardId,
+          date: new Date().toISOString()
+        };
+        addLogToFirestore(log);
+        update(d => ({
+          ...d,
+          logs: [log, ...d.logs],
+          pendingRedemptions: (d.pendingRedemptions || []).filter(p => p.id !== entry.id)
+        }));
+      };
+      const rejectR = entry => {
+        update(d => ({
+          ...d,
+          pendingRedemptions: (d.pendingRedemptions || []).filter(p => p.id !== entry.id)
+        }));
+      };
+      if (pendingR.length === 0) return null;
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+        style: {
+          color: MUTED,
+          fontSize: 12,
+          fontWeight: 800,
+          margin: "16px 0 10px"
+        }
+      }, "\u4EA4\u63DB\u627F\u8A8D\u5F85\u3061\uFF08", pendingR.length, "\u4EF6\uFF09"), pendingR.map(entry => {
+        const member = [...data.children, ...(data.parents || [])].find(m => m.id === entry.cid);
+        return /*#__PURE__*/React.createElement("div", {
+          key: entry.id,
+          style: {
+            background: PS,
+            border: `1.5px solid ${P}`,
+            borderRadius: 14,
+            padding: "12px 14px",
+            marginBottom: 10
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 10
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 26
+          }
+        }, entry.rewardEmoji), /*#__PURE__*/React.createElement("div", {
+          style: {
+            flex: 1
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontWeight: 700,
+            fontSize: 13,
+            color: TEXT
+          }
+        }, entry.rewardLabel), /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 11,
+            color: MUTED
+          }
+        }, member?.name || "?", " \xB7 ", entry.cost, "pt"))), /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            gap: 8
+          }
+        }, /*#__PURE__*/React.createElement("button", {
+          onClick: () => approveR(entry),
+          style: {
+            flex: 1,
+            background: G,
+            border: "none",
+            borderRadius: 10,
+            padding: "9px",
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: F
+          }
+        }, "\u2705 \u627F\u8A8D"), /*#__PURE__*/React.createElement("button", {
+          onClick: () => rejectR(entry),
+          style: {
+            flex: 1,
+            background: `${R}15`,
+            border: `1.5px solid ${R}`,
+            borderRadius: 10,
+            padding: "9px",
+            color: R,
+            fontWeight: 800,
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: F
+          }
+        }, "\u274C \u5374\u4E0B")));
+      }));
+    })());
+  })(), settingsTab === "family" && (() => {
+    const fm = data.familySettings?.familyMission || {
+      enabled: true,
+      label: "みんなの活動で 3,000 pt を育てよう",
+      target: 3000,
+      reward: "週末に家族でアイスを選ぶ"
+    };
+    const setFm = patch => update(d => ({
+      ...d,
+      familySettings: {
+        ...(d.familySettings || {}),
+        familyMission: {
+          ...(d.familySettings?.familyMission || {
+            enabled: true,
+            label: "みんなの活動で 3,000 pt を育てよう",
+            target: 3000,
+            reward: "週末に家族でアイスを選ぶ"
+          }),
+          ...patch
+        }
+      }
     }));
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12,
+        fontWeight: 800,
+        margin: "0 0 16px"
+      }
+    }, "\u5BB6\u65CF\u5168\u54E1\u3067\u76EE\u6307\u3059\u5171\u901A\u30B4\u30FC\u30EB\u3092\u8A2D\u5B9A\u3057\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, "\u5BB6\u65CF\u76EE\u6A19\u3092\u8868\u793A\u3059\u308B"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: MUTED,
+        fontSize: 11,
+        marginTop: 2
+      }
+    }, "\u30E9\u30F3\u30AD\u30F3\u30B0\u753B\u9762\u3068\u6BCE\u65E5\u30BF\u30D6\u306B\u9032\u6357\u3092\u8868\u793A")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setFm({
+        enabled: !fm.enabled
+      }),
+      style: {
+        position: "relative",
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        background: fm.enabled ? G : BORDER,
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: fm.enabled ? 24 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s"
+      }
+    }))), fm.enabled && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u76EE\u6A19\u306E\u6587\u7AE0"), /*#__PURE__*/React.createElement("input", {
+      value: fm.label,
+      onChange: e => setFm({
+        label: e.target.value
+      }),
+      placeholder: "\u4F8B\uFF1A\u307F\u3093\u306A\u306E\u6D3B\u52D5\u3067 3,000 pt \u3092\u80B2\u3066\u3088\u3046",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u76EE\u6A19\u30DD\u30A4\u30F3\u30C8"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 10
+      }
+    }, [1000, 2000, 3000, 5000, 10000].map(v => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      onClick: () => setFm({
+        target: v
+      }),
+      style: {
+        padding: "6px 14px",
+        border: `1.5px solid ${fm.target === v ? G : BORDER}`,
+        borderRadius: 10,
+        background: fm.target === v ? `${G}20` : "transparent",
+        color: fm.target === v ? G : MUTED,
+        fontWeight: fm.target === v ? 700 : 400,
+        fontSize: 12,
+        cursor: "pointer",
+        fontFamily: F
+      }
+    }, v.toLocaleString(), "pt"))), /*#__PURE__*/React.createElement("input", {
+      value: fm.target,
+      onChange: e => {
+        const v = parseInt(e.target.value);
+        if (!isNaN(v) && v > 0) setFm({
+          target: v
+        });
+      },
+      type: "number",
+      placeholder: "\u30AB\u30B9\u30BF\u30E0\u5024",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u9054\u6210\u3057\u305F\u3089\u3084\u308B\u3053\u3068"), /*#__PURE__*/React.createElement("input", {
+      value: fm.reward,
+      onChange: e => setFm({
+        reward: e.target.value
+      }),
+      placeholder: "\u4F8B\uFF1A\u9031\u672B\u306B\u5BB6\u65CF\u3067\u30A2\u30A4\u30B9\u3092\u9078\u3076",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    }))));
   })(), settingsTab === "transfer" && (() => {
     const code = (() => {
       try {
@@ -4558,6 +5161,8 @@ function ChildScreen({
   const _cTotalDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
   const _cBgTheme = BG_THEMES.find(t => t.id === ((data.bgTheme || {})[child.id] || "auto")) || BG_THEMES[0];
   const _cBgUnlock = (_cBgTheme.need || 0) <= _cTotalDone;
+  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
+  const _bgTid = (data.bgTheme || {})[child.id] || "auto"; // more タブで使用
   const heroGrad = _cBgUnlock && _cBgTheme.grad ? _cBgTheme.grad : null;
   const heroStars = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
@@ -4671,15 +5276,39 @@ function ChildScreen({
     }
   };
   const doRedeem = r => {
-    showFlash(-r.cost, r.emoji);
     setRewardPop(null);
-    addLog({
-      cid: child.id,
-      type: "reward",
-      label: `${r.label}（${r.unit}）`,
-      pts: -r.cost,
-      rid: r.id
-    });
+    const _rfs = data.familySettings || INIT.familySettings;
+    if (_rfs.rewardApproval) {
+      const entry = {
+        id: uid(),
+        cid: child.id,
+        rewardId: r.id,
+        rewardEmoji: r.emoji,
+        rewardLabel: r.label,
+        rewardUnit: r.unit,
+        cost: r.cost,
+        date: new Date().toISOString()
+      };
+      update(d => ({
+        ...d,
+        pendingRedemptions: [...(d.pendingRedemptions || []), entry]
+      }));
+      setFlash({
+        pts: 0,
+        emoji: "⏳",
+        pending: true
+      });
+      setTimeout(() => setFlash(null), 1400);
+    } else {
+      showFlash(-r.cost, r.emoji);
+      addLog({
+        cid: child.id,
+        type: "reward",
+        label: `${r.label}（${r.unit}）`,
+        pts: -r.cost,
+        rid: r.id
+      });
+    }
   };
   const doGacha = () => {
     if (todayDone) return;
@@ -4841,8 +5470,8 @@ function ChildScreen({
   // MyTasks filter
   const myIds = (data.myTaskIds || {})[child.id] || [];
   const hasFilter = myIds.length > 0;
-  const filtGood = hasFilter ? data.goodTasks.filter(t => myIds.includes(t.id)) : data.goodTasks;
-  const filtBad = hasFilter ? data.badTasks.filter(t => myIds.includes(t.id)) : data.badTasks;
+  const filtGood = hasFilter ? (data.goodTasks || []).filter(t => myIds.includes(t.id)) : data.goodTasks || [];
+  const filtBad = hasFilter ? (data.badTasks || []).filter(t => myIds.includes(t.id)) : data.badTasks || [];
   const sortTaskFn = (a, b) => taskSort === "pts_high" ? Math.abs(taskPts(b, child.id)) - Math.abs(taskPts(a, child.id)) : taskSort === "pts_low" ? Math.abs(taskPts(a, child.id)) - Math.abs(taskPts(b, child.id)) : taskSort === "name" ? a.label.localeCompare(b.label, "ja") : 0;
 
   // 5-tab grouped nav
@@ -4974,7 +5603,7 @@ function ChildScreen({
         color: "#fff",
         position: "relative"
       }
-    }, "\u2699", (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "\u2699", (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         position: "absolute",
         top: -5,
@@ -4992,7 +5621,7 @@ function ChildScreen({
         padding: "0 3px",
         lineHeight: 1
       }
-    }, (data.pendingApprovals || []).length))), /*#__PURE__*/React.createElement("div", {
+    }, (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length))), /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: "center",
         position: "relative",
@@ -5295,7 +5924,7 @@ function ChildScreen({
         color: "#e2e8f0",
         position: "relative"
       }
-    }, "\u2699", (data.pendingApprovals || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "\u2699", (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         position: "absolute",
         top: -5,
@@ -5313,7 +5942,7 @@ function ChildScreen({
         padding: "0 3px",
         lineHeight: 1
       }
-    }, (data.pendingApprovals || []).length))), /*#__PURE__*/React.createElement("div", {
+    }, (data.pendingApprovals || []).length + (data.pendingRedemptions || []).length))), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "20px 20px 18px",
         position: "relative",
@@ -5787,7 +6416,231 @@ function ChildScreen({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u6D3B\u52D5\u30BF\u30D6\u3078 \u2192")), !isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "\u6D3B\u52D5\u30BF\u30D6\u3078 \u2192")), !(data.beginnerMissionDone || {})[child.id] && (() => {
+    const claimed = (data.claimedMissions || {})[child.id] || [];
+    const quests = [{
+      id: "q1",
+      emoji: "⭐",
+      label: "タスクをやろう",
+      hint: isJunior ? "「やること」タブでお手伝いをやってみよう" : "「活動」タブでお手伝いをやってみよう",
+      done: myLogs.some(l => l.type === "good" || l.type === "bad") || (data.pendingApprovals || []).some(p => p.cid === child.id),
+      nav: () => setTab(isJunior ? "tasks" : "activity")
+    }, {
+      id: "q2",
+      emoji: "🎰",
+      label: "ガチャを引こう",
+      hint: "今日のガチャを1回引いてみよう",
+      done: myLogs.some(l => l.type === "gacha"),
+      nav: null
+    }, {
+      id: "q3",
+      emoji: "🎯",
+      label: "目標を1つ決めよう",
+      hint: "「ためる」タブで貯金の目標を作ってみよう",
+      done: (data.goals || []).some(g => g.cid === child.id),
+      nav: () => {
+        if (isJunior) {
+          setTab("goals");
+        } else {
+          setTab("money");
+          setMonTab("goals");
+        }
+      }
+    }, ...(!isJunior ? [{
+      id: "q4",
+      emoji: "🛍",
+      label: "ポイントをつかってみよう",
+      hint: "「ためる」タブのこうかんで使えるよ",
+      done: myLogs.some(l => l.type === "reward"),
+      nav: () => {
+        setTab("money");
+        setMonTab("rewards");
+      }
+    }] : [])];
+    const totalQ = quests.length;
+    const doneCnt = quests.filter(q => q.done).length;
+    const totalBonus = totalQ === 4 ? 300 : 250;
+    const claimQuest = qId => {
+      const qLabel = quests.find(q => q.id === qId)?.label || "";
+      const e = {
+        id: uid(),
+        cid: child.id,
+        type: "grant",
+        label: `🎉 クエスト完了「${qLabel}」`,
+        pts: 50,
+        date: new Date().toISOString()
+      };
+      update(d => {
+        const nc = [...(d.claimedMissions?.[child.id] || []), qId];
+        const allQ = quests.every(q => nc.includes(q.id));
+        const alreadyDone = !!d.beginnerMissionDone?.[child.id];
+        const newLogs = [e, ...d.logs];
+        if (allQ && !alreadyDone) {
+          const e2 = {
+            id: uid(),
+            cid: child.id,
+            type: "grant",
+            label: "🏆 スタートクエスト全クリア！",
+            pts: 100,
+            date: new Date().toISOString()
+          };
+          addLogToFirestore(e);
+          addLogToFirestore(e2);
+          return {
+            ...d,
+            logs: [e2, ...newLogs],
+            claimedMissions: {
+              ...(d.claimedMissions || {}),
+              [child.id]: nc
+            },
+            beginnerMissionDone: {
+              ...(d.beginnerMissionDone || {}),
+              [child.id]: true
+            }
+          };
+        }
+        addLogToFirestore(e);
+        return {
+          ...d,
+          logs: newLogs,
+          claimedMissions: {
+            ...(d.claimedMissions || {}),
+            [child.id]: nc
+          }
+        };
+      });
+      showFlash(50, "🎉");
+    };
+    const unclaimed = quests.filter(q => !claimed.includes(q.id));
+    if (unclaimed.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "10px 16px 0"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        borderRadius: 16,
+        padding: "14px 14px 10px",
+        border: `1.5px solid ${BORDER}`,
+        boxShadow: SHADOW
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, "\uD83C\uDF31"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 900,
+        fontSize: 13,
+        color: TEXT
+      }
+    }, "\u30B9\u30BF\u30FC\u30C8\u30AF\u30A8\u30B9\u30C8"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: MUTED
+      }
+    }, "\u5168\u90E8\u3084\u308B\u3068\u5408\u8A08+", totalBonus, "pt\uFF01")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 800,
+        color: doneCnt === totalQ ? GP : MUTED
+      }
+    }, doneCnt, "/", totalQ)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: BORDER,
+        borderRadius: 999,
+        height: 4,
+        marginBottom: 10,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: `${doneCnt / totalQ * 100}%`,
+        height: "100%",
+        background: G,
+        borderRadius: 999,
+        transition: "width .4s"
+      }
+    })), unclaimed.map(q => /*#__PURE__*/React.createElement("div", {
+      key: q.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 0",
+        borderTop: `1px solid ${BORDER}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16,
+        flexShrink: 0
+      }
+    }, q.done ? "✅" : q.emoji), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12,
+        color: q.done ? GP : TEXT
+      }
+    }, q.label), !q.done && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: MUTED,
+        marginTop: 1
+      }
+    }, q.hint), q.done && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: GP,
+        marginTop: 1
+      }
+    }, "\u9054\u6210\uFF01+50pt \u3046\u3051\u3068\u308C\u308B\u3088")), q.done ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => claimQuest(q.id),
+      style: {
+        background: G,
+        border: "none",
+        borderRadius: 10,
+        padding: "5px 12px",
+        color: "#fff",
+        fontWeight: 800,
+        fontSize: 11,
+        cursor: "pointer",
+        fontFamily: F,
+        flexShrink: 0
+      }
+    }, "\u3046\u3051\u3068\u308B") : /*#__PURE__*/React.createElement("button", {
+      onClick: () => q.nav && q.nav(),
+      disabled: !q.nav,
+      style: {
+        background: CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 10,
+        padding: "5px 12px",
+        color: MUTED,
+        fontWeight: 700,
+        fontSize: 11,
+        cursor: q.nav ? "pointer" : "default",
+        fontFamily: F,
+        flexShrink: 0
+      }
+    }, "\u3084\u3063\u3066\u307F\u308B")))));
+  })(), !isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       color: "rgba(255,255,255,0.25)",
       fontSize: 10,
@@ -6065,7 +6918,59 @@ function ChildScreen({
           }
         }, "\xD7", cnt));
       })));
-    })());
+    })(), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        background: darkBG ? "rgba(255,255,255,0.04)" : CARDS,
+        borderRadius: 12,
+        padding: "8px 12px",
+        border: `1px solid ${darkBG ? "rgba(255,255,255,0.08)" : BORDER}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: darkBG ? "rgba(255,255,255,0.35)" : MUTED,
+        fontWeight: 700,
+        marginBottom: 6
+      }
+    }, "\uD83C\uDFB2 \u63D0\u4F9B\u5272\u5408"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, (data.gacha || []).map(t => /*#__PURE__*/React.createElement("div", {
+      key: t.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: darkBG ? "rgba(255,255,255,0.06)" : CARD,
+        borderRadius: 8,
+        padding: "3px 8px",
+        border: `1px solid ${t.color}40`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11
+      }
+    }, t.emoji), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: t.color
+      }
+    }, t.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: darkBG ? "rgba(255,255,255,0.5)" : MUTED
+      }
+    }, t.rate, "%"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: darkBG ? "rgba(255,255,255,0.3)" : MUTED
+      }
+    }, t.min, "\u301C", t.max, "pt"))))));
   })(), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`)), isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(TabHint, {
     id: "daily",
     text: "\u6BCE\u65E5\u30BF\u30B9\u30AF\u3092\u30C1\u30A7\u30C3\u30AF\u3057\u3088\u3046\uFF01\u5168\u90E8\u30AF\u30EA\u30A2\u3059\u308B\u3068\u30DC\u30FC\u30CA\u30B9\u30DD\u30A4\u30F3\u30C8\u304C\u3082\u3089\u3048\u308B\u3088\uD83C\uDF1F",
@@ -6129,7 +7034,7 @@ function ChildScreen({
       color: MUTED,
       marginBottom: 8
     }
-  }, "\uD83D\uDCCB \u3055\u3044\u304D\u3093\u306E\u304D\u308D\u304F"), [...myLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(l => {
+  }, "\uD83D\uDCCB \u3055\u3044\u304D\u3093\u306E\u304D\u308D\u304F"), [...myLogs].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3).map(l => {
     const emoji = l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "transfer_in" ? "💌" : l.type === "transfer_out" ? "💸" : "⭐";
     return /*#__PURE__*/React.createElement("div", {
       key: l.id,
@@ -7068,7 +7973,7 @@ function ChildScreen({
       flexDirection: "column",
       gap: 10
     }
-  }, data.rewards.map(r => {
+  }, (data.rewards || []).map(r => {
     const ok = myBal >= r.cost;
     return /*#__PURE__*/React.createElement("button", {
       key: r.id,
@@ -7516,8 +8421,25 @@ function ChildScreen({
       textAlign: "center",
       marginTop: 20
     }
-  }, "\u307E\u3060\u304D\u308D\u304F\u304C\u306A\u3044\u3088"), [...myLogs].sort((a, b) => logSort === "new" ? b.date.localeCompare(a.date) : logSort === "old" ? a.date.localeCompare(b.date) : logSort === "pts_high" ? b.pts - a.pts : a.pts - b.pts).slice(0, 50).map(l => {
-    const emoji = l.type === "transfer_out" ? "💸" : l.type === "transfer_in" ? "💌" : l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...data.goodTasks, ...data.badTasks].find(t => t.id === l.rid)?.emoji || "📌";
+  }, "\u307E\u3060\u304D\u308D\u304F\u304C\u306A\u3044\u3088"), [...myLogs].sort((a, b) => logSort === "new" ? (b.date || "").localeCompare(a.date || "") : logSort === "old" ? (a.date || "").localeCompare(b.date || "") : logSort === "pts_high" ? b.pts - a.pts : a.pts - b.pts).slice(0, 50).map(l => {
+    const emoji = l.type === "transfer_out" ? "💸" : l.type === "transfer_in" ? "💌" : l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...(data.goodTasks || []), ...(data.badTasks || [])].find(t => t.id === l.rid)?.emoji || "📌";
+    const canDelete = l.type !== "gacha" && !(l.label || "").startsWith("🗑 取り消し:");
+    const deleteLog = () => {
+      const rev = {
+        id: uid(),
+        cid: child.id,
+        type: "grant",
+        label: `🗑 取り消し: ${l.label}`,
+        pts: -l.pts,
+        date: new Date().toISOString()
+      };
+      addLogToFirestore(rev);
+      update(d => ({
+        ...d,
+        logs: [rev, ...d.logs]
+      }));
+      showFlash(-l.pts, "🗑");
+    };
     return /*#__PURE__*/React.createElement("div", {
       key: l.id,
       style: {
@@ -7550,7 +8472,19 @@ function ChildScreen({
       }
     }, fmtDate(l.date))), /*#__PURE__*/React.createElement(Pt, {
       v: l.pts
-    }));
+    }), canDelete && /*#__PURE__*/React.createElement("button", {
+      onClick: deleteLog,
+      style: {
+        background: "none",
+        border: "none",
+        fontSize: 14,
+        cursor: "pointer",
+        color: MUTED,
+        padding: "2px 4px",
+        lineHeight: 1
+      },
+      title: "\u53D6\u308A\u6D88\u3057"
+    }, "\uD83D\uDDD1"));
   }))), effectiveTab === "more" && (moreOpen || "log") === "badges" && /*#__PURE__*/React.createElement(BadgesSection, {
     child: child,
     data: data,
@@ -13835,24 +14769,34 @@ function SeedMonster({
       fontWeight: 700,
       marginTop: 3
     }
-  }, "\uD83D\uDC51 \u3055\u3044\u3057\u3085\u3046\u3057\u3093\u304B\uFF01"), canEvolve && !evolving && /*#__PURE__*/React.createElement("button", {
-    onClick: doEvolve,
-    style: {
-      display: "block",
-      margin: "8px auto 0",
-      background: "linear-gradient(135deg,#fde68a,#f59e0b)",
-      border: "none",
-      borderRadius: 999,
-      padding: "6px 16px",
-      color: "#7c2d12",
-      fontWeight: 900,
-      fontSize: 11,
-      cursor: "pointer",
-      fontFamily: F,
-      animation: "evoPulse 1.2s ease-in-out infinite",
-      boxShadow: "0 0 14px rgba(251,191,36,0.8)"
-    }
-  }, "\uD83C\uDF1F \u3057\u3093\u304B\u3067\u304D\u308B\u3088\uFF01"), canReincarnate && !evolving && /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDC51 \u3055\u3044\u3057\u3085\u3046\u3057\u3093\u304B\uFF01"), canEvolve && !evolving && (() => {
+    const nextId = computeNextStageId();
+    const nextDef = nextId ? MONSTER_TREE[nextId] : null;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      onClick: doEvolve,
+      style: {
+        display: "block",
+        margin: "8px auto 0",
+        background: "linear-gradient(135deg,#fde68a,#f59e0b)",
+        border: "none",
+        borderRadius: 999,
+        padding: "6px 16px",
+        color: "#7c2d12",
+        fontWeight: 900,
+        fontSize: 11,
+        cursor: "pointer",
+        fontFamily: F,
+        animation: "evoPulse 1.2s ease-in-out infinite",
+        boxShadow: "0 0 14px rgba(251,191,36,0.8)"
+      }
+    }, "\uD83C\uDF1F \u3057\u3093\u304B\u3067\u304D\u308B\u3088\uFF01"), nextDef && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "rgba(253,230,138,0.8)",
+        marginTop: 3
+      }
+    }, "\u2192 ", nextDef.name, "\u306B\u306A\u308A\u305D\u3046\uFF01"));
+  })(), canReincarnate && !evolving && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     onClick: doReincarnate,
     style: {
       display: "block",
@@ -13868,7 +14812,14 @@ function SeedMonster({
       fontFamily: F,
       boxShadow: "0 0 10px rgba(99,102,241,0.7)"
     }
-  }, "\uD83D\uDD04 \u8EE2\u751F\u3059\u308B"), isFinal && !canReincarnate && !evolving && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDD04 \u8EE2\u751F\u3059\u308B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "rgba(200,180,255,0.8)",
+      marginTop: 2,
+      lineHeight: 1.4
+    }
+  }, "\u5375\u306B\u623B\u3063\u30667\u65E5\u9593\u30DD\u30A4\u30F3\u30C8+5%\uFF01")), isFinal && !canReincarnate && !evolving && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 6,
       fontSize: 9,
@@ -18218,17 +19169,17 @@ function SetupWizard({
       color: TEXT,
       margin: "0 0 6px"
     }
-  }, "\u30D5\u30A1\u30DF\u30EA\u30FC\u540D\u3092\u6C7A\u3081\u3088\u3046"), /*#__PURE__*/React.createElement("p", {
+  }, "\u304B\u305E\u304F\u306E\u306A\u307E\u3048\u3092\u6C7A\u3081\u3088\u3046\uFF01"), /*#__PURE__*/React.createElement("p", {
     style: {
       color: MUTED,
       fontSize: 13,
       margin: "0 0 22px",
       lineHeight: 1.6
     }
-  }, "\u3042\u3068\u3067\u5909\u3048\u308B\u3053\u3068\u3082\u3067\u304D\u307E\u3059"), /*#__PURE__*/React.createElement("input", {
+  }, "\u307F\u3093\u306A\u3067\u4F7F\u3046\u30B0\u30EB\u30FC\u30D7\u306E\u540D\u524D\u3067\u3059\u3002\u3042\u3068\u3067\u5909\u3048\u308B\u3053\u3068\u3082\u3067\u304D\u307E\u3059"), /*#__PURE__*/React.createElement("input", {
     value: familyName,
     onChange: e => setFamilyName(e.target.value),
-    placeholder: "\u4F8B\uFF1A\u7530\u4E2D\u5BB6\u3001\u304F\u308B\u308A\u3093\u30D5\u30A1\u30DF\u30EA\u30FC",
+    placeholder: "\u4F8B\uFF1A\u7530\u4E2D\u5BB6\u3001\u30B9\u30DE\u30A4\u30EB\u30D5\u30A1\u30DF\u30EA\u30FC",
     style: {
       ...INP,
       fontSize: 15,
@@ -19492,6 +20443,9 @@ function App() {
     const next = fn(prev);
     if (!next.logs || next.logs.length < (prev.logs || []).length - 2) next.logs = prev.logs;
     if (!next.expenses || next.expenses.length < (prev.expenses || []).length - 2) next.expenses = prev.expenses;
+    if (!next.rewards || next.rewards.length === 0) next.rewards = prev.rewards || next.rewards;
+    if (!next.goodTasks) next.goodTasks = prev.goodTasks;
+    if (!next.badTasks) next.badTasks = prev.badTasks;
     return next;
   }), []);
   const [forcePin, setForcePin] = useState(null);

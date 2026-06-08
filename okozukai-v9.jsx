@@ -24,6 +24,7 @@ const FIREBASE_CONFIG = {
   appId: "1:168102674534:web:691b66d776ed0d60b5ada7"
 };
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
+const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode=null; // ファミリーコードのキャッシュ
 
 function getDB(){
@@ -143,6 +144,16 @@ function startRealtimeSync(updateFn){
             if(prev.gachaDate){merged.gachaDate={...(merged.gachaDate||{})};const _td=todayKey();Object.keys(prev.gachaDate).forEach(cid=>{if(prev.gachaDate[cid]===_td)merged.gachaDate[cid]=_td;});}
             if(prev.streak) merged.streak=prev.streak;
             if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
+            // pendingApprovals: 承認/却下済みentryをリモートから復活させない
+            if(_processedApprovalIds.size>0){
+              merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
+            }
+            // 新しいpendingApprovalsがあれば親デバイスで通知
+            const _prevIds=new Set((prev.pendingApprovals||[]).map(p=>p.id));
+            const _newPending=(merged.pendingApprovals||[]).filter(p=>!_prevIds.has(p.id)&&!_processedApprovalIds.has(p.id));
+            if(_newPending.length>0&&(prev.familySettings||{}).approvalNotification&&"Notification"in window&&Notification.permission==="granted"){
+              _newPending.forEach(p=>{try{new Notification("承認リクエスト 📬",{body:`${p.taskLabel||"タスク"}（+${p.pts||0}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}});
+            }
             return merged;
           });
           console.log("Realtime sync:",t);
@@ -478,8 +489,10 @@ const INIT = {
     familyMission: { enabled: true, label: "みんなの活動で 3,000 pt を育てよう", target: 3000, reward: "週末に家族でアイスを選ぶ" },
     requireApproval: false,
     approvalNotification: false,
+    rewardApproval: false,
   },
   pendingApprovals: [],
+  pendingRedemptions: [],
 };
 
 function migrate(d) {
@@ -497,9 +510,12 @@ function migrate(d) {
   if(!d.claimedBadges) d.claimedBadges={};
   if(!d.noPinIds)      d.noPinIds={};
   if(!d.pendingApprovals) d.pendingApprovals=[];
+  if(!d.pendingRedemptions) d.pendingRedemptions=[];
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
+  if(d.familySettings.rewardApproval===undefined) d.familySettings.rewardApproval=false;
+  if(!d.familySettings.familyMission) d.familySettings.familyMission={...INIT.familySettings.familyMission};
   if(!d.monsterEvolved) d.monsterEvolved={};
   if(!d.monsterIV) d.monsterIV={};
   if(!d.monsterDiscovered) d.monsterDiscovered={};
@@ -515,6 +531,8 @@ function migrate(d) {
     if(evo && !d.monsterDiscovered[c.id].includes(evo)) d.monsterDiscovered[c.id]=[...d.monsterDiscovered[c.id],evo];
   });
   if(!d.onboardingChecks) d.onboardingChecks={};
+  if(!d.claimedMissions) d.claimedMissions={};
+  if(!d.beginnerMissionDone) d.beginnerMissionDone={};
   if(!d.gachaCollection) d.gachaCollection={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms={investment:"trade",forex:"trade",dailyBonus:true,ranking:true};
@@ -1246,6 +1264,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [smEditReward, setSmEditReward] = useState(null);
+  const [smAddOpen, setSmAddOpen] = useState(false);
+  const [smREmoji, setSmREmoji] = useState("🎁");
+  const [smRLabel, setSmRLabel] = useState("");
+  const [smRCost, setSmRCost] = useState("5");
+  const [smRUnit, setSmRUnit] = useState("");
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -1270,7 +1294,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   };
 
   const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
-  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["members","🔐 PIN"],["transfer","🔄 引継"]];
+  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["members","🔐 PIN"],["transfer","🔄 引継"]];
   const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
 
   if(!authed) return (
@@ -1329,7 +1353,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {SETTING_TABS.map(([v,l])=>(
             <button key={v} onClick={()=>setSettingsTab(v)}
               style={{padding:"8px 14px",border:"none",borderBottom:settingsTab===v?`3px solid ${Y}`:"3px solid transparent",background:"none",color:settingsTab===v?TEXT:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
-              {l}{v==="approval"&&(data.pendingApprovals||[]).length>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length}</span>}
+              {l}{v==="approval"&&((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</span>}
             </button>
           ))}
         </div>
@@ -1457,25 +1481,64 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>こうかんアイテムの管理</p>
               {(data.rewards||[]).map(r=>(
-                <div key={r.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
-                    <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
-                  </div>
-                  <button onClick={()=>update(d=>({...d,rewards:d.rewards.filter(x=>x.id!==r.id)}))}
-                    style={{padding:"4px 10px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:8,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>削除</button>
+                <div key={r.id}>
+                  {smEditReward?.id===r.id ? (
+                    <div style={{background:BG,border:`1.5px solid ${B}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                      <div style={{display:"flex",gap:6,marginBottom:6}}>
+                        <input value={smEditReward.emoji} onChange={e=>setSmEditReward(v=>({...v,emoji:e.target.value}))} style={{...INP,width:52,textAlign:"center"}}/>
+                        <input value={smEditReward.label} onChange={e=>setSmEditReward(v=>({...v,label:e.target.value}))} placeholder="特典名" style={INP}/>
+                      </div>
+                      <input value={smEditReward.cost} onChange={e=>setSmEditReward(v=>({...v,cost:e.target.value}))} type="number" placeholder="必要pt" style={{...INP,marginBottom:6}}/>
+                      <input value={smEditReward.unit} onChange={e=>setSmEditReward(v=>({...v,unit:e.target.value}))} placeholder="内容説明（例: 30分延長）" style={{...INP,marginBottom:10}}/>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{
+                          const cost=parseInt(smEditReward.cost);
+                          if(!smEditReward.label||isNaN(cost)||cost<=0)return;
+                          update(d=>({...d,rewards:d.rewards.map(x=>x.id===smEditReward.id?{...smEditReward,cost}:x)}));
+                          setSmEditReward(null);
+                        }} style={{flex:1,padding:"8px",background:G,border:"none",borderRadius:10,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>保存</button>
+                        <button onClick={()=>setSmEditReward(null)} style={{flex:1,padding:"8px",background:BORDER,border:"none",borderRadius:10,color:MUTED,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                      </div>
+                    </div>
+                  ):(
+                    <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                      {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
+                        <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
+                      </div>
+                      <button onClick={()=>setSmEditReward({...r,cost:String(r.cost)})}
+                        style={{padding:"4px 10px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>編集</button>
+                      <button onClick={()=>update(d=>({...d,rewards:d.rewards.filter(x=>x.id!==r.id)}))}
+                        style={{padding:"4px 10px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:8,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>削除</button>
+                    </div>
+                  )}
                 </div>
               ))}
-              <button onClick={()=>{
-                const label=prompt("ご褒美名");if(!label)return;
-                const cost=parseInt(prompt("必要pt"));if(isNaN(cost))return;
-                const emoji=prompt("絵文字","🎁")||"🎁";
-                const unit=prompt("単位（例：1回）","1回")||"1回";
-                update(d=>({...d,rewards:[...d.rewards,{id:uid(),emoji,label,cost,unit}]}));
-              }} style={{width:"100%",padding:"12px",background:`${G}15`,border:`2px dashed ${G}`,borderRadius:12,color:G,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
-                ＋ 新しいご褒美を追加
-              </button>
+              {smAddOpen ? (
+                <div style={{background:BG,border:`1.5px solid ${G}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    <input value={smREmoji} onChange={e=>setSmREmoji(e.target.value)} style={{...INP,width:52,textAlign:"center"}}/>
+                    <input value={smRLabel} onChange={e=>setSmRLabel(e.target.value)} placeholder="特典名" style={INP}/>
+                  </div>
+                  <input value={smRCost} onChange={e=>setSmRCost(e.target.value)} type="number" placeholder="必要pt（例: 5）" style={{...INP,marginBottom:6}}/>
+                  <input value={smRUnit} onChange={e=>setSmRUnit(e.target.value)} placeholder="内容説明（例: 1回）" style={{...INP,marginBottom:10}}/>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{
+                      const cost=parseInt(smRCost);
+                      if(!smRLabel||isNaN(cost)||cost<=0)return;
+                      update(d=>({...d,rewards:[...d.rewards,{id:uid(),emoji:smREmoji,label:smRLabel,cost,unit:smRUnit||"1回"}]}));
+                      setSmRLabel("");setSmREmoji("🎁");setSmRCost("5");setSmRUnit("");setSmAddOpen(false);
+                    }} style={{flex:1,padding:"8px",background:G,border:"none",borderRadius:10,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>追加</button>
+                    <button onClick={()=>setSmAddOpen(false)} style={{flex:1,padding:"8px",background:BORDER,border:"none",borderRadius:10,color:MUTED,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                  </div>
+                </div>
+              ):(
+                <button onClick={()=>setSmAddOpen(true)}
+                  style={{width:"100%",padding:"12px",background:`${G}15`,border:`2px dashed ${G}`,borderRadius:12,color:G,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
+                  ＋ 新しいご褒美を追加
+                </button>
+              )}
             </div>
           )}
 
@@ -1533,7 +1596,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             </div>
           )}
 
-settingsTab==="members"&&(
+          {settingsTab==="members"&&(
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>メンバーとPIN管理</p>
               {[{id:"parent",name:"おや管理",emoji:"🔐",pin:data.parentPin,isParent:true},...data.children,(data.parents||[])].flat().filter((x,i,a)=>x&&a.findIndex(y=>y&&y.id===x.id)===i).map(m=>{
@@ -1606,11 +1669,13 @@ settingsTab==="members"&&(
             const fs=data.familySettings||INIT.familySettings;
             const pending=data.pendingApprovals||[];
             const approve=(entry)=>{
+              _processedApprovalIds.add(entry.id);
               const log={id:uid(),cid:entry.cid,type:"good",label:entry.taskLabel,pts:entry.pts,date:new Date().toISOString(),rid:entry.taskId};
               addLogToFirestore(log);
               update(d=>({...d,logs:[log,...d.logs],pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             const reject=(entry)=>{
+              _processedApprovalIds.add(entry.id);
               update(d=>({...d,pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             return(<div>
@@ -1626,7 +1691,7 @@ settingsTab==="members"&&(
                 </button>
               </div>
               {/* 承認通知 */}
-              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:14,color:TEXT}}>承認通知</div>
                   <div style={{color:MUTED,fontSize:11,marginTop:2}}>申請が届いたらブラウザ通知でお知らせ</div>
@@ -1647,9 +1712,29 @@ settingsTab==="members"&&(
                   <div style={{position:"absolute",top:3,left:fs.approvalNotification?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
-              {/* 承認待ちキュー */}
-              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>承認待ち（{pending.length}件）</p>
-              {pending.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
+              {fs.approvalNotification && "Notification" in window && Notification.permission==="granted" && (
+                <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:18}}>✅</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:12,color:GP}}>通知の準備ができました！</div>
+                    <div style={{fontSize:10,color:MUTED,marginTop:1}}>子どもが申請するとスマホに通知が届きます</div>
+                  </div>
+                </div>
+              )}
+              {/* 交換承認が必要 */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>交換承認が必要</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、報酬の交換を親が承認してからptを消費</div>
+                </div>
+                <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),rewardApproval:!fs.rewardApproval}}))}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.rewardApproval?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:fs.rewardApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
+              {/* タスク承認待ちキュー */}
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>タスク承認待ち（{pending.length}件）</p>
+              {pending.length===0&&<div style={{textAlign:"center",padding:"16px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
               {pending.map(entry=>{
                 const member=[...data.children,...(data.parents||[])].find(m=>m.id===entry.cid);
                 return(
@@ -1668,7 +1753,93 @@ settingsTab==="members"&&(
                   </div>
                 );
               })}
+              {/* 交換承認待ちキュー */}
+              {(()=>{
+                const pendingR=data.pendingRedemptions||[];
+                const approveR=(entry)=>{
+                  const log={id:uid(),cid:entry.cid,type:"reward",label:`${entry.rewardLabel}（${entry.rewardUnit}）`,pts:-entry.cost,rid:entry.rewardId,date:new Date().toISOString()};
+                  addLogToFirestore(log);
+                  update(d=>({...d,logs:[log,...d.logs],pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
+                };
+                const rejectR=(entry)=>{
+                  update(d=>({...d,pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
+                };
+                if(pendingR.length===0) return null;
+                return(<>
+                  <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"16px 0 10px"}}>交換承認待ち（{pendingR.length}件）</p>
+                  {pendingR.map(entry=>{
+                    const member=[...data.children,...(data.parents||[])].find(m=>m.id===entry.cid);
+                    return(
+                      <div key={entry.id} style={{background:PS,border:`1.5px solid ${P}`,borderRadius:14,padding:"12px 14px",marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                          <span style={{fontSize:26}}>{entry.rewardEmoji}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{entry.rewardLabel}</div>
+                            <div style={{fontSize:11,color:MUTED}}>{member?.name||"?"} · {entry.cost}pt</div>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button onClick={()=>approveR(entry)} style={{flex:1,background:G,border:"none",borderRadius:10,padding:"9px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>✅ 承認</button>
+                          <button onClick={()=>rejectR(entry)} style={{flex:1,background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,padding:"9px",color:R,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>❌ 却下</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>);
+              })()}
             </div>);
+          })()}
+
+          {/* ── 家族目標タブ ── */}
+          {settingsTab==="family"&&(()=>{
+            const fm=data.familySettings?.familyMission||{enabled:true,label:"みんなの活動で 3,000 pt を育てよう",target:3000,reward:"週末に家族でアイスを選ぶ"};
+            const setFm=patch=>update(d=>({...d,familySettings:{...(d.familySettings||{}),familyMission:{...(d.familySettings?.familyMission||{enabled:true,label:"みんなの活動で 3,000 pt を育てよう",target:3000,reward:"週末に家族でアイスを選ぶ"}),...patch}}}));
+            return(
+              <div>
+                <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 16px"}}>家族全員で目指す共通ゴールを設定します</p>
+                {/* ON/OFF */}
+                <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:14,color:TEXT}}>家族目標を表示する</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>ランキング画面と毎日タブに進捗を表示</div>
+                  </div>
+                  <button onClick={()=>setFm({enabled:!fm.enabled})}
+                    style={{position:"relative",width:48,height:26,borderRadius:13,background:fm.enabled?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                    <div style={{position:"absolute",top:3,left:fm.enabled?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                  </button>
+                </div>
+                {fm.enabled&&<>
+                  {/* 目標文 */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>目標の文章</div>
+                    <input value={fm.label} onChange={e=>setFm({label:e.target.value})}
+                      placeholder="例：みんなの活動で 3,000 pt を育てよう"
+                      style={{...INP,marginBottom:0}}/>
+                  </div>
+                  {/* 目標pt */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>目標ポイント</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                      {[1000,2000,3000,5000,10000].map(v=>(
+                        <button key={v} onClick={()=>setFm({target:v})}
+                          style={{padding:"6px 14px",border:`1.5px solid ${fm.target===v?G:BORDER}`,borderRadius:10,background:fm.target===v?`${G}20`:"transparent",color:fm.target===v?G:MUTED,fontWeight:fm.target===v?700:400,fontSize:12,cursor:"pointer",fontFamily:F}}>
+                          {v.toLocaleString()}pt
+                        </button>
+                      ))}
+                    </div>
+                    <input value={fm.target} onChange={e=>{const v=parseInt(e.target.value);if(!isNaN(v)&&v>0)setFm({target:v});}}
+                      type="number" placeholder="カスタム値" style={{...INP,marginBottom:0}}/>
+                  </div>
+                  {/* 達成報酬 */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>達成したらやること</div>
+                    <input value={fm.reward} onChange={e=>setFm({reward:e.target.value})}
+                      placeholder="例：週末に家族でアイスを選ぶ"
+                      style={{...INP,marginBottom:0}}/>
+                  </div>
+                </>}
+              </div>
+            );
           })()}
 
           {/* ── 引き継ぎタブ ── */}
@@ -1740,6 +1911,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
   const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
+  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
+  const _bgTid = (data.bgTheme||{})[child.id]||"auto"; // more タブで使用
   const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
@@ -1810,9 +1983,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doRedeem = r => {
-    showFlash(-r.cost, r.emoji);
     setRewardPop(null);
-    addLog({ cid:child.id, type:"reward", label:`${r.label}（${r.unit}）`, pts:-r.cost, rid:r.id });
+    const _rfs = data.familySettings || INIT.familySettings;
+    if(_rfs.rewardApproval) {
+      const entry={id:uid(),cid:child.id,rewardId:r.id,rewardEmoji:r.emoji,rewardLabel:r.label,rewardUnit:r.unit,cost:r.cost,date:new Date().toISOString()};
+      update(d=>({...d,pendingRedemptions:[...(d.pendingRedemptions||[]),entry]}));
+      setFlash({pts:0,emoji:"⏳",pending:true});
+      setTimeout(()=>setFlash(null),1400);
+    } else {
+      showFlash(-r.cost, r.emoji);
+      addLog({ cid:child.id, type:"reward", label:`${r.label}（${r.unit}）`, pts:-r.cost, rid:r.id });
+    }
   };
 
   const doGacha = () => {
@@ -1877,8 +2058,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // MyTasks filter
   const myIds = (data.myTaskIds||{})[child.id]||[];
   const hasFilter = myIds.length>0;
-  const filtGood = hasFilter?data.goodTasks.filter(t=>myIds.includes(t.id)):data.goodTasks;
-  const filtBad  = hasFilter?data.badTasks.filter(t=>myIds.includes(t.id)):data.badTasks;
+  const filtGood = hasFilter?(data.goodTasks||[]).filter(t=>myIds.includes(t.id)):(data.goodTasks||[]);
+  const filtBad  = hasFilter?(data.badTasks||[]).filter(t=>myIds.includes(t.id)):(data.badTasks||[]);
   const sortTaskFn = (a,b) =>
     taskSort==="pts_high"?Math.abs(taskPts(b,child.id))-Math.abs(taskPts(a,child.id)):
     taskSort==="pts_low"?Math.abs(taskPts(a,child.id))-Math.abs(taskPts(b,child.id)):
@@ -1929,7 +2110,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:"rgba(255,255,255,0.9)",letterSpacing:0.5}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#fff",position:"relative"}}>
             ⚙
-            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
@@ -2022,7 +2203,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:12,color:"rgba(74,158,255,0.7)",letterSpacing:2,textTransform:"uppercase"}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#e2e8f0",position:"relative"}}>
             ⚙
-            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         {/* 残高表示 */}
@@ -2173,6 +2354,70 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </button>
           </div>
         )}
+        {/* ── スタートクエスト ── */}
+        {!((data.beginnerMissionDone||{})[child.id])&&(()=>{
+          const claimed=(data.claimedMissions||{})[child.id]||[];
+          const quests=[
+            {id:"q1",emoji:"⭐",label:"タスクをやろう",hint:isJunior?"「やること」タブでお手伝いをやってみよう":"「活動」タブでお手伝いをやってみよう",done:myLogs.some(l=>l.type==="good"||l.type==="bad")||(data.pendingApprovals||[]).some(p=>p.cid===child.id),nav:()=>setTab(isJunior?"tasks":"activity")},
+            {id:"q2",emoji:"🎰",label:"ガチャを引こう",hint:"今日のガチャを1回引いてみよう",done:myLogs.some(l=>l.type==="gacha"),nav:null},
+            {id:"q3",emoji:"🎯",label:"目標を1つ決めよう",hint:"「ためる」タブで貯金の目標を作ってみよう",done:(data.goals||[]).some(g=>g.cid===child.id),nav:()=>{if(isJunior){setTab("goals");}else{setTab("money");setMonTab("goals");}}},
+            ...(!isJunior?[{id:"q4",emoji:"🛍",label:"ポイントをつかってみよう",hint:"「ためる」タブのこうかんで使えるよ",done:myLogs.some(l=>l.type==="reward"),nav:()=>{setTab("money");setMonTab("rewards");}}]:[]),
+          ];
+          const totalQ=quests.length;
+          const doneCnt=quests.filter(q=>q.done).length;
+          const totalBonus=totalQ===4?300:250;
+          const claimQuest=(qId)=>{
+            const qLabel=quests.find(q=>q.id===qId)?.label||"";
+            const e={id:uid(),cid:child.id,type:"grant",label:`🎉 クエスト完了「${qLabel}」`,pts:50,date:new Date().toISOString()};
+            update(d=>{
+              const nc=[...(d.claimedMissions?.[child.id]||[]),qId];
+              const allQ=quests.every(q=>nc.includes(q.id));
+              const alreadyDone=!!(d.beginnerMissionDone?.[child.id]);
+              const newLogs=[e,...d.logs];
+              if(allQ&&!alreadyDone){
+                const e2={id:uid(),cid:child.id,type:"grant",label:"🏆 スタートクエスト全クリア！",pts:100,date:new Date().toISOString()};
+                addLogToFirestore(e); addLogToFirestore(e2);
+                return{...d,logs:[e2,...newLogs],claimedMissions:{...(d.claimedMissions||{}),[child.id]:nc},beginnerMissionDone:{...(d.beginnerMissionDone||{}),[child.id]:true}};
+              }
+              addLogToFirestore(e);
+              return{...d,logs:newLogs,claimedMissions:{...(d.claimedMissions||{}),[child.id]:nc}};
+            });
+            showFlash(50,"🎉");
+          };
+          const unclaimed=quests.filter(q=>!claimed.includes(q.id));
+          if(unclaimed.length===0) return null;
+          return(
+            <div style={{padding:"10px 16px 0"}}>
+              <div style={{background:CARD,borderRadius:16,padding:"14px 14px 10px",border:`1.5px solid ${BORDER}`,boxShadow:SHADOW}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:20}}>🌱</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:900,fontSize:13,color:TEXT}}>スタートクエスト</div>
+                    <div style={{fontSize:10,color:MUTED}}>全部やると合計+{totalBonus}pt！</div>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:800,color:doneCnt===totalQ?GP:MUTED}}>{doneCnt}/{totalQ}</div>
+                </div>
+                <div style={{background:BORDER,borderRadius:999,height:4,marginBottom:10,overflow:"hidden"}}>
+                  <div style={{width:`${doneCnt/totalQ*100}%`,height:"100%",background:G,borderRadius:999,transition:"width .4s"}}/>
+                </div>
+                {unclaimed.map(q=>(
+                  <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:`1px solid ${BORDER}`}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{q.done?"✅":q.emoji}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:12,color:q.done?GP:TEXT}}>{q.label}</div>
+                      {!q.done&&<div style={{fontSize:10,color:MUTED,marginTop:1}}>{q.hint}</div>}
+                      {q.done&&<div style={{fontSize:10,color:GP,marginTop:1}}>達成！+50pt うけとれるよ</div>}
+                    </div>
+                    {q.done
+                      ?<button onClick={()=>claimQuest(q.id)} style={{background:G,border:"none",borderRadius:10,padding:"5px 12px",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,flexShrink:0}}>うけとる</button>
+                      :<button onClick={()=>q.nav&&q.nav()} disabled={!q.nav} style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:10,padding:"5px 12px",color:MUTED,fontWeight:700,fontSize:11,cursor:q.nav?"pointer":"default",fontFamily:F,flexShrink:0}}>やってみる</button>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* Teen: タスクを先に表示（ガチャより優先） */}
         {!isJunior && <>
           <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
@@ -2256,6 +2501,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   )}
                 </div>);
               })()}
+              {/* 提供割合 */}
+              <div style={{marginTop:8,background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:12,padding:"8px 12px",border:`1px solid ${darkBG?"rgba(255,255,255,0.08)":BORDER}`}}>
+                <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🎲 提供割合</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {(data.gacha||[]).map(t=>(
+                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:4,background:darkBG?"rgba(255,255,255,0.06)":CARD,borderRadius:8,padding:"3px 8px",border:`1px solid ${t.color}40`}}>
+                      <span style={{fontSize:11}}>{t.emoji}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:t.color}}>{t.label}</span>
+                      <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
+                      <span style={{fontSize:9,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </>);
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
@@ -2280,7 +2539,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {myLogs.length>0&&(
             <div style={{padding:"8px 16px 16px"}}>
               <div style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}>📋 さいきんのきろく</div>
-              {[...myLogs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).map(l=>{
+              {[...myLogs].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,3).map(l=>{
                 const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="transfer_in"?"💌":l.type==="transfer_out"?"💸":"⭐";
                 return(
                   <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
@@ -2503,7 +2762,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{padding:16}}>
           <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:12}}>🎁 ためたポイントでこうかんしよう！</p>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {data.rewards.map(r=>{
+            {(data.rewards||[]).map(r=>{
               const ok=myBal>=r.cost;
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
@@ -2656,13 +2915,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div>
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
-          {[...myLogs].sort((a,b)=>logSort==="new"?b.date.localeCompare(a.date):logSort==="old"?a.date.localeCompare(b.date):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
-            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
+          {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
+            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
+            const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
+            const deleteLog=()=>{
+              const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
+              addLogToFirestore(rev);
+              update(d=>({...d,logs:[rev,...d.logs]}));
+              showFlash(-l.pts,"🗑");
+            };
             return(
               <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:20}}>{emoji}</span>
                 <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div></div>
                 <Pt v={l.pts}/>
+                {canDelete&&<button onClick={deleteLog} style={{background:"none",border:"none",fontSize:14,cursor:"pointer",color:MUTED,padding:"2px 4px",lineHeight:1}} title="取り消し">🗑</button>}
               </div>
             );
           })}
@@ -4915,17 +5182,27 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
       {isFinal && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
-      {/* 進化ボタン */}
-      {canEvolve && !evolving && (
-        <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
-          🌟 しんかできるよ！
-        </button>
-      )}
-      {/* 転生ボタン */}
+      {/* 進化ボタン＋進化先ヒント */}
+      {canEvolve && !evolving && (()=>{
+        const nextId = computeNextStageId();
+        const nextDef = nextId ? MONSTER_TREE[nextId] : null;
+        return(
+          <>
+            <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
+              🌟 しんかできるよ！
+            </button>
+            {nextDef&&<div style={{fontSize:9,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}になりそう！</div>}
+          </>
+        );
+      })()}
+      {/* 転生ボタン＋説明 */}
       {canReincarnate && !evolving && (
-        <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
-          🔄 転生する
-        </button>
+        <>
+          <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
+            🔄 転生する
+          </button>
+          <div style={{fontSize:9,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
+        </>
       )}
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (
@@ -6292,10 +6569,10 @@ function SetupWizard({ data, update, onComplete }) {
       {step===1&&(
         <div style={{flex:1}}>
           <div style={{fontSize:48,marginBottom:14}}>🏠</div>
-          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>ファミリー名を決めよう</h2>
-          <p style={{color:MUTED,fontSize:13,margin:"0 0 22px",lineHeight:1.6}}>あとで変えることもできます</p>
+          <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>かぞくのなまえを決めよう！</h2>
+          <p style={{color:MUTED,fontSize:13,margin:"0 0 22px",lineHeight:1.6}}>みんなで使うグループの名前です。あとで変えることもできます</p>
           <input value={familyName} onChange={e=>setFamilyName(e.target.value)}
-            placeholder="例：田中家、くるりんファミリー"
+            placeholder="例：田中家、スマイルファミリー"
             style={{...INP,fontSize:15,marginBottom:14}}/>
           {familyName.trim()&&(
             <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"12px 16px",marginBottom:22}}>
@@ -6807,6 +7084,9 @@ export default function App() {
     const next = fn(prev);
     if(!next.logs||next.logs.length<(prev.logs||[]).length-2) next.logs=prev.logs;
     if(!next.expenses||next.expenses.length<(prev.expenses||[]).length-2) next.expenses=prev.expenses;
+    if(!next.rewards||next.rewards.length===0) next.rewards=prev.rewards||next.rewards;
+    if(!next.goodTasks) next.goodTasks=prev.goodTasks;
+    if(!next.badTasks) next.badTasks=prev.badTasks;
     return next;
   }),[]);
   const [forcePin,setForcePin]=useState(null);
