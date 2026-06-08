@@ -489,8 +489,10 @@ const INIT = {
     familyMission: { enabled: true, label: "みんなの活動で 3,000 pt を育てよう", target: 3000, reward: "週末に家族でアイスを選ぶ" },
     requireApproval: false,
     approvalNotification: false,
+    rewardApproval: false,
   },
   pendingApprovals: [],
+  pendingRedemptions: [],
 };
 
 function migrate(d) {
@@ -508,9 +510,11 @@ function migrate(d) {
   if(!d.claimedBadges) d.claimedBadges={};
   if(!d.noPinIds)      d.noPinIds={};
   if(!d.pendingApprovals) d.pendingApprovals=[];
+  if(!d.pendingRedemptions) d.pendingRedemptions=[];
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
+  if(d.familySettings.rewardApproval===undefined) d.familySettings.rewardApproval=false;
   if(!d.familySettings.familyMission) d.familySettings.familyMission={...INIT.familySettings.familyMission};
   if(!d.monsterEvolved) d.monsterEvolved={};
   if(!d.monsterIV) d.monsterIV={};
@@ -1349,7 +1353,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {SETTING_TABS.map(([v,l])=>(
             <button key={v} onClick={()=>setSettingsTab(v)}
               style={{padding:"8px 14px",border:"none",borderBottom:settingsTab===v?`3px solid ${Y}`:"3px solid transparent",background:"none",color:settingsTab===v?TEXT:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
-              {l}{v==="approval"&&(data.pendingApprovals||[]).length>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length}</span>}
+              {l}{v==="approval"&&((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</span>}
             </button>
           ))}
         </div>
@@ -1717,9 +1721,20 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   </div>
                 </div>
               )}
-              {/* 承認待ちキュー */}
-              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>承認待ち（{pending.length}件）</p>
-              {pending.length===0&&<div style={{textAlign:"center",padding:"24px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
+              {/* 交換承認が必要 */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>交換承認が必要</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、報酬の交換を親が承認してからptを消費</div>
+                </div>
+                <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),rewardApproval:!fs.rewardApproval}}))}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.rewardApproval?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:fs.rewardApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
+              {/* タスク承認待ちキュー */}
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>タスク承認待ち（{pending.length}件）</p>
+              {pending.length===0&&<div style={{textAlign:"center",padding:"16px 0",color:MUTED,fontSize:13}}>承認待ちのタスクはありません</div>}
               {pending.map(entry=>{
                 const member=[...data.children,...(data.parents||[])].find(m=>m.id===entry.cid);
                 return(
@@ -1738,6 +1753,40 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   </div>
                 );
               })}
+              {/* 交換承認待ちキュー */}
+              {(()=>{
+                const pendingR=data.pendingRedemptions||[];
+                const approveR=(entry)=>{
+                  const log={id:uid(),cid:entry.cid,type:"reward",label:`${entry.rewardLabel}（${entry.rewardUnit}）`,pts:-entry.cost,rid:entry.rewardId,date:new Date().toISOString()};
+                  addLogToFirestore(log);
+                  update(d=>({...d,logs:[log,...d.logs],pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
+                };
+                const rejectR=(entry)=>{
+                  update(d=>({...d,pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
+                };
+                if(pendingR.length===0) return null;
+                return(<>
+                  <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"16px 0 10px"}}>交換承認待ち（{pendingR.length}件）</p>
+                  {pendingR.map(entry=>{
+                    const member=[...data.children,...(data.parents||[])].find(m=>m.id===entry.cid);
+                    return(
+                      <div key={entry.id} style={{background:PS,border:`1.5px solid ${P}`,borderRadius:14,padding:"12px 14px",marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                          <span style={{fontSize:26}}>{entry.rewardEmoji}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{entry.rewardLabel}</div>
+                            <div style={{fontSize:11,color:MUTED}}>{member?.name||"?"} · {entry.cost}pt</div>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:8}}>
+                          <button onClick={()=>approveR(entry)} style={{flex:1,background:G,border:"none",borderRadius:10,padding:"9px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>✅ 承認</button>
+                          <button onClick={()=>rejectR(entry)} style={{flex:1,background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,padding:"9px",color:R,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>❌ 却下</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>);
+              })()}
             </div>);
           })()}
 
@@ -1934,9 +1983,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doRedeem = r => {
-    showFlash(-r.cost, r.emoji);
     setRewardPop(null);
-    addLog({ cid:child.id, type:"reward", label:`${r.label}（${r.unit}）`, pts:-r.cost, rid:r.id });
+    const _rfs = data.familySettings || INIT.familySettings;
+    if(_rfs.rewardApproval) {
+      const entry={id:uid(),cid:child.id,rewardId:r.id,rewardEmoji:r.emoji,rewardLabel:r.label,rewardUnit:r.unit,cost:r.cost,date:new Date().toISOString()};
+      update(d=>({...d,pendingRedemptions:[...(d.pendingRedemptions||[]),entry]}));
+      setFlash({pts:0,emoji:"⏳",pending:true});
+      setTimeout(()=>setFlash(null),1400);
+    } else {
+      showFlash(-r.cost, r.emoji);
+      addLog({ cid:child.id, type:"reward", label:`${r.label}（${r.unit}）`, pts:-r.cost, rid:r.id });
+    }
   };
 
   const doGacha = () => {
@@ -2053,7 +2110,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:"rgba(255,255,255,0.9)",letterSpacing:0.5}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#fff",position:"relative"}}>
             ⚙
-            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
@@ -2146,7 +2203,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:12,color:"rgba(74,158,255,0.7)",letterSpacing:2,textTransform:"uppercase"}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#e2e8f0",position:"relative"}}>
             ⚙
-            {(data.pendingApprovals||[]).length>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         {/* 残高表示 */}
@@ -2444,6 +2501,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   )}
                 </div>);
               })()}
+              {/* 提供割合 */}
+              <div style={{marginTop:8,background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:12,padding:"8px 12px",border:`1px solid ${darkBG?"rgba(255,255,255,0.08)":BORDER}`}}>
+                <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🎲 提供割合</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {(data.gacha||[]).map(t=>(
+                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:4,background:darkBG?"rgba(255,255,255,0.06)":CARD,borderRadius:8,padding:"3px 8px",border:`1px solid ${t.color}40`}}>
+                      <span style={{fontSize:11}}>{t.emoji}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:t.color}}>{t.label}</span>
+                      <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
+                      <span style={{fontSize:9,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </>);
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
@@ -2846,11 +2917,19 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
           {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
             const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
+            const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
+            const deleteLog=()=>{
+              const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
+              addLogToFirestore(rev);
+              update(d=>({...d,logs:[rev,...d.logs]}));
+              showFlash(-l.pts,"🗑");
+            };
             return(
               <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:20}}>{emoji}</span>
                 <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div></div>
                 <Pt v={l.pts}/>
+                {canDelete&&<button onClick={deleteLog} style={{background:"none",border:"none",fontSize:14,cursor:"pointer",color:MUTED,padding:"2px 4px",lineHeight:1}} title="取り消し">🗑</button>}
               </div>
             );
           })}
