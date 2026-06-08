@@ -515,6 +515,8 @@ function migrate(d) {
     if(evo && !d.monsterDiscovered[c.id].includes(evo)) d.monsterDiscovered[c.id]=[...d.monsterDiscovered[c.id],evo];
   });
   if(!d.onboardingChecks) d.onboardingChecks={};
+  if(!d.claimedMissions) d.claimedMissions={};
+  if(!d.beginnerMissionDone) d.beginnerMissionDone={};
   if(!d.gachaCollection) d.gachaCollection={};
   // 既存メンバーにdisplayMode・permissions・visibilityを後付け（後方互換）
   const defaultChildPerms={investment:"trade",forex:"trade",dailyBonus:true,ranking:true};
@@ -2182,6 +2184,69 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </button>
           </div>
         )}
+        {/* ── スタートクエスト ── */}
+        {!((data.beginnerMissionDone||{})[child.id])&&(()=>{
+          const claimed=(data.claimedMissions||{})[child.id]||[];
+          const quests=[
+            {id:"q1",emoji:"⭐",label:"タスクをやろう",hint:isJunior?"「やること」タブでお手伝いをやってみよう":"「活動」タブでお手伝いをやってみよう",done:myLogs.some(l=>l.type==="good"||l.type==="bad")||(data.pendingApprovals||[]).some(p=>p.cid===child.id),nav:()=>setTab(isJunior?"tasks":"activity")},
+            {id:"q2",emoji:"🎰",label:"ガチャを引こう",hint:"今日のガチャを1回引いてみよう",done:myLogs.some(l=>l.type==="gacha"),nav:null},
+            {id:"q3",emoji:"🎯",label:"目標を1つ決めよう",hint:"「ためる」タブで貯金の目標を作ってみよう",done:(data.goals||[]).some(g=>g.cid===child.id),nav:()=>{if(isJunior){setTab("goals");}else{setTab("money");setMonTab("goals");}}},
+            ...(!isJunior?[{id:"q4",emoji:"🛍",label:"ポイントをつかってみよう",hint:"「ためる」タブのこうかんで使えるよ",done:myLogs.some(l=>l.type==="reward"),nav:()=>{setTab("money");setMonTab("rewards");}}]:[]),
+          ];
+          const totalQ=quests.length;
+          const doneCnt=quests.filter(q=>q.done).length;
+          const totalBonus=totalQ===4?300:250;
+          const claimQuest=(qId)=>{
+            const qLabel=quests.find(q=>q.id===qId)?.label||"";
+            const e={id:uid(),cid:child.id,type:"grant",label:`🎉 クエスト完了「${qLabel}」`,pts:50,date:new Date().toISOString()};
+            update(d=>{
+              const nc=[...(d.claimedMissions?.[child.id]||[]),qId];
+              const allQ=quests.every(q=>nc.includes(q.id));
+              const newLogs=[e,...d.logs];
+              if(allQ){
+                const e2={id:uid(),cid:child.id,type:"grant",label:"🏆 スタートクエスト全クリア！",pts:100,date:new Date().toISOString()};
+                addLogToFirestore(e); addLogToFirestore(e2);
+                return{...d,logs:[e2,...newLogs],claimedMissions:{...(d.claimedMissions||{}),[child.id]:nc},beginnerMissionDone:{...(d.beginnerMissionDone||{}),[child.id]:true}};
+              }
+              addLogToFirestore(e);
+              return{...d,logs:newLogs,claimedMissions:{...(d.claimedMissions||{}),[child.id]:nc}};
+            });
+            showFlash(50,"🎉");
+          };
+          const unclaimed=quests.filter(q=>!claimed.includes(q.id));
+          if(unclaimed.length===0) return null;
+          return(
+            <div style={{padding:"10px 16px 0"}}>
+              <div style={{background:CARD,borderRadius:16,padding:"14px 14px 10px",border:`1.5px solid ${BORDER}`,boxShadow:SHADOW}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:20}}>🌱</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:900,fontSize:13,color:TEXT}}>スタートクエスト</div>
+                    <div style={{fontSize:10,color:MUTED}}>全部やると合計+{totalBonus}pt！</div>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:800,color:doneCnt===totalQ?GP:MUTED}}>{doneCnt}/{totalQ}</div>
+                </div>
+                <div style={{background:BORDER,borderRadius:999,height:4,marginBottom:10,overflow:"hidden"}}>
+                  <div style={{width:`${doneCnt/totalQ*100}%`,height:"100%",background:G,borderRadius:999,transition:"width .4s"}}/>
+                </div>
+                {unclaimed.map(q=>(
+                  <div key={q.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:`1px solid ${BORDER}`}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{q.done?"✅":q.emoji}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:12,color:q.done?GP:TEXT}}>{q.label}</div>
+                      {!q.done&&<div style={{fontSize:10,color:MUTED,marginTop:1}}>{q.hint}</div>}
+                      {q.done&&<div style={{fontSize:10,color:GP,marginTop:1}}>達成！+50pt うけとれるよ</div>}
+                    </div>
+                    {q.done
+                      ?<button onClick={()=>claimQuest(q.id)} style={{background:G,border:"none",borderRadius:10,padding:"5px 12px",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,flexShrink:0}}>うけとる</button>
+                      :<button onClick={()=>q.nav&&q.nav()} disabled={!q.nav} style={{background:CARD,border:`1px solid ${BORDER}`,borderRadius:10,padding:"5px 12px",color:MUTED,fontWeight:700,fontSize:11,cursor:q.nav?"pointer":"default",fontFamily:F,flexShrink:0}}>やってみる</button>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* Teen: タスクを先に表示（ガチャより優先） */}
         {!isJunior && <>
           <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
