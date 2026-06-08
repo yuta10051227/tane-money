@@ -152,7 +152,7 @@ function startRealtimeSync(updateFn){
             const _prevIds=new Set((prev.pendingApprovals||[]).map(p=>p.id));
             const _newPending=(merged.pendingApprovals||[]).filter(p=>!_prevIds.has(p.id)&&!_processedApprovalIds.has(p.id));
             if(_newPending.length>0&&(prev.familySettings||{}).approvalNotification&&"Notification"in window&&Notification.permission==="granted"){
-              _newPending.forEach(p=>{try{new Notification("承認リクエスト 📬",{body:`${p.taskLabel}（+${p.pts}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}});
+              _newPending.forEach(p=>{try{new Notification("承認リクエスト 📬",{body:`${p.taskLabel||"タスク"}（+${p.pts||0}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}});
             }
             return merged;
           });
@@ -1592,7 +1592,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             </div>
           )}
 
-settingsTab==="members"&&(
+          {settingsTab==="members"&&(
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>メンバーとPIN管理</p>
               {[{id:"parent",name:"おや管理",emoji:"🔐",pin:data.parentPin,isParent:true},...data.children,(data.parents||[])].flat().filter((x,i,a)=>x&&a.findIndex(y=>y&&y.id===x.id)===i).map(m=>{
@@ -1862,6 +1862,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
   const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
+  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
+  const _bgTid = (data.bgTheme||{})[child.id]||"auto"; // more タブで使用
   const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
@@ -1999,8 +2001,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // MyTasks filter
   const myIds = (data.myTaskIds||{})[child.id]||[];
   const hasFilter = myIds.length>0;
-  const filtGood = hasFilter?data.goodTasks.filter(t=>myIds.includes(t.id)):data.goodTasks;
-  const filtBad  = hasFilter?data.badTasks.filter(t=>myIds.includes(t.id)):data.badTasks;
+  const filtGood = hasFilter?(data.goodTasks||[]).filter(t=>myIds.includes(t.id)):(data.goodTasks||[]);
+  const filtBad  = hasFilter?(data.badTasks||[]).filter(t=>myIds.includes(t.id)):(data.badTasks||[]);
   const sortTaskFn = (a,b) =>
     taskSort==="pts_high"?Math.abs(taskPts(b,child.id))-Math.abs(taskPts(a,child.id)):
     taskSort==="pts_low"?Math.abs(taskPts(a,child.id))-Math.abs(taskPts(b,child.id)):
@@ -2313,8 +2315,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             update(d=>{
               const nc=[...(d.claimedMissions?.[child.id]||[]),qId];
               const allQ=quests.every(q=>nc.includes(q.id));
+              const alreadyDone=!!(d.beginnerMissionDone?.[child.id]);
               const newLogs=[e,...d.logs];
-              if(allQ){
+              if(allQ&&!alreadyDone){
                 const e2={id:uid(),cid:child.id,type:"grant",label:"🏆 スタートクエスト全クリア！",pts:100,date:new Date().toISOString()};
                 addLogToFirestore(e); addLogToFirestore(e2);
                 return{...d,logs:[e2,...newLogs],claimedMissions:{...(d.claimedMissions||{}),[child.id]:nc},beginnerMissionDone:{...(d.beginnerMissionDone||{}),[child.id]:true}};
@@ -2465,7 +2468,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {myLogs.length>0&&(
             <div style={{padding:"8px 16px 16px"}}>
               <div style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}>📋 さいきんのきろく</div>
-              {[...myLogs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3).map(l=>{
+              {[...myLogs].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).slice(0,3).map(l=>{
                 const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="transfer_in"?"💌":l.type==="transfer_out"?"💸":"⭐";
                 return(
                   <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
@@ -2688,7 +2691,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{padding:16}}>
           <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:12}}>🎁 ためたポイントでこうかんしよう！</p>
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {data.rewards.map(r=>{
+            {(data.rewards||[]).map(r=>{
               const ok=myBal>=r.cost;
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
@@ -2841,8 +2844,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div>
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
-          {[...myLogs].sort((a,b)=>logSort==="new"?b.date.localeCompare(a.date):logSort==="old"?a.date.localeCompare(b.date):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
-            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
+          {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
+            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
             return(
               <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:20}}>{emoji}</span>
@@ -7002,6 +7005,9 @@ export default function App() {
     const next = fn(prev);
     if(!next.logs||next.logs.length<(prev.logs||[]).length-2) next.logs=prev.logs;
     if(!next.expenses||next.expenses.length<(prev.expenses||[]).length-2) next.expenses=prev.expenses;
+    if(!next.rewards||next.rewards.length===0) next.rewards=prev.rewards||next.rewards;
+    if(!next.goodTasks) next.goodTasks=prev.goodTasks;
+    if(!next.badTasks) next.badTasks=prev.badTasks;
     return next;
   }),[]);
   const [forcePin,setForcePin]=useState(null);

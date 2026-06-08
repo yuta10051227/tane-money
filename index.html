@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="f129428">
+<meta name="tane-version" content="e850d26">
 </head>
 <body>
   <div id="root"></div>
@@ -235,7 +235,7 @@ function startRealtimeSync(updateFn) {
               _newPending.forEach(p => {
                 try {
                   new Notification("承認リクエスト 📬", {
-                    body: `${p.taskLabel}（+${p.pts}pt）`,
+                    body: `${p.taskLabel || "タスク"}（+${p.pts || 0}pt）`,
                     icon: "/assets/tab_daily.png"
                   });
                 } catch (e) {}
@@ -4151,7 +4151,7 @@ function SettingsModal({
         color: interest > 0 ? G : MUTED
       }
     }, interest > 0 ? `+${interest}pt` : "−"));
-  }))), "settingsTab===\"members\"&&(", /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }))), settingsTab === "members" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     style: {
       color: MUTED,
       fontSize: 12,
@@ -4341,7 +4341,7 @@ function SettingsModal({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), ")}", settingsTab === "approval" && (() => {
+  }, "\uD83D\uDEAA \u3053\u306EiPhone\u304B\u3089\u30ED\u30B0\u30A2\u30A6\u30C8"))), settingsTab === "approval" && (() => {
     const fs = data.familySettings || INIT.familySettings;
     const pending = data.pendingApprovals || [];
     const approve = entry => {
@@ -4996,6 +4996,8 @@ function ChildScreen({
   const _cTotalDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
   const _cBgTheme = BG_THEMES.find(t => t.id === ((data.bgTheme || {})[child.id] || "auto")) || BG_THEMES[0];
   const _cBgUnlock = (_cBgTheme.need || 0) <= _cTotalDone;
+  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
+  const _bgTid = (data.bgTheme || {})[child.id] || "auto"; // more タブで使用
   const heroGrad = _cBgUnlock && _cBgTheme.grad ? _cBgTheme.grad : null;
   const heroStars = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
@@ -5279,8 +5281,8 @@ function ChildScreen({
   // MyTasks filter
   const myIds = (data.myTaskIds || {})[child.id] || [];
   const hasFilter = myIds.length > 0;
-  const filtGood = hasFilter ? data.goodTasks.filter(t => myIds.includes(t.id)) : data.goodTasks;
-  const filtBad = hasFilter ? data.badTasks.filter(t => myIds.includes(t.id)) : data.badTasks;
+  const filtGood = hasFilter ? (data.goodTasks || []).filter(t => myIds.includes(t.id)) : data.goodTasks || [];
+  const filtBad = hasFilter ? (data.badTasks || []).filter(t => myIds.includes(t.id)) : data.badTasks || [];
   const sortTaskFn = (a, b) => taskSort === "pts_high" ? Math.abs(taskPts(b, child.id)) - Math.abs(taskPts(a, child.id)) : taskSort === "pts_low" ? Math.abs(taskPts(a, child.id)) - Math.abs(taskPts(b, child.id)) : taskSort === "name" ? a.label.localeCompare(b.label, "ja") : 0;
 
   // 5-tab grouped nav
@@ -6282,8 +6284,9 @@ function ChildScreen({
       update(d => {
         const nc = [...(d.claimedMissions?.[child.id] || []), qId];
         const allQ = quests.every(q => nc.includes(q.id));
+        const alreadyDone = !!d.beginnerMissionDone?.[child.id];
         const newLogs = [e, ...d.logs];
-        if (allQ) {
+        if (allQ && !alreadyDone) {
           const e2 = {
             id: uid(),
             cid: child.id,
@@ -6790,7 +6793,7 @@ function ChildScreen({
       color: MUTED,
       marginBottom: 8
     }
-  }, "\uD83D\uDCCB \u3055\u3044\u304D\u3093\u306E\u304D\u308D\u304F"), [...myLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map(l => {
+  }, "\uD83D\uDCCB \u3055\u3044\u304D\u3093\u306E\u304D\u308D\u304F"), [...myLogs].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3).map(l => {
     const emoji = l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "transfer_in" ? "💌" : l.type === "transfer_out" ? "💸" : "⭐";
     return /*#__PURE__*/React.createElement("div", {
       key: l.id,
@@ -7729,7 +7732,7 @@ function ChildScreen({
       flexDirection: "column",
       gap: 10
     }
-  }, data.rewards.map(r => {
+  }, (data.rewards || []).map(r => {
     const ok = myBal >= r.cost;
     return /*#__PURE__*/React.createElement("button", {
       key: r.id,
@@ -8177,8 +8180,8 @@ function ChildScreen({
       textAlign: "center",
       marginTop: 20
     }
-  }, "\u307E\u3060\u304D\u308D\u304F\u304C\u306A\u3044\u3088"), [...myLogs].sort((a, b) => logSort === "new" ? b.date.localeCompare(a.date) : logSort === "old" ? a.date.localeCompare(b.date) : logSort === "pts_high" ? b.pts - a.pts : a.pts - b.pts).slice(0, 50).map(l => {
-    const emoji = l.type === "transfer_out" ? "💸" : l.type === "transfer_in" ? "💌" : l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...data.goodTasks, ...data.badTasks].find(t => t.id === l.rid)?.emoji || "📌";
+  }, "\u307E\u3060\u304D\u308D\u304F\u304C\u306A\u3044\u3088"), [...myLogs].sort((a, b) => logSort === "new" ? (b.date || "").localeCompare(a.date || "") : logSort === "old" ? (a.date || "").localeCompare(b.date || "") : logSort === "pts_high" ? b.pts - a.pts : a.pts - b.pts).slice(0, 50).map(l => {
+    const emoji = l.type === "transfer_out" ? "💸" : l.type === "transfer_in" ? "💌" : l.type === "grant" ? "🎁" : l.type === "gacha" ? "🎰" : l.type === "reward" ? "🎁" : l.type === "interest" ? "💹" : l.type === "invest_buy" ? "📈" : l.type === "invest_sell" ? "📉" : l.type === "tips" ? "💡" : [...(data.goodTasks || []), ...(data.badTasks || [])].find(t => t.id === l.rid)?.emoji || "📌";
     return /*#__PURE__*/React.createElement("div", {
       key: l.id,
       style: {
@@ -20170,6 +20173,9 @@ function App() {
     const next = fn(prev);
     if (!next.logs || next.logs.length < (prev.logs || []).length - 2) next.logs = prev.logs;
     if (!next.expenses || next.expenses.length < (prev.expenses || []).length - 2) next.expenses = prev.expenses;
+    if (!next.rewards || next.rewards.length === 0) next.rewards = prev.rewards || next.rewards;
+    if (!next.goodTasks) next.goodTasks = prev.goodTasks;
+    if (!next.badTasks) next.badTasks = prev.badTasks;
     return next;
   }), []);
   const [forcePin, setForcePin] = useState(null);
