@@ -500,6 +500,7 @@ function migrate(d) {
   if(!d.familySettings) d.familySettings={...INIT.familySettings};
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
+  if(!d.familySettings.familyMission) d.familySettings.familyMission={...INIT.familySettings.familyMission};
   if(!d.monsterEvolved) d.monsterEvolved={};
   if(!d.monsterIV) d.monsterIV={};
   if(!d.monsterDiscovered) d.monsterDiscovered={};
@@ -1248,6 +1249,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [smEditReward, setSmEditReward] = useState(null);
+  const [smAddOpen, setSmAddOpen] = useState(false);
+  const [smREmoji, setSmREmoji] = useState("🎁");
+  const [smRLabel, setSmRLabel] = useState("");
+  const [smRCost, setSmRCost] = useState("5");
+  const [smRUnit, setSmRUnit] = useState("");
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -1272,7 +1279,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   };
 
   const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
-  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["members","🔐 PIN"],["transfer","🔄 引継"]];
+  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["members","🔐 PIN"],["transfer","🔄 引継"]];
   const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
 
   if(!authed) return (
@@ -1459,25 +1466,64 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>こうかんアイテムの管理</p>
               {(data.rewards||[]).map(r=>(
-                <div key={r.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
-                    <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
-                  </div>
-                  <button onClick={()=>update(d=>({...d,rewards:d.rewards.filter(x=>x.id!==r.id)}))}
-                    style={{padding:"4px 10px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:8,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>削除</button>
+                <div key={r.id}>
+                  {smEditReward?.id===r.id ? (
+                    <div style={{background:BG,border:`1.5px solid ${B}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                      <div style={{display:"flex",gap:6,marginBottom:6}}>
+                        <input value={smEditReward.emoji} onChange={e=>setSmEditReward(v=>({...v,emoji:e.target.value}))} style={{...INP,width:52,textAlign:"center"}}/>
+                        <input value={smEditReward.label} onChange={e=>setSmEditReward(v=>({...v,label:e.target.value}))} placeholder="特典名" style={INP}/>
+                      </div>
+                      <input value={smEditReward.cost} onChange={e=>setSmEditReward(v=>({...v,cost:e.target.value}))} type="number" placeholder="必要pt" style={{...INP,marginBottom:6}}/>
+                      <input value={smEditReward.unit} onChange={e=>setSmEditReward(v=>({...v,unit:e.target.value}))} placeholder="内容説明（例: 30分延長）" style={{...INP,marginBottom:10}}/>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{
+                          const cost=parseInt(smEditReward.cost);
+                          if(!smEditReward.label||isNaN(cost)||cost<=0)return;
+                          update(d=>({...d,rewards:d.rewards.map(x=>x.id===smEditReward.id?{...smEditReward,cost}:x)}));
+                          setSmEditReward(null);
+                        }} style={{flex:1,padding:"8px",background:G,border:"none",borderRadius:10,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>保存</button>
+                        <button onClick={()=>setSmEditReward(null)} style={{flex:1,padding:"8px",background:BORDER,border:"none",borderRadius:10,color:MUTED,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                      </div>
+                    </div>
+                  ):(
+                    <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                      {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
+                        <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
+                      </div>
+                      <button onClick={()=>setSmEditReward({...r,cost:String(r.cost)})}
+                        style={{padding:"4px 10px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>編集</button>
+                      <button onClick={()=>update(d=>({...d,rewards:d.rewards.filter(x=>x.id!==r.id)}))}
+                        style={{padding:"4px 10px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:8,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>削除</button>
+                    </div>
+                  )}
                 </div>
               ))}
-              <button onClick={()=>{
-                const label=prompt("ご褒美名");if(!label)return;
-                const cost=parseInt(prompt("必要pt"));if(isNaN(cost))return;
-                const emoji=prompt("絵文字","🎁")||"🎁";
-                const unit=prompt("単位（例：1回）","1回")||"1回";
-                update(d=>({...d,rewards:[...d.rewards,{id:uid(),emoji,label,cost,unit}]}));
-              }} style={{width:"100%",padding:"12px",background:`${G}15`,border:`2px dashed ${G}`,borderRadius:12,color:G,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
-                ＋ 新しいご褒美を追加
-              </button>
+              {smAddOpen ? (
+                <div style={{background:BG,border:`1.5px solid ${G}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    <input value={smREmoji} onChange={e=>setSmREmoji(e.target.value)} style={{...INP,width:52,textAlign:"center"}}/>
+                    <input value={smRLabel} onChange={e=>setSmRLabel(e.target.value)} placeholder="特典名" style={INP}/>
+                  </div>
+                  <input value={smRCost} onChange={e=>setSmRCost(e.target.value)} type="number" placeholder="必要pt（例: 5）" style={{...INP,marginBottom:6}}/>
+                  <input value={smRUnit} onChange={e=>setSmRUnit(e.target.value)} placeholder="内容説明（例: 1回）" style={{...INP,marginBottom:10}}/>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{
+                      const cost=parseInt(smRCost);
+                      if(!smRLabel||isNaN(cost)||cost<=0)return;
+                      update(d=>({...d,rewards:[...d.rewards,{id:uid(),emoji:smREmoji,label:smRLabel,cost,unit:smRUnit||"1回"}]}));
+                      setSmRLabel("");setSmREmoji("🎁");setSmRCost("5");setSmRUnit("");setSmAddOpen(false);
+                    }} style={{flex:1,padding:"8px",background:G,border:"none",borderRadius:10,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>追加</button>
+                    <button onClick={()=>setSmAddOpen(false)} style={{flex:1,padding:"8px",background:BORDER,border:"none",borderRadius:10,color:MUTED,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                  </div>
+                </div>
+              ):(
+                <button onClick={()=>setSmAddOpen(true)}
+                  style={{width:"100%",padding:"12px",background:`${G}15`,border:`2px dashed ${G}`,borderRadius:12,color:G,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
+                  ＋ 新しいご褒美を追加
+                </button>
+              )}
             </div>
           )}
 
@@ -1680,6 +1726,58 @@ settingsTab==="members"&&(
                 );
               })}
             </div>);
+          })()}
+
+          {/* ── 家族目標タブ ── */}
+          {settingsTab==="family"&&(()=>{
+            const fm=data.familySettings?.familyMission||{enabled:true,label:"みんなの活動で 3,000 pt を育てよう",target:3000,reward:"週末に家族でアイスを選ぶ"};
+            const setFm=patch=>update(d=>({...d,familySettings:{...(d.familySettings||{}),familyMission:{...(d.familySettings?.familyMission||{enabled:true,label:"みんなの活動で 3,000 pt を育てよう",target:3000,reward:"週末に家族でアイスを選ぶ"}),...patch}}}));
+            return(
+              <div>
+                <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 16px"}}>家族全員で目指す共通ゴールを設定します</p>
+                {/* ON/OFF */}
+                <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:14,color:TEXT}}>家族目標を表示する</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>ランキング画面と毎日タブに進捗を表示</div>
+                  </div>
+                  <button onClick={()=>setFm({enabled:!fm.enabled})}
+                    style={{position:"relative",width:48,height:26,borderRadius:13,background:fm.enabled?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                    <div style={{position:"absolute",top:3,left:fm.enabled?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                  </button>
+                </div>
+                {fm.enabled&&<>
+                  {/* 目標文 */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>目標の文章</div>
+                    <input value={fm.label} onChange={e=>setFm({label:e.target.value})}
+                      placeholder="例：みんなの活動で 3,000 pt を育てよう"
+                      style={{...INP,marginBottom:0}}/>
+                  </div>
+                  {/* 目標pt */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>目標ポイント</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                      {[1000,2000,3000,5000,10000].map(v=>(
+                        <button key={v} onClick={()=>setFm({target:v})}
+                          style={{padding:"6px 14px",border:`1.5px solid ${fm.target===v?G:BORDER}`,borderRadius:10,background:fm.target===v?`${G}20`:"transparent",color:fm.target===v?G:MUTED,fontWeight:fm.target===v?700:400,fontSize:12,cursor:"pointer",fontFamily:F}}>
+                          {v.toLocaleString()}pt
+                        </button>
+                      ))}
+                    </div>
+                    <input value={fm.target} onChange={e=>{const v=parseInt(e.target.value);if(!isNaN(v)&&v>0)setFm({target:v});}}
+                      type="number" placeholder="カスタム値" style={{...INP,marginBottom:0}}/>
+                  </div>
+                  {/* 達成報酬 */}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>達成したらやること</div>
+                    <input value={fm.reward} onChange={e=>setFm({reward:e.target.value})}
+                      placeholder="例：週末に家族でアイスを選ぶ"
+                      style={{...INP,marginBottom:0}}/>
+                  </div>
+                </>}
+              </div>
+            );
           })()}
 
           {/* ── 引き継ぎタブ ── */}

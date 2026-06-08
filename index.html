@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="562a45d">
+<meta name="tane-version" content="2896167">
 </head>
 <body>
   <div id="root"></div>
@@ -1338,6 +1338,9 @@ function migrate(d) {
   };
   if (d.familySettings.requireApproval === undefined) d.familySettings.requireApproval = false;
   if (d.familySettings.approvalNotification === undefined) d.familySettings.approvalNotification = false;
+  if (!d.familySettings.familyMission) d.familySettings.familyMission = {
+    ...INIT.familySettings.familyMission
+  };
   if (!d.monsterEvolved) d.monsterEvolved = {};
   if (!d.monsterIV) d.monsterIV = {};
   if (!d.monsterDiscovered) d.monsterDiscovered = {};
@@ -3082,6 +3085,12 @@ function SettingsModal({
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [smEditReward, setSmEditReward] = useState(null);
+  const [smAddOpen, setSmAddOpen] = useState(false);
+  const [smREmoji, setSmREmoji] = useState("🎁");
+  const [smRLabel, setSmRLabel] = useState("");
+  const [smRCost, setSmRCost] = useState("5");
+  const [smRUnit, setSmRUnit] = useState("");
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G = "#34c77b",
     Y = "#f5c842",
@@ -3130,7 +3139,7 @@ function SettingsModal({
     }
   };
   const QUICK_TABS = [["grant", "🎁 pt付与"], ["approval", "✅ 承認"]];
-  const ADV_TABS = [["tasks", "📋 タスク"], ["assign", "👤 割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["members", "🔐 PIN"], ["transfer", "🔄 引継"]];
+  const ADV_TABS = [["tasks", "📋 タスク"], ["assign", "👤 割当"], ["rewards", "🎁 特典"], ["interest", "💹 利子"], ["family", "🏆 家族目標"], ["members", "🔐 PIN"], ["transfer", "🔄 引継"]];
   const SETTING_TABS = settingsGroup === "quick" ? QUICK_TABS : ADV_TABS;
   if (!authed) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3685,7 +3694,108 @@ function SettingsModal({
       margin: "0 0 12px"
     }
   }, "\u3053\u3046\u304B\u3093\u30A2\u30A4\u30C6\u30E0\u306E\u7BA1\u7406"), (data.rewards || []).map(r => /*#__PURE__*/React.createElement("div", {
-    key: r.id,
+    key: r.id
+  }, smEditReward?.id === r.id ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: BG,
+      border: `1.5px solid ${B}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.emoji,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      emoji: e.target.value
+    })),
+    style: {
+      ...INP,
+      width: 52,
+      textAlign: "center"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.label,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      label: e.target.value
+    })),
+    placeholder: "\u7279\u5178\u540D",
+    style: INP
+  })), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.cost,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      cost: e.target.value
+    })),
+    type: "number",
+    placeholder: "\u5FC5\u8981pt",
+    style: {
+      ...INP,
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smEditReward.unit,
+    onChange: e => setSmEditReward(v => ({
+      ...v,
+      unit: e.target.value
+    })),
+    placeholder: "\u5185\u5BB9\u8AAC\u660E\uFF08\u4F8B: 30\u5206\u5EF6\u9577\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const cost = parseInt(smEditReward.cost);
+      if (!smEditReward.label || isNaN(cost) || cost <= 0) return;
+      update(d => ({
+        ...d,
+        rewards: d.rewards.map(x => x.id === smEditReward.id ? {
+          ...smEditReward,
+          cost
+        } : x)
+      }));
+      setSmEditReward(null);
+    },
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: G,
+      border: "none",
+      borderRadius: 10,
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u4FDD\u5B58"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmEditReward(null),
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: BORDER,
+      border: "none",
+      borderRadius: 10,
+      color: MUTED,
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"))) : /*#__PURE__*/React.createElement("div", {
     style: {
       background: CARD,
       border: `1.5px solid ${BORDER}`,
@@ -3725,6 +3835,23 @@ function SettingsModal({
       fontSize: 11
     }
   }, r.cost, "pt \xB7 ", r.unit)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmEditReward({
+      ...r,
+      cost: String(r.cost)
+    }),
+    style: {
+      padding: "4px 10px",
+      background: `${B}15`,
+      border: `1.5px solid ${B}`,
+      borderRadius: 8,
+      color: B,
+      fontWeight: 700,
+      fontSize: 11,
+      cursor: "pointer",
+      fontFamily: F,
+      marginRight: 4
+    }
+  }, "\u7DE8\u96C6"), /*#__PURE__*/React.createElement("button", {
     onClick: () => update(d => ({
       ...d,
       rewards: d.rewards.filter(x => x.id !== r.id)
@@ -3740,25 +3867,103 @@ function SettingsModal({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u524A\u9664"))), /*#__PURE__*/React.createElement("button", {
+  }, "\u524A\u9664")))), smAddOpen ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: BG,
+      border: `1.5px solid ${G}`,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: smREmoji,
+    onChange: e => setSmREmoji(e.target.value),
+    style: {
+      ...INP,
+      width: 52,
+      textAlign: "center"
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smRLabel,
+    onChange: e => setSmRLabel(e.target.value),
+    placeholder: "\u7279\u5178\u540D",
+    style: INP
+  })), /*#__PURE__*/React.createElement("input", {
+    value: smRCost,
+    onChange: e => setSmRCost(e.target.value),
+    type: "number",
+    placeholder: "\u5FC5\u8981pt\uFF08\u4F8B: 5\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    value: smRUnit,
+    onChange: e => setSmRUnit(e.target.value),
+    placeholder: "\u5185\u5BB9\u8AAC\u660E\uFF08\u4F8B: 1\u56DE\uFF09",
+    style: {
+      ...INP,
+      marginBottom: 10
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: () => {
-      const label = prompt("ご褒美名");
-      if (!label) return;
-      const cost = parseInt(prompt("必要pt"));
-      if (isNaN(cost)) return;
-      const emoji = prompt("絵文字", "🎁") || "🎁";
-      const unit = prompt("単位（例：1回）", "1回") || "1回";
+      const cost = parseInt(smRCost);
+      if (!smRLabel || isNaN(cost) || cost <= 0) return;
       update(d => ({
         ...d,
         rewards: [...d.rewards, {
           id: uid(),
-          emoji,
-          label,
+          emoji: smREmoji,
+          label: smRLabel,
           cost,
-          unit
+          unit: smRUnit || "1回"
         }]
       }));
+      setSmRLabel("");
+      setSmREmoji("🎁");
+      setSmRCost("5");
+      setSmRUnit("");
+      setSmAddOpen(false);
     },
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: G,
+      border: "none",
+      borderRadius: 10,
+      color: "#fff",
+      fontWeight: 800,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u8FFD\u52A0"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmAddOpen(false),
+    style: {
+      flex: 1,
+      padding: "8px",
+      background: BORDER,
+      border: "none",
+      borderRadius: 10,
+      color: MUTED,
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: F
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"))) : /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSmAddOpen(true),
     style: {
       width: "100%",
       padding: "12px",
@@ -4389,6 +4594,190 @@ function SettingsModal({
         }
       }, "\u274C \u5374\u4E0B")));
     }));
+  })(), settingsTab === "family" && (() => {
+    const fm = data.familySettings?.familyMission || {
+      enabled: true,
+      label: "みんなの活動で 3,000 pt を育てよう",
+      target: 3000,
+      reward: "週末に家族でアイスを選ぶ"
+    };
+    const setFm = patch => update(d => ({
+      ...d,
+      familySettings: {
+        ...(d.familySettings || {}),
+        familyMission: {
+          ...(d.familySettings?.familyMission || {
+            enabled: true,
+            label: "みんなの活動で 3,000 pt を育てよう",
+            target: 3000,
+            reward: "週末に家族でアイスを選ぶ"
+          }),
+          ...patch
+        }
+      }
+    }));
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      style: {
+        color: MUTED,
+        fontSize: 12,
+        fontWeight: 800,
+        margin: "0 0 16px"
+      }
+    }, "\u5BB6\u65CF\u5168\u54E1\u3067\u76EE\u6307\u3059\u5171\u901A\u30B4\u30FC\u30EB\u3092\u8A2D\u5B9A\u3057\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 14,
+        color: TEXT
+      }
+    }, "\u5BB6\u65CF\u76EE\u6A19\u3092\u8868\u793A\u3059\u308B"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: MUTED,
+        fontSize: 11,
+        marginTop: 2
+      }
+    }, "\u30E9\u30F3\u30AD\u30F3\u30B0\u753B\u9762\u3068\u6BCE\u65E5\u30BF\u30D6\u306B\u9032\u6357\u3092\u8868\u793A")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setFm({
+        enabled: !fm.enabled
+      }),
+      style: {
+        position: "relative",
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        background: fm.enabled ? G : BORDER,
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: fm.enabled ? 24 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s"
+      }
+    }))), fm.enabled && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u76EE\u6A19\u306E\u6587\u7AE0"), /*#__PURE__*/React.createElement("input", {
+      value: fm.label,
+      onChange: e => setFm({
+        label: e.target.value
+      }),
+      placeholder: "\u4F8B\uFF1A\u307F\u3093\u306A\u306E\u6D3B\u52D5\u3067 3,000 pt \u3092\u80B2\u3066\u3088\u3046",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u76EE\u6A19\u30DD\u30A4\u30F3\u30C8"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 10
+      }
+    }, [1000, 2000, 3000, 5000, 10000].map(v => /*#__PURE__*/React.createElement("button", {
+      key: v,
+      onClick: () => setFm({
+        target: v
+      }),
+      style: {
+        padding: "6px 14px",
+        border: `1.5px solid ${fm.target === v ? G : BORDER}`,
+        borderRadius: 10,
+        background: fm.target === v ? `${G}20` : "transparent",
+        color: fm.target === v ? G : MUTED,
+        fontWeight: fm.target === v ? 700 : 400,
+        fontSize: 12,
+        cursor: "pointer",
+        fontFamily: F
+      }
+    }, v.toLocaleString(), "pt"))), /*#__PURE__*/React.createElement("input", {
+      value: fm.target,
+      onChange: e => {
+        const v = parseInt(e.target.value);
+        if (!isNaN(v) && v > 0) setFm({
+          target: v
+        });
+      },
+      type: "number",
+      placeholder: "\u30AB\u30B9\u30BF\u30E0\u5024",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: CARD,
+        border: `1.5px solid ${BORDER}`,
+        borderRadius: 14,
+        padding: "14px 16px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        fontSize: 13,
+        color: TEXT,
+        marginBottom: 8
+      }
+    }, "\u9054\u6210\u3057\u305F\u3089\u3084\u308B\u3053\u3068"), /*#__PURE__*/React.createElement("input", {
+      value: fm.reward,
+      onChange: e => setFm({
+        reward: e.target.value
+      }),
+      placeholder: "\u4F8B\uFF1A\u9031\u672B\u306B\u5BB6\u65CF\u3067\u30A2\u30A4\u30B9\u3092\u9078\u3076",
+      style: {
+        ...INP,
+        marginBottom: 0
+      }
+    }))));
   })(), settingsTab === "transfer" && (() => {
     const code = (() => {
       try {
