@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="a1da13e">
+<meta name="tane-version" content="3d75907">
 </head>
 <body>
   <div id="root"></div>
@@ -614,6 +614,30 @@ const LINE_UNLOCK = {
   b: 0,
   c: 15
 };
+
+// 隠しモンスター（大きなクリア=累計タスクで解放。すがた(スキン)として装備できる）
+const HIDDEN_MONSTERS = [{
+  id: "niji",
+  name: "ニジドラゴン",
+  rarity: 5,
+  need: 60,
+  desc: "虹色にかがやく伝説の竜。雨上がりの空に現れるという。",
+  edu: "虹は太陽の光が空気中の雨つぶで曲がり、7色(赤・橙・黄・緑・青・藍・紫)に分かれて見える現象。だから虹は太陽と反対の空に出る。"
+}, {
+  id: "kogane",
+  name: "コガネオウ",
+  rarity: 5,
+  need: 120,
+  desc: "全身が黄金にかがやく王者。ふれたものを宝に変えるとか。",
+  edu: "金(ゴールド)はさびず輝きが長く続くため、昔から世界中でお金や宝物に使われた。とてもやわらかく、わずかな量で大きく延ばせる金属。"
+}, {
+  id: "hoshi",
+  name: "ホシリュウ",
+  rarity: 5,
+  need: 200,
+  desc: "夜空からまいおりた星の竜。ねがいをかなえるといわれる。",
+  edu: "夜空の星のほとんどは太陽のような『恒星』。とても遠いので、今見えている光は何年も前に出たもの。光は1秒で地球を7周半すすむ。"
+}];
 
 // ═══════════════════════════════════════════════════════
 const INIT = {
@@ -4530,6 +4554,12 @@ function ChildScreen({
   onFamily
 }) {
   const [tab, setTab] = useState("daily");
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _cTotalDone = (data.logs || []).filter(l => l.cid === child.id && (l.type === "good" || l.type === "daily")).length;
+  const _cBgTheme = BG_THEMES.find(t => t.id === ((data.bgTheme || {})[child.id] || "auto")) || BG_THEMES[0];
+  const _cBgUnlock = (_cBgTheme.need || 0) <= _cTotalDone;
+  const heroGrad = _cBgUnlock && _cBgTheme.grad ? _cBgTheme.grad : null;
+  const heroStars = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [gachaRes, setGachaRes] = useState(null);
@@ -7291,6 +7321,163 @@ function ChildScreen({
       }
     }, "\u30BF\u30C3\u30D7\u3067\u5909\u66F4")));
   }))), effectiveTab === "more" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 16px 8px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => setMoreOpen(o => o === "hidden" ? null : "hidden"),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      background: CARD,
+      border: `1.5px solid ${BORDER}`,
+      borderRadius: 14,
+      padding: "12px 14px",
+      cursor: "pointer",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "\u2728"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: TEXT
+    }
+  }, "\u3072\u307F\u3064\u306E\u306A\u304B\u307E")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: MUTED,
+      fontWeight: 700
+    }
+  }, HIDDEN_MONSTERS.filter(h => h.need <= totalDoneMon).length, "/", HIDDEN_MONSTERS.length), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: MUTED
+    }
+  }, moreOpen === "hidden" ? "▲" : "▼"))), moreOpen === "hidden" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: MUTED,
+      marginBottom: 8,
+      lineHeight: 1.5
+    }
+  }, "\u305F\u304F\u3055\u3093\u30AF\u30EA\u30A2\u3059\u308B\u3068\u89E3\u653E\uFF01\u30BF\u30C3\u30D7\u3067\u300C\u3059\u304C\u305F\u300D\u3092\u5909\u3048\u3089\u308C\u308B\u3088\u3002"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(3,1fr)",
+      gap: 8
+    }
+  }, HIDDEN_MONSTERS.map(h => {
+    const unlocked = h.need <= totalDoneMon;
+    const equipped = (data.monsterSkin || {})[child.id] === h.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: h.id,
+      onClick: () => {
+        if (unlocked) update(d => ({
+          ...d,
+          monsterSkin: {
+            ...(d.monsterSkin || {}),
+            [child.id]: equipped ? null : h.id
+          }
+        }));
+      },
+      style: {
+        borderRadius: 12,
+        padding: "8px 4px",
+        textAlign: "center",
+        background: equipped ? GS : CARD,
+        border: equipped ? `2.5px solid ${GP}` : `1.5px solid ${BORDER}`,
+        cursor: unlocked ? "pointer" : "default",
+        opacity: unlocked ? 1 : 0.85
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: `/assets/monster_${h.id}_f0.png`,
+      alt: unlocked ? h.name : "???",
+      style: {
+        width: 50,
+        height: 50,
+        objectFit: "contain",
+        display: "block",
+        margin: "0 auto 3px",
+        filter: unlocked ? "none" : "brightness(0)"
+      },
+      onError: e => {
+        e.target.style.visibility = "hidden";
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        fontWeight: 800,
+        color: unlocked ? TEXT : MUTED,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, unlocked ? h.name : "???"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: GOLD,
+        fontWeight: 700
+      }
+    }, "★".repeat(h.rarity)), !unlocked ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: MUTED,
+        fontWeight: 700
+      }
+    }, "\uD83D\uDD12 \u3042\u3068", h.need - totalDoneMon, "\u56DE") : equipped ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: GP,
+        fontWeight: 800
+      }
+    }, "\u3059\u304C\u305F\u4E2D(\u30BF\u30C3\u30D7\u3067\u623B\u3059)") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 8,
+        color: MUTED
+      }
+    }, "\u30BF\u30C3\u30D7\u3067\u3059\u304C\u305F\u5909\u66F4"));
+  })), (() => {
+    const eq = HIDDEN_MONSTERS.find(h => h.need <= totalDoneMon && (data.monsterSkin || {})[child.id] === h.id);
+    return eq ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        fontSize: 9,
+        color: TEXTS,
+        lineHeight: 1.6,
+        background: CARDS,
+        borderRadius: 10,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 800,
+        color: TEXT,
+        marginBottom: 2
+      }
+    }, eq.name), /*#__PURE__*/React.createElement("div", null, eq.desc), /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: B,
+        marginTop: 2
+      }
+    }, eq.edu)) : null;
+  })())), effectiveTab === "more" && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 16
     }
@@ -13170,8 +13357,13 @@ function SeedMonster({
   const nextGate = isFinal ? null : STAGE_GATES[curStage]; // 次の進化に必要な累計タスク数
   const prevGate = curStage > 0 ? STAGE_GATES[curStage - 1] || 0 : 0;
   const canEvolve = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
+  // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
+  const skinId = (data.monsterSkin || {})[child.id] || null;
+  const skinDef = skinId ? HIDDEN_MONSTERS.find(h => h.id === skinId) : null;
+  const skinActive = !!(skinDef && totalTasksDone >= skinDef.need);
+  const dispId = skinActive ? skinId : monsterId;
   // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
-  const imgSrc = `/assets/monster_${monsterId}_side_f${frame}.png`;
+  const imgSrc = `/assets/monster_${dispId}_side_f${frame}.png`;
 
   // 進化先を分岐ルールで決定
   const computeNextStageId = () => {
@@ -13376,8 +13568,8 @@ function SeedMonster({
   const evoPct = isFinal ? 100 : Math.max(0, Math.min(100, Math.round((totalTasksDone - prevGate) / Math.max(1, nextGate - prevGate) * 100)));
   const evoRemaining = isFinal ? 0 : Math.max(0, nextGate - totalTasksDone);
   const nickname = (data.monsterNickname || {})[child.id];
-  const dispName = nickname || monDef.name;
-  const rarityStr = "★".repeat(monDef.rarity || 1);
+  const dispName = nickname || (skinActive ? skinDef.name : monDef.name);
+  const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
@@ -13481,7 +13673,7 @@ function SeedMonster({
       const s = t.dataset.fb || "0";
       if (s === "0") {
         t.dataset.fb = "1";
-        t.src = `/assets/monster_${monsterId}_f${frame}.png`;
+        t.src = `/assets/monster_${dispId}_f${frame}.png`;
       } else if (s === "1") {
         t.dataset.fb = "2";
         t.src = "/assets/monster_egg_f0.png";

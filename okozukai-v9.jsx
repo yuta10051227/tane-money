@@ -287,6 +287,19 @@ const BG_THEMES = [
 // モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
 const LINE_UNLOCK = { "":0, a:0, b:0, c:15 };
 
+// 隠しモンスター（大きなクリア=累計タスクで解放。すがた(スキン)として装備できる）
+const HIDDEN_MONSTERS = [
+  { id:"niji",   name:"ニジドラゴン", rarity:5, need:60,
+    desc:"虹色にかがやく伝説の竜。雨上がりの空に現れるという。",
+    edu:"虹は太陽の光が空気中の雨つぶで曲がり、7色(赤・橙・黄・緑・青・藍・紫)に分かれて見える現象。だから虹は太陽と反対の空に出る。" },
+  { id:"kogane", name:"コガネオウ",   rarity:5, need:120,
+    desc:"全身が黄金にかがやく王者。ふれたものを宝に変えるとか。",
+    edu:"金(ゴールド)はさびず輝きが長く続くため、昔から世界中でお金や宝物に使われた。とてもやわらかく、わずかな量で大きく延ばせる金属。" },
+  { id:"hoshi",  name:"ホシリュウ",   rarity:5, need:200,
+    desc:"夜空からまいおりた星の竜。ねがいをかなえるといわれる。",
+    edu:"夜空の星のほとんどは太陽のような『恒星』。とても遠いので、今見えている光は何年も前に出たもの。光は1秒で地球を7周半すすむ。" },
+];
+
 // ═══════════════════════════════════════════════════════
 const INIT = {
   parentPin: "0000",
@@ -1723,6 +1736,12 @@ settingsTab==="members"&&(
 
 function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
+  // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
+  const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
+  const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
+  const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
+  const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
+  const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [gachaRes, setGachaRes] = useState(null);
@@ -2559,6 +2578,60 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ひみつのなかま(隠しモンスター) ── */}
+      {effectiveTab==="more" && (
+        <div style={{padding:"0 16px 8px"}}>
+          <div onClick={()=>setMoreOpen(o=>o==="hidden"?null:"hidden")}
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>✨</span>
+              <span style={{fontSize:13,fontWeight:700,color:TEXT}}>ひみつのなかま</span>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
+                {HIDDEN_MONSTERS.filter(h=>h.need<=totalDoneMon).length}/{HIDDEN_MONSTERS.length}
+              </span>
+              <span style={{fontSize:11,color:MUTED}}>{moreOpen==="hidden"?"▲":"▼"}</span>
+            </div>
+          </div>
+          {moreOpen==="hidden" && (
+            <div>
+              <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>たくさんクリアすると解放！タップで「すがた」を変えられるよ。</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {HIDDEN_MONSTERS.map(h=>{
+                  const unlocked=h.need<=totalDoneMon;
+                  const equipped=(data.monsterSkin||{})[child.id]===h.id;
+                  return (
+                    <div key={h.id}
+                      onClick={()=>{ if(unlocked) update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:equipped?null:h.id}})); }}
+                      style={{borderRadius:12,padding:"8px 4px",textAlign:"center",background:equipped?GS:CARD,border:equipped?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.85}}>
+                      <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
+                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",filter:unlocked?"none":"brightness(0)"}}
+                        onError={e=>{e.target.style.visibility="hidden"}}/>
+                      <div style={{fontSize:9,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                        {unlocked?h.name:"???"}
+                      </div>
+                      <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(h.rarity)}</div>
+                      {!unlocked
+                        ? <div style={{fontSize:8,color:MUTED,fontWeight:700}}>🔒 あと{h.need-totalDoneMon}回</div>
+                        : equipped
+                        ? <div style={{fontSize:8,color:GP,fontWeight:800}}>すがた中(タップで戻す)</div>
+                        : <div style={{fontSize:8,color:MUTED}}>タップですがた変更</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              {(()=>{const eq=HIDDEN_MONSTERS.find(h=>h.need<=totalDoneMon && (data.monsterSkin||{})[child.id]===h.id);return eq?(
+                <div style={{marginTop:8,fontSize:9,color:TEXTS,lineHeight:1.6,background:CARDS,borderRadius:10,padding:"8px 10px"}}>
+                  <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{eq.name}</div>
+                  <div>{eq.desc}</div>
+                  <div style={{color:B,marginTop:2}}>{eq.edu}</div>
+                </div>):null;})()}
             </div>
           )}
         </div>
@@ -4607,8 +4680,13 @@ function SeedMonster({ child, data, size=90, update }) {
   const nextGate       = isFinal ? null : STAGE_GATES[curStage];    // 次の進化に必要な累計タスク数
   const prevGate       = curStage > 0 ? (STAGE_GATES[curStage-1] || 0) : 0;
   const canEvolve      = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
+  // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
+  const skinId         = (data.monsterSkin||{})[child.id] || null;
+  const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
+  const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need);
+  const dispId         = skinActive ? skinId : monsterId;
   // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
-  const imgSrc         = `/assets/monster_${monsterId}_side_f${frame}.png`;
+  const imgSrc         = `/assets/monster_${dispId}_side_f${frame}.png`;
 
   // 進化先を分岐ルールで決定
   const computeNextStageId = () => {
@@ -4751,8 +4829,8 @@ function SeedMonster({ child, data, size=90, update }) {
     : Math.max(0, Math.min(100, Math.round((totalTasksDone - prevGate) / Math.max(1, nextGate - prevGate) * 100)));
   const evoRemaining = isFinal ? 0 : Math.max(0, nextGate - totalTasksDone);
   const nickname  = (data.monsterNickname||{})[child.id];
-  const dispName  = nickname || monDef.name;
-  const rarityStr = "★".repeat(monDef.rarity||1);
+  const dispName  = nickname || (skinActive ? skinDef.name : monDef.name);
+  const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
 
   return (
     <div style={{position:"relative",flexShrink:0,textAlign:"center"}}>
@@ -4787,7 +4865,7 @@ function SeedMonster({ child, data, size=90, update }) {
             transition:"filter 0.4s",
           }}>
             <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
-              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${monsterId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
+              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
