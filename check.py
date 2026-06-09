@@ -93,14 +93,25 @@ for v in ["O", "Y", "SHADOW"]:
         if re.search(rf"(?<![A-Za-z_$0-9]){v}(?![A-Za-z_$0-9])", content):
             deleted_used.append(v)
 
+import os
+html_path = os.path.join(os.path.dirname(os.path.abspath(path)), "index.html")
+html_conflict = False
+if os.path.exists(html_path):
+    html_content = open(html_path, "r", encoding="utf-8").read()
+    html_conflict = bool(re.search(r'^<{7} |^>{7} |^={7}$', html_content, re.MULTILINE))
+
+jsx_conflict = bool(re.search(r'^<{7} |^>{7} |^={7}$', content, re.MULTILINE))
+
 print("=== 追加チェック ===")
 print(f"パース: {'OK' if parse_ok else 'NG: ' + parse_result.stdout.strip()}")
 print(f"生JSXコード: {'なし' if not raw_jsx else '★あり! ' + str(raw_jsx)}")
 print(f"lucide残骸: {'なし' if not lucide_used else '★あり! ' + str(lucide_used)}")
 print(f"削除済み変数: {'なし' if not deleted_used else '★あり! ' + str(deleted_used)}")
+print(f"コンフリクトマーカー(JSX): {'なし' if not jsx_conflict else '★あり! <<<<<<< が残っています'}")
+print(f"コンフリクトマーカー(HTML): {'なし' if not html_conflict else '★あり! <<<<<<< が残っています'}")
 print("==================")
 sys.exit(
     1
-    if (missing or not parse_ok or raw_jsx or lucide_used or deleted_used)
+    if (missing or not parse_ok or raw_jsx or lucide_used or deleted_used or jsx_conflict or html_conflict)
     else 0
 )
