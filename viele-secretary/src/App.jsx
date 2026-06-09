@@ -1568,6 +1568,54 @@ export default function App() {
     return () => { cancelled = true; };
   }, [calToken]);
 
+  // 「連携」：サーバー経由のOAuth（リフレッシュトークン取得）。一度で維持され続ける。
+  const connectCalendar = () => {
+    setCalError(null);
+    const uid = (user && user.uid) || "x";
+    window.location.href = `/api/gcal-start?state=${encodeURIComponent(uid)}`;
+  };
+
+  // カレンダー連携を解除（refresh/legacyトークンを失効＋破棄）
+  const disconnectCalendar = () => {
+    revokeToken(calToken);
+    revokeToken(data && data.gcalRefresh);
+    localStorage.removeItem("viele-cal-token");
+    update({ gcalRefresh: null });
+    setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
+  };
+
+  // ログアウト（共有端末対策でカレンダートークンも破棄）
+  const logout = () => {
+    revokeToken(calToken);
+    localStorage.removeItem("viele-cal-token");
+    signOut(auth);
+  };
+
+  // ── 今日のまとめ（ニュース）状態 ──
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestError, setDigestError] = useState(null);
+  const digestRef = useRef(false);
+  const [fortuneLoading, setFortuneLoading] = useState(false);
+  const [fortuneError, setFortuneError] = useState(null);
+  const fortuneRef = useRef(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
+
+  // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
+  const notifySupported = typeof Notification !== "undefined";
+  const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
+  const notifiedRef = useRef(false);
+  const enableNotify = async () => {
+    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
+    const p = await Notification.requestPermission();
+    if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
+    else alert("通知が許可されませんでした。端末の設定から許可できます。");
+  };
+  const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
+  const local = useLocal(STORE_KEY, seed);
+  const { data, loading, error, update } = firebaseEnabled ? cloud : local;
+
+  // ── Googleカレンダー連携（refresh token方式・data宣言後に置く）──
   // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ・ループ防止でガードを先に立てる）
   const gcalSavedRef = useRef(false);
   useEffect(() => {
@@ -1629,53 +1677,6 @@ export default function App() {
       });
     if (newTrips.length) update({ trips: [...(d.trips || []), ...newTrips] });
   }, [calEvents, calStatus]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 「連携」：サーバー経由のOAuth（リフレッシュトークン取得）。一度で維持され続ける。
-  const connectCalendar = () => {
-    setCalError(null);
-    const uid = (user && user.uid) || "x";
-    window.location.href = `/api/gcal-start?state=${encodeURIComponent(uid)}`;
-  };
-
-  // カレンダー連携を解除（refresh/legacyトークンを失効＋破棄）
-  const disconnectCalendar = () => {
-    revokeToken(calToken);
-    revokeToken(data && data.gcalRefresh);
-    localStorage.removeItem("viele-cal-token");
-    update({ gcalRefresh: null });
-    setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
-  };
-
-  // ログアウト（共有端末対策でカレンダートークンも破棄）
-  const logout = () => {
-    revokeToken(calToken);
-    localStorage.removeItem("viele-cal-token");
-    signOut(auth);
-  };
-
-  // ── 今日のまとめ（ニュース）状態 ──
-  const [digestLoading, setDigestLoading] = useState(false);
-  const [digestError, setDigestError] = useState(null);
-  const digestRef = useRef(false);
-  const [fortuneLoading, setFortuneLoading] = useState(false);
-  const [fortuneError, setFortuneError] = useState(null);
-  const fortuneRef = useRef(false);
-  const [importing, setImporting] = useState(false);
-  const [importMsg, setImportMsg] = useState(null);
-
-  // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
-  const notifySupported = typeof Notification !== "undefined";
-  const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
-  const notifiedRef = useRef(false);
-  const enableNotify = async () => {
-    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
-    const p = await Notification.requestPermission();
-    if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
-    else alert("通知が許可されませんでした。端末の設定から許可できます。");
-  };
-  const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
-  const local = useLocal(STORE_KEY, seed);
-  const { data, loading, error, update } = firebaseEnabled ? cloud : local;
 
   // 開いた時に遅れがあればブラウザ通知（dataを使うのでdata宣言後に置く）
   useEffect(() => {
