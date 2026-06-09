@@ -236,51 +236,54 @@ function startLogsRealtimeSync(updateFn) {
 // MONSTER TREE
 // ═══════════════════════════════════════════════════════
 const MONSTER_TREE = {
-  egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b", evolveC:"1c",
-          desc:"秘められた力を持つ不思議な卵。何が生まれるか誰も知らない。", edu:"" },
-  "1a": { id:"1a",  name:"ほのおっち",      rarity:1, line:"a", stage:1, evolveA:"2a1", evolveB:"2a2",
-          desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"人類が火を使い始めたのは約140万年前ともいわれる。火のおかげで食べ物を加熱でき、夜も明るく安全に過ごせるようになった。火を手に入れたことは人類最大の発明の一つ。" },
-  "1b": { id:"1b",  name:"もりっち",        rarity:1, line:"b", stage:1, evolveA:"2b1", evolveB:"2b2",
-          desc:"森の精霊の赤ちゃん。木の葉のベッドで眠るのが大好き。", edu:"日本は国土の約3分の2（約68%）が森林で、世界でも有数の森林大国。木は光合成で二酸化炭素を吸い、酸素を作って地球の空気をきれいにしている。" },
-  "2a1":{ id:"2a1", name:"ヒリュウ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"炎をまとった東洋の小さな竜。空を飛び、天気をあやつるという。", edu:"東洋（中国・日本）の竜は水や天をつかさどる神聖な存在で、皇帝の象徴だった。竜を退治される悪役として描く西洋とは逆に、東洋では幸運をもたらす守り神とされる。" },
-  "2a2":{ id:"2a2", name:"カグツチ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"日本神話の火の神。生まれながらにして炎を纏う。", edu:"カグツチは日本最古の歴史書『古事記』（約1300年前・712年成立）に登場する火の神。生まれたとき母イザナミを失わせ、怒った父イザナギに斬られたと伝わる。" },
-  "2b1":{ id:"2b1", name:"ユニコーン",      rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"額に黄金の角を持つ白馬。純粋な心の者にしか心を開かない。", edu:"ユニコーンは中世ヨーロッパで広く信じられた幻獣。角には毒を消す力があると信じられ高値で取引されたが、その正体は海の生き物イッカクの長い牙だったといわれる。" },
-  "2b2":{ id:"2b2", name:"コダマ",          rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"古い木に宿る日本の精霊。山びこはこの子の声だという。", edu:"木霊（コダマ）は樹木に宿るとされる日本の精霊。昔の人は大きな木を切ると祟りがあると考え自然を大切にした。自然のあらゆる物に魂が宿るという考え方をアニミズムという。" },
-  "3a1":{ id:"3a1", name:"フェニックス",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"炎の中から生まれ変わる不死の鳥。500年ごとに若返るという。", edu:"フェニックス（不死鳥）はエジプト・ギリシャ・中国など世界各地に似た伝説がある。エジプトでは『ベヌウ』と呼ばれ太陽の象徴。今も『よみがえり・再生』の象徴として使われる。" },
-  "3a2":{ id:"3a2", name:"カグツチ神将",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"鍛えられた炎の神将。剣をふるうたび炎の渦が生まれる。", edu:"日本の武士にとって刀は『武士の魂』とされ、名刀には名前が付けられ親から子へ受け継がれた。刀は玉鋼を熱しては何度も折り返して鍛える、世界でも高度な技術で作られる。" },
-  "3b1":{ id:"3b1", name:"スフィンクス",    rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"なぞかけを好む砂漠の守護者。問いに答えられぬ者を通さない。", edu:"スフィンクスはエジプトとギリシャ両方の伝説に登場する。エジプト・ギザの大スフィンクスは約4500年前に造られた世界最大級の石像で、全長は約73mもある。" },
-  "3b2":{ id:"3b2", name:"アヌビス",        rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"ジャッカルの頭を持つ死者の神。魂の重さを羽根とはかる。", edu:"古代エジプトでは死後、心臓を『正義の羽根』と天秤ではかり、軽ければ天国へ行けると信じた。だから人々は正しく生きようとした。ミイラ作りもアヌビスが守るとされた。" },
-  "4a1":{ id:"4a1", name:"レッドドラゴン",  rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"西洋神話で最強とされる竜。ひと息で城を焼きつくす。", edu:"西洋の竜は中世ヨーロッパの騎士物語の強敵。竜を倒した聖ゲオルギウスはイギリスの守護聖人として有名で、赤い竜はウェールズの国旗にも描かれている。" },
-  "4a2":{ id:"4a2", name:"スサノオ",        rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"嵐と海をつかさどる英雄神。八岐大蛇を倒した荒ぶる神。", edu:"スサノオは日本神話の英雄。八つの頭を持つ大蛇ヤマタノオロチを退治し、その尾から名剣『草薙剣』を見つけた。これは今も伝わる三種の神器の一つとされる。" },
-  "4b1":{ id:"4b1", name:"ガネーシャ",      rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"象の頭を持つ知恵と商売の神。学問や芸術を見守る。", edu:"ガネーシャはヒンドゥー教で最も人気のある神の一つで、学問・商売・幸運の神。日本では『歓喜天』として信仰される。インドでは新しいことを始める前に祈られる。" },
-  "4b2":{ id:"4b2", name:"ガルーダ",        rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"黄金の翼を持つ神鳥。神々を乗せ空をかける天空の王者。", edu:"ガルーダはヒンドゥー教・仏教の聖なる鳥で、ヘビの天敵。インドネシアの国の紋章になっており、同国を代表する航空会社の名前にもなっている。" },
-  // ── 水ライン（c）──
-  "1c": { id:"1c",  name:"みずっち",        rarity:1, line:"c", stage:1, evolveA:"2c1", evolveB:"2c2",
-          desc:"水の精霊の赤ちゃん。きれいな水辺が大好きで、ぷかぷか浮かぶ。", edu:"地球の表面の約7割は海などの水でおおわれている。でも飲める『真水』はそのうちごくわずか。水は雲→雨→川→海とぐるぐる循環している。" },
-  "2c1":{ id:"2c1", name:"カッパ",          rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
-          desc:"頭の皿に水をたくわえる日本の妖怪。相撲ときゅうりが大好き。", edu:"河童（かっぱ）は日本各地に伝わる水辺の妖怪。頭の皿の水がかわくと力が出ないとされた。川の事故への注意を伝える昔の人の知恵ともいわれる。" },
-  "2c2":{ id:"2c2", name:"シーサーペント",  rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
-          desc:"大海をうねる巨大な海蛇。船乗りたちに恐れられた。", edu:"シーサーペント（大海蛇）は世界中の海の伝説に登場する。北欧神話の大蛇ヨルムンガンドは世界をぐるりと囲むほど巨大だと語られた。" },
-  "3c1":{ id:"3c1", name:"リヴァイアサン",  rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
-          desc:"海の底にひそむ伝説の大怪物。ひとのみで嵐を起こす。", edu:"リヴァイアサンは旧約聖書に出てくる海の巨大な怪物。手のつけられない強大な力の象徴とされ、英語では『巨大なもの』の意味でも使われる。" },
-  "3c2":{ id:"3c2", name:"クラーケン",      rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
-          desc:"無数の触手で船をしずめる海の魔物。深海の王者。", edu:"クラーケンは北欧（ノルウェー沖）の伝承の巨大なイカ・タコの怪物。実在するダイオウイカ（最大十数mとされる）が伝説のもとになったとも考えられている。" },
-  "4c1":{ id:"4c1", name:"ポセイドン",      rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
-          desc:"三叉のほこを持つ海の神。ひと振りで嵐と大波を起こす。", edu:"ポセイドンはギリシャ神話の海の神で、三叉の銛トライデントが象徴。海だけでなく地震や馬も司るとされ、オリンポス十二神の一柱として恐れられた。" },
-  "4c2":{ id:"4c2", name:"龍神",            rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
-          desc:"海をおさめる日本の龍の神。竜宮城のあるじ。", edu:"龍神（リュウジン）は日本で海をつかさどる神。海の底の龍宮城の伝説は『浦島太郎』の物語にもつながる。雨ごいの神として各地の神社でまつられてきた。" },
+  egg:  { id:"egg", name:"タマゴ", rarity:1, line:"", stage:0, evolveTo:"m01",
+          desc:"なにが生まれるかわからない、ふしぎなタマゴ。タッチしてあたためよう。", edu:"" },
+  // ── 幼年期（共通）──
+  m01:  { id:"m01", name:"ミンタモ", rarity:1, line:"", stage:1, evolveTo:"m02",
+          desc:"コインのタネから生まれたばかりの赤ちゃん。げんきにぴょこぴょこ動く。",
+          edu:"お金は「ためる」と少しずつ増えていく。小さなタネも、毎日の水やりで大きく育つよ。" },
+  m02:  { id:"m02", name:"コロミント", rarity:1, line:"", stage:2, branch:["m03","m07","m11"],
+          desc:"葉っぱの芽が出てきた幼年期。これから3つの道のどれかに進化する。",
+          edu:"同じスタートでも、どんな毎日を過ごすかで未来は変わる。きみの行動が進化先を決めるよ。" },
+  // ── A系統：自然・森（こつこつ継続で寄る）──
+  m03:  { id:"m03", name:"バドゥクン", rarity:2, line:"a", stage:3, evolveTo:"m04",
+          desc:"森の若芽をせおったいたずら好き。毎日の小さな積み重ねが大すき。",
+          edu:"毎日コツコツ続けることを「習慣」という。少しずつでも毎日ためると、1年で大きな差になる。" },
+  m04:  { id:"m04", name:"フロラクン", rarity:3, line:"a", stage:4, evolveTo:"m05",
+          desc:"花と緑をまとった成熟期。仲間思いで、まわりを元気にする。",
+          edu:"植物は太陽の力で養分をつくる(光合成)。お金も「はたらく」と新しい価値を生み出せる。" },
+  m05:  { id:"m05", name:"シダーハート", rarity:4, line:"a", stage:5, evolveTo:"m06",
+          desc:"大樹の心をもつ完全体。根を深くはり、どっしりかまえる。",
+          edu:"大きな木も、もとは一粒のタネ。今ためているお金が、将来の大きな安心になる。" },
+  m06:  { id:"m06", name:"ワールドミント", rarity:5, line:"a", stage:6, evolveTo:null,
+          desc:"世界をやどす森の王・究極体。ふれた大地に緑とゆたかさを広げる。",
+          edu:"自然はみんなの大切な財産。お金も、人やまわりと分け合うと、もっと大きな力になる。" },
+  // ── B系統：竜・歴史（タスク&バッジで強くなると寄る）──
+  m07:  { id:"m07", name:"スパイドラ", rarity:2, line:"b", stage:3, evolveTo:"m08",
+          desc:"小さな竜の子。たからものを集めるのが得意で、好奇心おうせい。",
+          edu:"大むかし、人は貝や石をお金として使った。やがて金や銀の「硬貨」が生まれた。" },
+  m08:  { id:"m08", name:"ギルドレイク", rarity:3, line:"b", stage:4, evolveTo:"m09",
+          desc:"黄金にかがやくウロコの成熟期。たからの番人として知られる。",
+          edu:"硬貨のふちのギザギザは、けずって金属をぬすむズルを防ぐための昔の工夫。" },
+  m09:  { id:"m09", name:"レリックワーム", rarity:4, line:"b", stage:5, evolveTo:"m10",
+          desc:"古代の遺産を守る完全体。長い時を生き、歴史をその身に刻む。",
+          edu:"紙のお金(紙幣)が広まったのは約1000年前の中国から。重い硬貨より持ち運びが楽になった。" },
+  m10:  { id:"m10", name:"クロノドレイク", rarity:5, line:"b", stage:6, evolveTo:null,
+          desc:"時をあやつる究極の竜。過去と未来をつなぎ、富の流れを見通す。",
+          edu:"いまは「電子マネー」で形のないお金も使える時代。お金の形は時代とともに進化する。" },
+  // ── C系統：民話・学問（まなび&目標で寄る）──
+  m11:  { id:"m11", name:"トーテモル", rarity:2, line:"c", stage:3, evolveTo:"m12",
+          desc:"おまもりを身につけた森の精。ものしりで、なぞなぞが大すき。",
+          edu:"世界には「お金のことわざ」がたくさん。『時は金なり』は時間の大切さを教える。" },
+  m12:  { id:"m12", name:"スクロベア", rarity:3, line:"c", stage:4, evolveTo:"m13",
+          desc:"巻物をかかえた学者グマの成熟期。知ることが何よりの楽しみ。",
+          edu:"お金の使い方の計画を「予算(よさん)」という。先に決めておくと、むだづかいが減る。" },
+  m13:  { id:"m13", name:"アーキヴル", rarity:4, line:"c", stage:5, evolveTo:"m14",
+          desc:"知識の書庫を守るフクロウの完全体。あらゆる知恵を記録する。",
+          edu:"お金を貸し借りすると「利子(りし)」がつくことがある。ふやす力にも、借りすぎの注意にもなる。" },
+  m14:  { id:"m14", name:"ミスミント", rarity:5, line:"c", stage:6, evolveTo:null,
+          desc:"伝説をつむぐ賢者・究極体。学びの力で、人々をゆたかにみちびく。",
+          edu:"いちばん大切な財産は「学び」。知識は使ってもへらず、一生きみを助けてくれる。" },
 };
 
 // ═══════════════════════════════════════════════════════
@@ -296,7 +299,7 @@ const BG_THEMES = [
 ];
 
 // モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
-const LINE_UNLOCK = { "":0, a:0, b:0, c:15 };
+const LINE_UNLOCK = { "":0, a:0, b:0, c:0 };
 
 // 隠しモンスター（大きなクリア=累計タスクで解放。すがた(スキン)として装備できる）
 // 表示＝解放(need)昇順に並べる(最初に解放される体が先頭に来るように)
@@ -329,6 +332,49 @@ const HIDDEN_MONSTERS = [
 ];
 
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// 進化の状態（時間ゲート＋育てた度ゲージの二重条件）
+// EVO_HOURS:  現ステージを「出る」のに必要な最低経過時間(h)。成長期→当日,成熟→24h,完全→72h,究極→72h
+// EVO_GROWTH: 現ステージを「出る」のに必要な累計"育てた度"(=お手伝い + バッジ*3 + なでなで日数*2)
+const EVO_HOURS  = { 0:0, 1:0, 2:0, 3:24, 4:72, 5:72 };
+const EVO_GROWTH = { 0:2, 1:5, 2:9, 3:16, 4:26, 5:40 };
+const REINC_HOURS = 96;   // 究極体→転生できるまで(4日)
+function getMonState(data, child){
+  const cid = child.id;
+  const logs = (data.logs||[]).filter(l=>l.cid===cid);
+  const tasksDone  = logs.filter(l=>l.type==="good"||l.type==="daily").length;
+  const badgeCount = logs.filter(l=>l.type==="badge").length;
+  const careDays   = ((data.monsterCare||{})[cid]||{}).days || 0;
+  const gauge      = tasksDone + badgeCount*3 + careDays*2;   // 育てた度
+  const rawId = (data.monsterEvolved||{})[cid] || null;
+  const curId = (rawId && MONSTER_TREE[rawId]) ? rawId : "egg";
+  const def   = MONSTER_TREE[curId];
+  const stage = def.stage||0;
+  const isFinal = !def.evolveTo && !def.branch;
+  const need     = EVO_GROWTH[stage] ?? 0;
+  const prevNeed = stage>0 ? (EVO_GROWTH[stage-1] ?? 0) : 0;
+  const growthOk = gauge >= need;
+  const growthPct = isFinal ? 100 : Math.max(0, Math.min(100, Math.round((gauge-prevNeed)/Math.max(1,need-prevNeed)*100)));
+  const growthRemain = isFinal ? 0 : Math.max(0, need - gauge);
+  const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
+  const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
+  const reqMs = (EVO_HOURS[stage] ?? 0) * 3600000;
+  const timeOk = elapsedMs >= reqMs;
+  const timeRemainMs = Math.max(0, reqMs - elapsedMs);
+  const canEvolve = !isFinal && timeOk && growthOk;
+  const reincRemainMs = isFinal ? Math.max(0, REINC_HOURS*3600000 - elapsedMs) : 0;
+  const canReincarnate = isFinal && elapsedMs >= REINC_HOURS*3600000;
+  return { curId, def, stage, isFinal, tasksDone, badgeCount, careDays, gauge, need,
+           growthOk, growthPct, growthRemain, timeOk, timeRemainMs, canEvolve,
+           canReincarnate, reincRemainMs };
+}
+function fmtTimeRemain(ms){
+  if(ms<=0 || !isFinite(ms)) return "";
+  const h = Math.ceil(ms/3600000);
+  if(h>=24){ const d=Math.ceil(h/24); return `あと${d}日`; }
+  return `あと${h}時間`;
+}
+
 const INIT = {
   parentPin: "0000",
   children: [
@@ -539,6 +585,11 @@ function migrate(d) {
   if(!d.monsterEvolvedAt) d.monsterEvolvedAt={};
   if(!d.reincarnationCount) d.reincarnationCount={};
   if(!d.reincarnationBonus) d.reincarnationBonus={};
+  if(!d.monsterStageAt) d.monsterStageAt={};
+  if(!d.monsterCare) d.monsterCare={};
+  // 旧モンスター体系(1a/2a1…)の保存値は新ツリーに無いので卵へリセット
+  Object.keys(d.monsterEvolved||{}).forEach(cid=>{ if(d.monsterEvolved[cid] && !MONSTER_TREE[d.monsterEvolved[cid]]) d.monsterEvolved[cid]=null; });
+  Object.keys(d.monsterDiscovered||{}).forEach(cid=>{ d.monsterDiscovered[cid]=(d.monsterDiscovered[cid]||[]).filter(id=>MONSTER_TREE[id]); });
   // 全子供に egg を図鑑登録（初期値）
   (d.children||[]).forEach(c=>{
     if(!d.monsterDiscovered[c.id]) d.monsterDiscovered[c.id]=["egg"];
@@ -1082,7 +1133,7 @@ function DailyTasks({ child, data, update }) {
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
             <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ タネっちがよろこんだ！</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ なかまがよろこんだ！</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
@@ -2134,26 +2185,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <SeedMonster child={child} data={data} size={130} update={update}/>
         </div>
         {(()=>{
-          const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-          const STAGE_GATES=[2,6,14,28];
-          const rawId=(data.monsterEvolved||{})[child.id];
-          const curId=(rawId&&MONSTER_TREE[rawId])?rawId:"egg";
-          const def=MONSTER_TREE[curId];
-          if(!def.evolveA) return null;          // 最終形はヒント非表示
-          const st=def.stage||0;
-          const gate=STAGE_GATES[st];
-          const prev=st>0?(STAGE_GATES[st-1]||0):0;
-          const pct=Math.max(0,Math.min(1,(tDone-prev)/Math.max(1,gate-prev)));
-          const remaining=Math.max(0,gate-tDone);
-          const ready=remaining<=0;
+          const m=getMonState(data, child);
+          if(m.isFinal) return null;          // 最終形はヒント非表示
+          const ready=m.canEvolve;
+          const label = ready ? "🌟 いまならしんかできるよ！"
+            : !m.growthOk ? `🌟 あと${m.growthRemain}でしんかできるよ！`
+            : `⏳ ${fmtTimeRemain(m.timeRemainMs)}でしんか`;
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{ready?"🌟 いまならしんかできるよ！":`🌟 あと${remaining}回でしんかできるよ！`}</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{gate}</span>
+                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{label}</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{m.growthOk?100:m.growthPct}%</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
+                <div style={{height:"100%",width:`${m.growthOk?100:m.growthPct}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
               </div>
             </div>
           );
@@ -2808,7 +2853,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
-                {(data.monsterDiscovered?.[child.id]||[]).length}/22
+                {(data.monsterDiscovered?.[child.id]||[]).length}/15
               </span>
               <span style={{fontSize:11,color:MUTED}}>{moreOpen==="zukan"?"▲":"▼"}</span>
             </div>
@@ -4950,73 +4995,48 @@ function SeedMonster({ child, data, size=90, update }) {
   const badgeCount     = myLogs.filter(l=>l.type==="badge").length;
   const lifetimePts    = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
 
-  // 進化ツリー（ステージごとに必要な累計タスク数。約1週間で最終形に到達する設定）
-  // 前半はやさしく(2→6)、後半はむずかしく(14→28)。index=現在のステージ(0=タマゴ)
-  const STAGE_GATES    = [2, 6, 14, 28];
-  const rawStageId     = (data.monsterEvolved||{})[child.id] || null;
-  // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
-  const currentStageId = (rawStageId && MONSTER_TREE[rawStageId]) ? rawStageId : null;
+  // ── 進化状態（時間ゲート＋育てた度ゲージの二重条件）──
+  const mon            = getMonState(data, child);
+  const currentStageId = mon.curId === "egg" ? null : mon.curId;
   const evolved        = !!currentStageId;
-  const monDef         = evolved ? MONSTER_TREE[currentStageId] : MONSTER_TREE["egg"];
-  const monsterId      = evolved ? currentStageId : "egg";
-  const curStage       = monDef.stage || 0;
-  const isFinal        = !monDef.evolveA;                          // これ以上進化先がない最終形
-  const nextGate       = isFinal ? null : STAGE_GATES[curStage];    // 次の進化に必要な累計タスク数
-  const prevGate       = curStage > 0 ? (STAGE_GATES[curStage-1] || 0) : 0;
-  const canEvolve      = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
+  const monDef         = mon.def;
+  const monsterId      = mon.curId;
+  const curStage       = mon.stage;
+  const isFinal        = mon.isFinal;
+  const canEvolve      = mon.canEvolve && !!update;
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
-  // Juniorは装備UIが無いため、孤立スキンが残っても表示しない(解除手段がない問題の回避)
   const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
   // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
   const imgSrc         = `/assets/monster_${dispId}_side_f${frame}.png`;
 
-  // 進化先を分岐ルールで決定
+  // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
   const computeNextStageId = () => {
-    const cur = currentStageId || "egg";
-    const def = MONSTER_TREE[cur] || MONSTER_TREE["egg"];
-    if (!def.evolveA) return null;
-    // 子ごとに違う進化先になるようchild.id+やり直し回数のハッシュで分岐(ワクワク重視)。
-    // 遊び方(継続/目標/バッジ)は少しだけ寄せる。タスク数は誰でも多いので加点しない=全員同じを防ぐ
-    const reroll = ((data.reincarnationCount||{})[child.id]||0) + ((data.rehatchCount||{})[child.id]||0);
-    // 兄弟の並び順。兄弟どうしは必ず違う系統に寄るようローテーションの基準にする
-    const sibIdx = Math.max(0, (data.children||[]).findIndex(c => c.id === child.id));
-    const hashStr = (s) => { let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); };
-    const jit = (key) => hashStr(child.id + "|" + key + "|" + reroll) % 100;
-    if (cur === "egg") {
-      // 火/森/水の3分岐。水はクリア(累計タスク)で解放されるまで対象外
-      const waterOpen = totalTasksDone >= (LINE_UNLOCK.c || 0);
+    const def = MONSTER_TREE[mon.curId] || MONSTER_TREE["egg"];
+    if (def.branch) {
+      // m02→成長期：3系統のどれかへ。子ごと・やり直し回数・遊び方で寄せる(ワクワク重視)
+      const reroll = ((data.reincarnationCount||{})[child.id]||0) + ((data.rehatchCount||{})[child.id]||0);
+      const sibIdx = Math.max(0, (data.children||[]).findIndex(c => c.id === child.id));
+      const hashStr = (str)=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0);};
+      const jit = (k)=>hashStr(child.id+"|"+k+"|"+reroll)%100;
       const cands = [
-        { id: def.evolveA, w: jit("egg_a") },                                  // 火
-        { id: def.evolveB, w: jit("egg_b") + Math.min(22, curStreak * 5) },    // 森(継続が得意なら寄る)
+        { id: def.branch[0], w: jit("a") + Math.min(24, curStreak*4) },   // 自然/森(継続が得意なら寄る)
+        { id: def.branch[1], w: jit("b") + Math.min(24, badgeCount*4) },  // 竜/歴史(バッジが得意なら寄る)
+        { id: def.branch[2], w: jit("c") + Math.min(24, goalsDone*8) },   // 民話/学問(目標が得意なら寄る)
       ];
-      if (waterOpen) cands.push({ id: def.evolveC, w: jit("egg_c") + Math.min(22, goalsDone * 8) }); // 水(目標達成が得意なら寄る)
-      // 兄弟ごとに必ず違う系統に(やり直しで順に変わる)。全員同じを確実に防ぐ
-      const pref = (sibIdx + reroll) % cands.length;
+      const pref = (sibIdx + reroll) % cands.length;  // 兄弟どうしは必ず違う系統に寄る
       cands[pref].w += 1000;
-      cands.sort((a, b) => b.w - a.w);
+      cands.sort((a,b)=>b.w-a.w);
       return cands[0].id;
     }
-    // 以降のA/B分岐も兄弟＋段＋やり直しで変える(同じ道をたどらせない)
-    const pref = (sibIdx + reroll + hashStr(cur)) % 2;
-    let a = jit(cur + "_a") + Math.min(16, badgeCount * 3);
-    let b = jit(cur + "_b") + Math.min(16, curStreak * 3 + goalsDone * 5);
-    if (pref === 0) a += 1000; else b += 1000;
-    return a >= b ? def.evolveA : def.evolveB;
+    return def.evolveTo || null;
   };
 
-  // 転生可能判定
-  const evolvedAt     = (data.monsterEvolvedAt||{})[child.id] || null;
-  const reincCount    = (data.reincarnationCount||{})[child.id] || 0;
-  // 転生は最終進化後、3日経過＋さらにタスクを頑張ってから（少し努力させる）
-  const REINC_EXTRA    = 15;
-  const reincGoal      = STAGE_GATES[STAGE_GATES.length-1] + REINC_EXTRA; // 28+15=43
-  const reincDaysOk    = evolvedAt ? (new Date() - new Date(evolvedAt)) >= 3*24*60*60*1000 : false;
-  const reincTasksOk   = totalTasksDone >= reincGoal;
-  const canReincarnate = isFinal && evolved && !evolving && reincDaysOk && reincTasksOk;
-  const reincTaskRemain= isFinal ? Math.max(0, reincGoal - totalTasksDone) : 0;
+  // 転生（究極体の4日後に可能）
+  const reincCount     = (data.reincarnationCount||{})[child.id] || 0;
+  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -5035,6 +5055,17 @@ function SeedMonster({ child, data, size=90, update }) {
 
   const handleTap = () => {
     if (evolving) return;
+    // なでなで(お世話)を1日1回だけ育てた度に加算
+    if (update) {
+      const today = todayKey();
+      if (((data.monsterCare||{})[child.id]||{}).last !== today) {
+        update(d => {
+          const c = (d.monsterCare||{})[child.id] || {};
+          if (c.last === today) return d;
+          return {...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}};
+        });
+      }
+    }
     const id = Date.now();
     setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
     setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
@@ -5064,6 +5095,7 @@ function SeedMonster({ child, data, size=90, update }) {
           ...d,
           monsterEvolved:    {...(d.monsterEvolved||{}),    [child.id]: nextId},
           monsterEvolvedAt:  {...(d.monsterEvolvedAt||{}),  [child.id]: now},
+          monsterStageAt:    {...(d.monsterStageAt||{}),    [child.id]: now},
           monsterIV:         {...(d.monsterIV||{}),         [child.id]: iv},
           monsterDiscovered: {...(d.monsterDiscovered||{}), [child.id]: disc},
         };
@@ -5083,6 +5115,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ...d,
       monsterEvolved:       {...(d.monsterEvolved||{}),       [child.id]: null},
       monsterEvolvedAt:     {...(d.monsterEvolvedAt||{}),     [child.id]: null},
+      monsterStageAt:       {...(d.monsterStageAt||{}),       [child.id]: new Date().toISOString()},
       reincarnationCount:   {...(d.reincarnationCount||{}),   [child.id]: ((d.reincarnationCount||{})[child.id]||0)+1},
       reincarnationBonus:   {...(d.reincarnationBonus||{}),   [child.id]: {until, rate:0.05}},
     }));
@@ -5097,6 +5130,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ...d,
       monsterEvolved:   {...(d.monsterEvolved||{}),   [child.id]: null},
       monsterEvolvedAt: {...(d.monsterEvolvedAt||{}), [child.id]: null},
+      monsterStageAt:   {...(d.monsterStageAt||{}),   [child.id]: new Date().toISOString()},
       rehatchCount:     {...(d.rehatchCount||{}),     [child.id]: ((d.rehatchCount||{})[child.id]||0)+1},
     }));
     setSpeech("タマゴにもどったよ！🥚");
@@ -5110,9 +5144,8 @@ function SeedMonster({ child, data, size=90, update }) {
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
   ].filter(Boolean).slice(0,3);
 
-  const evoPct    = isFinal ? 100
-    : Math.max(0, Math.min(100, Math.round((totalTasksDone - prevGate) / Math.max(1, nextGate - prevGate) * 100)));
-  const evoRemaining = isFinal ? 0 : Math.max(0, nextGate - totalTasksDone);
+  const evoPct       = mon.growthPct;
+  const evoRemaining = mon.growthRemain;
   const nickname  = (data.monsterNickname||{})[child.id];
   const dispName  = nickname || (skinActive ? skinDef.name : monDef.name);
   const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
@@ -5193,8 +5226,10 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
             <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
           </div>
-          {!canEvolve && evoRemaining>0 && (
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>あと{evoRemaining}回でしんか✨</div>
+          {!canEvolve && (
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>
+              {!mon.growthOk ? `あと${evoRemaining}でしんか✨` : `⏳ ${fmtTimeRemain(mon.timeRemainMs)}でしんか`}
+            </div>
           )}
         </>
       )}
@@ -5225,7 +5260,7 @@ function SeedMonster({ child, data, size=90, update }) {
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (
         <div style={{marginTop:6,fontSize:9,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
-          {reincTaskRemain>0 ? `🔄 転生まで あと${reincTaskRemain}回がんばろう` : "🔄 転生まで もう少し…"}
+          🔄 転生まで {fmtTimeRemain(mon.reincRemainMs)||"もう少し…"}
         </div>
       )}
       {evolving && (
@@ -5257,7 +5292,7 @@ function MonsterZukan({ data, child }) {
   const [expandId, setExpandId] = useState(null);
   const discovered = data.monsterDiscovered?.[child.id] || [];
   const tDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const allIds = ["egg","1a","1b","1c","2a1","2a2","2b1","2b2","2c1","2c2","3a1","3a2","3b1","3b2","3c1","3c2","4a1","4a2","4b1","4b2","4c1","4c2"];
+  const allIds = ["egg","m01","m02","m03","m04","m05","m06","m07","m08","m09","m10","m11","m12","m13","m14"];
   const foundCount = allIds.filter(id => discovered.includes(id)).length;
 
   return (
