@@ -1568,12 +1568,12 @@ export default function App() {
     return () => { cancelled = true; };
   }, [calToken]);
 
-  // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ）
+  // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ・ループ防止でガードを先に立てる）
   const gcalSavedRef = useRef(false);
   useEffect(() => {
     if (!data || gcalSavedRef.current || !PENDING_GCAL_REFRESH) return;
-    if (data.gcalRefresh !== PENDING_GCAL_REFRESH) update({ gcalRefresh: PENDING_GCAL_REFRESH });
     gcalSavedRef.current = true;
+    if (data.gcalRefresh !== PENDING_GCAL_REFRESH) update({ gcalRefresh: PENDING_GCAL_REFRESH });
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // refresh token があればサーバー経由で予定取得（連携を維持＝再連携不要・3ヶ月先まで）
@@ -1587,12 +1587,15 @@ export default function App() {
         const r = await fetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
         const text = await r.text();
         let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
-        if (j.error) throw new Error(j.error);
         if (cancelled) return;
+        if (j.error) {
+          // 連携が切れている場合は保存済みトークンを破棄して再連携を促す
+          if (j.needReconnect) update({ gcalRefresh: null });
+          throw new Error(j.error);
+        }
         setCalList(j.calendars || []);
         setCalEvents(j.events || []);
         setCalStatus("ok");
-        if (j.needReconnect) { update({ gcalRefresh: null }); }
       } catch (e) {
         if (cancelled) return;
         setCalError(e); setCalStatus("error");
@@ -1602,22 +1605,30 @@ export default function App() {
   }, [data && data.gcalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 出張の自動検知：カレンダー予定に「出張」を含むものがあれば、逆算チェーンを自動生成（3ヶ月先まで）
+  // ※ data を依存に入れると update→再実行の無限ループになるため、calEvents/calStatus のみを依存にし、
+  //    処理済みIDは ref に蓄積して二重生成・ループを防ぐ。
+  const tripSeenRef = useRef(new Set());
+  const tripDataRef = useRef(null);
+  tripDataRef.current = data; // 最新の data を ref で参照（依存配列に入れない）
   useEffect(() => {
-    if (!data || calStatus !== "ok" || !calEvents.length) return;
+    const d = tripDataRef.current;
+    if (!d || calStatus !== "ok" || !calEvents.length) return;
     const now0 = new Date(); now0.setHours(0, 0, 0, 0);
     const horizon = new Date(now0.getTime() + 100 * 86400000); // 約3ヶ月先
-    const existing = new Set((data.trips || []).map((t) => t.srcId).filter(Boolean));
-    const ignore = data.tripIgnore || []; // 削除した自動出張は再生成しない
+    const existing = new Set((d.trips || []).map((t) => t.srcId).filter(Boolean));
+    const ignore = d.tripIgnore || []; // 削除した自動出張は再生成しない
+    const seen = tripSeenRef.current;
     const newTrips = calEvents
-      .filter((ev) => ev.title && ev.title.includes("出張"))
+      .filter((ev) => ev.id && ev.title && ev.title.includes("出張"))
       .filter((ev) => { const s = new Date(ev.startISO); return s >= now0 && s <= horizon; })
-      .filter((ev) => !existing.has(ev.id) && !ignore.includes(ev.id))
+      .filter((ev) => !existing.has(ev.id) && !ignore.includes(ev.id) && !seen.has(ev.id))
       .map((ev) => {
+        seen.add(ev.id);
         const tpl = pickTripTemplate(ev.title);
         return { id: "ts" + ev.id, srcId: ev.id, auto: true, title: ev.title, template: tpl, date: iso(new Date(ev.startISO)), items: templateItems(tpl) };
       });
-    if (newTrips.length) update({ trips: [...(data.trips || []), ...newTrips] });
-  }, [calEvents, calStatus, data]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (newTrips.length) update({ trips: [...(d.trips || []), ...newTrips] });
+  }, [calEvents, calStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 「連携」：サーバー経由のOAuth（リフレッシュトークン取得）。一度で維持され続ける。
   const connectCalendar = () => {
