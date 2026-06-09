@@ -28,6 +28,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg}"],
+        // /api/* への画面遷移(OAuth等)はSWのSPAフォールバックで横取りせず、サーバーへ通す
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
