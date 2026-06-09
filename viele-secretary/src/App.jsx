@@ -9,6 +9,18 @@ import { computeChart } from "./natal";
 
 const STORE_KEY = "viele-secretary";
 
+// OAuthコールバックから戻った refresh token をURLフラグメントから回収（Firestoreへ保存して永続化）
+const PENDING_GCAL_REFRESH = (() => {
+  try {
+    const m = (window.location.hash || "").match(/gcalrefresh=([^&]+)/);
+    if (m) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return decodeURIComponent(m[1]);
+    }
+  } catch { /* ignore */ }
+  return null;
+})();
+
 /* ──────────────────────────────────────────────────────────────
    配色（落ち着いた秘書ダッシュボード）
    ────────────────────────────────────────────────────────────── */
@@ -205,6 +217,14 @@ function templateItems(name) {
   return (TEMPLATES[name] || []).map((it) => ({ ...it, done: false }));
 }
 
+// 「出張」予定のタイトルから最適な逆算チェーンの型を推定
+function pickTripTemplate(title) {
+  const s = String(title || "");
+  if (/海外|外国|バリ|ハワイ|台湾|韓国|セブ|タイ|ベトナム|シンガポール|インドネシア/.test(s)) return "海外実習";
+  if (/日帰り/.test(s)) return "日帰り";
+  return "遠方登壇";
+}
+
 /* ──────────────────────────────────────────────────────────────
    今週の予定（時間配分メーターの元データ）
    Phase2でGoogleカレンダー連携に差し替える前提のローカル定数。
@@ -380,7 +400,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
   const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
 
   return (
-    <Panel title="出張・遠征の逆算チェーン" accent={C.green} help="本番日から逆算して、各手配の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。「型から追加」で遠征の種類を選ぶと、手配項目が一式そろいます。" right={<AddTrip onAdd={onAdd} />}>
+    <Panel title="出張・遠征の逆算チェーン" accent={C.green} help="本番日から逆算して、各手配の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。Googleカレンダーに『出張』を含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
       {(!trips || trips.length === 0) && <Empty>遠征予定はありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
@@ -400,6 +420,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <strong style={{ fontSize: 14 }}>{trip.title}</strong>
+                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 6, padding: "1px 6px" }}>🤖自動</span>}
                   <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 6, padding: "1px 6px" }}>{trip.template}</span>
                   <span style={{ flex: 1 }} />
                   <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
@@ -1422,7 +1443,7 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting }) 
     return (
       <div style={{ fontSize: 12, color: C.green, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
         <span>✅</span>
-        <span>Googleカレンダー連携中（今週 {count}件を反映）</span>
+        <span>Googleカレンダー連携中（今週 {count}件を反映・連携は維持されます）</span>
       </div>
     );
   }
@@ -1434,7 +1455,7 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting }) 
         <span style={{ color: isErr ? C.red : C.sub, wordBreak: "break-word" }}>
           {isErr
             ? `カレンダー取得に失敗：${(error && error.message) || error}`
-            : "サンプル表示（準備中）— Googleカレンダーと連携すると、今週の実績が自動で反映されます。"}
+            : "サンプル表示（準備中）— Googleカレンダーと一度連携すれば、以後は自動で維持され、毎回ログインし直す必要はありません。"}
         </span>
       </div>
       <button
@@ -1547,28 +1568,70 @@ export default function App() {
     return () => { cancelled = true; };
   }, [calToken]);
 
-  // 「連携」：カレンダー読み取り権限を要求してアクセストークン取得（約1時間有効）
-  const connectCalendar = async () => {
-    setConnecting(true);
+  // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ）
+  const gcalSavedRef = useRef(false);
+  useEffect(() => {
+    if (!data || gcalSavedRef.current || !PENDING_GCAL_REFRESH) return;
+    if (data.gcalRefresh !== PENDING_GCAL_REFRESH) update({ gcalRefresh: PENDING_GCAL_REFRESH });
+    gcalSavedRef.current = true;
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // refresh token があればサーバー経由で予定取得（連携を維持＝再連携不要・3ヶ月先まで）
+  useEffect(() => {
+    const refresh = data && data.gcalRefresh;
+    if (!refresh) return;
+    let cancelled = false;
+    setCalStatus("loading"); setCalError(null);
+    (async () => {
+      try {
+        const r = await fetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
+        const text = await r.text();
+        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+        if (j.error) throw new Error(j.error);
+        if (cancelled) return;
+        setCalList(j.calendars || []);
+        setCalEvents(j.events || []);
+        setCalStatus("ok");
+        if (j.needReconnect) { update({ gcalRefresh: null }); }
+      } catch (e) {
+        if (cancelled) return;
+        setCalError(e); setCalStatus("error");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [data && data.gcalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 出張の自動検知：カレンダー予定に「出張」を含むものがあれば、逆算チェーンを自動生成（3ヶ月先まで）
+  useEffect(() => {
+    if (!data || calStatus !== "ok" || !calEvents.length) return;
+    const now0 = new Date(); now0.setHours(0, 0, 0, 0);
+    const horizon = new Date(now0.getTime() + 100 * 86400000); // 約3ヶ月先
+    const existing = new Set((data.trips || []).map((t) => t.srcId).filter(Boolean));
+    const ignore = data.tripIgnore || []; // 削除した自動出張は再生成しない
+    const newTrips = calEvents
+      .filter((ev) => ev.title && ev.title.includes("出張"))
+      .filter((ev) => { const s = new Date(ev.startISO); return s >= now0 && s <= horizon; })
+      .filter((ev) => !existing.has(ev.id) && !ignore.includes(ev.id))
+      .map((ev) => {
+        const tpl = pickTripTemplate(ev.title);
+        return { id: "ts" + ev.id, srcId: ev.id, auto: true, title: ev.title, template: tpl, date: iso(new Date(ev.startISO)), items: templateItems(tpl) };
+      });
+    if (newTrips.length) update({ trips: [...(data.trips || []), ...newTrips] });
+  }, [calEvents, calStatus, data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 「連携」：サーバー経由のOAuth（リフレッシュトークン取得）。一度で維持され続ける。
+  const connectCalendar = () => {
     setCalError(null);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope(CALENDAR_SCOPE);
-      const result = await signInWithPopup(auth, provider);
-      const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
-      if (token) { localStorage.setItem("viele-cal-token", token); setCalToken(token); }
-      else throw new Error("アクセストークンを取得できませんでした");
-    } catch (e) {
-      setCalError(e);
-      setCalStatus("error");
-    }
-    setConnecting(false);
+    const uid = (user && user.uid) || "x";
+    window.location.href = `/api/gcal-start?state=${encodeURIComponent(uid)}`;
   };
 
-  // カレンダー連携を解除（トークン失効＝revoke＋破棄）
+  // カレンダー連携を解除（refresh/legacyトークンを失効＋破棄）
   const disconnectCalendar = () => {
     revokeToken(calToken);
+    revokeToken(data && data.gcalRefresh);
     localStorage.removeItem("viele-cal-token");
+    update({ gcalRefresh: null });
     setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
   };
 
@@ -1760,7 +1823,13 @@ export default function App() {
   };
   // 削除は誤操作防止のため確認を挟む
   const confirmDelete = (fn) => { if (window.confirm("削除しますか？この操作は取り消せません。")) fn(); };
-  const removeTrip = (id) => confirmDelete(() => update({ trips: data.trips.filter((t) => t.id !== id) }));
+  const removeTrip = (id) => confirmDelete(() => {
+    const t = data.trips.find((x) => x.id === id);
+    const patch = { trips: data.trips.filter((x) => x.id !== id) };
+    // 自動検知の出張を消したら、同じ予定からは再生成しない
+    if (t && t.auto && t.srcId) patch.tripIgnore = [...(data.tripIgnore || []), t.srcId];
+    update(patch);
+  });
   const editTrip = (id, patch) => update({ trips: data.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
   const mapTripItems = (tripId, fn) =>
     update({ trips: data.trips.map((t) => (t.id === tripId ? { ...t, items: fn(t.items) } : t)) });
@@ -1796,7 +1865,7 @@ export default function App() {
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
 
   // ── カレンダー由来データの組み立て（複数カレンダー対応）──
-  const usingCal = !!calToken && calStatus === "ok";
+  const usingCal = calStatus === "ok" && (!!calToken || !!(data && data.gcalRefresh));
   const catMap = data.catMap || {};       // 予定名→役割 の手動上書き（同名は次回も適用）
   const calConfig = data.calConfig || {}; // カレンダーID→ロール(work/family/off)
   const axisOfCat = (cat) => (cat === "制作" || cat === "集客" ? "仕組み" : "労働");
