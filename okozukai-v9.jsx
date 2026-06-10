@@ -5071,8 +5071,12 @@ function SeedMonster({ child, data, size=90, update }) {
   const dispId         = skinActive ? skinId : monsterId;
   // 6コマ素材持ちは前向きアニメ(特徴パーツが動く)を順送り。それ以外は従来の横向き2コマ
   const sixFrame       = !!MON_FRAMES6[dispId];
-  const fIdx           = sixFrame ? Math.floor(frame / 3) % 6 : Math.floor(frame / 5) % 2;
-  const imgSrc         = sixFrame
+  // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
+  const hatching       = evolving && monsterId === "egg";
+  const fIdx           = hatching ? (3 + Math.floor(frame/2) % 3)
+                       : sixFrame ? Math.floor(frame / 3) % 6
+                       : Math.floor(frame / 5) % 2;
+  const imgSrc         = (sixFrame || hatching)
     ? `/assets/monster_${dispId}_f${fIdx}.png`
     : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
@@ -5160,9 +5164,10 @@ function SeedMonster({ child, data, size=90, update }) {
         };
       });
     }, 1600);
+    const wasEgg = monsterId === "egg";
     setTimeout(() => {
       setEvolving(false);
-      setSpeech("しんかしたよ！🌟");
+      setSpeech(wasEgg ? "うまれたよ！🐣✨" : "しんかしたよ！🌟");
       setTimeout(()=>setSpeech(null),2500);
     }, 2400);
   };
@@ -5236,9 +5241,9 @@ function SeedMonster({ child, data, size=90, update }) {
       <div style={{transform:`translateX(${walkX}px) scaleX(${sixFrame?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
         <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
           <div style={{
-            animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
+            animation:hatching?"shk 0.3s ease-in-out infinite":evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
             cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
-            filter:evolving?"brightness(2.5) saturate(0.2)":"none",
+            filter:hatching?"none":evolving?"brightness(2.5) saturate(0.2)":"none",  // ハッチ中はヒビを見せる(白飛びさせない)
             transition:"filter 0.4s",
           }}>
             <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block",imageRendering:"pixelated"}}
