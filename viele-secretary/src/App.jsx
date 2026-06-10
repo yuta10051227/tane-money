@@ -1555,9 +1555,9 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
       {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%")}
-      {stage("②", "本申込", C.purple, `${cv}人 · CV ${cvRate}%`, cvPct, "82%")}
+      {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%")}
       {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%")}
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
     </div>
   );
 }
@@ -1606,13 +1606,14 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
 
   return (
     <Panel
-      title="ローンチKPI（登録→申込→売上）"
+      title="ローンチ進捗（先行登録→申込→売上）"
       accent={C.accent}
-      help="ローンチごとに『先行登録 → 本申込(CV) → 売上』を三角ファネルで1枚に表示します。各段に目標と実績、達成率を出し、締切まで何日かを信号(🟢🟠🔴)で示します。売上実績は『本申込人数 × 客単価』で自動計算。数字は✎からいつでも更新できます。"
+      help="ローンチ（新しい講座・商品の募集や販売）ごとに『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✎からいつでも更新できます。"
       right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
     >
       {mode === "new" && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8, lineHeight: 1.6 }}>まず「名前」と「締切日」だけ入れればOK。人数や金額の数字は、あとから✎でいつでも更新できます。</div>
           {formFields(f, setF)}
           <button
             style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
@@ -2613,7 +2614,7 @@ const inp = {
 const lbl = {
   flex: 1,
   minWidth: 0,
-  fontSize: 11,
+  fontSize: 13,
   color: C.sub,
   display: "flex",
   flexDirection: "column",
