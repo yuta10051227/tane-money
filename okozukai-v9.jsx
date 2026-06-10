@@ -673,6 +673,7 @@ function migrate(d) {
   if(!d.reincarnationBonus) d.reincarnationBonus={};
   if(!d.monsterStageAt) d.monsterStageAt={};
   if(!d.monsterCare) d.monsterCare={};
+  if(!d.collectedMons) d.collectedMons={};   // うちのこ(卒業した猫)コレクション
   // 旧モンスター体系(1a/2a1…)の保存値は新ツリーに無いので卵へリセット
   Object.keys(d.monsterEvolved||{}).forEach(cid=>{ if(d.monsterEvolved[cid] && !MONSTER_TREE[d.monsterEvolved[cid]]) d.monsterEvolved[cid]=null; });
   Object.keys(d.monsterDiscovered||{}).forEach(cid=>{ d.monsterDiscovered[cid]=(d.monsterDiscovered[cid]||[]).filter(id=>MONSTER_TREE[id]); });
@@ -3100,8 +3101,28 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {moreOpen==="cats" && (
             <div>
               <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>
-                飼い猫モチーフの新シリーズ。タマゴから育てて、育て方で進化先が変わるよ（近日：集めて遊べるようになります）。
+                飼い猫モチーフ。タマゴから育てて究極体まで行くと「卒業」して、ランダムで次の猫がやってくるよ🐈
               </div>
+              {/* 集めた子(卒業した猫) */}
+              {(() => {
+                const got = (data.collectedMons||{})[child.id] || [];
+                if (got.length===0) return null;
+                return (
+                  <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:14,padding:"8px 10px",marginBottom:10}}>
+                    <div style={{fontSize:11,fontWeight:900,color:GP,marginBottom:6}}>🏅 そつぎょうした子 {got.length}匹</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {got.slice().reverse().map((m,i)=>(
+                        <div key={i} style={{textAlign:"center",width:52}}>
+                          <img src={`/assets/monster_${m.id}_f0.png`} alt={m.name}
+                            style={{width:44,height:44,objectFit:"contain",imageRendering:"pixelated",display:"block",margin:"0 auto"}}
+                            onError={e=>{e.target.style.visibility="hidden"}}/>
+                          <div style={{fontSize:7,color:TEXTS,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {CAT_LINES.map(cat=>{
                 const Cell=({sid,label,big})=>(
                   <div style={{textAlign:"center",flexShrink:0,width:big?64:54}}>
@@ -5336,6 +5357,27 @@ function SeedMonster({ child, data, size=90, update }) {
     setTimeout(()=>setSpeech(null),2500);
   };
 
+  // 卒業：猫を育て切ったら「うちのこ」に加え、ランダムで次の猫タマゴをむかえる
+  const doGraduate = () => {
+    if (!canReincarnate || evolving) return;
+    const species = String(monsterId).split("_")[0];   // cpurin / cku
+    const entry = { species, id: monsterId, name: monDef.name, rarity: monDef.rarity||5, date: new Date().toISOString() };
+    // 直前と違う猫を優先してランダム抽選
+    const pool = CAT_LINES.filter(c => c.id !== species);
+    const cands = pool.length ? pool : CAT_LINES;
+    const next = cands[Math.floor(Math.random()*cands.length)];
+    update(d => ({
+      ...d,
+      collectedMons:    {...(d.collectedMons||{}),    [child.id]: [...((d.collectedMons||{})[child.id]||[]), entry]},
+      monsterEvolved:   {...(d.monsterEvolved||{}),   [child.id]: `${next.id}_egg`},
+      monsterEvolvedAt: {...(d.monsterEvolvedAt||{}), [child.id]: null},
+      monsterStageAt:   {...(d.monsterStageAt||{}),   [child.id]: new Date().toISOString()},
+      monsterDiscovered:{...(d.monsterDiscovered||{}),[child.id]: [...new Set([...((d.monsterDiscovered||{})[child.id]||[]), `${next.id}_egg`])]},
+    }));
+    setSpeech(`🎓そつぎょう！${next.emoji}あたらしいタマゴが届いたよ✨`);
+    setTimeout(()=>setSpeech(null),3200);
+  };
+
   // タマゴからやり直す(別の進化を試せる。やり直し回数で分岐が変わる)
   const doRehatch = () => {
     if (evolving) return;
@@ -5461,14 +5503,23 @@ function SeedMonster({ child, data, size=90, update }) {
           </>
         );
       })()}
-      {/* 転生ボタン＋説明 */}
+      {/* 卒業(猫) / 転生(その他) ボタン＋説明 */}
       {canReincarnate && !evolving && (
-        <>
-          <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
-            🔄 転生する
-          </button>
-          <div style={{fontSize:9,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
-        </>
+        monDef.line==="cat" ? (
+          <>
+            <button onClick={doGraduate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#34c77b,#187a4e)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(52,199,123,0.7)"}}>
+              🎓 卒業して次の子をむかえる
+            </button>
+            <div style={{fontSize:9,color:"rgba(180,255,210,0.85)",marginTop:2,lineHeight:1.4}}>育て切った！うちのこに加わって、新しい猫のタマゴが届くよ🐈</div>
+          </>
+        ) : (
+          <>
+            <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
+              🔄 転生する
+            </button>
+            <div style={{fontSize:9,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
+          </>
+        )
       )}
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (

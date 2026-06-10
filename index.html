@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="9213dfd">
+<meta name="tane-version" content="79acb7a">
 </head>
 <body>
   <div id="root"></div>
@@ -1675,6 +1675,7 @@ function migrate(d) {
   if (!d.reincarnationBonus) d.reincarnationBonus = {};
   if (!d.monsterStageAt) d.monsterStageAt = {};
   if (!d.monsterCare) d.monsterCare = {};
+  if (!d.collectedMons) d.collectedMons = {}; // うちのこ(卒業した猫)コレクション
   // 旧モンスター体系(1a/2a1…)の保存値は新ツリーに無いので卵へリセット
   Object.keys(d.monsterEvolved || {}).forEach(cid => {
     if (d.monsterEvolved[cid] && !MONSTER_TREE[d.monsterEvolved[cid]]) d.monsterEvolved[cid] = null;
@@ -8832,7 +8833,61 @@ function ChildScreen({
       marginBottom: 8,
       lineHeight: 1.5
     }
-  }, "\u98FC\u3044\u732B\u30E2\u30C1\u30FC\u30D5\u306E\u65B0\u30B7\u30EA\u30FC\u30BA\u3002\u30BF\u30DE\u30B4\u304B\u3089\u80B2\u3066\u3066\u3001\u80B2\u3066\u65B9\u3067\u9032\u5316\u5148\u304C\u5909\u308F\u308B\u3088\uFF08\u8FD1\u65E5\uFF1A\u96C6\u3081\u3066\u904A\u3079\u308B\u3088\u3046\u306B\u306A\u308A\u307E\u3059\uFF09\u3002"), CAT_LINES.map(cat => {
+  }, "\u98FC\u3044\u732B\u30E2\u30C1\u30FC\u30D5\u3002\u30BF\u30DE\u30B4\u304B\u3089\u80B2\u3066\u3066\u7A76\u6975\u4F53\u307E\u3067\u884C\u304F\u3068\u300C\u5352\u696D\u300D\u3057\u3066\u3001\u30E9\u30F3\u30C0\u30E0\u3067\u6B21\u306E\u732B\u304C\u3084\u3063\u3066\u304F\u308B\u3088\uD83D\uDC08"), (() => {
+    const got = (data.collectedMons || {})[child.id] || [];
+    if (got.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: GOLDS,
+        border: `1.5px solid ${GOLD}`,
+        borderRadius: 14,
+        padding: "8px 10px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 900,
+        color: GP,
+        marginBottom: 6
+      }
+    }, "\uD83C\uDFC5 \u305D\u3064\u304E\u3087\u3046\u3057\u305F\u5B50 ", got.length, "\u5339"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, got.slice().reverse().map((m, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        textAlign: "center",
+        width: 52
+      }
+    }, /*#__PURE__*/React.createElement("img", {
+      src: `/assets/monster_${m.id}_f0.png`,
+      alt: m.name,
+      style: {
+        width: 44,
+        height: 44,
+        objectFit: "contain",
+        imageRendering: "pixelated",
+        display: "block",
+        margin: "0 auto"
+      },
+      onError: e => {
+        e.target.style.visibility = "hidden";
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 7,
+        color: TEXTS,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }
+    }, m.name)))));
+  })(), CAT_LINES.map(cat => {
     const Cell = ({
       sid,
       label,
@@ -15063,6 +15118,48 @@ function SeedMonster({
     setTimeout(() => setSpeech(null), 2500);
   };
 
+  // 卒業：猫を育て切ったら「うちのこ」に加え、ランダムで次の猫タマゴをむかえる
+  const doGraduate = () => {
+    if (!canReincarnate || evolving) return;
+    const species = String(monsterId).split("_")[0]; // cpurin / cku
+    const entry = {
+      species,
+      id: monsterId,
+      name: monDef.name,
+      rarity: monDef.rarity || 5,
+      date: new Date().toISOString()
+    };
+    // 直前と違う猫を優先してランダム抽選
+    const pool = CAT_LINES.filter(c => c.id !== species);
+    const cands = pool.length ? pool : CAT_LINES;
+    const next = cands[Math.floor(Math.random() * cands.length)];
+    update(d => ({
+      ...d,
+      collectedMons: {
+        ...(d.collectedMons || {}),
+        [child.id]: [...((d.collectedMons || {})[child.id] || []), entry]
+      },
+      monsterEvolved: {
+        ...(d.monsterEvolved || {}),
+        [child.id]: `${next.id}_egg`
+      },
+      monsterEvolvedAt: {
+        ...(d.monsterEvolvedAt || {}),
+        [child.id]: null
+      },
+      monsterStageAt: {
+        ...(d.monsterStageAt || {}),
+        [child.id]: new Date().toISOString()
+      },
+      monsterDiscovered: {
+        ...(d.monsterDiscovered || {}),
+        [child.id]: [...new Set([...((d.monsterDiscovered || {})[child.id] || []), `${next.id}_egg`])]
+      }
+    }));
+    setSpeech(`🎓そつぎょう！${next.emoji}あたらしいタマゴが届いたよ✨`);
+    setTimeout(() => setSpeech(null), 3200);
+  };
+
   // タマゴからやり直す(別の進化を試せる。やり直し回数で分岐が変わる)
   const doRehatch = () => {
     if (evolving) return;
@@ -15416,7 +15513,30 @@ function SeedMonster({
         marginTop: 3
       }
     }, "\u2192 ", nextDef.name, "\u306B\u306A\u308A\u305D\u3046\uFF01"));
-  })(), canReincarnate && !evolving && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  })(), canReincarnate && !evolving && (monDef.line === "cat" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: doGraduate,
+    style: {
+      display: "block",
+      margin: "6px auto 0",
+      background: "linear-gradient(135deg,#34c77b,#187a4e)",
+      border: "none",
+      borderRadius: 999,
+      padding: "5px 14px",
+      color: "#fff",
+      fontWeight: 900,
+      fontSize: 10,
+      cursor: "pointer",
+      fontFamily: F,
+      boxShadow: "0 0 10px rgba(52,199,123,0.7)"
+    }
+  }, "\uD83C\uDF93 \u5352\u696D\u3057\u3066\u6B21\u306E\u5B50\u3092\u3080\u304B\u3048\u308B"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "rgba(180,255,210,0.85)",
+      marginTop: 2,
+      lineHeight: 1.4
+    }
+  }, "\u80B2\u3066\u5207\u3063\u305F\uFF01\u3046\u3061\u306E\u3053\u306B\u52A0\u308F\u3063\u3066\u3001\u65B0\u3057\u3044\u732B\u306E\u30BF\u30DE\u30B4\u304C\u5C4A\u304F\u3088\uD83D\uDC08")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     onClick: doReincarnate,
     style: {
       display: "block",
@@ -15439,7 +15559,7 @@ function SeedMonster({
       marginTop: 2,
       lineHeight: 1.4
     }
-  }, "\u5375\u306B\u623B\u3063\u30667\u65E5\u9593\u30DD\u30A4\u30F3\u30C8+5%\uFF01")), isFinal && !canReincarnate && !evolving && /*#__PURE__*/React.createElement("div", {
+  }, "\u5375\u306B\u623B\u3063\u30667\u65E5\u9593\u30DD\u30A4\u30F3\u30C8+5%\uFF01"))), isFinal && !canReincarnate && !evolving && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 6,
       fontSize: 9,
