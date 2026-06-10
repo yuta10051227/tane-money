@@ -660,7 +660,7 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
 /* ──────────────────────────────────────────────────────────────
    今週の時間配分メーター（役割 ＋ 労働⟷仕組みの2軸）
    ────────────────────────────────────────────────────────────── */
-function TimeMeter({ entries, source, status, error, count, onConnect, connecting }) {
+function TimeMeter({ entries, source, status, error, count, onConnect, connecting, onRefresh, refreshing }) {
   const r1 = (n) => Math.round(n * 10) / 10;
   const total = entries.reduce((s, e) => s + e.hours, 0);
   const cats = Array.from(new Set([...Object.keys(CAT), ...entries.map((e) => e.cat)]));
@@ -673,7 +673,7 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
 
   return (
     <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
-      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
+      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} onRefresh={onRefresh} refreshing={refreshing} />
       {total === 0 ? (
         <Empty>{source === "calendar" ? "今週の時間指定の予定が見つかりませんでした。" : "データがありません。"}</Empty>
       ) : (
@@ -775,7 +775,7 @@ function SwipeView({ slides, accent = C.blue, hint }) {
   );
 }
 
-function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat }) {
+function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat, onRefresh, refreshing }) {
   const list = days || [];
   const slides = list.map((day) => ({
     key: day.key,
@@ -786,7 +786,7 @@ function Schedule({ days, source, status, error, count, onConnect, connecting, o
   }));
   return (
     <Panel title="予定（横スワイプで先の日へ）" accent={C.blue}>
-      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} />
+      <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} onRefresh={onRefresh} refreshing={refreshing} />
       <SwipeView slides={slides} accent={C.blue} hint="← 横スワイプ / 矢印で 今日・明日・明後日… →" />
     </Panel>
   );
@@ -1438,12 +1438,17 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
 }
 
 /* カレンダー連携の状態表示＋連携ボタン（時間メーター/今日の予定の上に出す） */
-function CalStatusNote({ source, status, error, count, onConnect, connecting }) {
+function CalStatusNote({ source, status, error, count, onConnect, connecting, onRefresh, refreshing }) {
   if (source === "calendar") {
     return (
       <div style={{ fontSize: 12, color: C.green, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
         <span>✅</span>
-        <span>Googleカレンダー連携中（今週 {count}件を反映・連携は維持されます）</span>
+        <span style={{ flex: 1 }}>Googleカレンダー連携中（今週 {count}件・自動で最新化）</span>
+        {onRefresh && (
+          <button onClick={onRefresh} disabled={refreshing} title="今すぐ最新の予定に更新" style={{ ...chipBtn, fontSize: 11, padding: "3px 8px", color: refreshing ? C.faint : C.green, borderColor: C.line }}>
+            {refreshing ? "更新中…" : "🔄 更新"}
+          </button>
+        )}
       </div>
     );
   }
@@ -1466,6 +1471,113 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting }) 
         {connecting ? "連携中…" : isErr ? "再連携する" : "Googleカレンダーを連携"}
       </button>
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Googleカレンダーへ予定を追加・編集・削除（書き込み）
+   ────────────────────────────────────────────────────────────── */
+function CalManager({ calList, events, onCreate, onUpdate, onDelete, busy, msg }) {
+  const writable = (calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer");
+  const defaultCal = ((writable.find((c) => c.primary) || writable[0]) || {}).id || "primary";
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ title: "", date: iso(new Date()), allDay: false, start: "10:00", end: "11:00", calendarId: "" });
+  const [editId, setEditId] = useState(null);
+  const [ef, setEf] = useState({ title: "", date: "", allDay: false, start: "10:00" });
+
+  const calId = f.calendarId || defaultCal;
+  const submitCreate = async () => {
+    if (!f.title.trim()) return;
+    const ev = f.allDay
+      ? { title: f.title.trim(), allDay: true, startISO: f.date } // 終日（終了はサーバーが翌日に）
+      : { title: f.title.trim(), allDay: false, startISO: new Date(`${f.date}T${f.start}:00`).toISOString(), endISO: new Date(`${f.date}T${f.end}:00`).toISOString() };
+    const ok = await onCreate(calId, ev);
+    if (ok) { setF({ ...f, title: "" }); setOpen(false); }
+  };
+  const startEdit = (e) => {
+    setEditId(e.id);
+    setEf({ title: e.title, date: iso(e.start), allDay: !!e.allDay, start: e.allDay ? "10:00" : e.time });
+  };
+  const saveEdit = async (e) => {
+    const dur = e.endISO && !e.allDay ? Math.max(900000, new Date(e.endISO) - new Date(e.startISO)) : 3600000;
+    const ev = ef.allDay
+      ? { title: ef.title.trim() || "(無題)", allDay: true, startISO: ef.date }
+      : (() => { const s = new Date(`${ef.date}T${ef.start}:00`); return { title: ef.title.trim() || "(無題)", allDay: false, startISO: s.toISOString(), endISO: new Date(s.getTime() + dur).toISOString() }; })();
+    const ok = await onUpdate(e.calendarId, e.id, ev);
+    if (ok) setEditId(null);
+  };
+
+  const noWritable = writable.length === 0;
+  return (
+    <Panel title="Googleカレンダーに追加・編集" accent={C.blue} help="ここで作った予定はGoogleカレンダーに直接書き込まれ、家族や他の端末にもそのまま反映されます。既存の予定の時間変更・削除もできます。"
+      right={<button onClick={() => setOpen((v) => !v)} disabled={noWritable} style={{ ...chipBtn, background: open ? C.panel2 : C.blue, color: open ? C.text : "#0B0D11", borderColor: C.blue }}>{open ? "閉じる" : "＋予定を追加"}</button>}>
+      {noWritable && (
+        <div style={{ fontSize: 12, color: C.orange, background: C.panel2, border: `1px solid ${C.orange}`, borderRadius: 8, padding: "8px 10px" }}>
+          書き込みできるカレンダーがありません。「連携を解除」→「Googleカレンダーを連携」で、カレンダーの<strong>編集権限</strong>を許可し直してください。
+        </div>
+      )}
+      {msg && <div style={{ fontSize: 12, color: msg.startsWith("失敗") || msg.includes("必要") ? C.red : C.green, marginBottom: 8 }}>{msg}</div>}
+
+      {open && !noWritable && (
+        <div style={{ background: C.panel2, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <input autoFocus value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="予定のタイトル（例：オンライン施術）" style={inp} />
+          <input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} style={inp} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.sub, margin: "2px 0 8px" }}>
+            <input type="checkbox" checked={f.allDay} onChange={(e) => setF({ ...f, allDay: e.target.checked })} /> 終日
+          </label>
+          {!f.allDay && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+              <input type="time" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} style={{ ...inp, marginBottom: 0 }} />
+              <span style={{ color: C.faint }}>〜</span>
+              <input type="time" value={f.end} onChange={(e) => setF({ ...f, end: e.target.value })} style={{ ...inp, marginBottom: 0 }} />
+            </div>
+          )}
+          {writable.length > 1 && (
+            <select value={calId} onChange={(e) => setF({ ...f, calendarId: e.target.value })} style={inp}>
+              {writable.map((c) => <option key={c.id} value={c.id}>{c.summary}{c.primary ? "（メイン）" : ""}</option>)}
+            </select>
+          )}
+          <button onClick={submitCreate} disabled={busy || !f.title.trim()} style={{ ...chipBtn, background: C.blue, color: "#0B0D11", borderColor: C.blue, fontWeight: 700 }}>
+            {busy ? "追加中…" : "Googleカレンダーに追加"}
+          </button>
+        </div>
+      )}
+
+      {(events || []).length === 0 ? (
+        <Empty>編集できる予定（先の日程）はありません。</Empty>
+      ) : (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 11, color: C.faint }}>これからの予定（タップで時間変更・削除）</div>
+          {(events || []).map((e) => (
+            <div key={e.id} style={{ background: C.panel2, borderRadius: 10, padding: 10 }}>
+              {editId === e.id ? (
+                <div>
+                  <input value={ef.title} onChange={(x) => setEf({ ...ef, title: x.target.value })} style={inp} />
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+                    <input type="date" value={ef.date} onChange={(x) => setEf({ ...ef, date: x.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+                    {!ef.allDay && <input type="time" value={ef.start} onChange={(x) => setEf({ ...ef, start: x.target.value })} style={{ ...inp, marginBottom: 0, width: 110 }} />}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => saveEdit(e)} disabled={busy} style={{ ...chipBtn, background: C.blue, color: "#0B0D11", borderColor: C.blue }}>保存</button>
+                    <button onClick={() => setEditId(null)} style={chipBtn}>取消</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 3, background: catColor(e.cat) }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.title}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{e.start.getMonth() + 1}/{e.start.getDate()}（{WD[e.start.getDay()]}）{e.allDay ? " 終日" : ` ${e.time}`}</div>
+                  </div>
+                  <button onClick={() => startEdit(e)} style={iconBtn} title="編集">✎</button>
+                  <button onClick={() => onDelete(e.calendarId, e.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -1537,6 +1649,11 @@ export default function App() {
   const [calStatus, setCalStatus] = useState("idle"); // idle|loading|ok|error
   const [calError, setCalError] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [calNonce, setCalNonce] = useState(0); // ++で予定を再取得（手動更新・復帰時・定期）
+  const lastCalFetchRef = useRef(0);
+  const refreshCalendar = () => setCalNonce((n) => n + 1);
+  const [calWriteBusy, setCalWriteBusy] = useState(false); // 予定の追加・編集・削除中
+  const [calWriteMsg, setCalWriteMsg] = useState(null);
   const [tab, setTab] = useState(0); // トップのタブ（ホーム/仕事/売上/タスク/ニュース）
   const tabTouch = useRef(null);
 
@@ -1584,6 +1701,35 @@ export default function App() {
     setCalToken(null); setCalEvents([]); setCalList([]); setCalStatus("idle"); setCalError(null);
   };
 
+  // アプリ → Googleカレンダーへ 作成/更新/削除（書き込み）。成功後に再取得して反映。
+  const calWrite = async (action, payload) => {
+    const refresh = data && data.gcalRefresh;
+    if (!refresh) { setCalWriteMsg("連携が必要です"); return false; }
+    setCalWriteBusy(true); setCalWriteMsg(null);
+    try {
+      const r = await fetch("/api/gcal-write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh, action, ...payload }) });
+      const text = await r.text();
+      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+      if (j.error) {
+        if (j.needReconnect) setCalWriteMsg("書き込み権限が必要です。一度「連携を解除」→「連携」で再許可してください。");
+        throw new Error(j.error);
+      }
+      lastCalFetchRef.current = 0; // 直後の再取得を強制
+      refreshCalendar();
+      setCalWriteMsg(action === "delete" ? "削除しました" : action === "update" ? "更新しました" : "追加しました");
+      return true;
+    } catch (e) {
+      setCalWriteMsg((prev) => prev || ("失敗：" + String((e && e.message) || e)));
+      return false;
+    } finally {
+      setCalWriteBusy(false);
+    }
+  };
+  const createCalEvent = (calendarId, event) => calWrite("create", { calendarId, event });
+  const updateCalEvent = (calendarId, eventId, event) => calWrite("update", { calendarId, eventId, event });
+  const deleteCalEvent = (calendarId, eventId) =>
+    new Promise((resolve) => { if (window.confirm("この予定をGoogleカレンダーから削除しますか？")) resolve(calWrite("delete", { calendarId, eventId })); else resolve(false); });
+
   // ログアウト（共有端末対策でカレンダートークンも破棄）
   const logout = () => {
     revokeToken(calToken);
@@ -1625,6 +1771,7 @@ export default function App() {
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // refresh token があればサーバー経由で予定取得（連携を維持＝再連携不要・3ヶ月先まで）
+  // calNonce が増えると再取得（手動更新ボタン・アプリ復帰時・定期ポーリング）
   useEffect(() => {
     const refresh = data && data.gcalRefresh;
     if (!refresh) return;
@@ -1644,12 +1791,28 @@ export default function App() {
         setCalList(j.calendars || []);
         setCalEvents(j.events || []);
         setCalStatus("ok");
+        lastCalFetchRef.current = Date.now();
       } catch (e) {
         if (cancelled) return;
         setCalError(e); setCalStatus("error");
       }
     })();
     return () => { cancelled = true; };
+  }, [data && data.gcalRefresh, calNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // アプリに戻ったとき・定期的に自動で再取得（Googleカレンダー側の変更をすぐ反映）
+  useEffect(() => {
+    if (!(data && data.gcalRefresh)) return;
+    const maybeRefresh = () => { if (Date.now() - lastCalFetchRef.current > 30000) refreshCalendar(); }; // 30秒以上経過時のみ
+    const onVisible = () => { if (document.visibilityState === "visible") maybeRefresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", maybeRefresh);
+    const id = setInterval(maybeRefresh, 5 * 60 * 1000); // 5分ごと
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", maybeRefresh);
+      clearInterval(id);
+    };
   }, [data && data.gcalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 出張の自動検知：カレンダー予定に「出張」を含むものがあれば、逆算チェーンを自動生成（3ヶ月先まで）
@@ -1947,7 +2110,15 @@ export default function App() {
     onConnect: connectCalendar,
     connecting,
     count: weekWork.length,
+    onRefresh: refreshCalendar,
+    refreshing: calStatus === "loading",
   };
+
+  // 編集できる予定：書き込み可能なカレンダーの本日以降の予定（最大40件）
+  const writableCalIds = new Set((calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer").map((c) => c.id));
+  const calEditable = usingCal
+    ? includedEntries.filter((e) => e.start >= todayStart && writableCalIds.has(e.calendarId)).sort((a, b) => a.start - b.start).slice(0, 40)
+    : [];
 
   const alerts = computeAlerts(data);
   const moneyOutstanding = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
@@ -2009,6 +2180,7 @@ export default function App() {
             <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} />
             <TimeMeter entries={scheduleEntries} {...calProps} />
             {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} />}
+            {usingCal && <CalManager calList={calList} events={calEditable} onCreate={createCalEvent} onUpdate={updateCalEvent} onDelete={deleteCalEvent} busy={calWriteBusy} msg={calWriteMsg} />}
             <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
             {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
           </>

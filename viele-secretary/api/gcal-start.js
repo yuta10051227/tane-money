@@ -10,7 +10,8 @@ export default function handler(req, res) {
   auth.searchParams.set("client_id", CLIENT_ID);
   auth.searchParams.set("redirect_uri", redirectUri);
   auth.searchParams.set("response_type", "code");
-  auth.searchParams.set("scope", "https://www.googleapis.com/auth/calendar.readonly");
+  // events: 予定の作成・更新・削除（書き込み） / readonly: カレンダー一覧の取得
+  auth.searchParams.set("scope", "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly");
   auth.searchParams.set("access_type", "offline");
   auth.searchParams.set("prompt", "consent");
   auth.searchParams.set("include_granted_scopes", "true");
