@@ -436,20 +436,22 @@ function getMonState(data, child){
   const def   = MONSTER_TREE[curId];
   const stage = def.stage||0;
   const isFinal = !def.evolveTo && !def.branch;
+  // テスト進化モード(1時間限定): 時間ゲート＆育てた度をスキップして即進化/即卒業できる
+  const testEvolve = ((data.testEvolveUntil||{})[cid] || 0) > Date.now();
   const need     = EVO_GROWTH[stage] ?? 0;
   const prevNeed = stage>0 ? (EVO_GROWTH[stage-1] ?? 0) : 0;
-  const growthOk = gauge >= need;
+  const growthOk = testEvolve ? true : (gauge >= need);
   const growthPct = isFinal ? 100 : Math.max(0, Math.min(100, Math.round((gauge-prevNeed)/Math.max(1,need-prevNeed)*100)));
   const growthRemain = isFinal ? 0 : Math.max(0, need - gauge);
   const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
   const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
   const reqMs = (EVO_HOURS[stage] ?? 0) * 3600000;
-  const timeOk = elapsedMs >= reqMs;
+  const timeOk = testEvolve ? true : (elapsedMs >= reqMs);
   const timeRemainMs = Math.max(0, reqMs - elapsedMs);
   const canEvolve = !isFinal && timeOk && growthOk;
   const reincRemainMs = isFinal ? Math.max(0, REINC_HOURS*3600000 - elapsedMs) : 0;
-  const canReincarnate = isFinal && elapsedMs >= REINC_HOURS*3600000;
-  return { curId, def, stage, isFinal, tasksDone, badgeCount, careDays, gauge, need,
+  const canReincarnate = isFinal && (testEvolve || elapsedMs >= REINC_HOURS*3600000);
+  return { curId, def, stage, isFinal, tasksDone, badgeCount, careDays, gauge, need, testEvolve,
            growthOk, growthPct, growthRemain, timeOk, timeRemainMs, canEvolve,
            canReincarnate, reincRemainMs };
 }
@@ -3103,6 +3105,24 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>
                 飼い猫モチーフ。タマゴから育てて究極体まで行くと「卒業」して、ランダムで次の猫がやってくるよ🐈
               </div>
+              {/* テスト用: 1時間だけ即進化(時間/育てた度スキップ) */}
+              {(() => {
+                const until = (data.testEvolveUntil||{})[child.id] || 0;
+                const active = until > Date.now();
+                const minLeft = Math.max(0, Math.ceil((until-Date.now())/60000));
+                return (
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,background:active?BS:CARD,border:`1.5px dashed ${active?B:BORDER}`,borderRadius:12,padding:"8px 10px"}}>
+                    <span style={{fontSize:14}}>🧪</span>
+                    <div style={{flex:1,fontSize:10,color:TEXTS,fontWeight:700,lineHeight:1.3}}>
+                      {active ? `テスト進化ON：あと${minLeft}分（タップで即進化・即卒業）` : "テスト用：1時間だけ即進化できるようにする"}
+                    </div>
+                    <button onClick={()=>update(d=>({...d, testEvolveUntil:{...(d.testEvolveUntil||{}), [child.id]: active?0:(Date.now()+3600000)}}))}
+                      style={{fontSize:10,fontWeight:800,color:"#fff",background:active?MUTED:B,border:"none",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontFamily:F,flexShrink:0}}>
+                      {active?"OFFにする":"1時間ON"}
+                    </button>
+                  </div>
+                );
+              })()}
               {/* 集めた子(卒業した猫) */}
               {(() => {
                 const got = (data.collectedMons||{})[child.id] || [];
