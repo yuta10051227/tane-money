@@ -764,7 +764,7 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
 }
 
 /* Googleカレンダーへ予定を追加する小さなバー（今日の予定の上に置く） */
-function AddEventBar({ calList, onCreate, busy, msg }) {
+function AddEventBar({ calList, onCreate, busy, msg, onReconnect }) {
   const writable = (calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer");
   const defaultCal = ((writable.find((c) => c.primary) || writable[0]) || {}).id || "primary";
   const [open, setOpen] = useState(false);
@@ -811,6 +811,11 @@ function AddEventBar({ calList, onCreate, busy, msg }) {
         </div>
       )}
       {msg && <div style={{ fontSize: 12, color: msg.startsWith("失敗") || msg.includes("必要") ? C.red : C.green, marginTop: 6 }}>{msg}</div>}
+      {(noWritable || (msg && msg.includes("必要"))) && onReconnect && (
+        <button onClick={onReconnect} style={{ ...chipBtn, marginTop: 8, background: C.text, color: "#0B0D11", borderColor: C.text, fontWeight: 700 }}>
+          書き込みを許可する（再連携）
+        </button>
+      )}
     </div>
   );
 }
@@ -2188,7 +2193,7 @@ export default function App() {
           <>
             <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} />
             <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
-            {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} />}
+            {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
             <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
             <TimeMeter entries={scheduleEntries} {...calProps} />
             {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
