@@ -309,6 +309,28 @@ const LINE_UNLOCK = { "":0, a:0, b:0, c:0 };
 
 // 隠しモンスター（大きなクリア=累計タスクで解放。すがた(スキン)として装備できる）
 // 表示＝解放(need)昇順に並べる(最初に解放される体が先頭に来るように)
+// 猫タネもん(うちのこ)シリーズ。卵→ベビー→成熟→完全体(分岐)→究極体(人型)。
+// ※モチーフは飼い猫。育てて卒業させ、ランダムに次の猫卵をもらうコレクション用(段階実装)。
+const CAT_LINES = [
+  { id:"cpurin", name:"プリン", emoji:"🐱",
+    stages:[
+      { id:"egg",   label:"タマゴ",   rarity:1 },
+      { id:"b1",    label:"ベビーI",  rarity:1 },
+      { id:"b2",    label:"ベビーII", rarity:2 },
+      { id:"mature",label:"つぶらのプリン（成熟期）", rarity:3 },
+    ],
+    branches:[
+      { force:"森の力", color:"#34C77B", stages:[
+        { id:"perfA", label:"森導士プリン（完全体）", rarity:4 },
+        { id:"ultA",  label:"聖天使プリンエル（究極体）", rarity:5 },
+      ]},
+      { force:"星の力", color:"#7B61C9", stages:[
+        { id:"perfB", label:"星見導師プリン（完全体）", rarity:4 },
+        { id:"ultB",  label:"星界神プリンゾーン（究極体）", rarity:5 },
+      ]},
+    ] },
+];
+
 const HIDDEN_MONSTERS = [
   // ── 新収録「黄金の系譜」(お金×成長×自然×伝説×歴史) ＋ 既存隠し ──
   { id:"mameko", name:"マメコ",        rarity:4, need:40,
@@ -3002,6 +3024,63 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <div>{eq.desc}</div>
                   <div style={{color:B,marginTop:2}}>{eq.edu}</div>
                 </div>):null;})()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── うちのこ(猫タネもん) ── */}
+      {effectiveTab==="more" && (
+        <div style={{padding:"0 16px 8px"}}>
+          <div onClick={()=>setMoreOpen(o=>o==="cats"?null:"cats")}
+            style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🐱</span>
+              <span style={{fontSize:13,fontWeight:700,color:TEXT}}>うちのこ（ねこタネもん）</span>
+            </div>
+            <span style={{fontSize:11,color:MUTED}}>{moreOpen==="cats"?"▲":"▼"}</span>
+          </div>
+          {moreOpen==="cats" && (
+            <div>
+              <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>
+                飼い猫モチーフの新シリーズ。タマゴから育てて、育て方で進化先が変わるよ（近日：集めて遊べるようになります）。
+              </div>
+              {CAT_LINES.map(cat=>{
+                const Cell=({sid,label,big})=>(
+                  <div style={{textAlign:"center",flexShrink:0,width:big?64:54}}>
+                    <img src={`/assets/monster_${cat.id}_${sid}_f0.png`} alt={label}
+                      style={{width:big?56:46,height:big?56:46,objectFit:"contain",imageRendering:"pixelated",display:"block",margin:"0 auto"}}
+                      onError={e=>{e.target.style.visibility="hidden"}}/>
+                    <div style={{fontSize:7.5,color:TEXTS,fontWeight:700,lineHeight:1.2,marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</div>
+                  </div>
+                );
+                return (
+                  <div key={cat.id} style={{background:GS,border:`1.5px solid ${G}40`,borderRadius:14,padding:"10px 8px",marginBottom:10}}>
+                    <div style={{fontSize:12,fontWeight:900,color:GP,marginBottom:6}}>{cat.emoji} {cat.name}</div>
+                    {/* 共通の道 */}
+                    <div style={{display:"flex",alignItems:"center",gap:2,overflowX:"auto",paddingBottom:4}}>
+                      {cat.stages.map((s,i)=>(
+                        <React.Fragment key={s.id}>
+                          {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:10}}>▶</span>}
+                          <Cell sid={s.id} label={s.label}/>
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    {/* 分岐 */}
+                    {cat.branches.map((br,bi)=>(
+                      <div key={bi} style={{display:"flex",alignItems:"center",gap:4,marginTop:4,paddingLeft:8}}>
+                        <span style={{fontSize:9,fontWeight:800,color:br.color,flexShrink:0,width:46}}>└{br.force}</span>
+                        {br.stages.map((s,i)=>(
+                          <React.Fragment key={s.id}>
+                            {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:10}}>▶</span>}
+                            <Cell sid={s.id} label={s.label}/>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
