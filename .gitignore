@@ -3,3 +3,8 @@ app.js
 okozukai-v9-stable.jsx
 .DS_Store
 ._*
+
+# Python bytecode cache
+scripts/__pycache__/
+__pycache__/
+*.pyc

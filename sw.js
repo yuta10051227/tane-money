@@ -1,4 +1,4 @@
-const CACHE = 'tane-money-v2';
+const CACHE = 'tane-money-v3';
 const PRECACHE = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -21,6 +21,21 @@ self.addEventListener('fetch', e => {
   if (url.includes('firestore') || url.includes('firebase') ||
       url.includes('cdnjs') || url.includes('googleapis') ||
       url.includes('gstatic')) return;
+
+  // 画像アセット(/assets/)はネットワーク優先: 差し替えた絵が即反映され、古い絵が残らない。
+  // オフライン時のみキャッシュにフォールバック。
+  if (url.includes('/assets/')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200 && e.request.method === 'GET') {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(c => c || new Response('Offline', {status: 503})))
+    );
+    return;
+  }
 
   e.respondWith(
     caches.match(e.request).then(cached => {

@@ -236,52 +236,61 @@ function startLogsRealtimeSync(updateFn) {
 // MONSTER TREE
 // ═══════════════════════════════════════════════════════
 const MONSTER_TREE = {
-  egg:  { id:"egg",  name:"タマゴ",         rarity:1, line:"",  stage:0, evolveA:"1a", evolveB:"1b", evolveC:"1c",
-          desc:"秘められた力を持つ不思議な卵。何が生まれるか誰も知らない。", edu:"" },
-  "1a": { id:"1a",  name:"ほのおっち",      rarity:1, line:"a", stage:1, evolveA:"2a1", evolveB:"2a2",
-          desc:"炎の精霊の赤ちゃん。元気いっぱいでいつも燃えている。", edu:"人類が火を使い始めたのは約140万年前ともいわれる。火のおかげで食べ物を加熱でき、夜も明るく安全に過ごせるようになった。火を手に入れたことは人類最大の発明の一つ。" },
-  "1b": { id:"1b",  name:"もりっち",        rarity:1, line:"b", stage:1, evolveA:"2b1", evolveB:"2b2",
-          desc:"森の精霊の赤ちゃん。木の葉のベッドで眠るのが大好き。", edu:"日本は国土の約3分の2（約68%）が森林で、世界でも有数の森林大国。木は光合成で二酸化炭素を吸い、酸素を作って地球の空気をきれいにしている。" },
-  "2a1":{ id:"2a1", name:"ヒリュウ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"炎をまとった東洋の小さな竜。空を飛び、天気をあやつるという。", edu:"東洋（中国・日本）の竜は水や天をつかさどる神聖な存在で、皇帝の象徴だった。竜を退治される悪役として描く西洋とは逆に、東洋では幸運をもたらす守り神とされる。" },
-  "2a2":{ id:"2a2", name:"カグツチ",        rarity:2, line:"a", stage:2, evolveA:"3a1", evolveB:"3a2",
-          desc:"日本神話の火の神。生まれながらにして炎を纏う。", edu:"カグツチは日本最古の歴史書『古事記』（約1300年前・712年成立）に登場する火の神。生まれたとき母イザナミを失わせ、怒った父イザナギに斬られたと伝わる。" },
-  "2b1":{ id:"2b1", name:"ユニコーン",      rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"額に黄金の角を持つ白馬。純粋な心の者にしか心を開かない。", edu:"ユニコーンは中世ヨーロッパで広く信じられた幻獣。角には毒を消す力があると信じられ高値で取引されたが、その正体は海の生き物イッカクの長い牙だったといわれる。" },
-  "2b2":{ id:"2b2", name:"コダマ",          rarity:2, line:"b", stage:2, evolveA:"3b1", evolveB:"3b2",
-          desc:"古い木に宿る日本の精霊。山びこはこの子の声だという。", edu:"木霊（コダマ）は樹木に宿るとされる日本の精霊。昔の人は大きな木を切ると祟りがあると考え自然を大切にした。自然のあらゆる物に魂が宿るという考え方をアニミズムという。" },
-  "3a1":{ id:"3a1", name:"フェニックス",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"炎の中から生まれ変わる不死の鳥。500年ごとに若返るという。", edu:"フェニックス（不死鳥）はエジプト・ギリシャ・中国など世界各地に似た伝説がある。エジプトでは『ベヌウ』と呼ばれ太陽の象徴。今も『よみがえり・再生』の象徴として使われる。" },
-  "3a2":{ id:"3a2", name:"カグツチ神将",    rarity:3, line:"a", stage:3, evolveA:"4a1", evolveB:"4a2",
-          desc:"鍛えられた炎の神将。剣をふるうたび炎の渦が生まれる。", edu:"日本の武士にとって刀は『武士の魂』とされ、名刀には名前が付けられ親から子へ受け継がれた。刀は玉鋼を熱しては何度も折り返して鍛える、世界でも高度な技術で作られる。" },
-  "3b1":{ id:"3b1", name:"スフィンクス",    rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"なぞかけを好む砂漠の守護者。問いに答えられぬ者を通さない。", edu:"スフィンクスはエジプトとギリシャ両方の伝説に登場する。エジプト・ギザの大スフィンクスは約4500年前に造られた世界最大級の石像で、全長は約73mもある。" },
-  "3b2":{ id:"3b2", name:"アヌビス",        rarity:3, line:"b", stage:3, evolveA:"4b1", evolveB:"4b2",
-          desc:"ジャッカルの頭を持つ死者の神。魂の重さを羽根とはかる。", edu:"古代エジプトでは死後、心臓を『正義の羽根』と天秤ではかり、軽ければ天国へ行けると信じた。だから人々は正しく生きようとした。ミイラ作りもアヌビスが守るとされた。" },
-  "4a1":{ id:"4a1", name:"レッドドラゴン",  rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"西洋神話で最強とされる竜。ひと息で城を焼きつくす。", edu:"西洋の竜は中世ヨーロッパの騎士物語の強敵。竜を倒した聖ゲオルギウスはイギリスの守護聖人として有名で、赤い竜はウェールズの国旗にも描かれている。" },
-  "4a2":{ id:"4a2", name:"スサノオ",        rarity:4, line:"a", stage:4, evolveA:null, evolveB:null,
-          desc:"嵐と海をつかさどる英雄神。八岐大蛇を倒した荒ぶる神。", edu:"スサノオは日本神話の英雄。八つの頭を持つ大蛇ヤマタノオロチを退治し、その尾から名剣『草薙剣』を見つけた。これは今も伝わる三種の神器の一つとされる。" },
-  "4b1":{ id:"4b1", name:"ガネーシャ",      rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"象の頭を持つ知恵と商売の神。学問や芸術を見守る。", edu:"ガネーシャはヒンドゥー教で最も人気のある神の一つで、学問・商売・幸運の神。日本では『歓喜天』として信仰される。インドでは新しいことを始める前に祈られる。" },
-  "4b2":{ id:"4b2", name:"ガルーダ",        rarity:4, line:"b", stage:4, evolveA:null, evolveB:null,
-          desc:"黄金の翼を持つ神鳥。神々を乗せ空をかける天空の王者。", edu:"ガルーダはヒンドゥー教・仏教の聖なる鳥で、ヘビの天敵。インドネシアの国の紋章になっており、同国を代表する航空会社の名前にもなっている。" },
-  // ── 水ライン（c）──
-  "1c": { id:"1c",  name:"みずっち",        rarity:1, line:"c", stage:1, evolveA:"2c1", evolveB:"2c2",
-          desc:"水の精霊の赤ちゃん。きれいな水辺が大好きで、ぷかぷか浮かぶ。", edu:"地球の表面の約7割は海などの水でおおわれている。でも飲める『真水』はそのうちごくわずか。水は雲→雨→川→海とぐるぐる循環している。" },
-  "2c1":{ id:"2c1", name:"カッパ",          rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
-          desc:"頭の皿に水をたくわえる日本の妖怪。相撲ときゅうりが大好き。", edu:"河童（かっぱ）は日本各地に伝わる水辺の妖怪。頭の皿の水がかわくと力が出ないとされた。川の事故への注意を伝える昔の人の知恵ともいわれる。" },
-  "2c2":{ id:"2c2", name:"シーサーペント",  rarity:2, line:"c", stage:2, evolveA:"3c1", evolveB:"3c2",
-          desc:"大海をうねる巨大な海蛇。船乗りたちに恐れられた。", edu:"シーサーペント（大海蛇）は世界中の海の伝説に登場する。北欧神話の大蛇ヨルムンガンドは世界をぐるりと囲むほど巨大だと語られた。" },
-  "3c1":{ id:"3c1", name:"リヴァイアサン",  rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
-          desc:"海の底にひそむ伝説の大怪物。ひとのみで嵐を起こす。", edu:"リヴァイアサンは旧約聖書に出てくる海の巨大な怪物。手のつけられない強大な力の象徴とされ、英語では『巨大なもの』の意味でも使われる。" },
-  "3c2":{ id:"3c2", name:"クラーケン",      rarity:3, line:"c", stage:3, evolveA:"4c1", evolveB:"4c2",
-          desc:"無数の触手で船をしずめる海の魔物。深海の王者。", edu:"クラーケンは北欧（ノルウェー沖）の伝承の巨大なイカ・タコの怪物。実在するダイオウイカ（最大十数mとされる）が伝説のもとになったとも考えられている。" },
-  "4c1":{ id:"4c1", name:"ポセイドン",      rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
-          desc:"三叉のほこを持つ海の神。ひと振りで嵐と大波を起こす。", edu:"ポセイドンはギリシャ神話の海の神で、三叉の銛トライデントが象徴。海だけでなく地震や馬も司るとされ、オリンポス十二神の一柱として恐れられた。" },
-  "4c2":{ id:"4c2", name:"龍神",            rarity:4, line:"c", stage:4, evolveA:null, evolveB:null,
-          desc:"海をおさめる日本の龍の神。竜宮城のあるじ。", edu:"龍神（リュウジン）は日本で海をつかさどる神。海の底の龍宮城の伝説は『浦島太郎』の物語にもつながる。雨ごいの神として各地の神社でまつられてきた。" },
+  egg:  { id:"egg", name:"タマゴ", rarity:1, line:"", stage:0, evolveTo:"m01",
+          desc:"なにが生まれるかわからない、ふしぎなタマゴ。タッチしてあたためよう。", edu:"" },
+  // ── 幼年期（共通）──
+  m01:  { id:"m01", name:"ミンタモ", rarity:1, line:"", stage:1, evolveTo:"m02",
+          desc:"コインのタネから生まれたばかりの赤ちゃん。げんきにぴょこぴょこ動く。",
+          edu:"お金は「ためる」と少しずつ増えていく。小さなタネも、毎日の水やりで大きく育つよ。" },
+  m02:  { id:"m02", name:"コロミント", rarity:1, line:"", stage:2, branch:["m03","m07","m11"],
+          desc:"葉っぱの芽が出てきた幼年期。これから3つの道のどれかに進化する。",
+          edu:"ここで3つの道に分かれるよ。もくひょうを達成すると「まなび」、れんぞく7日で「森」、ちょきん1000で「たから」へ進化！" },
+  // ── A系統：自然・森（こつこつ継続で寄る）──
+  m03:  { id:"m03", name:"バドゥクン", rarity:2, line:"a", stage:3, evolveTo:"m04",
+          branchHint:"まいにちつづけて さいこう7日れんぞくで こっちに進化！",
+          desc:"森の若芽をせおったいたずら好き。毎日の小さな積み重ねが大すき。",
+          edu:"毎日コツコツ続けることを「習慣」という。少しずつでも毎日ためると、1年で大きな差になる。" },
+  m04:  { id:"m04", name:"フロラクン", rarity:3, line:"a", stage:4, evolveTo:"m05",
+          desc:"花と緑をまとった成熟期。仲間思いで、まわりを元気にする。",
+          edu:"植物は太陽の力で養分をつくる(光合成)。お金も「はたらく」と新しい価値を生み出せる。" },
+  m05:  { id:"m05", name:"シダーハート", rarity:4, line:"a", stage:5, evolveTo:"m06",
+          desc:"大樹の心をもつ完全体。根を深くはり、どっしりかまえる。",
+          edu:"大きな木も、もとは一粒のタネ。今ためているお金が、将来の大きな安心になる。" },
+  m06:  { id:"m06", name:"ワールドミント", rarity:5, line:"a", stage:6, evolveTo:null,
+          desc:"世界をやどす森の王・究極体。ふれた大地に緑とゆたかさを広げる。",
+          edu:"自然はみんなの大切な財産。お金も、人やまわりと分け合うと、もっと大きな力になる。" },
+  // ── B系統：竜・歴史（タスク&バッジで強くなると寄る）──
+  m07:  { id:"m07", name:"スパイドラ", rarity:2, line:"b", stage:3, evolveTo:"m08",
+          branchHint:"ちょきんを 1000までためると こっちに進化！",
+          desc:"小さな竜の子。たからものを集めるのが得意で、好奇心おうせい。",
+          edu:"大むかし、人は貝や石をお金として使った。やがて金や銀の「硬貨」が生まれた。" },
+  m08:  { id:"m08", name:"ギルドレイク", rarity:3, line:"b", stage:4, evolveTo:"m09",
+          desc:"黄金にかがやくウロコの成熟期。たからの番人として知られる。",
+          edu:"硬貨のふちのギザギザは、けずって金属をぬすむズルを防ぐための昔の工夫。" },
+  m09:  { id:"m09", name:"レリックワーム", rarity:4, line:"b", stage:5, evolveTo:"m10",
+          desc:"古代の遺産を守る完全体。長い時を生き、歴史をその身に刻む。",
+          edu:"紙のお金(紙幣)が広まったのは約1000年前の中国から。重い硬貨より持ち運びが楽になった。" },
+  m10:  { id:"m10", name:"クロノドレイク", rarity:5, line:"b", stage:6, evolveTo:null,
+          desc:"時をあやつる究極の竜。過去と未来をつなぎ、富の流れを見通す。",
+          edu:"いまは「電子マネー」で形のないお金も使える時代。お金の形は時代とともに進化する。" },
+  // ── C系統：民話・学問（まなび&目標で寄る）──
+  m11:  { id:"m11", name:"トーテモル", rarity:2, line:"c", stage:3, evolveTo:"m12",
+          branchHint:"もくひょうを 1つたっせいすると こっちに進化！",
+          desc:"おまもりを身につけた森の精。ものしりで、なぞなぞが大すき。",
+          edu:"世界には「お金のことわざ」がたくさん。『時は金なり』は時間の大切さを教える。" },
+  m12:  { id:"m12", name:"スクロベア", rarity:3, line:"c", stage:4, evolveTo:"m13",
+          desc:"巻物をかかえた学者グマの成熟期。知ることが何よりの楽しみ。",
+          edu:"お金の使い方の計画を「予算(よさん)」という。先に決めておくと、むだづかいが減る。" },
+  m13:  { id:"m13", name:"アーキヴル", rarity:4, line:"c", stage:5, evolveTo:"m14",
+          desc:"知識の書庫を守るフクロウの完全体。あらゆる知恵を記録する。",
+          edu:"お金を貸し借りすると「利子(りし)」がつくことがある。ふやす力にも、借りすぎの注意にもなる。" },
+  m14:  { id:"m14", name:"ミスミント", rarity:5, line:"c", stage:6, evolveTo:null,
+          desc:"伝説をつむぐ賢者・究極体。学びの力で、人々をゆたかにみちびく。",
+          edu:"いちばん大切な財産は「学び」。知識は使ってもへらず、一生きみを助けてくれる。" },
 };
+
+// 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
+const MON_FRAMES6 = { egg:1, m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09:1,m10:1 };
 
 // ═══════════════════════════════════════════════════════
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
@@ -296,22 +305,82 @@ const BG_THEMES = [
 ];
 
 // モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
-const LINE_UNLOCK = { "":0, a:0, b:0, c:15 };
+const LINE_UNLOCK = { "":0, a:0, b:0, c:0 };
 
 // 隠しモンスター（大きなクリア=累計タスクで解放。すがた(スキン)として装備できる）
+// 表示＝解放(need)昇順に並べる(最初に解放される体が先頭に来るように)
 const HIDDEN_MONSTERS = [
+  // ── 新収録「黄金の系譜」(お金×成長×自然×伝説×歴史) ＋ 既存隠し ──
+  { id:"mameko", name:"マメコ",        rarity:4, need:40,
+    desc:"一枚の金貨から生まれた妖精。みんなの貯金が大すき。",
+    edu:"コイン(硬貨)は国が価値を保証したお金。重さや、ふちのギザギザ・模様で、本物だと分かるように作られている。" },
   { id:"niji",   name:"ニジドラゴン", rarity:5, need:60,
     desc:"虹色にかがやく伝説の竜。雨上がりの空に現れるという。",
     edu:"虹は太陽の光が空気中の雨つぶで曲がり、7色(赤・橙・黄・緑・青・藍・紫)に分かれて見える現象。だから虹は太陽と反対の空に出る。" },
+  { id:"garuda", name:"テンガ・ガルダ", rarity:5, need:90,
+    desc:"雷をまとう黄金の神鳥。大空を支配するといわれる。",
+    edu:"雷は雲の中の電気が一気に流れる現象。光ってから音(ゴロゴロ)まで時間があるのは、光が音よりずっと速く伝わるから。" },
   { id:"kogane", name:"コガネオウ",   rarity:5, need:120,
     desc:"全身が黄金にかがやく王者。ふれたものを宝に変えるとか。",
     edu:"金(ゴールド)はさびず輝きが長く続くため、昔から世界中でお金や宝物に使われた。とてもやわらかく、わずかな量で大きく延ばせる金属。" },
+  { id:"gear",   name:"ギアドレイク",  rarity:5, need:140,
+    desc:"体の中の歯車が回り続ける機械竜。とまらない成長の象徴。",
+    edu:"歯車を組み合わせると、小さな力で大きな仕事ができる。お金も「複利」で、利子に利子がついて歯車のように増えていく。" },
   { id:"hoshi",  name:"ホシリュウ",   rarity:5, need:200,
     desc:"夜空からまいおりた星の竜。ねがいをかなえるといわれる。",
     edu:"夜空の星のほとんどは太陽のような『恒星』。とても遠いので、今見えている光は何年も前に出たもの。光は1秒で地球を7周半すすむ。" },
+  { id:"palad",  name:"ゴルド・パラディン", rarity:5, need:220,
+    desc:"黄金のよろいをまとう神の将。紋章は誇りのしるし。",
+    edu:"昔の騎士や武将は、盾やはたの『紋章』で自分の家や役わりを示した。紋章はいわば自分だけの印(ロゴ)。" },
+  { id:"ogon",   name:"オウゴンリュウ", rarity:5, need:280,
+    desc:"全身が黄金にかがやく伝説の竜。富をもたらす王者。",
+    edu:"金は世界中で大むかしから、価値が変わりにくい『お金』として使われた。さびず輝きが続くので、宝物や硬貨になった。" },
 ];
 
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// 進化の状態（時間ゲート＋育てた度ゲージの二重条件）
+// EVO_HOURS:  現ステージを「出る」のに必要な最低経過時間(h)。成長期→当日,成熟→24h,完全→72h,究極→72h
+// EVO_GROWTH: 現ステージを「出る」のに必要な累計"育てた度"(=お手伝い + バッジ*3 + なでなで日数*2)
+const EVO_HOURS  = { 0:0, 1:0, 2:0, 3:24, 4:72, 5:72 };
+const EVO_GROWTH = { 0:2, 1:5, 2:9, 3:16, 4:26, 5:40 };
+const REINC_HOURS = 96;   // 究極体→転生できるまで(4日)
+function getMonState(data, child){
+  const cid = child.id;
+  const logs = (data.logs||[]).filter(l=>l.cid===cid);
+  const tasksDone  = logs.filter(l=>l.type==="good"||l.type==="daily").length;
+  const badgeCount = logs.filter(l=>l.type==="badge").length;
+  const careDays   = ((data.monsterCare||{})[cid]||{}).days || 0;
+  const gauge      = tasksDone + badgeCount*3 + careDays*2;   // 育てた度
+  const rawId = (data.monsterEvolved||{})[cid] || null;
+  const curId = (rawId && MONSTER_TREE[rawId]) ? rawId : "egg";
+  const def   = MONSTER_TREE[curId];
+  const stage = def.stage||0;
+  const isFinal = !def.evolveTo && !def.branch;
+  const need     = EVO_GROWTH[stage] ?? 0;
+  const prevNeed = stage>0 ? (EVO_GROWTH[stage-1] ?? 0) : 0;
+  const growthOk = gauge >= need;
+  const growthPct = isFinal ? 100 : Math.max(0, Math.min(100, Math.round((gauge-prevNeed)/Math.max(1,need-prevNeed)*100)));
+  const growthRemain = isFinal ? 0 : Math.max(0, need - gauge);
+  const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
+  const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
+  const reqMs = (EVO_HOURS[stage] ?? 0) * 3600000;
+  const timeOk = elapsedMs >= reqMs;
+  const timeRemainMs = Math.max(0, reqMs - elapsedMs);
+  const canEvolve = !isFinal && timeOk && growthOk;
+  const reincRemainMs = isFinal ? Math.max(0, REINC_HOURS*3600000 - elapsedMs) : 0;
+  const canReincarnate = isFinal && elapsedMs >= REINC_HOURS*3600000;
+  return { curId, def, stage, isFinal, tasksDone, badgeCount, careDays, gauge, need,
+           growthOk, growthPct, growthRemain, timeOk, timeRemainMs, canEvolve,
+           canReincarnate, reincRemainMs };
+}
+function fmtTimeRemain(ms){
+  if(ms<=0 || !isFinite(ms)) return "";
+  const h = Math.ceil(ms/3600000);
+  if(h>=24){ const d=Math.ceil(h/24); return `あと${d}日`; }
+  return `あと${h}時間`;
+}
+
 const INIT = {
   parentPin: "0000",
   children: [
@@ -429,7 +498,8 @@ const INIT = {
       active: true,
     }
   ],
-  activeSetId: "set_default",  // 現在アクティブなセットID
+  activeSetId: "set_default",  // 後方互換(単一)
+  activeSetIds: ["set_default"],  // 同時アクティブ(最大2)
   dailyProgress: {},
   parents: [
     {id:"p1",name:"パパ",emoji:"👨",pin:"3333",
@@ -522,6 +592,11 @@ function migrate(d) {
   if(!d.monsterEvolvedAt) d.monsterEvolvedAt={};
   if(!d.reincarnationCount) d.reincarnationCount={};
   if(!d.reincarnationBonus) d.reincarnationBonus={};
+  if(!d.monsterStageAt) d.monsterStageAt={};
+  if(!d.monsterCare) d.monsterCare={};
+  // 旧モンスター体系(1a/2a1…)の保存値は新ツリーに無いので卵へリセット
+  Object.keys(d.monsterEvolved||{}).forEach(cid=>{ if(d.monsterEvolved[cid] && !MONSTER_TREE[d.monsterEvolved[cid]]) d.monsterEvolved[cid]=null; });
+  Object.keys(d.monsterDiscovered||{}).forEach(cid=>{ d.monsterDiscovered[cid]=(d.monsterDiscovered[cid]||[]).filter(id=>MONSTER_TREE[id]); });
   // 全子供に egg を図鑑登録（初期値）
   (d.children||[]).forEach(c=>{
     if(!d.monsterDiscovered[c.id]) d.monsterDiscovered[c.id]=["egg"];
@@ -559,6 +634,10 @@ function migrate(d) {
     active:s.active!==false,
   }));
   if(!d.activeSetId) d.activeSetId=d.dailyTaskSets[0]?.id||"set_default";
+  // 同時アクティブ配列を保証(旧データはactiveSetIdから生成)。存在するセットのみ・最大2件
+  if(!Array.isArray(d.activeSetIds)||d.activeSetIds.length===0) d.activeSetIds=[d.activeSetId].filter(Boolean);
+  d.activeSetIds=d.activeSetIds.filter(id=>d.dailyTaskSets.some(s=>s.id===id)).slice(0,2);
+  if(d.activeSetIds.length===0&&d.dailyTaskSets[0]) d.activeSetIds=[d.dailyTaskSets[0].id];
   if(!d.dailyProgress) d.dailyProgress={};
   if(!d.rewards||d.rewards.length===0) d.rewards=INIT.rewards;
   if(d.rewards.length<=3&&d.rewards.some(r=>r.id==="r1"||r.id==="r2")) d.rewards=INIT.rewards;
@@ -962,31 +1041,30 @@ function GachaAnim({ result, onClose }) {
 // ═══════════════════════════════════════════════════════
 function DailyTasks({ child, data, update }) {
   const today  = todayKey();
-  // アクティブセットを取得（期間チェックあり・null安全）
+  // アクティブセットを取得（最大2セットを同時に。期間チェック・null安全）
   const sets = data.dailyTaskSets || [];
-  const activeSet = (() => {
+  const inWindow = s => !!s && s.active!==false &&
+    (!s.startDate || today >= s.startDate) && (!s.endDate || today <= s.endDate);
+  const activeSets = (() => {
     try {
-      if (sets.length === 0) return null;
-      const byId = sets.find(s => s.id === data.activeSetId && s.active);
-      if (byId) {
-        if (byId.startDate && today < byId.startDate) {
-          // 開始前なら他のアクティブセットを探す
-        } else if (byId.endDate && today > byId.endDate) {
-          // 期限切れなら他のアクティブセットを探す
-        } else {
-          return byId;
-        }
+      if (sets.length === 0) return [];
+      const ids = (Array.isArray(data.activeSetIds) && data.activeSetIds.length)
+        ? data.activeSetIds : (data.activeSetId ? [data.activeSetId] : []);
+      let chosen = ids.map(id => sets.find(s => s.id === id)).filter(inWindow);
+      if (chosen.length === 0) {
+        const fb = sets.find(inWindow) || sets.find(s => s.active!==false) || sets[0];
+        chosen = fb ? [fb] : [];
       }
-      // 期間内でactiveなセットを探す
-      return sets.find(s => s.active &&
-        (!s.startDate || today >= s.startDate) &&
-        (!s.endDate   || today <= s.endDate)
-      ) || sets.find(s => s.active) || sets[0] || null;
-    } catch(e) { return null; }
+      return chosen.slice(0, 2);
+    } catch(e) { return []; }
   })();
-  // セットがあればそのタスク、なければlegacy dailyTasksにフォールバック
-  const tasks  = (activeSet?.tasks?.length > 0 ? activeSet.tasks : null) || data.dailyTasks || [];
-  const bonus  = activeSet?.bonus ?? data.dailyBonus ?? 50;
+  const activeSet = activeSets[0] || null;   // 後方互換(ヘッダ表示等)
+  // 2セットのタスクを結合。完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
+  const tasks = activeSets.length
+    ? activeSets.flatMap(s => (Array.isArray(s.tasks)?s.tasks:[]).map(t =>
+        ({...t, _k:`${s.id}::${t.id}`, _setId:s.id, _setName:s.name, _setEmoji:s.emoji})))
+    : (data.dailyTasks || []).map(t => ({...t, _k:t.id, _setId:"", _setName:"", _setEmoji:""}));
+  const bonusTotal = activeSets.reduce((sum,s)=>sum+(s.bonus??0), 0) || (activeSets.length?0:(data.dailyBonus??50));
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
@@ -1012,10 +1090,14 @@ function DailyTasks({ child, data, update }) {
   };
 
   const isCheck   = t => t.type === "check";
-  const isDone    = t => isCheck(t) ? !!prog[t.id] : (prog[t.id]||0) >= (t.target||1);
+  const isDone    = t => isCheck(t) ? !!prog[t._k] : (prog[t._k]||0) >= (t.target||1);
   const doneCount = tasks.filter(t => isDone(t)).length;
   const allDone   = doneCount === tasks.length && tasks.length > 0;
-  const bonusAlreadyGiven = !!prog["__bonus__"];
+  // セット単位の完了/ボーナス判定(2セットそれぞれに全達成ボーナス)
+  const bonusKey  = s => `__bonus__::${s.id}`;
+  const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
+    tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
+  const allBonusGiven = activeSets.length>0 && activeSets.every(s => !s.bonus || prog[bonusKey(s)]);
 
   const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
   const setDailyProg = (d, extra) => ({
@@ -1026,35 +1108,41 @@ function DailyTasks({ child, data, update }) {
     }
   });
 
+  // 該当セットが全部終わったら、そのセットのボーナスを付与(1回だけ)
+  const awardSetBonus = (setId, newProg) => {
+    const s = activeSets.find(x => x.id === setId);
+    if (!s || !s.bonus || s.bonus <= 0) return;
+    if (prog[bonusKey(s)]) return;
+    if (!setDoneIn(s, newProg)) return;
+    setTimeout(() => {
+      const bonusEntry = mkEntry(`🌟 ${s.name} ぜんぶ達成ボーナス！`, s.bonus);
+      update(d => ({ ...setDailyProg(d, {[bonusKey(s)]:true}), logs:[bonusEntry,...d.logs] }));
+      addLogToFirestore(bonusEntry);
+      setFlash({ pts:s.bonus, emoji:"🌟" });
+      setTimeout(()=>setFlash(null),1400);
+    }, 600);
+  };
+
   const handleCheck = t => {
     if (isDone(t)) return;
     showFlash(t.pts, t.emoji);
-    markJustDone(t.id);
+    markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t.id]:true}), logs:[entry,...d.logs] }));
+    update(d => ({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }));
     addLogToFirestore(entry);
-    const newProg = { ...prog, [t.id]: true };
-    const nowAllDone = tasks.every(tt => tt.type==="check" ? !!newProg[tt.id] : (newProg[tt.id]||0)>=(tt.target||1));
-    if (nowAllDone && bonus > 0 && !bonusAlreadyGiven) {
-      setTimeout(() => {
-        const bonusEntry = mkEntry("🌟 全タスク達成ボーナス！", bonus);
-        update(d => ({ ...setDailyProg(d, {[t.id]:true,"__bonus__":true}), logs:[bonusEntry,...d.logs] }));
-        addLogToFirestore(bonusEntry);
-        setFlash({ pts:bonus, emoji:"🌟" });
-        setTimeout(()=>setFlash(null),1400);
-      }, 600);
-    }
+    awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
 
   const handleCount = t => {
-    const cur = prog[t.id] || 0;
+    const cur = prog[t._k] || 0;
     if (cur >= (t.target||1) && isDone(t)) return;
     const nxt = cur + 1;
     showFlash(t.pts, t.emoji);
-    if(nxt>=(t.target||1)) markJustDone(t.id);
+    if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t.id]:nxt}), logs:[entry,...d.logs] }));
+    update(d => ({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }));
     addLogToFirestore(entry);
+    if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
 
   return (
@@ -1064,8 +1152,8 @@ function DailyTasks({ child, data, update }) {
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
-            <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ タネっちがよろこんだ！</div>
+            <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ なかまがよろこんだ！</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
@@ -1073,11 +1161,14 @@ function DailyTasks({ child, data, update }) {
 
       {/* Progress bar */}
       <div style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14}}>
-        {/* セット名表示 */}
-        {activeSet&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-          <span style={{fontSize:16}}>{activeSet.emoji}</span>
-          <span style={{fontWeight:800,fontSize:12,color:P}}>{activeSet.name}</span>
-          {activeSet.endDate&&<span style={{fontSize:10,color:MUTED}}>〜{activeSet.endDate}まで</span>}
+        {/* アクティブセット名（最大2つ） */}
+        {activeSets.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          {activeSets.map(s=>(
+            <span key={s.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:`${P}12`,borderRadius:10,padding:"2px 8px"}}>
+              <span style={{fontSize:14}}>{s.emoji}</span>
+              <span style={{fontWeight:800,fontSize:11,color:P}}>{s.name}</span>
+            </span>
+          ))}
         </div>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <p style={{fontWeight:900,fontSize:14,margin:0,color:allDone?G:TEXT}}>
@@ -1088,24 +1179,33 @@ function DailyTasks({ child, data, update }) {
         <div style={{height:10,background:BORDER,borderRadius:5,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${tasks.length?doneCount/tasks.length*100:0}%`,background:allDone?G:Y,borderRadius:5,transition:"width .5s ease"}}/>
         </div>
-        {bonus>0 && (
-          <p style={{color:bonusAlreadyGiven?G:MUTED,fontSize:12,fontWeight:700,margin:0}}>
-            {bonusAlreadyGiven ? `✅ ボーナス +${bonus}pt もらえた！` : `🎁 全部やると +${bonus}pt ボーナス！`}
+        {bonusTotal>0 && (
+          <p style={{color:allBonusGiven?G:MUTED,fontSize:12,fontWeight:700,margin:0}}>
+            {allBonusGiven ? `✅ ボーナス +${bonusTotal}pt もらえた！` : `🎁 ぜんぶやると +${bonusTotal}pt ボーナス！`}
           </p>
         )}
-        {!activeSet&&tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
+        {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
-      {/* Task list */}
+      {/* Task list（セットごとに見出しを付けて2セットまとめ表示） */}
       {tasks.length === 0 && (
         <p style={{color:MUTED,textAlign:"center",fontSize:13,marginTop:20}}>まだデイリータスクがないよ</p>
       )}
-      {tasks.map(t => {
+      {tasks.map((t,i) => {
         const done = isDone(t);
-        const count = isCheck(t) ? null : (prog[t.id]||0);
+        const count = isCheck(t) ? null : (prog[t._k]||0);
+        const showHeader = activeSets.length>1 && (i===0 || tasks[i-1]._setId!==t._setId);
         return (
-          <div key={t.id}
-            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.08)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 4px ${G}90`:"none"}}>
+          <React.Fragment key={t._k}>
+          {showHeader&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,margin:"6px 2px 8px",paddingTop:i===0?0:6}}>
+              <span style={{fontSize:15}}>{t._setEmoji}</span>
+              <span style={{fontWeight:800,fontSize:12,color:P}}>{t._setName}</span>
+              <div style={{flex:1,height:1,background:BORDER}}/>
+            </div>
+          )}
+          <div
+            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t._k]?"scale(1.08)":"scale(1)", boxShadow:justDone[t._k]?`0 0 0 4px ${G}90`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
@@ -1128,6 +1228,7 @@ function DailyTasks({ child, data, update }) {
               </div>
             )}
           </div>
+          </React.Fragment>
         );
       })}
       <style>{`@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
@@ -1909,10 +2010,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
   // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const _cBgTheme   = BG_THEMES.find(t=>t.id===((data.bgTheme||{})[child.id]||"auto")) || BG_THEMES[0];
+  const totalDoneMon = _cTotalDone;   // もっとタブ(背景/隠しモンスター)の解放判定で使用
+  const _bgTid      = (data.bgTheme||{})[child.id] || "auto";   // 背景きせかえの選択中判定で使用
+  const _cBgTheme   = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
   const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
-  const totalDoneMon = _cTotalDone; // more タブ（はいけい/ひみつのなかま）で使用
-  const _bgTid = (data.bgTheme||{})[child.id]||"auto"; // more タブで使用
   const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
@@ -2117,26 +2218,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <SeedMonster child={child} data={data} size={130} update={update}/>
         </div>
         {(()=>{
-          const tDone=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-          const STAGE_GATES=[2,6,14,28];
-          const rawId=(data.monsterEvolved||{})[child.id];
-          const curId=(rawId&&MONSTER_TREE[rawId])?rawId:"egg";
-          const def=MONSTER_TREE[curId];
-          if(!def.evolveA) return null;          // 最終形はヒント非表示
-          const st=def.stage||0;
-          const gate=STAGE_GATES[st];
-          const prev=st>0?(STAGE_GATES[st-1]||0):0;
-          const pct=Math.max(0,Math.min(1,(tDone-prev)/Math.max(1,gate-prev)));
-          const remaining=Math.max(0,gate-tDone);
-          const ready=remaining<=0;
+          const m=getMonState(data, child);
+          if(m.isFinal) return null;          // 最終形はヒント非表示
+          const ready=m.canEvolve;
+          const label = ready ? "🌟 いまならしんかできるよ！"
+            : !m.growthOk ? `🌟 あと${m.growthRemain}でしんかできるよ！`
+            : `⏳ ${fmtTimeRemain(m.timeRemainMs)}でしんか`;
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{ready?"🌟 いまならしんかできるよ！":`🌟 あと${remaining}回でしんかできるよ！`}</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{tDone}/{gate}</span>
+                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{label}</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{m.growthOk?100:m.growthPct}%</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${pct*100}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
+                <div style={{height:"100%",width:`${m.growthOk?100:m.growthPct}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
               </div>
             </div>
           );
@@ -2339,6 +2434,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
+        {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
+        {(()=>{ const ft=getMonthTheme(); return (
+          <button onClick={()=>{ if(!todayDone) doGacha(); }} disabled={todayDone} aria-label="デイリーガチャ"
+            style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
+              border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
+              background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
+              boxShadow:todayDone?"0 4px 12px rgba(0,0,0,0.25)":`0 6px 22px ${ft.color}95`,
+              cursor:todayDone?"default":"pointer",fontSize:30,display:"flex",alignItems:"center",justifyContent:"center",
+              animation:todayDone?"none":"gachaFab 1.6s ease-in-out infinite",fontFamily:F}}>
+            {todayDone?"✓":ft.emoji}
+            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:9,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>ひく！</span>}
+          </button>
+        );})()}
+        <style>{`@keyframes gachaFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
         {data.firstActionPending&&(data.goodTasks||[]).length>0&&(
           <div style={{background:GS,border:`2px solid ${G}`,borderRadius:16,padding:"14px 16px",marginBottom:16,position:"relative"}}>
             <button onClick={()=>update(d=>({...d,firstActionPending:false}))} style={{position:"absolute",top:8,right:10,background:"none",border:"none",fontSize:16,cursor:"pointer",color:MUTED}}>✕</button>
@@ -2418,13 +2527,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           );
         })()}
-        {/* Teen: タスクを先に表示（ガチャより優先） */}
+        {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
           <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
-        {/* ── デイリーガチャ（Junior: 最上部 / Teen: タスクの下） ── */}
+        {isJunior && <>
+          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
+        </>}
+        {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
         <div style={{padding:"12px 16px 4px"}}>
           {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 DAILY GACHA</div>}
           {(()=>{
@@ -2519,10 +2632,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
-        {/* Junior: タスクはガチャの後 */}
+        {/* Junior: ガチャの後はショートカット＆きろくのみ（タスク本体はガチャの前へ移動済み） */}
         {isJunior && <>
-          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
-          <DailyTasks child={child} data={data} update={update}/>
           {/* やることへのショートカット */}
           <div style={{padding:"8px 16px 4px"}}>
             <button onClick={()=>setTab("tasks")}
@@ -2791,7 +2902,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
-                {(data.monsterDiscovered?.[child.id]||[]).length}/22
+                {(data.monsterDiscovered?.[child.id]||[]).length}/15
               </span>
               <span style={{fontSize:11,color:MUTED}}>{moreOpen==="zukan"?"▲":"▼"}</span>
             </div>
@@ -2870,7 +2981,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       onClick={()=>{ if(unlocked) update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:equipped?null:h.id}})); }}
                       style={{borderRadius:12,padding:"8px 4px",textAlign:"center",background:equipped?GS:CARD,border:equipped?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.85}}>
                       <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
-                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",filter:unlocked?"none":"brightness(0)"}}
+                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
                         onError={e=>{e.target.style.visibility="hidden"}}/>
                       <div style={{fontSize:9,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                         {unlocked?h.name:"???"}
@@ -3121,9 +3232,16 @@ function ParentDailyTab({data,update,sb}){
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes}:s)
   }));
 
-  const activateSet = id => update(d=>({...d, activeSetId:id,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>({...s,active:s.id===id?true:s.active}))
-  }));
+  // 最大2セットを同時アクティブにトグル(3つ目を選ぶと一番古い選択が外れる)
+  const toggleActive = id => update(d=>{
+    const cur = Array.isArray(d.activeSetIds) ? d.activeSetIds.filter(x=>(d.dailyTaskSets||[]).some(s=>s.id===x)) : (d.activeSetId?[d.activeSetId]:[]);
+    let next;
+    if (cur.includes(id)) next = cur.filter(x=>x!==id);     // 解除
+    else next = [...cur, id].slice(-2);                      // 追加(最大2・古いものから押し出し)
+    if (next.length===0) next = [id];                        // 最低1つは残す
+    return {...d, activeSetIds: next, activeSetId: next[0],
+      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true}:s)};
+  });
 
   const addTaskToSet = (setId, task) => update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:[...s.tasks,task]}:s)
@@ -3175,7 +3293,8 @@ function ParentDailyTab({data,update,sb}){
     {/* セットカード一覧 */}
     {sets.map(s=>{
       const status=getSetStatus(s);
-      const isActive=data.activeSetId===s.id;
+      const activeIds=Array.isArray(data.activeSetIds)&&data.activeSetIds.length?data.activeSetIds:[data.activeSetId];
+      const isActive=activeIds.includes(s.id);
       const isOpen=selSetId===s.id;
       return(<div key={s.id} style={{background:CARD,border:`2px solid ${isActive?G:isOpen?B:BORDER}`,borderRadius:18,marginBottom:10,overflow:"hidden"}}>
 
@@ -3191,12 +3310,13 @@ function ParentDailyTab({data,update,sb}){
             </div>
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            {/* アクティブ切替 */}
-            {!isActive&&<button onClick={()=>activateSet(s.id)}
+            {/* アクティブ切替（最大2つ同時。タップでON/OFF） */}
+            {!isActive&&<button onClick={()=>toggleActive(s.id)}
               style={{padding:"4px 10px",background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
-              選択
+              ＋使う
             </button>}
-            {isActive&&<span style={{padding:"4px 10px",background:`${G}30`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:800,fontSize:11}}>使用中</span>}
+            {isActive&&<button onClick={()=>toggleActive(s.id)}
+              style={{padding:"4px 10px",background:`${G}30`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>使用中✓</button>}
             {/* 展開 */}
             <button onClick={()=>setSelSetId(isOpen?null:s.id)}
               style={{padding:"4px 8px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:8,color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F}}>
@@ -4900,7 +5020,8 @@ function SeedMonster({ child, data, size=90, update }) {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setFrame(f => 1 - f), 500);
+    // 100ms刻みの共通カウンタ。6コマ持ち=300ms送り/2コマ=500ms送りに換算(90=両周期の公倍数)
+    const t = setInterval(() => setFrame(f => (f + 1) % 90), 100);
     return () => clearInterval(t);
   }, []);
 
@@ -4912,7 +5033,8 @@ function SeedMonster({ child, data, size=90, update }) {
     if (evolving) { setWalkX(0); walkRef.current = 0; return; }
     const id = setInterval(() => {
       const nx = Math.round((Math.random() * 2 - 1) * 34);
-      setFace(nx >= walkRef.current ? 1 : -1);
+      // 横向きスプライトは素が左向き。右へ進むときは反転(-1)しないと後ろ歩きに見える
+      setFace(nx >= walkRef.current ? -1 : 1);
       walkRef.current = nx;
       setWalkX(nx);
     }, 2200);
@@ -4933,72 +5055,51 @@ function SeedMonster({ child, data, size=90, update }) {
   const badgeCount     = myLogs.filter(l=>l.type==="badge").length;
   const lifetimePts    = myLogs.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
 
-  // 進化ツリー（ステージごとに必要な累計タスク数。約1週間で最終形に到達する設定）
-  // 前半はやさしく(2→6)、後半はむずかしく(14→28)。index=現在のステージ(0=タマゴ)
-  const STAGE_GATES    = [2, 6, 14, 28];
-  const rawStageId     = (data.monsterEvolved||{})[child.id] || null;
-  // 旧バージョンの無効な保存値はeggとして扱う(画像割れ・名前/バッジ矛盾の防止)
-  const currentStageId = (rawStageId && MONSTER_TREE[rawStageId]) ? rawStageId : null;
+  // ── 進化状態（時間ゲート＋育てた度ゲージの二重条件）──
+  const mon            = getMonState(data, child);
+  const currentStageId = mon.curId === "egg" ? null : mon.curId;
   const evolved        = !!currentStageId;
-  const monDef         = evolved ? MONSTER_TREE[currentStageId] : MONSTER_TREE["egg"];
-  const monsterId      = evolved ? currentStageId : "egg";
-  const curStage       = monDef.stage || 0;
-  const isFinal        = !monDef.evolveA;                          // これ以上進化先がない最終形
-  const nextGate       = isFinal ? null : STAGE_GATES[curStage];    // 次の進化に必要な累計タスク数
-  const prevGate       = curStage > 0 ? (STAGE_GATES[curStage-1] || 0) : 0;
-  const canEvolve      = !isFinal && nextGate != null && totalTasksDone >= nextGate && !!update;
+  const monDef         = mon.def;
+  const monsterId      = mon.curId;
+  const curStage       = mon.stage;
+  const isFinal        = mon.isFinal;
+  const canEvolve      = mon.canEvolve && !!update;
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
-  const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need);
+  const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
-  // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
-  const imgSrc         = `/assets/monster_${dispId}_side_f${frame}.png`;
+  // 6コマ素材持ちは前向きアニメ(特徴パーツが動く)を順送り。それ以外は従来の横向き2コマ
+  const sixFrame       = !!MON_FRAMES6[dispId];
+  // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
+  const hatching       = evolving && monsterId === "egg";
+  const fIdx           = hatching ? (3 + Math.floor(frame/2) % 3)
+                       : sixFrame ? Math.floor(frame / 3) % 6
+                       : Math.floor(frame / 5) % 2;
+  const imgSrc         = (sixFrame || hatching)
+    ? `/assets/monster_${dispId}_f${fIdx}.png`
+    : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
-  // 進化先を分岐ルールで決定
+  // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
+  // 分岐は乱数なしの固定ルール=「子どもの行動」で決まる(図鑑のbranchHintと必ず一致させること)
+  //   1. 目標を1つ達成       → c系統(まなび)   ※意思が一番はっきり出る行動を最優先
+  //   2. 最高れんぞく7日     → a系統(森)
+  //   3. 貯金残高1000以上    → b系統(たから)
+  //   4. どれも未達          → a系統(デフォルト=毎日タッチで誰でも届く森)
   const computeNextStageId = () => {
-    const cur = currentStageId || "egg";
-    const def = MONSTER_TREE[cur] || MONSTER_TREE["egg"];
-    if (!def.evolveA) return null;
-    // 子ごとに違う進化先になるようchild.id+やり直し回数のハッシュで分岐(ワクワク重視)。
-    // 遊び方(継続/目標/バッジ)は少しだけ寄せる。タスク数は誰でも多いので加点しない=全員同じを防ぐ
-    const reroll = ((data.reincarnationCount||{})[child.id]||0) + ((data.rehatchCount||{})[child.id]||0);
-    // 兄弟の並び順。兄弟どうしは必ず違う系統に寄るようローテーションの基準にする
-    const sibIdx = Math.max(0, (data.children||[]).findIndex(c => c.id === child.id));
-    const hashStr = (s) => { let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0); };
-    const jit = (key) => hashStr(child.id + "|" + key + "|" + reroll) % 100;
-    if (cur === "egg") {
-      // 火/森/水の3分岐。水はクリア(累計タスク)で解放されるまで対象外
-      const waterOpen = totalTasksDone >= (LINE_UNLOCK.c || 0);
-      const cands = [
-        { id: def.evolveA, w: jit("egg_a") },                                  // 火
-        { id: def.evolveB, w: jit("egg_b") + Math.min(22, curStreak * 5) },    // 森(継続が得意なら寄る)
-      ];
-      if (waterOpen) cands.push({ id: def.evolveC, w: jit("egg_c") + Math.min(22, goalsDone * 8) }); // 水(目標達成が得意なら寄る)
-      // 兄弟ごとに必ず違う系統に(やり直しで順に変わる)。全員同じを確実に防ぐ
-      const pref = (sibIdx + reroll) % cands.length;
-      cands[pref].w += 1000;
-      cands.sort((a, b) => b.w - a.w);
-      return cands[0].id;
+    const def = MONSTER_TREE[mon.curId] || MONSTER_TREE["egg"];
+    if (def.branch) {
+      if (goalsDone >= 1)  return def.branch[2];  // c まなび
+      if (maxStreak >= 7)  return def.branch[0];  // a 森
+      if (myBal >= 1000)   return def.branch[1];  // b たから
+      return def.branch[0];
     }
-    // 以降のA/B分岐も兄弟＋段＋やり直しで変える(同じ道をたどらせない)
-    const pref = (sibIdx + reroll + hashStr(cur)) % 2;
-    let a = jit(cur + "_a") + Math.min(16, badgeCount * 3);
-    let b = jit(cur + "_b") + Math.min(16, curStreak * 3 + goalsDone * 5);
-    if (pref === 0) a += 1000; else b += 1000;
-    return a >= b ? def.evolveA : def.evolveB;
+    return def.evolveTo || null;
   };
 
-  // 転生可能判定
-  const evolvedAt     = (data.monsterEvolvedAt||{})[child.id] || null;
-  const reincCount    = (data.reincarnationCount||{})[child.id] || 0;
-  // 転生は最終進化後、3日経過＋さらにタスクを頑張ってから（少し努力させる）
-  const REINC_EXTRA    = 15;
-  const reincGoal      = STAGE_GATES[STAGE_GATES.length-1] + REINC_EXTRA; // 28+15=43
-  const reincDaysOk    = evolvedAt ? (new Date() - new Date(evolvedAt)) >= 3*24*60*60*1000 : false;
-  const reincTasksOk   = totalTasksDone >= reincGoal;
-  const canReincarnate = isFinal && evolved && !evolving && reincDaysOk && reincTasksOk;
-  const reincTaskRemain= isFinal ? Math.max(0, reincGoal - totalTasksDone) : 0;
+  // 転生（究極体の4日後に可能）
+  const reincCount     = (data.reincarnationCount||{})[child.id] || 0;
+  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -5017,6 +5118,17 @@ function SeedMonster({ child, data, size=90, update }) {
 
   const handleTap = () => {
     if (evolving) return;
+    // なでなで(お世話)を1日1回だけ育てた度に加算
+    if (update) {
+      const today = todayKey();
+      if (((data.monsterCare||{})[child.id]||{}).last !== today) {
+        update(d => {
+          const c = (d.monsterCare||{})[child.id] || {};
+          if (c.last === today) return d;
+          return {...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}};
+        });
+      }
+    }
     const id = Date.now();
     setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
     setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
@@ -5046,14 +5158,16 @@ function SeedMonster({ child, data, size=90, update }) {
           ...d,
           monsterEvolved:    {...(d.monsterEvolved||{}),    [child.id]: nextId},
           monsterEvolvedAt:  {...(d.monsterEvolvedAt||{}),  [child.id]: now},
+          monsterStageAt:    {...(d.monsterStageAt||{}),    [child.id]: now},
           monsterIV:         {...(d.monsterIV||{}),         [child.id]: iv},
           monsterDiscovered: {...(d.monsterDiscovered||{}), [child.id]: disc},
         };
       });
     }, 1600);
+    const wasEgg = monsterId === "egg";
     setTimeout(() => {
       setEvolving(false);
-      setSpeech("しんかしたよ！🌟");
+      setSpeech(wasEgg ? "うまれたよ！🐣✨" : "しんかしたよ！🌟");
       setTimeout(()=>setSpeech(null),2500);
     }, 2400);
   };
@@ -5065,6 +5179,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ...d,
       monsterEvolved:       {...(d.monsterEvolved||{}),       [child.id]: null},
       monsterEvolvedAt:     {...(d.monsterEvolvedAt||{}),     [child.id]: null},
+      monsterStageAt:       {...(d.monsterStageAt||{}),       [child.id]: new Date().toISOString()},
       reincarnationCount:   {...(d.reincarnationCount||{}),   [child.id]: ((d.reincarnationCount||{})[child.id]||0)+1},
       reincarnationBonus:   {...(d.reincarnationBonus||{}),   [child.id]: {until, rate:0.05}},
     }));
@@ -5079,6 +5194,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ...d,
       monsterEvolved:   {...(d.monsterEvolved||{}),   [child.id]: null},
       monsterEvolvedAt: {...(d.monsterEvolvedAt||{}), [child.id]: null},
+      monsterStageAt:   {...(d.monsterStageAt||{}),   [child.id]: new Date().toISOString()},
       rehatchCount:     {...(d.rehatchCount||{}),     [child.id]: ((d.rehatchCount||{})[child.id]||0)+1},
     }));
     setSpeech("タマゴにもどったよ！🥚");
@@ -5092,9 +5208,8 @@ function SeedMonster({ child, data, size=90, update }) {
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
   ].filter(Boolean).slice(0,3);
 
-  const evoPct    = isFinal ? 100
-    : Math.max(0, Math.min(100, Math.round((totalTasksDone - prevGate) / Math.max(1, nextGate - prevGate) * 100)));
-  const evoRemaining = isFinal ? 0 : Math.max(0, nextGate - totalTasksDone);
+  const evoPct       = mon.growthPct;
+  const evoRemaining = mon.growthRemain;
   const nickname  = (data.monsterNickname||{})[child.id];
   const dispName  = nickname || (skinActive ? skinDef.name : monDef.name);
   const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
@@ -5123,16 +5238,16 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
 
       {/* モンスター画像（デジモン風に横移動） */}
-      <div style={{transform:`translateX(${walkX}px) scaleX(${face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
+      <div style={{transform:`translateX(${walkX}px) scaleX(${sixFrame?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
         <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
           <div style={{
-            animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
+            animation:hatching?"shk 0.3s ease-in-out infinite":evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
             cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
-            filter:evolving?"brightness(2.5) saturate(0.2)":"none",
+            filter:hatching?"none":evolving?"brightness(2.5) saturate(0.2)":"none",  // ハッチ中はヒビを見せる(白飛びさせない)
             transition:"filter 0.4s",
           }}>
-            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block"}}
-              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
+            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block",imageRendering:"pixelated"}}
+              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f0.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
@@ -5175,8 +5290,10 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
             <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
           </div>
-          {!canEvolve && evoRemaining>0 && (
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>あと{evoRemaining}回でしんか✨</div>
+          {!canEvolve && (
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>
+              {!mon.growthOk ? `あと${evoRemaining}でしんか✨` : `⏳ ${fmtTimeRemain(mon.timeRemainMs)}でしんか`}
+            </div>
           )}
         </>
       )}
@@ -5207,7 +5324,7 @@ function SeedMonster({ child, data, size=90, update }) {
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (
         <div style={{marginTop:6,fontSize:9,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
-          {reincTaskRemain>0 ? `🔄 転生まで あと${reincTaskRemain}回がんばろう` : "🔄 転生まで もう少し…"}
+          🔄 転生まで {fmtTimeRemain(mon.reincRemainMs)||"もう少し…"}
         </div>
       )}
       {evolving && (
@@ -5224,7 +5341,7 @@ function SeedMonster({ child, data, size=90, update }) {
       <style>{`
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
-        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
         @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
@@ -5238,46 +5355,96 @@ function SeedMonster({ child, data, size=90, update }) {
 function MonsterZukan({ data, child }) {
   const [expandId, setExpandId] = useState(null);
   const discovered = data.monsterDiscovered?.[child.id] || [];
-  const tDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
-  const allIds = ["egg","1a","1b","1c","2a1","2a2","2b1","2b2","2c1","2c2","3a1","3a2","3b1","3b2","3c1","3c2","4a1","4a2","4b1","4b2","4c1","4c2"];
-  const foundCount = allIds.filter(id => discovered.includes(id)).length;
+  const allIds = ["egg","m01","m02","m03","m04","m05","m06","m07","m08","m09","m10","m11","m12","m13","m14"];
+  const foundCount = allIds.filter(id => discovered.includes(id) || id==="egg").length;
+
+  // 分岐チャート構成: 共通の道 → 分岐点 → 3系統の枝
+  const COMMON = ["egg","m01","m02"];
+  const BRANCHES = [
+    { line:"a", label:"森のみち",     emoji:"🌱", color:G,    bg:GS,
+      cond:"まいにちつづけて さいこう7日れんぞく", ids:["m03","m04","m05","m06"] },
+    { line:"b", label:"たからのみち", emoji:"💰", color:GOLD, bg:GOLDS,
+      cond:"ちょきんを 1000までためる",             ids:["m07","m08","m09","m10"] },
+    { line:"c", label:"まなびのみち", emoji:"📖", color:P,    bg:PS,
+      cond:"もくひょうを 1つたっせいする",           ids:["m11","m12","m13","m14"] },
+  ];
+
+  const Card = ({id, accent}) => {
+    const def = MONSTER_TREE[id];
+    const found = discovered.includes(id) || id === "egg";
+    const isOpen = expandId === id;
+    return (
+      <div onClick={()=>found ? setExpandId(isOpen?null:id) : null}
+        style={{flex:1,minWidth:0,background:found?CARD:CARDS,border:isOpen?`2px solid ${accent||G}`:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 2px",textAlign:"center",cursor:found?"pointer":"default"}}>
+        <img src={`/assets/monster_${id}_f0.png`} alt={found?def.name:"???"}
+          style={{width:42,height:42,objectFit:"contain",display:"block",margin:"0 auto 2px",imageRendering:"pixelated",filter:found?"none":"brightness(0)"}}
+          onError={e=>{e.target.style.visibility="hidden"}}/>
+        <div style={{fontSize:8,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          {found ? def.name : "???"}
+        </div>
+        <div style={{fontSize:7,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
+      </div>
+    );
+  };
+  const Arrow = ({color}) => (
+    <div style={{display:"flex",alignItems:"center",fontSize:10,color:color||MUTED,fontWeight:900,flexShrink:0,padding:"0 1px"}}>▶</div>
+  );
+  // タップしたモンスターの詳細(その行の下に全幅表示)
+  const Detail = ({ids}) => {
+    if (!expandId || !ids.includes(expandId)) return null;
+    const def = MONSTER_TREE[expandId];
+    if (!(discovered.includes(expandId) || expandId==="egg")) return null;
+    return (
+      <div style={{marginTop:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:9,color:TEXTS,lineHeight:1.6,textAlign:"left"}}>
+        <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{def.name} <span style={{color:GOLD}}>{"★".repeat(def.rarity)}</span></div>
+        <div style={{marginBottom:3}}>{def.desc}</div>
+        {def.branchHint && <div style={{color:GP,fontWeight:700,marginBottom:3}}>🔀 {def.branchHint}</div>}
+        {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
+      </div>
+    );
+  };
 
   return (
     <div style={{padding:"0 0 8px"}}>
       <div style={{fontSize:11,color:MUTED,fontWeight:700,marginBottom:10}}>
         発見済み {foundCount} / {allIds.length}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-        {allIds.map(id => {
-          const def = MONSTER_TREE[id];
-          const found = discovered.includes(id) || id === "egg";
-          const lineNeed = LINE_UNLOCK[def.line] || 0;
-          const lineLocked = !found && tDone < lineNeed;   // 未発見かつ系統が未解放
-          const isOpen = expandId === id;
-          return (
-            <div key={id}
-              onClick={()=>found ? setExpandId(isOpen?null:id) : null}
-              style={{background:found?CARD:CARDS,border:`1.5px solid ${found?BORDER:BORDER}`,borderRadius:14,padding:"10px 6px",textAlign:"center",cursor:found?"pointer":"default",transition:"transform .15s",transform:isOpen?"scale(1.04)":"scale(1)"}}>
-              <img
-                src={`/assets/monster_${id}_f0.png`}
-                alt={found?def.name:"???"}
-                style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",filter:found?"none":"brightness(0)"}}
-                onError={e=>{e.target.style.visibility="hidden"}}
-              />
-              <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {found ? def.name : lineLocked ? `🔒 あと${lineNeed-tDone}回` : "???"}
-              </div>
-              <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
-              {isOpen && found && (
-                <div style={{marginTop:6,fontSize:9,color:TEXTS,textAlign:"left",lineHeight:1.5,borderTop:`1px solid ${BORDER}`,paddingTop:6}}>
-                  <div style={{marginBottom:3}}>{def.desc}</div>
-                  {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
-                </div>
-              )}
-            </div>
-          );
-        })}
+
+      {/* ── 共通の道 ── */}
+      <div style={{fontSize:9,color:MUTED,fontWeight:800,marginBottom:4}}>はじまりの道（みんな共通）</div>
+      <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
+        <Card id="egg"/><Arrow/><Card id="m01"/><Arrow/><Card id="m02"/>
+        <div style={{flex:1.2}}/>
       </div>
+      <Detail ids={COMMON}/>
+
+      {/* ── 分岐点 ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 8px"}}>
+        <div style={{flex:1,height:1.5,background:BORDER}}/>
+        <div style={{fontSize:10,fontWeight:900,color:GP}}>🔀 コロミントから 3つの道に分岐！</div>
+        <div style={{flex:1,height:1.5,background:BORDER}}/>
+      </div>
+
+      {/* ── 3系統の枝 ── */}
+      {BRANCHES.map(br => (
+        <div key={br.line} style={{marginBottom:10,background:br.bg,border:`1.5px solid ${br.color}40`,borderRadius:14,padding:"8px 8px 8px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <span style={{fontSize:12}}>{br.emoji}</span>
+            <span style={{fontSize:11,fontWeight:900,color:TEXT}}>{br.label}</span>
+            <span style={{fontSize:8,color:GOLD,fontWeight:700}}>…★{MONSTER_TREE[br.ids[3]].rarity}まで</span>
+          </div>
+          <div style={{fontSize:8.5,color:TEXTS,fontWeight:700,marginBottom:6}}>条件: {br.cond} で進化</div>
+          <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
+            {br.ids.map((id,i)=>(
+              <React.Fragment key={id}>
+                {i>0 && <Arrow color={br.color}/>}
+                <Card id={id} accent={br.color}/>
+              </React.Fragment>
+            ))}
+          </div>
+          <Detail ids={br.ids}/>
+        </div>
+      ))}
     </div>
   );
 }
