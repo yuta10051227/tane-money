@@ -2513,13 +2513,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           );
         })()}
-        {/* Teen: タスクを先に表示（ガチャより優先） */}
+        {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
           <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
-        {/* ── デイリーガチャ（Junior: 最上部 / Teen: タスクの下） ── */}
+        {isJunior && <>
+          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
+          <DailyTasks child={child} data={data} update={update}/>
+        </>}
+        {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
         <div style={{padding:"12px 16px 4px"}}>
           {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 DAILY GACHA</div>}
           {(()=>{
@@ -2614,10 +2618,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           })()}
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
         </div>
-        {/* Junior: タスクはガチャの後 */}
+        {/* Junior: ガチャの後はショートカット＆きろくのみ（タスク本体はガチャの前へ移動済み） */}
         {isJunior && <>
-          <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
-          <DailyTasks child={child} data={data} update={update}/>
           {/* やることへのショートカット */}
           <div style={{padding:"8px 16px 4px"}}>
             <button onClick={()=>setTab("tasks")}

@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="b49d58f">
+<meta name="tane-version" content="336303f">
 </head>
 <body>
   <div id="root"></div>
@@ -6758,6 +6758,16 @@ function ChildScreen({
     child: child,
     data: data,
     update: update
+  })), isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(TabHint, {
+    id: "daily",
+    text: "\u6BCE\u65E5\u30BF\u30B9\u30AF\u3092\u30C1\u30A7\u30C3\u30AF\u3057\u3088\u3046\uFF01\u5168\u90E8\u30AF\u30EA\u30A2\u3059\u308B\u3068\u30DC\u30FC\u30CA\u30B9\u30DD\u30A4\u30F3\u30C8\u304C\u3082\u3089\u3048\u308B\u3088\uD83C\uDF1F",
+    data: data,
+    update: update,
+    cid: child.id
+  }), /*#__PURE__*/React.createElement(DailyTasks, {
+    child: child,
+    data: data,
+    update: update
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "12px 16px 4px"
@@ -7071,17 +7081,7 @@ function ChildScreen({
         color: darkBG ? "rgba(255,255,255,0.3)" : MUTED
       }
     }, t.min, "\u301C", t.max, "pt"))))));
-  })(), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`)), isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(TabHint, {
-    id: "daily",
-    text: "\u6BCE\u65E5\u30BF\u30B9\u30AF\u3092\u30C1\u30A7\u30C3\u30AF\u3057\u3088\u3046\uFF01\u5168\u90E8\u30AF\u30EA\u30A2\u3059\u308B\u3068\u30DC\u30FC\u30CA\u30B9\u30DD\u30A4\u30F3\u30C8\u304C\u3082\u3089\u3048\u308B\u3088\uD83C\uDF1F",
-    data: data,
-    update: update,
-    cid: child.id
-  }), /*#__PURE__*/React.createElement(DailyTasks, {
-    child: child,
-    data: data,
-    update: update
-  }), /*#__PURE__*/React.createElement("div", {
+  })(), /*#__PURE__*/React.createElement("style", null, `@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`)), isJunior && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "8px 16px 4px"
     }
