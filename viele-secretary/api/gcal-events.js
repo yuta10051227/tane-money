@@ -19,7 +19,7 @@ async function getCalendars(at) {
   const r = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&maxResults=250", { headers: { Authorization: `Bearer ${at}` } });
   if (!r.ok) throw new Error("calendarList " + r.status);
   const j = await r.json();
-  return (j.items || []).map((c) => ({ id: c.id, summary: c.summaryOverride || c.summary || c.id, primary: !!c.primary }));
+  return (j.items || []).map((c) => ({ id: c.id, summary: c.summaryOverride || c.summary || c.id, primary: !!c.primary, accessRole: c.accessRole || "reader" }));
 }
 async function getEvents(at, calId, timeMin, timeMax) {
   const p = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250" });
