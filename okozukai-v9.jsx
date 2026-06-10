@@ -244,9 +244,10 @@ const MONSTER_TREE = {
           edu:"お金は「ためる」と少しずつ増えていく。小さなタネも、毎日の水やりで大きく育つよ。" },
   m02:  { id:"m02", name:"コロミント", rarity:1, line:"", stage:2, branch:["m03","m07","m11"],
           desc:"葉っぱの芽が出てきた幼年期。これから3つの道のどれかに進化する。",
-          edu:"同じスタートでも、どんな毎日を過ごすかで未来は変わる。きみの行動が進化先を決めるよ。" },
+          edu:"ここで3つの道に分かれるよ。もくひょうを達成すると「まなび」、れんぞく7日で「森」、ちょきん1000で「たから」へ進化！" },
   // ── A系統：自然・森（こつこつ継続で寄る）──
   m03:  { id:"m03", name:"バドゥクン", rarity:2, line:"a", stage:3, evolveTo:"m04",
+          branchHint:"まいにちつづけて さいこう7日れんぞくで こっちに進化！",
           desc:"森の若芽をせおったいたずら好き。毎日の小さな積み重ねが大すき。",
           edu:"毎日コツコツ続けることを「習慣」という。少しずつでも毎日ためると、1年で大きな差になる。" },
   m04:  { id:"m04", name:"フロラクン", rarity:3, line:"a", stage:4, evolveTo:"m05",
@@ -260,6 +261,7 @@ const MONSTER_TREE = {
           edu:"自然はみんなの大切な財産。お金も、人やまわりと分け合うと、もっと大きな力になる。" },
   // ── B系統：竜・歴史（タスク&バッジで強くなると寄る）──
   m07:  { id:"m07", name:"スパイドラ", rarity:2, line:"b", stage:3, evolveTo:"m08",
+          branchHint:"ちょきんを 1000までためると こっちに進化！",
           desc:"小さな竜の子。たからものを集めるのが得意で、好奇心おうせい。",
           edu:"大むかし、人は貝や石をお金として使った。やがて金や銀の「硬貨」が生まれた。" },
   m08:  { id:"m08", name:"ギルドレイク", rarity:3, line:"b", stage:4, evolveTo:"m09",
@@ -273,6 +275,7 @@ const MONSTER_TREE = {
           edu:"いまは「電子マネー」で形のないお金も使える時代。お金の形は時代とともに進化する。" },
   // ── C系統：民話・学問（まなび&目標で寄る）──
   m11:  { id:"m11", name:"トーテモル", rarity:2, line:"c", stage:3, evolveTo:"m12",
+          branchHint:"もくひょうを 1つたっせいすると こっちに進化！",
           desc:"おまもりを身につけた森の精。ものしりで、なぞなぞが大すき。",
           edu:"世界には「お金のことわざ」がたくさん。『時は金なり』は時間の大切さを教える。" },
   m12:  { id:"m12", name:"スクロベア", rarity:3, line:"c", stage:4, evolveTo:"m13",
@@ -4974,7 +4977,8 @@ function SeedMonster({ child, data, size=90, update }) {
     if (evolving) { setWalkX(0); walkRef.current = 0; return; }
     const id = setInterval(() => {
       const nx = Math.round((Math.random() * 2 - 1) * 34);
-      setFace(nx >= walkRef.current ? 1 : -1);
+      // 横向きスプライトは素が左向き。右へ進むときは反転(-1)しないと後ろ歩きに見える
+      setFace(nx >= walkRef.current ? -1 : 1);
       walkRef.current = nx;
       setWalkX(nx);
     }, 2200);
@@ -5013,23 +5017,18 @@ function SeedMonster({ child, data, size=90, update }) {
   const imgSrc         = `/assets/monster_${dispId}_side_f${frame}.png`;
 
   // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
+  // 分岐は乱数なしの固定ルール=「子どもの行動」で決まる(図鑑のbranchHintと必ず一致させること)
+  //   1. 目標を1つ達成       → c系統(まなび)   ※意思が一番はっきり出る行動を最優先
+  //   2. 最高れんぞく7日     → a系統(森)
+  //   3. 貯金残高1000以上    → b系統(たから)
+  //   4. どれも未達          → a系統(デフォルト=毎日タッチで誰でも届く森)
   const computeNextStageId = () => {
     const def = MONSTER_TREE[mon.curId] || MONSTER_TREE["egg"];
     if (def.branch) {
-      // m02→成長期：3系統のどれかへ。子ごと・やり直し回数・遊び方で寄せる(ワクワク重視)
-      const reroll = ((data.reincarnationCount||{})[child.id]||0) + ((data.rehatchCount||{})[child.id]||0);
-      const sibIdx = Math.max(0, (data.children||[]).findIndex(c => c.id === child.id));
-      const hashStr = (str)=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0);};
-      const jit = (k)=>hashStr(child.id+"|"+k+"|"+reroll)%100;
-      const cands = [
-        { id: def.branch[0], w: jit("a") + Math.min(24, curStreak*4) },   // 自然/森(継続が得意なら寄る)
-        { id: def.branch[1], w: jit("b") + Math.min(24, badgeCount*4) },  // 竜/歴史(バッジが得意なら寄る)
-        { id: def.branch[2], w: jit("c") + Math.min(24, goalsDone*8) },   // 民話/学問(目標が得意なら寄る)
-      ];
-      const pref = (sibIdx + reroll) % cands.length;  // 兄弟どうしは必ず違う系統に寄る
-      cands[pref].w += 1000;
-      cands.sort((a,b)=>b.w-a.w);
-      return cands[0].id;
+      if (goalsDone >= 1)  return def.branch[2];  // c まなび
+      if (maxStreak >= 7)  return def.branch[0];  // a 森
+      if (myBal >= 1000)   return def.branch[1];  // b たから
+      return def.branch[0];
     }
     return def.evolveTo || null;
   };
@@ -5277,7 +5276,7 @@ function SeedMonster({ child, data, size=90, update }) {
       <style>{`
         @keyframes smPop{0%{opacity:0;transform:translateX(-50%) scale(0.7)}70%{transform:translateX(-50%) scale(1.06)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
         @keyframes smSparkle{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(0,-28px)}}
-        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
         @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
@@ -5291,46 +5290,96 @@ function SeedMonster({ child, data, size=90, update }) {
 function MonsterZukan({ data, child }) {
   const [expandId, setExpandId] = useState(null);
   const discovered = data.monsterDiscovered?.[child.id] || [];
-  const tDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const allIds = ["egg","m01","m02","m03","m04","m05","m06","m07","m08","m09","m10","m11","m12","m13","m14"];
-  const foundCount = allIds.filter(id => discovered.includes(id)).length;
+  const foundCount = allIds.filter(id => discovered.includes(id) || id==="egg").length;
+
+  // 分岐チャート構成: 共通の道 → 分岐点 → 3系統の枝
+  const COMMON = ["egg","m01","m02"];
+  const BRANCHES = [
+    { line:"a", label:"森のみち",     emoji:"🌱", color:G,    bg:GS,
+      cond:"まいにちつづけて さいこう7日れんぞく", ids:["m03","m04","m05","m06"] },
+    { line:"b", label:"たからのみち", emoji:"💰", color:GOLD, bg:GOLDS,
+      cond:"ちょきんを 1000までためる",             ids:["m07","m08","m09","m10"] },
+    { line:"c", label:"まなびのみち", emoji:"📖", color:P,    bg:PS,
+      cond:"もくひょうを 1つたっせいする",           ids:["m11","m12","m13","m14"] },
+  ];
+
+  const Card = ({id, accent}) => {
+    const def = MONSTER_TREE[id];
+    const found = discovered.includes(id) || id === "egg";
+    const isOpen = expandId === id;
+    return (
+      <div onClick={()=>found ? setExpandId(isOpen?null:id) : null}
+        style={{flex:1,minWidth:0,background:found?CARD:CARDS,border:isOpen?`2px solid ${accent||G}`:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 2px",textAlign:"center",cursor:found?"pointer":"default"}}>
+        <img src={`/assets/monster_${id}_f0.png`} alt={found?def.name:"???"}
+          style={{width:42,height:42,objectFit:"contain",display:"block",margin:"0 auto 2px",imageRendering:"pixelated",filter:found?"none":"brightness(0)"}}
+          onError={e=>{e.target.style.visibility="hidden"}}/>
+        <div style={{fontSize:8,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          {found ? def.name : "???"}
+        </div>
+        <div style={{fontSize:7,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
+      </div>
+    );
+  };
+  const Arrow = ({color}) => (
+    <div style={{display:"flex",alignItems:"center",fontSize:10,color:color||MUTED,fontWeight:900,flexShrink:0,padding:"0 1px"}}>▶</div>
+  );
+  // タップしたモンスターの詳細(その行の下に全幅表示)
+  const Detail = ({ids}) => {
+    if (!expandId || !ids.includes(expandId)) return null;
+    const def = MONSTER_TREE[expandId];
+    if (!(discovered.includes(expandId) || expandId==="egg")) return null;
+    return (
+      <div style={{marginTop:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:9,color:TEXTS,lineHeight:1.6,textAlign:"left"}}>
+        <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{def.name} <span style={{color:GOLD}}>{"★".repeat(def.rarity)}</span></div>
+        <div style={{marginBottom:3}}>{def.desc}</div>
+        {def.branchHint && <div style={{color:GP,fontWeight:700,marginBottom:3}}>🔀 {def.branchHint}</div>}
+        {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
+      </div>
+    );
+  };
 
   return (
     <div style={{padding:"0 0 8px"}}>
       <div style={{fontSize:11,color:MUTED,fontWeight:700,marginBottom:10}}>
         発見済み {foundCount} / {allIds.length}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-        {allIds.map(id => {
-          const def = MONSTER_TREE[id];
-          const found = discovered.includes(id) || id === "egg";
-          const lineNeed = LINE_UNLOCK[def.line] || 0;
-          const lineLocked = !found && tDone < lineNeed;   // 未発見かつ系統が未解放
-          const isOpen = expandId === id;
-          return (
-            <div key={id}
-              onClick={()=>found ? setExpandId(isOpen?null:id) : null}
-              style={{background:found?CARD:CARDS,border:`1.5px solid ${found?BORDER:BORDER}`,borderRadius:14,padding:"10px 6px",textAlign:"center",cursor:found?"pointer":"default",transition:"transform .15s",transform:isOpen?"scale(1.04)":"scale(1)"}}>
-              <img
-                src={`/assets/monster_${id}_f0.png`}
-                alt={found?def.name:"???"}
-                style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 4px",imageRendering:"pixelated",filter:found?"none":"brightness(0)"}}
-                onError={e=>{e.target.style.visibility="hidden"}}
-              />
-              <div style={{fontSize:9,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {found ? def.name : lineLocked ? `🔒 あと${lineNeed-tDone}回` : "???"}
-              </div>
-              <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
-              {isOpen && found && (
-                <div style={{marginTop:6,fontSize:9,color:TEXTS,textAlign:"left",lineHeight:1.5,borderTop:`1px solid ${BORDER}`,paddingTop:6}}>
-                  <div style={{marginBottom:3}}>{def.desc}</div>
-                  {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
-                </div>
-              )}
-            </div>
-          );
-        })}
+
+      {/* ── 共通の道 ── */}
+      <div style={{fontSize:9,color:MUTED,fontWeight:800,marginBottom:4}}>はじまりの道（みんな共通）</div>
+      <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
+        <Card id="egg"/><Arrow/><Card id="m01"/><Arrow/><Card id="m02"/>
+        <div style={{flex:1.2}}/>
       </div>
+      <Detail ids={COMMON}/>
+
+      {/* ── 分岐点 ── */}
+      <div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 8px"}}>
+        <div style={{flex:1,height:1.5,background:BORDER}}/>
+        <div style={{fontSize:10,fontWeight:900,color:GP}}>🔀 コロミントから 3つの道に分岐！</div>
+        <div style={{flex:1,height:1.5,background:BORDER}}/>
+      </div>
+
+      {/* ── 3系統の枝 ── */}
+      {BRANCHES.map(br => (
+        <div key={br.line} style={{marginBottom:10,background:br.bg,border:`1.5px solid ${br.color}40`,borderRadius:14,padding:"8px 8px 8px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <span style={{fontSize:12}}>{br.emoji}</span>
+            <span style={{fontSize:11,fontWeight:900,color:TEXT}}>{br.label}</span>
+            <span style={{fontSize:8,color:GOLD,fontWeight:700}}>…★{MONSTER_TREE[br.ids[3]].rarity}まで</span>
+          </div>
+          <div style={{fontSize:8.5,color:TEXTS,fontWeight:700,marginBottom:6}}>条件: {br.cond} で進化</div>
+          <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
+            {br.ids.map((id,i)=>(
+              <React.Fragment key={id}>
+                {i>0 && <Arrow color={br.color}/>}
+                <Card id={id} accent={br.color}/>
+              </React.Fragment>
+            ))}
+          </div>
+          <Detail ids={br.ids}/>
+        </div>
+      ))}
     </div>
   );
 }
