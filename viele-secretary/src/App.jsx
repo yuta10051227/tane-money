@@ -252,6 +252,30 @@ const LOG = [
 ];
 
 /* ──────────────────────────────────────────────────────────────
+   重要メール ルール（カテゴリ別キーワード）
+   ────────────────────────────────────────────────────────────── */
+const DEFAULT_MAIL_RULES = {
+  money:     { label: "お金",   icon: "💰", keywords: ["請求","入金","領収","お支払","ご入金","振込","決済","invoice","receipt","payment"] },
+  client:    { label: "顧客",   icon: "💬", keywords: ["問い合わせ","お問合せ","ご質問","申し込み","お申込","ご相談","ご連絡"] },
+  schedule:  { label: "予約",   icon: "📅", keywords: ["予約","日程","打ち合わせ","打合せ","面談","ミーティング","日時","リスケ","キャンセル"] },
+  important: { label: "重要",   icon: "⚠️", keywords: ["締切","期限","契約","重要","更新","ご確認","確認のお願い","要対応"] },
+};
+
+// カテゴリの優先順（最初にマッチした方が勝ち）
+const MAIL_CAT_ORDER = ["important","money","client","schedule"];
+
+// subject + from にどのカテゴリが含まれるか判定
+function classifyMail(mail, rules) {
+  const hay = ((mail.subject || "") + " " + (mail.from || "")).toLowerCase();
+  for (const key of MAIL_CAT_ORDER) {
+    const cat = (rules || DEFAULT_MAIL_RULES)[key];
+    if (!cat) continue;
+    if ((cat.keywords || []).some((kw) => hay.includes(kw.toLowerCase()))) return key;
+  }
+  return null;
+}
+
+/* ──────────────────────────────────────────────────────────────
    初期データ（初回ログイン時にFirestoreへ自動投入）
    日付は「今日」基準の相対値で生成 → どの時点でも信号が機能する
    ────────────────────────────────────────────────────────────── */
@@ -295,6 +319,12 @@ function makeSeed() {
       { id: "f2", name: "SNS集客・マーケ", url: "https://news.google.com/rss/search?q=SNS%20マーケティング%20集客&hl=ja&gl=JP&ceid=JP:ja" },
       { id: "f3", name: "個人事業・フリーランス", url: "https://news.google.com/rss/search?q=個人事業主%20フリーランス&hl=ja&gl=JP&ceid=JP:ja" },
     ],
+    mailRules: {
+      money:     { label: "お金",   icon: "💰", keywords: ["請求","入金","領収","お支払","ご入金","振込","決済","invoice","receipt","payment"] },
+      client:    { label: "顧客",   icon: "💬", keywords: ["問い合わせ","お問合せ","ご質問","申し込み","お申込","ご相談","ご連絡"] },
+      schedule:  { label: "予約",   icon: "📅", keywords: ["予約","日程","打ち合わせ","打合せ","面談","ミーティング","日時","リスケ","キャンセル"] },
+      important: { label: "重要",   icon: "⚠️", keywords: ["締切","期限","契約","重要","更新","ご確認","確認のお願い","要対応"] },
+    },
     digest: null,
     newsCats: ["top", "business", "marketing", "solo"],
     birth: null,
@@ -1212,8 +1242,159 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
   );
 }
 
+/* ──────────────────────────────────────────────────────────────
+   重要メールパネル（Gmail連携）
+   ────────────────────────────────────────────────────────────── */
+function MailPanel({ mails, loading, mailError, rules, onRefresh, onReconnect }) {
+  const MAX_SHOW = 6;
+  const shown = (mails || []).slice(0, MAX_SHOW);
+  const rest = (mails || []).length - MAX_SHOW;
+  const r = rules || DEFAULT_MAIL_RULES;
+
+  const fmtMailDate = (iso) => {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    } catch { return ""; }
+  };
+
+  const catColor = (key) => {
+    const m = { money: C.accent, client: C.green, schedule: C.blue, important: C.red };
+    return m[key] || C.sub;
+  };
+
+  return (
+    <Panel
+      title="重要メール"
+      accent={C.blue}
+      help="Googleカレンダーと同じ連携で、指定キーワードに合致するメールだけを表示します。ルールは「設定・取り込み」から編集できます。"
+      right={
+        <button onClick={onRefresh} disabled={loading} style={{ ...chipBtn, fontSize: 11, padding: "3px 10px" }}>
+          {loading ? "取得中…" : "更新"}
+        </button>
+      }
+    >
+      {mailError && mailError.needReconnect && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ fontSize: 13, color: C.red, marginBottom: 8 }}>
+            メールを見るには再連携が必要です（Gmailスコープの追加が必要）。
+          </div>
+          <button onClick={onReconnect} style={{ ...chipBtn, background: C.text, color: "#0B0D11", borderColor: C.text, fontWeight: 700, fontSize: 12 }}>
+            Googleアカウントを再連携
+          </button>
+        </div>
+      )}
+      {mailError && !mailError.needReconnect && (
+        <div style={{ fontSize: 12, color: C.red, marginBottom: 8, wordBreak: "break-word" }}>
+          取得に失敗：{String((mailError && mailError.message) || mailError)}
+        </div>
+      )}
+      {!mailError && !loading && (mails || []).length === 0 && (
+        <Empty>ルールに合致する重要メールはありません。</Empty>
+      )}
+      {shown.length > 0 && (
+        <div style={{ display: "grid", gap: 0 }}>
+          {shown.map((m, i) => {
+            const catKey = classifyMail(m, r);
+            const cat = catKey ? r[catKey] : null;
+            return (
+              <a
+                key={m.id || i}
+                href={m.link || `https://mail.google.com/mail/u/0/#inbox/${m.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "none", color: "inherit", display: "block", borderBottom: i < shown.length - 1 ? `1px solid ${C.line}` : "none", padding: "9px 0" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <span style={{ fontSize: 16, flex: "0 0 auto" }}>{cat ? cat.icon : "📧"}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: catKey ? catColor(catKey) : C.sub, flex: "0 0 auto", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.from ? m.from.replace(/<[^>]+>/, "").trim().slice(0, 12) : "不明"}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.subject || "(件名なし)"}
+                  </span>
+                  <span style={{ fontSize: 11, color: C.sub, flex: "0 0 auto" }}>
+                    {fmtMailDate(m.dateISO)}
+                  </span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+      {rest > 0 && (
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>ほか {rest}件</div>
+      )}
+    </Panel>
+  );
+}
+
+/* 重要メールのルール編集UI（Acc内） */
+function MailRulesEditor({ rules, onUpdate }) {
+  const r = rules || DEFAULT_MAIL_RULES;
+  const [inputs, setInputs] = useState({ money: "", client: "", schedule: "", important: "" });
+
+  const removeKeyword = (catKey, kw) => {
+    const cat = r[catKey];
+    if (!cat) return;
+    const next = { ...r, [catKey]: { ...cat, keywords: cat.keywords.filter((k) => k !== kw) } };
+    onUpdate(next);
+  };
+
+  const addKeyword = (catKey) => {
+    const kw = (inputs[catKey] || "").trim();
+    if (!kw) return;
+    const cat = r[catKey];
+    if (!cat) return;
+    if ((cat.keywords || []).includes(kw)) { setInputs((s) => ({ ...s, [catKey]: "" })); return; }
+    const next = { ...r, [catKey]: { ...cat, keywords: [...(cat.keywords || []), kw] } };
+    onUpdate(next);
+    setInputs((s) => ({ ...s, [catKey]: "" }));
+  };
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>重要メールのルール（キーワード）</div>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}>
+        件名・差出人にこのキーワードが含まれるメールを「重要メール」として表示します。
+      </div>
+      {Object.entries(r).map(([catKey, cat]) => (
+        <div key={catKey} style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+            {cat.icon} {cat.label}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+            {(cat.keywords || []).map((kw) => (
+              <span key={kw} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 999, padding: "3px 8px" }}>
+                {kw}
+                <button
+                  onClick={() => removeKeyword(catKey, kw)}
+                  style={{ background: "transparent", border: "none", color: C.sub, cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 0, display: "grid", placeItems: "center", width: 16, height: 16 }}
+                  aria-label={`${kw}を削除`}
+                >x</button>
+              </span>
+            ))}
+            {(cat.keywords || []).length === 0 && <span style={{ fontSize: 12, color: C.faint }}>（キーワードなし）</span>}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              value={inputs[catKey] || ""}
+              onChange={(e) => setInputs((s) => ({ ...s, [catKey]: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === "Enter") addKeyword(catKey); }}
+              placeholder="キーワードを追加"
+              style={{ ...inp, marginBottom: 0, flex: 1 }}
+            />
+            <button onClick={() => addKeyword(catKey)} style={chipBtn}>追加</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks }) {
+function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, mailCount, mailPanelRef }) {
   const t = (fortune && fortune.today) || {};
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
@@ -1273,6 +1454,14 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, r
       {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab(0)} />}
       {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab(2)} />}
       {brief && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab(4)} />}
+      {mailCount > 0 && (
+        <Row
+          icon="📧"
+          label={`重要メール ${mailCount}件`}
+          color={C.blue}
+          onClick={() => { if (mailPanelRef && mailPanelRef.current) mailPanelRef.current.scrollIntoView({ behavior: "smooth" }); }}
+        />
+      )}
     </section>
   );
 }
@@ -1816,6 +2005,12 @@ export default function App() {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
 
+  // ── 重要メール（Gmail）状態 ──
+  const [mails, setMails] = useState([]);
+  const [mailLoading, setMailLoading] = useState(false);
+  const [mailError, setMailError] = useState(null);
+  const mailPanelRef = useRef(null);
+
   // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
   const notifySupported = typeof Notification !== "undefined";
   const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
@@ -1944,6 +2139,45 @@ export default function App() {
     }
     notifiedRef.current = true;
   }, [notify, data, notifySupported]);
+
+  // ── 重要メール（Gmail）取得 ──
+  const refreshMails = async (dataArg) => {
+    const d = dataArg || data;
+    if (!d || !d.gcalRefresh) return;
+    const rules = d.mailRules || DEFAULT_MAIL_RULES;
+    // 全カテゴリのキーワードを統合
+    const keywords = Object.values(rules).flatMap((cat) => cat.keywords || []);
+    if (!keywords.length) return;
+    setMailLoading(true);
+    setMailError(null);
+    try {
+      const r = await fetch("/api/gmail-fetch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: d.gcalRefresh, keywords }),
+      });
+      const text = await r.text();
+      let j;
+      try { j = JSON.parse(text); } catch { console.error("[VIELE] gmail-fetch parse error", r.status, text.slice(0, 200)); throw new Error("メールの取得に失敗しました。"); }
+      if (j.error) {
+        const err = new Error(j.error);
+        err.needReconnect = !!j.needReconnect;
+        throw err;
+      }
+      setMails(j.mails || []);
+    } catch (e) {
+      setMailError(e);
+    }
+    setMailLoading(false);
+  };
+
+  // 初回（gcalRefresh が取れたら）自動取得
+  const mailFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!data || !data.gcalRefresh || mailFetchedRef.current) return;
+    mailFetchedRef.current = true;
+    refreshMails(data);
+  }, [data && data.gcalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 今日のまとめ（ニュース）取得 ──
   const newsCats = data ? (data.newsCats || DEFAULT_NEWS_CATS) : DEFAULT_NEWS_CATS;
@@ -2306,8 +2540,20 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} />
+              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} mailCount={mails.length} mailPanelRef={mailPanelRef} />
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
+              {data.gcalRefresh && (
+                <div ref={mailPanelRef}>
+                  <MailPanel
+                    mails={mails}
+                    loading={mailLoading}
+                    mailError={mailError}
+                    rules={data.mailRules || DEFAULT_MAIL_RULES}
+                    onRefresh={() => refreshMails()}
+                    onReconnect={connectCalendar}
+                  />
+                </div>
+              )}
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
               <TimeMeter entries={scheduleEntries} {...calProps} />
@@ -2315,6 +2561,10 @@ export default function App() {
               <Acc title="設定・取り込み" defaultOpen={false}>
                 <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+                <MailRulesEditor
+                  rules={data.mailRules || DEFAULT_MAIL_RULES}
+                  onUpdate={(nextRules) => update({ mailRules: nextRules })}
+                />
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <button
                     style={{ ...chipBtn, display: "inline-flex", alignItems: "center", minHeight: 40, padding: "9px 14px", fontSize: 13 }}
