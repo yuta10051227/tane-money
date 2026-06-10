@@ -498,7 +498,8 @@ const INIT = {
       active: true,
     }
   ],
-  activeSetId: "set_default",  // 現在アクティブなセットID
+  activeSetId: "set_default",  // 後方互換(単一)
+  activeSetIds: ["set_default"],  // 同時アクティブ(最大2)
   dailyProgress: {},
   parents: [
     {id:"p1",name:"パパ",emoji:"👨",pin:"3333",
@@ -633,6 +634,10 @@ function migrate(d) {
     active:s.active!==false,
   }));
   if(!d.activeSetId) d.activeSetId=d.dailyTaskSets[0]?.id||"set_default";
+  // 同時アクティブ配列を保証(旧データはactiveSetIdから生成)。存在するセットのみ・最大2件
+  if(!Array.isArray(d.activeSetIds)||d.activeSetIds.length===0) d.activeSetIds=[d.activeSetId].filter(Boolean);
+  d.activeSetIds=d.activeSetIds.filter(id=>d.dailyTaskSets.some(s=>s.id===id)).slice(0,2);
+  if(d.activeSetIds.length===0&&d.dailyTaskSets[0]) d.activeSetIds=[d.dailyTaskSets[0].id];
   if(!d.dailyProgress) d.dailyProgress={};
   if(!d.rewards||d.rewards.length===0) d.rewards=INIT.rewards;
   if(d.rewards.length<=3&&d.rewards.some(r=>r.id==="r1"||r.id==="r2")) d.rewards=INIT.rewards;
@@ -1036,31 +1041,30 @@ function GachaAnim({ result, onClose }) {
 // ═══════════════════════════════════════════════════════
 function DailyTasks({ child, data, update }) {
   const today  = todayKey();
-  // アクティブセットを取得（期間チェックあり・null安全）
+  // アクティブセットを取得（最大2セットを同時に。期間チェック・null安全）
   const sets = data.dailyTaskSets || [];
-  const activeSet = (() => {
+  const inWindow = s => !!s && s.active!==false &&
+    (!s.startDate || today >= s.startDate) && (!s.endDate || today <= s.endDate);
+  const activeSets = (() => {
     try {
-      if (sets.length === 0) return null;
-      const byId = sets.find(s => s.id === data.activeSetId && s.active);
-      if (byId) {
-        if (byId.startDate && today < byId.startDate) {
-          // 開始前なら他のアクティブセットを探す
-        } else if (byId.endDate && today > byId.endDate) {
-          // 期限切れなら他のアクティブセットを探す
-        } else {
-          return byId;
-        }
+      if (sets.length === 0) return [];
+      const ids = (Array.isArray(data.activeSetIds) && data.activeSetIds.length)
+        ? data.activeSetIds : (data.activeSetId ? [data.activeSetId] : []);
+      let chosen = ids.map(id => sets.find(s => s.id === id)).filter(inWindow);
+      if (chosen.length === 0) {
+        const fb = sets.find(inWindow) || sets.find(s => s.active!==false) || sets[0];
+        chosen = fb ? [fb] : [];
       }
-      // 期間内でactiveなセットを探す
-      return sets.find(s => s.active &&
-        (!s.startDate || today >= s.startDate) &&
-        (!s.endDate   || today <= s.endDate)
-      ) || sets.find(s => s.active) || sets[0] || null;
-    } catch(e) { return null; }
+      return chosen.slice(0, 2);
+    } catch(e) { return []; }
   })();
-  // セットがあればそのタスク、なければlegacy dailyTasksにフォールバック
-  const tasks  = (activeSet?.tasks?.length > 0 ? activeSet.tasks : null) || data.dailyTasks || [];
-  const bonus  = activeSet?.bonus ?? data.dailyBonus ?? 50;
+  const activeSet = activeSets[0] || null;   // 後方互換(ヘッダ表示等)
+  // 2セットのタスクを結合。完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
+  const tasks = activeSets.length
+    ? activeSets.flatMap(s => (Array.isArray(s.tasks)?s.tasks:[]).map(t =>
+        ({...t, _k:`${s.id}::${t.id}`, _setId:s.id, _setName:s.name, _setEmoji:s.emoji})))
+    : (data.dailyTasks || []).map(t => ({...t, _k:t.id, _setId:"", _setName:"", _setEmoji:""}));
+  const bonusTotal = activeSets.reduce((sum,s)=>sum+(s.bonus??0), 0) || (activeSets.length?0:(data.dailyBonus??50));
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
@@ -1086,10 +1090,14 @@ function DailyTasks({ child, data, update }) {
   };
 
   const isCheck   = t => t.type === "check";
-  const isDone    = t => isCheck(t) ? !!prog[t.id] : (prog[t.id]||0) >= (t.target||1);
+  const isDone    = t => isCheck(t) ? !!prog[t._k] : (prog[t._k]||0) >= (t.target||1);
   const doneCount = tasks.filter(t => isDone(t)).length;
   const allDone   = doneCount === tasks.length && tasks.length > 0;
-  const bonusAlreadyGiven = !!prog["__bonus__"];
+  // セット単位の完了/ボーナス判定(2セットそれぞれに全達成ボーナス)
+  const bonusKey  = s => `__bonus__::${s.id}`;
+  const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
+    tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
+  const allBonusGiven = activeSets.length>0 && activeSets.every(s => !s.bonus || prog[bonusKey(s)]);
 
   const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
   const setDailyProg = (d, extra) => ({
@@ -1100,35 +1108,41 @@ function DailyTasks({ child, data, update }) {
     }
   });
 
+  // 該当セットが全部終わったら、そのセットのボーナスを付与(1回だけ)
+  const awardSetBonus = (setId, newProg) => {
+    const s = activeSets.find(x => x.id === setId);
+    if (!s || !s.bonus || s.bonus <= 0) return;
+    if (prog[bonusKey(s)]) return;
+    if (!setDoneIn(s, newProg)) return;
+    setTimeout(() => {
+      const bonusEntry = mkEntry(`🌟 ${s.name} ぜんぶ達成ボーナス！`, s.bonus);
+      update(d => ({ ...setDailyProg(d, {[bonusKey(s)]:true}), logs:[bonusEntry,...d.logs] }));
+      addLogToFirestore(bonusEntry);
+      setFlash({ pts:s.bonus, emoji:"🌟" });
+      setTimeout(()=>setFlash(null),1400);
+    }, 600);
+  };
+
   const handleCheck = t => {
     if (isDone(t)) return;
     showFlash(t.pts, t.emoji);
-    markJustDone(t.id);
+    markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t.id]:true}), logs:[entry,...d.logs] }));
+    update(d => ({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }));
     addLogToFirestore(entry);
-    const newProg = { ...prog, [t.id]: true };
-    const nowAllDone = tasks.every(tt => tt.type==="check" ? !!newProg[tt.id] : (newProg[tt.id]||0)>=(tt.target||1));
-    if (nowAllDone && bonus > 0 && !bonusAlreadyGiven) {
-      setTimeout(() => {
-        const bonusEntry = mkEntry("🌟 全タスク達成ボーナス！", bonus);
-        update(d => ({ ...setDailyProg(d, {[t.id]:true,"__bonus__":true}), logs:[bonusEntry,...d.logs] }));
-        addLogToFirestore(bonusEntry);
-        setFlash({ pts:bonus, emoji:"🌟" });
-        setTimeout(()=>setFlash(null),1400);
-      }, 600);
-    }
+    awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
 
   const handleCount = t => {
-    const cur = prog[t.id] || 0;
+    const cur = prog[t._k] || 0;
     if (cur >= (t.target||1) && isDone(t)) return;
     const nxt = cur + 1;
     showFlash(t.pts, t.emoji);
-    if(nxt>=(t.target||1)) markJustDone(t.id);
+    if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t.id]:nxt}), logs:[entry,...d.logs] }));
+    update(d => ({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }));
     addLogToFirestore(entry);
+    if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
 
   return (
@@ -1147,11 +1161,14 @@ function DailyTasks({ child, data, update }) {
 
       {/* Progress bar */}
       <div style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14}}>
-        {/* セット名表示 */}
-        {activeSet&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-          <span style={{fontSize:16}}>{activeSet.emoji}</span>
-          <span style={{fontWeight:800,fontSize:12,color:P}}>{activeSet.name}</span>
-          {activeSet.endDate&&<span style={{fontSize:10,color:MUTED}}>〜{activeSet.endDate}まで</span>}
+        {/* アクティブセット名（最大2つ） */}
+        {activeSets.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          {activeSets.map(s=>(
+            <span key={s.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:`${P}12`,borderRadius:10,padding:"2px 8px"}}>
+              <span style={{fontSize:14}}>{s.emoji}</span>
+              <span style={{fontWeight:800,fontSize:11,color:P}}>{s.name}</span>
+            </span>
+          ))}
         </div>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <p style={{fontWeight:900,fontSize:14,margin:0,color:allDone?G:TEXT}}>
@@ -1162,24 +1179,33 @@ function DailyTasks({ child, data, update }) {
         <div style={{height:10,background:BORDER,borderRadius:5,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${tasks.length?doneCount/tasks.length*100:0}%`,background:allDone?G:Y,borderRadius:5,transition:"width .5s ease"}}/>
         </div>
-        {bonus>0 && (
-          <p style={{color:bonusAlreadyGiven?G:MUTED,fontSize:12,fontWeight:700,margin:0}}>
-            {bonusAlreadyGiven ? `✅ ボーナス +${bonus}pt もらえた！` : `🎁 全部やると +${bonus}pt ボーナス！`}
+        {bonusTotal>0 && (
+          <p style={{color:allBonusGiven?G:MUTED,fontSize:12,fontWeight:700,margin:0}}>
+            {allBonusGiven ? `✅ ボーナス +${bonusTotal}pt もらえた！` : `🎁 ぜんぶやると +${bonusTotal}pt ボーナス！`}
           </p>
         )}
-        {!activeSet&&tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
+        {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
-      {/* Task list */}
+      {/* Task list（セットごとに見出しを付けて2セットまとめ表示） */}
       {tasks.length === 0 && (
         <p style={{color:MUTED,textAlign:"center",fontSize:13,marginTop:20}}>まだデイリータスクがないよ</p>
       )}
-      {tasks.map(t => {
+      {tasks.map((t,i) => {
         const done = isDone(t);
-        const count = isCheck(t) ? null : (prog[t.id]||0);
+        const count = isCheck(t) ? null : (prog[t._k]||0);
+        const showHeader = activeSets.length>1 && (i===0 || tasks[i-1]._setId!==t._setId);
         return (
-          <div key={t.id}
-            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t.id]?"scale(1.08)":"scale(1)", boxShadow:justDone[t.id]?`0 0 0 4px ${G}90`:"none"}}>
+          <React.Fragment key={t._k}>
+          {showHeader&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,margin:"6px 2px 8px",paddingTop:i===0?0:6}}>
+              <span style={{fontSize:15}}>{t._setEmoji}</span>
+              <span style={{fontWeight:800,fontSize:12,color:P}}>{t._setName}</span>
+              <div style={{flex:1,height:1,background:BORDER}}/>
+            </div>
+          )}
+          <div
+            style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t._k]?"scale(1.08)":"scale(1)", boxShadow:justDone[t._k]?`0 0 0 4px ${G}90`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
@@ -1202,6 +1228,7 @@ function DailyTasks({ child, data, update }) {
               </div>
             )}
           </div>
+          </React.Fragment>
         );
       })}
       <style>{`@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
@@ -3189,9 +3216,16 @@ function ParentDailyTab({data,update,sb}){
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes}:s)
   }));
 
-  const activateSet = id => update(d=>({...d, activeSetId:id,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>({...s,active:s.id===id?true:s.active}))
-  }));
+  // 最大2セットを同時アクティブにトグル(3つ目を選ぶと一番古い選択が外れる)
+  const toggleActive = id => update(d=>{
+    const cur = Array.isArray(d.activeSetIds) ? d.activeSetIds.filter(x=>(d.dailyTaskSets||[]).some(s=>s.id===x)) : (d.activeSetId?[d.activeSetId]:[]);
+    let next;
+    if (cur.includes(id)) next = cur.filter(x=>x!==id);     // 解除
+    else next = [...cur, id].slice(-2);                      // 追加(最大2・古いものから押し出し)
+    if (next.length===0) next = [id];                        // 最低1つは残す
+    return {...d, activeSetIds: next, activeSetId: next[0],
+      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true}:s)};
+  });
 
   const addTaskToSet = (setId, task) => update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:[...s.tasks,task]}:s)
@@ -3243,7 +3277,8 @@ function ParentDailyTab({data,update,sb}){
     {/* セットカード一覧 */}
     {sets.map(s=>{
       const status=getSetStatus(s);
-      const isActive=data.activeSetId===s.id;
+      const activeIds=Array.isArray(data.activeSetIds)&&data.activeSetIds.length?data.activeSetIds:[data.activeSetId];
+      const isActive=activeIds.includes(s.id);
       const isOpen=selSetId===s.id;
       return(<div key={s.id} style={{background:CARD,border:`2px solid ${isActive?G:isOpen?B:BORDER}`,borderRadius:18,marginBottom:10,overflow:"hidden"}}>
 
@@ -3259,12 +3294,13 @@ function ParentDailyTab({data,update,sb}){
             </div>
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
-            {/* アクティブ切替 */}
-            {!isActive&&<button onClick={()=>activateSet(s.id)}
+            {/* アクティブ切替（最大2つ同時。タップでON/OFF） */}
+            {!isActive&&<button onClick={()=>toggleActive(s.id)}
               style={{padding:"4px 10px",background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
-              選択
+              ＋使う
             </button>}
-            {isActive&&<span style={{padding:"4px 10px",background:`${G}30`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:800,fontSize:11}}>使用中</span>}
+            {isActive&&<button onClick={()=>toggleActive(s.id)}
+              style={{padding:"4px 10px",background:`${G}30`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>使用中✓</button>}
             {/* 展開 */}
             <button onClick={()=>setSelSetId(isOpen?null:s.id)}
               style={{padding:"4px 8px",background:"transparent",border:`1px solid ${BORDER}`,borderRadius:8,color:MUTED,fontSize:13,cursor:"pointer",fontFamily:F}}>
