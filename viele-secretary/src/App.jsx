@@ -5,7 +5,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart } from "./natal";
+import { computeChart, dayEnergy } from "./natal";
 
 const STORE_KEY = "viele-secretary";
 
@@ -1216,9 +1216,16 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
   const next = (today || [])[0];
   const sc = Number(t.score) || 0;
-  const mode = sc >= 4 ? { label: "攻めの日", color: C.green, tip: t.action }
-    : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
-      : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
+  const byStance = {
+    攻め: { label: "攻めの日", color: C.green, tip: t.action },
+    守り: { label: "守りの日", color: C.red, tip: t.caution || t.action },
+    整える: { label: "整える日", color: C.accent, tip: t.action },
+    労い: { label: "労いの日", color: C.blue, tip: t.action },
+  };
+  const mode = t.stance ? byStance[t.stance]
+    : sc >= 4 ? { label: "攻めの日", color: C.green, tip: t.action }
+      : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
+        : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
   const Row = ({ icon, label, color, onClick }) => (
     <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
       <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
@@ -1916,11 +1923,13 @@ export default function App() {
     setFortuneLoading(true);
     setFortuneError(null);
     try {
-      const chartText = computeChart(birthOverride || data.birth || DEFAULT_BIRTH).text; // 命式はブラウザ側で計算
+      const birth = birthOverride || data.birth || DEFAULT_BIRTH;
+      const chartText = computeChart(birth).text; // 命式はブラウザ側で計算
+      const energy = dayEnergy(birth, iso(new Date())); // その日の気（決定論的にスコア＆スタンス）
       const r = await fetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chart: chartText, situation: buildSituation(data), today: iso(new Date()) }),
+        body: JSON.stringify({ chart: chartText, situation: buildSituation(data), today: iso(new Date()), energy }),
       });
       const text = await r.text();
       let j;

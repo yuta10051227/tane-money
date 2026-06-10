@@ -1,7 +1,7 @@
 // VIELE secretary — 運気API（年運・月運・日運）
-// ユーザー自身が取得した命式データ(西洋占星術/四柱推命/インドダシャー)を根拠に、
-// Geminiが「断定的で愛ある厳しさ(細木数子風)」で鑑定。外部占い文は再配信しない。
-// 出典: 大久保占い研究室 (senjutsu.jp) — データのライセンスに従い明記。
+// 自前エンジンの命式＋「その日の気」(命式から決定論的に算出したスコア/スタンス)を根拠に、
+// Geminiが“やさしめ＋メリハリ”で鑑定（攻め/守り/整える/労いを日替わりで）。
+// スコア・運気の波は命式由来の決定論値で確定させ、毎日きちんと変化させる。外部占い文は再配信しない。
 
 import { geminiText } from "./_gemini.js";
 
@@ -14,6 +14,7 @@ export default async function handler(req, res) {
     // 命式テキストはクライアント側(自前エンジン)で計算済みのものを受け取る
     const chart = body.chart || "";
     const situation = body.situation || "";
+    const energy = body.energy || null; // その日の気（スコア/スタンス/関係）を決定論的に算出済み
 
     const key = process.env.GEMINI_API_KEY;
     if (!key) { res.status(200).json({ aiEnabled: false }); return; }
@@ -26,16 +27,34 @@ export default async function handler(req, res) {
     const mm = d.getMonth() + 1;
     const dim = new Date(yy, mm, 0).getDate(); // 今月の日数
 
+    // スタンスごとの口調ガイド（やさしめ＋メリハリ）
+    const STANCE_TONE = {
+      攻め: "今日は追い風。明るく熱く背中を押す。『動けば返ってくる』と前向きに。",
+      守り: "今日は試される日。やさしく、守りを固めるよう労わる。脅さず『無理しないで』の姿勢。",
+      整える: "今日は淡々と整える日。落ち着いたトーンで、足元を整えることを肯定する。",
+      労い: "今日は充電してよい日。しっかり褒め、労い、『休むのも仕事』と伝える。",
+    };
+    const te = energy && energy.today ? energy.today : null;
+    const tme = energy && energy.tomorrow ? energy.tomorrow : null;
+    const energyBlock = te
+      ? `【その日の気（命式から算出済み・これを必ず土台にする）】\n` +
+        `本日: ${te.ganZhi}・${te.relation}・スタンス=${te.stance}（${te.focus}）スコア${te.score}\n` +
+        (tme ? `明日: ${tme.ganZhi}・${tme.relation}・スタンス=${tme.stance}（${tme.focus}）スコア${tme.score}\n` : "") +
+        `本日の口調方針: ${STANCE_TONE[te.stance] || ""}\n`
+      : "";
+
     const prompt =
-      `あなたは断定的で歯切れがよく、愛のある厳しさで導く占い師です（細木数子の六星占術のような毅然とした口調）。` +
-      `相手は施術業＋コンテンツ発信の一人社長。実用的で背中を押す助言にしてください。\n` +
-      `次の命式データを根拠に、本日(${today})・明日(${tomorrow})・${mm}月(${dim}日間)・${yy}年の運勢を占ってください。\n【命式】\n${chart}\n` +
-      (situation ? `【今のあなたの状況（事業の実データ）】\n${situation}\nこの状況を強く踏まえ、today.work / today.action / month.advice は“今のこの人”に刺さる具体的な助言にすること。\n` : "") +
-      `口調は言い切る（例:「〜しなさい」「〜は禁物」「〜が吉」）。ただし脅さない、前向きに。\n` +
-      `スコアは1〜5の整数。月の日別・年の月別は運気の波が分かるよう変化をつけること。\n` +
+      `あなたは、あたたかく寄り添いながら要所では背中を押す“秘書のような占い師”です。` +
+      `相手は施術業＋コンテンツ発信の一人社長。基本は応援・労い・肯定。日によってメリハリをつけ、勝負日は熱く、しんどい日はやさしく労わってください。` +
+      `絶対に毎日同じ説教を繰り返さないこと。脅さない、詰めない、追い込まない。\n` +
+      `次の命式と「その日の気」を根拠に、本日(${today})・明日(${tomorrow})・${mm}月(${dim}日間)・${yy}年の運勢を占ってください。\n【命式】\n${chart}\n` +
+      energyBlock +
+      (situation ? `【参考：いま抱えていること】\n${situation}\nこれは“今日の一手(action)”を1つだけ、やさしく具体的に添えるためだけに使う。仕事運・金運・対人運・戒めに毎回これを持ち込まないこと（同じ話の繰り返しを避ける）。\n` : "") +
+      `口調はやさしく、要所だけ言い切る。命令ばかりにしない。「〜してみよう」「今日は休んでいい」「よくやっている」等、肯定や労いも入れる。\n` +
+      `戒め(caution)は“脅し”ではなく“やさしい気づき”にし、日替わりで内容を必ず変える。\n` +
       `出力は必ず次のJSONのみ（前置き・説明・コードフェンス不要）:\n` +
-      `{"today":{"score":整数,"theme":"今日の一言","work":"仕事運1〜2文","money":"金運1〜2文","social":"対人運1〜2文","action":"今日の行動1文","caution":"戒め1文","color":"ラッキーカラー"},` +
-      `"tomorrow":{"score":整数,"theme":"明日の一言","work":"仕事運1文","money":"金運1文","social":"対人運1文","action":"明日の行動1文","caution":"戒め1文","color":"ラッキーカラー"},` +
+      `{"today":{"score":整数,"theme":"今日の一言","work":"仕事運1〜2文","money":"金運1〜2文","social":"対人運1〜2文","action":"今日の一手1文","caution":"やさしい気づき1文","color":"ラッキーカラー"},` +
+      `"tomorrow":{"score":整数,"theme":"明日の一言","work":"仕事運1文","money":"金運1文","social":"対人運1文","action":"明日の一手1文","caution":"やさしい気づき1文","color":"ラッキーカラー"},` +
       `"month":{"theme":"今月のテーマ","flow":"今月の流れ2〜3文","advice":"今月の指針1文","days":[${dim}個の整数スコア配列(1日〜${dim}日)]},` +
       `"year":{"theme":"今年のテーマ","flow":"今年の大きな流れ2〜3文","peak":"好機の時期","caution":"慎むべき時期","months":[12個の整数スコア配列(1月〜12月)]}}`;
 
@@ -46,6 +65,13 @@ export default async function handler(req, res) {
     txt = (txt || "").replace(/^```json/i, "").replace(/^```/, "").replace(/```$/, "").trim();
     let fortune = null;
     try { fortune = JSON.parse(txt); } catch { /* ignore */ }
+
+    // スコア・運気の波は命式から算出した決定論値で上書き（AIの固定値・揺れを排除＝毎日ちゃんと変わる）
+    if (fortune && energy) {
+      if (fortune.today && te) { fortune.today.score = te.score; fortune.today.stance = te.stance; }
+      if (fortune.tomorrow && tme) { fortune.tomorrow.score = tme.score; fortune.tomorrow.stance = tme.stance; }
+      if (fortune.month && Array.isArray(energy.monthDays) && energy.monthDays.length) fortune.month.days = energy.monthDays;
+    }
 
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
     res.status(200).json({

@@ -127,3 +127,44 @@ function currentDasha(birthUtc, nakIdx, nakFrac, today) {
   }
   return { md: md.ruler, ad: adRuler, adRange };
 }
+
+/* ──────────────────────────────────────────────────────────────
+   その日の「気」：本人の日主（五行）と、その日の日干の五行の関係から
+   スコア(1〜5)とスタンス(攻め/守り/整える/労い)を決定論的に算出。
+   → 日ごとに本当に変化する運気の波を作る（AI任せの固定値を排除）。
+   ────────────────────────────────────────────────────────────── */
+const FIVE = { 甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土", 己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水" };
+const GEN = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };   // X 生 Y
+const CTRL = { 木: "土", 土: "水", 水: "火", 火: "金", 金: "木" };  // X 剋 Y
+
+// dateISO("YYYY-MM-DD") の日干支から関係を出す
+function relationFor(meElem, dateISO) {
+  const d = new Date(dateISO + "T00:00:00");
+  const idx = ((jdn(d.getFullYear(), d.getMonth() + 1, d.getDate()) - DAY_ANCHOR) % 60 + 60) % 60;
+  const stem = G[idx % 10], branch = Z[idx % 12];
+  const other = FIVE[stem];
+  let relation, score, stance, focus;
+  if (other === meElem) { relation = "比和（仲間の気）"; score = 3; stance = "整える"; focus = "足場を固め、淡々と整える日。無理に広げない。"; }
+  else if (GEN[other] === meElem) { relation = "印（支えられる）"; score = 4; stance = "労い"; focus = "人や学びに支えられる日。受け取り、休み、充電してよい。"; }
+  else if (GEN[meElem] === other) { relation = "食傷（生み出す）"; score = 5; stance = "攻め"; focus = "表現・発信・制作が伸びる日。アウトプットで前進。"; }
+  else if (CTRL[meElem] === other) { relation = "財（掴みにいく）"; score = 4; stance = "攻め"; focus = "成果・お金を取りにいける日。動けば返ってくる。"; }
+  else { relation = "官殺（試される）"; score = 2; stance = "守り"; focus = "プレッシャーがかかる日。守りを固め、背伸びしない。"; }
+  return { ganZhi: stem + branch, stem, branch, element: other, relation, score, stance, focus };
+}
+
+// 本日・明日・今月の日別スコアを返す
+export function dayEnergy(birth, todayISO) {
+  const me = FIVE[computeChart(birth).dayMaster] || "水";
+  const t = new Date(todayISO + "T00:00:00");
+  const tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1);
+  const iso = (x) => x.toISOString().slice(0, 10);
+  const today = relationFor(me, todayISO);
+  const tmr = relationFor(me, iso(tomorrow));
+  // 今月の日別スコア（運気グラフ用）
+  const yy = t.getFullYear(), mm = t.getMonth();
+  const dim = new Date(yy, mm + 1, 0).getDate();
+  const monthDays = [];
+  for (let day = 1; day <= dim; day++) monthDays.push(relationFor(me, `${yy}-${String(mm + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`).score);
+  return { me, today, tomorrow: tmr, monthDays };
+}
+
