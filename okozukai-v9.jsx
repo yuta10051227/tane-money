@@ -307,6 +307,26 @@ const MONSTER_TREE = {
           desc:"究極体・天使のプリン。光の輪と翼をもつ守り神。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
   cpurin_ultB:   { id:"cpurin_ultB",   name:"星界神プリンゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
           desc:"究極体・星界の神プリン。宇宙の星々をしたがえる。", edu:"目標をかなえ続けた者だけが届く、伝説のすがた。" },
+  // ── 猫タネもん：クー(cku) 黒猫 ──
+  cku_egg:    { id:"cku_egg",    name:"クーのタマゴ", rarity:1, line:"cat", stage:0, evolveTo:"cku_b1",
+          desc:"よるのようにくろい、ねこのタマゴ。", edu:"いきものを育てるには毎日のお世話が大切。お金も毎日コツコツ。" },
+  cku_b1:     { id:"cku_b1",     name:"こねこクー", rarity:1, line:"cat", stage:1, evolveTo:"cku_b2",
+          desc:"生まれたての黒いこねこ。目がきらきら。", edu:"小さな一歩のつみ重ねが大きな成長に。" },
+  cku_b2:     { id:"cku_b2",     name:"わんぱくクー", rarity:2, line:"cat", stage:2, evolveTo:"cku_mature",
+          desc:"やんちゃな黒ねこ。よるのおさんぽが大すき。", edu:"毎日つづけると習慣になる。続ける力はお金を育てる力。" },
+  cku_mature: { id:"cku_mature", name:"つぶらのクー", rarity:3, line:"cat", stage:3, branch:["cku_perfA","cku_perfB"],
+          desc:"成熟期のクー。育て方で2つの道に分かれる。",
+          edu:"ここで分岐！れんぞく7日で『森の力』、もくひょう達成で『星の力』へ。" },
+  cku_perfA:  { id:"cku_perfA",  name:"森導士クー", rarity:4, line:"cat", stage:4, evolveTo:"cku_ultA",
+          branchHint:"まいにちつづけて さいこう7日れんぞくで こっちに進化！",
+          desc:"森の力にめざめた完全体のクー。", edu:"続ける力が大きな実りを生む。" },
+  cku_perfB:  { id:"cku_perfB",  name:"星見導師クー", rarity:4, line:"cat", stage:4, evolveTo:"cku_ultB",
+          branchHint:"もくひょうを たっせいすると こっちに進化！",
+          desc:"星の力にめざめた完全体のクー。", edu:"目標をやりとげる力は夢への第一歩。" },
+  cku_ultA:   { id:"cku_ultA",   name:"聖天使クーエル", rarity:5, line:"cat", stage:5, evolveTo:null,
+          desc:"究極体・天使のクー。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
+  cku_ultB:   { id:"cku_ultB",   name:"星界神クーゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
+          desc:"究極体・星界の神クー。", edu:"目標をかなえ続けた者だけが届く伝説のすがた。" },
 };
 
 // 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
@@ -347,6 +367,23 @@ const CAT_LINES = [
       { force:"星の力", color:"#7B61C9", stages:[
         { id:"perfB", label:"星見導師プリン（完全体）", rarity:4 },
         { id:"ultB",  label:"星界神プリンゾーン（究極体）", rarity:5 },
+      ]},
+    ] },
+  { id:"cku", name:"クー", emoji:"🐈‍⬛",
+    stages:[
+      { id:"egg",   label:"タマゴ",   rarity:1 },
+      { id:"b1",    label:"ベビーI",  rarity:1 },
+      { id:"b2",    label:"ベビーII", rarity:2 },
+      { id:"mature",label:"つぶらのクー（成熟期）", rarity:3 },
+    ],
+    branches:[
+      { force:"森の力", color:"#34C77B", stages:[
+        { id:"perfA", label:"森導士クー（完全体）", rarity:4 },
+        { id:"ultA",  label:"聖天使クーエル（究極体）", rarity:5 },
+      ]},
+      { force:"星の力", color:"#7B61C9", stages:[
+        { id:"perfB", label:"星見導師クー（完全体）", rarity:4 },
+        { id:"ultB",  label:"星界神クーゾーン（究極体）", rarity:5 },
       ]},
     ] },
 ];
