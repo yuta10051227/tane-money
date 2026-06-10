@@ -289,6 +289,9 @@ const MONSTER_TREE = {
           edu:"いちばん大切な財産は「学び」。知識は使ってもへらず、一生きみを助けてくれる。" },
 };
 
+// 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
+const MON_FRAMES6 = { m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09:1,m10:1 };
+
 // ═══════════════════════════════════════════════════════
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
 const BG_THEMES = [
@@ -4965,7 +4968,8 @@ function SeedMonster({ child, data, size=90, update }) {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setFrame(f => 1 - f), 500);
+    // 100ms刻みの共通カウンタ。6コマ持ち=300ms送り/2コマ=500ms送りに換算(90=両周期の公倍数)
+    const t = setInterval(() => setFrame(f => (f + 1) % 90), 100);
     return () => clearInterval(t);
   }, []);
 
@@ -5013,8 +5017,12 @@ function SeedMonster({ child, data, size=90, update }) {
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
   const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
-  // ヒーローでは横向き(side)スプライトで歩かせる。無ければ前向き→タマゴにフォールバック
-  const imgSrc         = `/assets/monster_${dispId}_side_f${frame}.png`;
+  // 6コマ素材持ちは前向きアニメ(特徴パーツが動く)を順送り。それ以外は従来の横向き2コマ
+  const sixFrame       = !!MON_FRAMES6[dispId];
+  const fIdx           = sixFrame ? Math.floor(frame / 3) % 6 : Math.floor(frame / 5) % 2;
+  const imgSrc         = sixFrame
+    ? `/assets/monster_${dispId}_f${fIdx}.png`
+    : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
   // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
   // 分岐は乱数なしの固定ルール=「子どもの行動」で決まる(図鑑のbranchHintと必ず一致させること)
@@ -5173,7 +5181,7 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
 
       {/* モンスター画像（デジモン風に横移動） */}
-      <div style={{transform:`translateX(${walkX}px) scaleX(${face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
+      <div style={{transform:`translateX(${walkX}px) scaleX(${sixFrame?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
         <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
           <div style={{
             animation:evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
@@ -5182,7 +5190,7 @@ function SeedMonster({ child, data, size=90, update }) {
             transition:"filter 0.4s",
           }}>
             <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block",imageRendering:"pixelated"}}
-              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f${frame}.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
+              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f0.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
