@@ -279,6 +279,18 @@ function makeSeed() {
       { id: "d1", title: "（例）先行登録 開始", date: iso(addDays(now, 25)), stage: "先行登録" },
       { id: "d2", title: "（例）本申込 開始", date: iso(addDays(now, 40)), stage: "本申込" },
     ],
+    // ローンチKPI（先行登録→本申込CV→売上 の三角ファネル）
+    launches: [
+      {
+        id: "L1",
+        name: "（例）春の新講座ローンチ",
+        goalReg: 100, reg: 67,   // 先行登録：目標/実績（人）
+        goalCv: 30, cv: 12,      // 本申込：目標/実績（人）
+        price: 40000,            // 客単価（円）
+        goalRev: 800000,         // 売上目標（円）
+        deadline: iso(addDays(now, 3)),
+      },
+    ],
     content: [
       { id: "c1", title: "（例）動画コンテンツ", phase: "撮影", done: false },
       { id: "c2", title: "（例）SNS投稿", phase: "編集", done: false },
@@ -1485,7 +1497,146 @@ function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, re
 
 /* 請求・お金（金額・種別つき。未処理合計を表示） */
 const yen = (n) => "¥" + (Number(n) || 0).toLocaleString("ja-JP");
+// 万円表記（1万以上は「¥48万」のように圧縮。それ未満は通常表記）
+const manYen = (n) => {
+  n = Number(n) || 0;
+  if (n >= 10000) return "¥" + (Math.round(n / 1000) / 10).toLocaleString("ja-JP") + "万";
+  return yen(n);
+};
 const MONEY_KINDS = ["請求", "入金", "支払"];
+
+/* ──────────────────────────────────────────────────────────────
+   ローンチKPI：先行登録 → 本申込(CV) → 売上 の三角ファネル
+   各ローンチごとに「目標 vs 実績」を1枚で俯瞰し、締切まで何日かを信号表示。
+   売上実績は 本申込数 × 客単価 で自動計算。
+   ────────────────────────────────────────────────────────────── */
+function FunnelBar({ pct, color, width }) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div style={{ width: width || "100%", height: 12, background: C.panel, borderRadius: 6, overflow: "hidden", border: `1px solid ${C.line}` }}>
+      <div style={{ width: `${p}%`, height: "100%", background: color, borderRadius: 6, transition: "width .3s" }} />
+    </div>
+  );
+}
+
+function LaunchFunnel({ L, onEdit, onRemove }) {
+  const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+  const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+  const price = Number(L.price) || 0;
+  const rev = cv * price, goalRev = Number(L.goalRev) || 0;
+  const regPct = goalReg ? (reg / goalReg) * 100 : 0;
+  const cvPct = goalCv ? (cv / goalCv) * 100 : 0;
+  const revPct = goalRev ? (rev / goalRev) * 100 : 0;
+  const cvRate = reg ? Math.round((cv / reg) * 100) : 0; // 本申込/先行登録 の転換率
+  const sig = L.deadline ? deadlineSignal(L.deadline) : null;
+  const done = (p) => (p >= 100 ? C.green : null);
+
+  const stage = (no, name, color, sub, pct, width) => (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+        <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{no}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{name}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 13, color: done(pct) || color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{sub}</span>
+        <span style={{ fontSize: 12, color: C.sub, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct)}%</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <FunnelBar pct={pct} color={done(pct) || color} width={width} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{L.name}</span>
+        {sig && <span style={{ fontSize: 13, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot} {sig.label}</span>}
+        <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✎</button>
+        <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
+      </div>
+      {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%")}
+      {stage("②", "本申込", C.purple, `${cv}人 · CV ${cvRate}%`, cvPct, "82%")}
+      {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%")}
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
+    </div>
+  );
+}
+
+function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
+  const list = launches || [];
+  const blankNew = { name: "", goalReg: 100, reg: 0, goalCv: 30, cv: 0, price: 30000, goalRev: 800000, deadline: iso(addDays(new Date(), 21)) };
+  const [mode, setMode] = useState(null); // null | "new"
+  const [f, setF] = useState(blankNew);
+  const [editId, setEditId] = useState(null);
+  const [e, setE] = useState(blankNew);
+
+  const numF = (obj, set, key) => (ev) => set({ ...obj, [key]: ev.target.value });
+  const startEdit = (L) => {
+    setEditId(L.id);
+    setE({ name: L.name, goalReg: L.goalReg, reg: L.reg, goalCv: L.goalCv, cv: L.cv, price: L.price, goalRev: L.goalRev, deadline: L.deadline || iso(addDays(new Date(), 21)) });
+  };
+  const toNums = (o) => ({
+    name: (o.name || "").trim(),
+    goalReg: Number(o.goalReg) || 0, reg: Number(o.reg) || 0,
+    goalCv: Number(o.goalCv) || 0, cv: Number(o.cv) || 0,
+    price: Number(o.price) || 0, goalRev: Number(o.goalRev) || 0,
+    deadline: o.deadline,
+  });
+  const saveEdit = () => { if (e.name.trim()) onEdit(editId, toNums(e)); setEditId(null); };
+
+  // 入力フォーム（新規/編集 共通レイアウト）
+  const formFields = (obj, set) => (
+    <>
+      <input value={obj.name} onChange={numF(obj, set, "name")} placeholder="ローンチ名（例：春の新講座）" style={inp} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>先行登録 目標<input value={obj.goalReg} onChange={numF(obj, set, "goalReg")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>登録 実績<input value={obj.reg} onChange={numF(obj, set, "reg")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>本申込 目標<input value={obj.goalCv} onChange={numF(obj, set, "goalCv")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>本申込 実績<input value={obj.cv} onChange={numF(obj, set, "cv")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>客単価（円）<input value={obj.price} onChange={numF(obj, set, "price")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>売上目標（円）<input value={obj.goalRev} onChange={numF(obj, set, "goalRev")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <label style={{ ...lbl, width: "100%" }}>締切日<input type="date" value={obj.deadline} onChange={numF(obj, set, "deadline")} style={inp} /></label>
+    </>
+  );
+
+  return (
+    <Panel
+      title="ローンチKPI（登録→申込→売上）"
+      accent={C.accent}
+      help="ローンチごとに『先行登録 → 本申込(CV) → 売上』を三角ファネルで1枚に表示します。各段に目標と実績、達成率を出し、締切まで何日かを信号(🟢🟠🔴)で示します。売上実績は『本申込人数 × 客単価』で自動計算。数字は✎からいつでも更新できます。"
+      right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
+    >
+      {mode === "new" && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          {formFields(f, setF)}
+          <button
+            style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
+            onClick={() => { if (!f.name.trim()) return; onAdd(toNums(f)); setF(blankNew); setMode(null); }}
+          >追加</button>
+        </div>
+      )}
+      {list.length === 0 && <Empty>ローンチがありません。右上の「＋ローンチ」から、先行登録の目標人数・客単価・売上目標を入れると進捗ファネルが出ます。</Empty>}
+      {list.map((L) =>
+        editId === L.id ? (
+          <div key={L.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            {formFields(e, setE)}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveEdit} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存</button>
+              <button onClick={() => setEditId(null)} style={chipBtn}>取消</button>
+            </div>
+          </div>
+        ) : (
+          <LaunchFunnel key={L.id} L={L} onEdit={startEdit} onRemove={onRemove} />
+        )
+      )}
+    </Panel>
+  );
+}
 
 function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const list = items || [];
@@ -2142,6 +2293,7 @@ export default function App() {
     },
   });
   const content = makeListOps("content");
+  const launches = makeListOps("launches");
   const money = makeListOps("money");
   const tasks = makeListOps("tasks");
   const feedsOps = makeListOps("feeds");
@@ -2295,7 +2447,7 @@ export default function App() {
                       style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.red}`, background: "transparent", color: C.red, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
                       onClick={() => {
                         if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
-                          update({ trips: [], deadlines: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
+                          update({ trips: [], deadlines: [], launches: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
                         }
                       }}
                     >サンプルを全部消す</button>
@@ -2368,13 +2520,21 @@ export default function App() {
         )}
 
         {tab === 2 && (
-          <MoneyList
-            items={data.money}
-            onToggle={money.toggle}
-            onAdd={money.add}
-            onEdit={money.edit}
-            onRemove={money.remove}
-          />
+          <>
+            <LaunchKpi
+              launches={data.launches}
+              onAdd={launches.add}
+              onEdit={launches.edit}
+              onRemove={launches.remove}
+            />
+            <MoneyList
+              items={data.money}
+              onToggle={money.toggle}
+              onAdd={money.add}
+              onEdit={money.edit}
+              onRemove={money.remove}
+            />
+          </>
         )}
 
         {tab === 3 && (
@@ -2449,6 +2609,15 @@ const inp = {
   fontSize: 13,
   marginBottom: 8,
   outline: "none",
+};
+const lbl = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 11,
+  color: C.sub,
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
 };
 const chipBtn = {
   background: "transparent",
