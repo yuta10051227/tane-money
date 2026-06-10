@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="5514949">
+<meta name="tane-version" content="2aa7003">
 </head>
 <body>
   <div id="root"></div>
@@ -482,6 +482,89 @@ const MONSTER_TREE = {
     evolveTo: null,
     desc: "伝説をつむぐ賢者・究極体。学びの力で、人々をゆたかにみちびく。",
     edu: "いちばん大切な財産は「学び」。知識は使ってもへらず、一生きみを助けてくれる。"
+  },
+  // ── 猫タネもん：プリン(cpurin) egg→b1→b2→mature→[森の力/星の力]→ult ──
+  cpurin_egg: {
+    id: "cpurin_egg",
+    name: "プリンのタマゴ",
+    rarity: 1,
+    line: "cat",
+    stage: 0,
+    evolveTo: "cpurin_b1",
+    desc: "鈴のついた、ねこのタマゴ。あたためるとプリンが生まれる。",
+    edu: "いきものを育てるには毎日のお世話が大切。お金も毎日コツコツ育てよう。"
+  },
+  cpurin_b1: {
+    id: "cpurin_b1",
+    name: "こねこプリン",
+    rarity: 1,
+    line: "cat",
+    stage: 1,
+    evolveTo: "cpurin_b2",
+    desc: "生まれたての、ちいさなプリン。げんきいっぱい。",
+    edu: "小さな一歩のつみ重ねが、大きな成長になるよ。"
+  },
+  cpurin_b2: {
+    id: "cpurin_b2",
+    name: "わんぱくプリン",
+    rarity: 2,
+    line: "cat",
+    stage: 2,
+    evolveTo: "cpurin_mature",
+    desc: "あそびざかりのプリン。しっぽをふってごきげん。",
+    edu: "毎日つづけると「習慣」になる。続ける力はお金を育てる力。"
+  },
+  cpurin_mature: {
+    id: "cpurin_mature",
+    name: "つぶらのプリン",
+    rarity: 3,
+    line: "cat",
+    stage: 3,
+    branch: ["cpurin_perfA", "cpurin_perfB"],
+    desc: "成熟期のプリン。育て方で2つの道に分かれる。",
+    edu: "ここで分岐！れんぞく7日で『森の力』、もくひょう達成で『星の力』へ進化するよ。"
+  },
+  cpurin_perfA: {
+    id: "cpurin_perfA",
+    name: "森導士プリン",
+    rarity: 4,
+    line: "cat",
+    stage: 4,
+    evolveTo: "cpurin_ultA",
+    branchHint: "まいにちつづけて さいこう7日れんぞくで こっちに進化！",
+    desc: "森の力にめざめた完全体。みどりの杖で自然をあやつる。",
+    edu: "自然はみんなの大切な財産。続ける力が大きな実りを生む。"
+  },
+  cpurin_perfB: {
+    id: "cpurin_perfB",
+    name: "星見導師プリン",
+    rarity: 4,
+    line: "cat",
+    stage: 4,
+    evolveTo: "cpurin_ultB",
+    branchHint: "もくひょうを たっせいすると こっちに進化！",
+    desc: "星の力にめざめた完全体。星をよんで未来を見る。",
+    edu: "目標を決めてやりとげる力は、夢をかなえる第一歩。"
+  },
+  cpurin_ultA: {
+    id: "cpurin_ultA",
+    name: "聖天使プリンエル",
+    rarity: 5,
+    line: "cat",
+    stage: 5,
+    evolveTo: null,
+    desc: "究極体・天使のプリン。光の輪と翼をもつ守り神。",
+    edu: "コツコツ続けた先に、いちばん輝くすがたが待っている。"
+  },
+  cpurin_ultB: {
+    id: "cpurin_ultB",
+    name: "星界神プリンゾーン",
+    rarity: 5,
+    line: "cat",
+    stage: 5,
+    evolveTo: null,
+    desc: "究極体・星界の神プリン。宇宙の星々をしたがえる。",
+    edu: "目標をかなえ続けた者だけが届く、伝説のすがた。"
   }
 };
 
@@ -8668,12 +8751,63 @@ function ChildScreen({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 6,
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
         fontSize: 12,
         fontWeight: 900,
-        color: GP,
-        marginBottom: 6
+        color: GP
       }
-    }, cat.emoji, " ", cat.name), /*#__PURE__*/React.createElement("div", {
+    }, cat.emoji, " ", cat.name), ((data.monsterEvolved || {})[child.id] || "").startsWith(cat.id) ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 800,
+        color: GP,
+        background: `${G}25`,
+        borderRadius: 8,
+        padding: "3px 10px",
+        flexShrink: 0
+      }
+    }, "\uD83D\uDC3E \u80B2\u6210\u4E2D") : /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (typeof window !== "undefined" && window.confirm(`いまの子をおやすみさせて、${cat.name}をタマゴから育てる？`)) update(d => ({
+          ...d,
+          monsterEvolved: {
+            ...(d.monsterEvolved || {}),
+            [child.id]: `${cat.id}_egg`
+          },
+          monsterEvolvedAt: {
+            ...(d.monsterEvolvedAt || {}),
+            [child.id]: null
+          },
+          monsterStageAt: {
+            ...(d.monsterStageAt || {}),
+            [child.id]: new Date().toISOString()
+          },
+          monsterDiscovered: {
+            ...(d.monsterDiscovered || {}),
+            [child.id]: [...new Set([...((d.monsterDiscovered || {})[child.id] || []), `${cat.id}_egg`])]
+          }
+        }));
+      },
+      style: {
+        fontSize: 10,
+        fontWeight: 800,
+        color: "#fff",
+        background: G,
+        border: "none",
+        borderRadius: 8,
+        padding: "4px 12px",
+        cursor: "pointer",
+        fontFamily: F,
+        flexShrink: 0
+      }
+    }, "\uD83E\uDD5A \u3053\u306E\u3053\u3092\u80B2\u3066\u308B")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -14662,10 +14796,18 @@ function SeedMonster({
   const computeNextStageId = () => {
     const def = MONSTER_TREE[mon.curId] || MONSTER_TREE["egg"];
     if (def.branch) {
-      if (goalsDone >= 1) return def.branch[2]; // c まなび
-      if (maxStreak >= 7) return def.branch[0]; // a 森
-      if (myBal >= 1000) return def.branch[1]; // b たから
-      return def.branch[0];
+      const b = def.branch;
+      if (b.length >= 3) {
+        // 3分岐(m系): まなび>森>たから>default森
+        if (goalsDone >= 1) return b[2]; // c まなび(目標)
+        if (maxStreak >= 7) return b[0]; // a 森(継続)
+        if (myBal >= 1000) return b[1]; // b たから(貯金)
+        return b[0];
+      }
+      // 2分岐(猫): [0]=森の力(継続) / [1]=星の力(目標)
+      if (goalsDone >= 1) return b[1]; // 星の力(目標達成)
+      if (maxStreak >= 7) return b[0]; // 森の力(継続7日)
+      return b[0];
     }
     return def.evolveTo || null;
   };
