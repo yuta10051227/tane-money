@@ -5334,7 +5334,7 @@ function SeedMonster({ child, data, size=90, update }) {
   });
 
   const doEvolve = () => {
-    if (!canEvolve || evolving) return;
+    if ((!canEvolve && !mon.testEvolve) || evolving) return;   // テスト中はcanEvolve判定を待たず進化
     setEvolving(true);
     setSpeech(null);
     const nextId = computeNextStageId();
@@ -5510,8 +5510,8 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
       {isFinal && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
-      {/* 進化ボタン＋進化先ヒント */}
-      {canEvolve && !evolving && (()=>{
+      {/* 進化ボタン＋進化先ヒント (テスト中は分岐ステージでも必ず表示) */}
+      {(canEvolve || (mon.testEvolve && !isFinal)) && !evolving && (()=>{
         const nextId = computeNextStageId();
         const nextDef = nextId ? MONSTER_TREE[nextId] : null;
         return(

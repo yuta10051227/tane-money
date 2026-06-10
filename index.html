@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="50577df">
+<meta name="tane-version" content="a685f40">
 </head>
 <body>
   <div id="root"></div>
@@ -15091,7 +15091,7 @@ function SeedMonster({
     spd: Math.floor(Math.random() * 10) + 1
   });
   const doEvolve = () => {
-    if (!canEvolve || evolving) return;
+    if (!canEvolve && !mon.testEvolve || evolving) return; // テスト中はcanEvolve判定を待たず進化
     setEvolving(true);
     setSpeech(null);
     const nextId = computeNextStageId();
@@ -15537,7 +15537,7 @@ function SeedMonster({
       fontWeight: 700,
       marginTop: 3
     }
-  }, "\uD83D\uDC51 \u3055\u3044\u3057\u3085\u3046\u3057\u3093\u304B\uFF01"), canEvolve && !evolving && (() => {
+  }, "\uD83D\uDC51 \u3055\u3044\u3057\u3085\u3046\u3057\u3093\u304B\uFF01"), (canEvolve || mon.testEvolve && !isFinal) && !evolving && (() => {
     const nextId = computeNextStageId();
     const nextDef = nextId ? MONSTER_TREE[nextId] : null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
