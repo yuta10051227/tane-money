@@ -261,41 +261,34 @@ function makeSeed() {
     trips: [
       {
         id: "t1",
-        title: "大阪セミナー登壇",
+        title: "（例）登壇イベント",
         template: "遠方登壇",
         date: iso(addDays(now, 21)),
         items: templateItems("遠方登壇").map((it, i) => ({ ...it, done: i < 2 })),
       },
       {
         id: "t2",
-        title: "福岡 日帰り施術会",
+        title: "（例）日帰り出張",
         template: "日帰り",
         date: iso(addDays(now, 9)),
         items: templateItems("日帰り").map((it, i) => ({ ...it, done: i < 1 })),
       },
-      {
-        id: "t3",
-        title: "バリ 海外実習",
-        template: "海外実習",
-        date: iso(addDays(now, 75)),
-        items: templateItems("海外実習").map((it, i) => ({ ...it, done: i < 1 })),
-      },
     ],
-    // 二段ローンチ：LINE先行登録 → セミナー本申込
+    // 二段ローンチサンプル
     deadlines: [
-      { id: "d1", title: "LINE先行登録 開始", date: iso(addDays(now, 25)), stage: "先行登録" },
-      { id: "d2", title: "セミナー本申込 開始", date: iso(addDays(now, 40)), stage: "本申込" },
+      { id: "d1", title: "（例）先行登録 開始", date: iso(addDays(now, 25)), stage: "先行登録" },
+      { id: "d2", title: "（例）本申込 開始", date: iso(addDays(now, 40)), stage: "本申込" },
     ],
     content: [
-      { id: "c1", title: "YouTube 長尺（今週分）", phase: "撮影", done: false },
-      { id: "c2", title: "ショート 切り抜き 3本", phase: "編集", done: false },
-      { id: "c3", title: "ブログ 1本（SEO）", phase: "執筆", done: true },
+      { id: "c1", title: "（例）動画コンテンツ", phase: "撮影", done: false },
+      { id: "c2", title: "（例）SNS投稿", phase: "編集", done: false },
+      { id: "c3", title: "（例）ブログ記事", phase: "執筆", done: true },
     ],
     money: [
-      { id: "m1", title: "MF請求書 今月分 発行", amount: 0, kind: "請求", done: false },
-      { id: "m2", title: "Academy 月額 入金確認", amount: 0, kind: "入金", done: false },
+      { id: "m1", title: "（例）請求書 発行", amount: 0, kind: "請求", done: false },
+      { id: "m2", title: "（例）入金確認", amount: 0, kind: "入金", done: false },
     ],
-    tasks: [{ id: "k1", title: "確定申告まわりの資料整理", done: false }],
+    tasks: [{ id: "k1", title: "（例）まず『サンプルを全部消す』で自分の予定に入れ替える", done: false }],
     // まとめ(ニュース)の情報源（編集可）
     feeds: [
       { id: "f1", name: "Googleニュース", url: "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja" },
@@ -304,7 +297,7 @@ function makeSeed() {
     ],
     digest: null,
     newsCats: ["top", "business", "marketing", "solo"],
-    birth: { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 },
+    birth: null,
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     sampleNotice: true, // サンプルデータ識別フラグ
@@ -992,8 +985,8 @@ const NEWS_CATEGORIES = [
 ];
 const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
 
-/* 既定の出生データ（運気の命式計算に使用。data.birth があればそちら優先） */
-const DEFAULT_BIRTH = { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 };
+/* 既定の出生データ — 配布版では null（各ユーザーが自分で入力） */
+const DEFAULT_BIRTH = null;
 
 /* 都道府県→緯度経度（県庁所在地）。出生地選択で命式の精度を確保 */
 const PREFS = [
@@ -1164,9 +1157,10 @@ function BirthEditor({ birth, onSave }) {
     if (!date) { alert("生年月日を入れてください"); return; }
     onSave({ name: name.trim(), date, time: time || "12:00", place: pref, lat: p[1], lon: p[2], utcOffset: 9 });
   };
+  const hasDate = !!(birth && birth.date);
   return (
-    <Acc title="出生情報の編集" color={C.sub}>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
+    <Acc title={hasDate ? "出生情報の編集" : "出生情報を入力（あなたの運勢を占います）"} color={hasDate ? C.sub : C.purple} defaultOpen={!hasDate}>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前（任意）" style={inp} />
       <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>生年月日</label>
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
@@ -1305,62 +1299,76 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
     >
       {aiOff && <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>※ AI機能は現在オフです</div>}
+      {(!birth || !birth.date) && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.purple}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple, marginBottom: 6 }}>
+            まず、あなたの出生情報を入力してください
+          </div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
+            占いはあなたの命式から計算します。下の「出生情報を入力」を開いて生年月日を登録すると、あなた専用の運気が出ます。
+          </div>
+        </div>
+      )}
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
-      {!fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
+      {birth && birth.date && !fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
 
-      {t.theme && (
-        <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
-          <Line label="仕事運" value={t.work} color={C.green} />
-          <Line label="金運" value={t.money} color={C.accent} />
-          <Line label="対人運" value={t.social} color={C.blue} />
-          <Line label="やるべき" value={t.action} color={C.purple} />
-          <Line label="戒め" value={t.caution} color={C.red} />
-          <Line label="ラッキー" value={t.color} color={C.sub} />
-        </Acc>
-      )}
-
-      {tm.theme && (
-        <Acc title="明日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
-          <Line label="仕事運" value={tm.work} color={C.green} />
-          <Line label="金運" value={tm.money} color={C.accent} />
-          <Line label="対人運" value={tm.social} color={C.blue} />
-          <Line label="やるべき" value={tm.action} color={C.purple} />
-          <Line label="ラッキー" value={tm.color} color={C.sub} />
-        </Acc>
-      )}
-
-      {m.theme && (
-        <Acc title={`今月 ・ ${m.theme}`} color={C.blue}>
-          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{m.flow}</div>
-          {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
-          {Array.isArray(m.days) && m.days.length > 0 && (
-            <>
-              <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
-              <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
-              </div>
-            </>
+      {birth && birth.date && (
+        <>
+          {t.theme && (
+            <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
+              <Line label="仕事運" value={t.work} color={C.green} />
+              <Line label="金運" value={t.money} color={C.accent} />
+              <Line label="対人運" value={t.social} color={C.blue} />
+              <Line label="やるべき" value={t.action} color={C.purple} />
+              <Line label="戒め" value={t.caution} color={C.red} />
+              <Line label="ラッキー" value={t.color} color={C.sub} />
+            </Acc>
           )}
-        </Acc>
-      )}
 
-      {y.theme && (
-        <Acc title={`今年 ・ ${y.theme}`} color={C.purple}>
-          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{y.flow}</div>
-          {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
-          {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
-          {Array.isArray(y.months) && y.months.length === 12 && (
-            <>
-              <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
-              <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span>1月</span><span>今月</span><span>12月</span>
-              </div>
-            </>
+          {tm.theme && (
+            <Acc title="明日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
+              <Line label="仕事運" value={tm.work} color={C.green} />
+              <Line label="金運" value={tm.money} color={C.accent} />
+              <Line label="対人運" value={tm.social} color={C.blue} />
+              <Line label="やるべき" value={tm.action} color={C.purple} />
+              <Line label="ラッキー" value={tm.color} color={C.sub} />
+            </Acc>
           )}
-        </Acc>
+
+          {m.theme && (
+            <Acc title={`今月 ・ ${m.theme}`} color={C.blue}>
+              <div style={{ fontSize: 13, lineHeight: 1.6 }}>{m.flow}</div>
+              {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
+              {Array.isArray(m.days) && m.days.length > 0 && (
+                <>
+                  <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
+                  <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                    <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
+                  </div>
+                </>
+              )}
+            </Acc>
+          )}
+
+          {y.theme && (
+            <Acc title={`今年 ・ ${y.theme}`} color={C.purple}>
+              <div style={{ fontSize: 13, lineHeight: 1.6 }}>{y.flow}</div>
+              {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
+              {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
+              {Array.isArray(y.months) && y.months.length === 12 && (
+                <>
+                  <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
+                  <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                    <span>1月</span><span>今月</span><span>12月</span>
+                  </div>
+                </>
+              )}
+            </Acc>
+          )}
+        </>
       )}
 
       <BirthEditor birth={birth} onSave={onSaveBirth} />
@@ -1550,18 +1558,19 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
         style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
       >
         <input value={title} onChange={(ev) => setTitle(ev.target.value)} placeholder="請求・入金項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
-        <input value={amount} onChange={(ev) => setAmount(ev.target.value)} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+        <input value={amount} onChange={(ev) => setAmount(ev.target.value)} placeholder="例: 30000" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
         <select value={kind} onChange={(ev) => setKind(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 70 }}>
           {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
         </select>
         <button type="submit" style={chipBtn}>追加</button>
       </form>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>請求＝出した請求書 ／ 入金＝受け取り ／ 支払＝経費</div>
     </Panel>
   );
 }
 
 function Empty({ children }) {
-  return <div style={{ fontSize: 13, color: C.sub, padding: "6px 2px" }}>{children}</div>;
+  return <div style={{ fontSize: 13, color: C.sub, padding: "8px 2px", lineHeight: 1.6 }}>{children}</div>;
 }
 
 /* 今日の要対応（遅れ・締切間近の集約）。任意でブラウザ通知をオンにできる。 */
@@ -1647,8 +1656,11 @@ function LoginGate({ onLogin, error }) {
       <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
         <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>VIELE</div>
         <h1 style={{ fontSize: 26, margin: "8px 0 6px" }}>secretary</h1>
-        <p style={{ color: C.sub, fontSize: 14, marginBottom: 28 }}>
+        <p style={{ color: C.sub, fontSize: 14, marginBottom: 16 }}>
           一人社長のための秘書ダッシュボード。<br />本人だけが閲覧・全端末で同期。
+        </p>
+        <p style={{ color: C.sub, fontSize: 13, marginBottom: 28, lineHeight: 1.6 }}>
+          ログインすると、あなた専用のデータ領域が作られます。他の人のデータとは完全に分かれています。
         </p>
         <button
           onClick={onLogin}
@@ -1970,10 +1982,14 @@ export default function App() {
   // ── 運気 ──
   const refreshFortune = async (birthOverride) => {
     if (!data) return;
+    const birth = birthOverride || data.birth;
+    if (!birth || !birth.date) {
+      setFortuneError(new Error("先に出生情報を入力してください"));
+      return;
+    }
     setFortuneLoading(true);
     setFortuneError(null);
     try {
-      const birth = birthOverride || data.birth || DEFAULT_BIRTH;
       const chartText = computeChart(birth).text; // 命式はブラウザ側で計算
       const energy = dayEnergy(birth, iso(new Date())); // その日の気（決定論的にスコア＆スタンス）
       const r = await fetch("/api/fortune", {
@@ -2021,6 +2037,7 @@ export default function App() {
 
   useEffect(() => {
     if (!data || fortuneRef.current) return;
+    if (!(data.birth && data.birth.date)) return; // birth 未設定時は自動 fetch しない
     if (!data.fortune || data.fortune.date !== iso(new Date())) {
       fortuneRef.current = true;
       refreshFortune();
@@ -2272,14 +2289,14 @@ export default function App() {
               {data.sampleNotice && (
                 <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
-                    いま表示されているデータはサンプルです（「大阪セミナー登壇」など）。
+                    いま表示されているデータはサンプルです（「（例）」と付いた項目）。
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.red}`, background: "transparent", color: C.red, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
                       onClick={() => {
                         if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
-                          update({ trips: [], deadlines: [], content: [], money: [], tasks: [], manualEvents: [], sampleNotice: false });
+                          update({ trips: [], deadlines: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
                         }
                       }}
                     >サンプルを全部消す</button>
@@ -2299,6 +2316,26 @@ export default function App() {
               <Acc title="設定・取り込み" defaultOpen={false}>
                 <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <button
+                    style={{ ...chipBtn, display: "inline-flex", alignItems: "center", minHeight: 40, padding: "9px 14px", fontSize: 13 }}
+                    onClick={() => {
+                      try {
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        const d = iso(new Date());
+                        a.href = url;
+                        a.download = `viele-backup-${d}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        alert("エクスポートに失敗しました: " + String(e && e.message || e));
+                      }
+                    }}
+                  >データをJSONで書き出す</button>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>全データを viele-backup-YYYY-MM-DD.json としてダウンロードします。</div>
+                </div>
               </Acc>
             </>
           );
@@ -2375,7 +2412,7 @@ export default function App() {
             error={fortuneError}
             aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
             onRefresh={() => refreshFortune()}
-            birth={data.birth || DEFAULT_BIRTH}
+            birth={data.birth}
             onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
           />
         )}
@@ -2419,10 +2456,13 @@ const chipBtn = {
   border: `1px solid ${C.line}`,
   color: C.text,
   borderRadius: 8,
-  padding: "6px 12px",
-  fontSize: 12,
+  padding: "9px 14px",
+  fontSize: 13,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  minHeight: 40,
+  display: "inline-flex",
+  alignItems: "center",
 };
 const iconBtn = {
   background: "transparent",
