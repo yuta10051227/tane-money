@@ -126,6 +126,28 @@ function computeAlerts(data) {
     const diff = daysUntil(d.date);
     if (diff >= 0 && diff <= 7) soon.push({ label: d.title, diff });
   });
+  // ローンチKPI：締切が近い(7日以内)/過ぎた のに進捗が目標の80%未満なら要対応に出す
+  (data.launches || []).forEach((L) => {
+    if (!L.deadline) return;
+    const diff = daysUntil(L.deadline);
+    if (diff > 7 || diff < -30) return; // まだ先 / 終わって久しい ものは出さない
+    const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+    const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+    const rev = cv * (Number(L.price) || 0), goalRev = Number(L.goalRev) || 0;
+    const regPct = goalReg ? (reg / goalReg) * 100 : 100;
+    const cvPct = goalCv ? (cv / goalCv) * 100 : 100;
+    const revPct = goalRev ? (rev / goalRev) * 100 : 100;
+    const worst = Math.min(regPct, cvPct, revPct);
+    if (worst >= 80) return; // どの段も8割以上届いていれば警告しない
+    // 一番遅れている段を文言にする
+    const lag =
+      regPct <= cvPct && regPct <= revPct ? `先行登録 ${reg}/${goalReg}人`
+      : cvPct <= revPct ? `本申込 ${cv}/${goalCv}人`
+      : `売上 ${Math.round(revPct)}%`;
+    const label = `📣 ${L.name}：${lag}（達成${Math.round(worst)}%）`;
+    if (diff < 0) late.push({ label, diff });
+    else soon.push({ label, diff });
+  });
   late.sort((a, b) => a.diff - b.diff);
   soon.sort((a, b) => a.diff - b.diff);
   return { late, soon };
@@ -145,6 +167,16 @@ function buildSituation(data) {
   if (tk.length) lines.push(`未完タスク${tk.length}件: ${tk.slice(0, 2).map((x) => x.title).join("、")}`);
   const trip = (data.trips || []).map((t) => ({ t, d: daysUntil(t.date) })).filter((x) => x.d >= 0).sort((a, b) => a.d - b.d)[0];
   if (trip) lines.push(`次の遠征/イベント: ${trip.t.title}(あと${trip.d}日)`);
+  // 進行中ローンチ（締切が近い順に1件）の進捗を要約
+  const lc = (data.launches || [])
+    .map((L) => ({ L, d: L.deadline ? daysUntil(L.deadline) : 9999 }))
+    .filter((x) => x.d >= -30 && x.d <= 30)
+    .sort((a, b) => a.d - b.d)[0];
+  if (lc) {
+    const L = lc.L;
+    const rev = (Number(L.cv) || 0) * (Number(L.price) || 0);
+    lines.push(`進行中ローンチ: ${L.name}（先行登録${Number(L.reg) || 0}/${Number(L.goalReg) || 0}人・本申込${Number(L.cv) || 0}/${Number(L.goalCv) || 0}人・売上¥${rev.toLocaleString("ja-JP")}/¥${(Number(L.goalRev) || 0).toLocaleString("ja-JP")}・${lc.d >= 0 ? `締切あと${lc.d}日` : `締切${-lc.d}日経過`}）`);
+  }
   return lines.join("\n");
 }
 
