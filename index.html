@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="336303f">
+<meta name="tane-version" content="8c7ae89">
 </head>
 <body>
   <div id="root"></div>
@@ -6459,7 +6459,49 @@ function ChildScreen({
       cursor: "pointer",
       fontFamily: F
     }
-  }, "\u3053\u3046\u304B\u3093\uD83C\uDF89")))), effectiveTab === "daily" && /*#__PURE__*/React.createElement(React.Fragment, null, data.firstActionPending && (data.goodTasks || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u3053\u3046\u304B\u3093\uD83C\uDF89")))), effectiveTab === "daily" && /*#__PURE__*/React.createElement(React.Fragment, null, (() => {
+    const ft = getMonthTheme();
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!todayDone) doGacha();
+      },
+      disabled: todayDone,
+      "aria-label": "\u30C7\u30A4\u30EA\u30FC\u30AC\u30C1\u30E3",
+      style: {
+        position: "fixed",
+        right: 16,
+        bottom: 24,
+        zIndex: 120,
+        width: 66,
+        height: 66,
+        borderRadius: "50%",
+        border: todayDone ? `2px solid ${BORDER}` : "3px solid #fff",
+        background: todayDone ? "radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)" : `radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
+        boxShadow: todayDone ? "0 4px 12px rgba(0,0,0,0.25)" : `0 6px 22px ${ft.color}95`,
+        cursor: todayDone ? "default" : "pointer",
+        fontSize: 30,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        animation: todayDone ? "none" : "gachaFab 1.6s ease-in-out infinite",
+        fontFamily: F
+      }
+    }, todayDone ? "✓" : ft.emoji, !todayDone && /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        top: -7,
+        right: -8,
+        background: R,
+        color: "#fff",
+        fontSize: 9,
+        fontWeight: 900,
+        borderRadius: 10,
+        padding: "1px 6px",
+        border: "1.5px solid #fff",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
+      }
+    }, "\u3072\u304F\uFF01"));
+  })(), /*#__PURE__*/React.createElement("style", null, `@keyframes gachaFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`), data.firstActionPending && (data.goodTasks || []).length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       background: GS,
       border: `2px solid ${G}`,

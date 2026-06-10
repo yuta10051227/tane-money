@@ -2434,6 +2434,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && <>
+        {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
+        {(()=>{ const ft=getMonthTheme(); return (
+          <button onClick={()=>{ if(!todayDone) doGacha(); }} disabled={todayDone} aria-label="デイリーガチャ"
+            style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
+              border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
+              background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
+              boxShadow:todayDone?"0 4px 12px rgba(0,0,0,0.25)":`0 6px 22px ${ft.color}95`,
+              cursor:todayDone?"default":"pointer",fontSize:30,display:"flex",alignItems:"center",justifyContent:"center",
+              animation:todayDone?"none":"gachaFab 1.6s ease-in-out infinite",fontFamily:F}}>
+            {todayDone?"✓":ft.emoji}
+            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:9,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>ひく！</span>}
+          </button>
+        );})()}
+        <style>{`@keyframes gachaFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
         {data.firstActionPending&&(data.goodTasks||[]).length>0&&(
           <div style={{background:GS,border:`2px solid ${G}`,borderRadius:16,padding:"14px 16px",marginBottom:16,position:"relative"}}>
             <button onClick={()=>update(d=>({...d,firstActionPending:false}))} style={{position:"absolute",top:8,right:10,background:"none",border:"none",fontSize:16,cursor:"pointer",color:MUTED}}>✕</button>
