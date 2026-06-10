@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// VIELE secretary — 本人だけ読み書き可
+// VIELE secretary — 本人だけ読み書き可 ＋ メール許可リスト
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -8,24 +8,33 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null
                          && request.auth.uid == uid
-                         && isAllowed(request.auth.uid);
+                         && isAllowed();
 
       // 配下のサブコレクションも同じ本人のみ
       match /{document=**} {
         allow read, write: if request.auth != null
                            && request.auth.uid == uid
-                           && isAllowed(request.auth.uid);
+                           && isAllowed();
       }
     }
 
-    // ── ALLOWLIST ──────────────────────────────────────────────
-    // 完全に自分のアカウントだけにロックしたい場合は、初回ログイン後に
-    // Authentication 画面で確認できる自分のUIDを下の配列に入れる。
-    // 例:  return uid in ['abc123YOUR_UID'];
-    // 空配列のままなら「ログイン本人＝ドキュメント所有者」のみ許可（既定）。
-    function isAllowed(uid) {
-      let allowlist = [];
-      return allowlist.size() == 0 || uid in allowlist;
+    // ── ALLOWLIST（メール許可リスト）─────────────────────────────
+    // 「使わせたい知人のGoogleメール」をここに列挙する。
+    //   ・各自は自分のアカウント・自分のデータで利用する（制限ではなく入場許可）。
+    //   ・リストに無いアカウントは登録・利用できない＝野良ユーザーやコスト悪用を防ぐ。
+    //   ・追加/削除したら firebase deploy --only firestore:rules（または
+    //     Firebaseコンソール > Firestore > ルール に貼り付け）で反映。
+    //   ・ALLOWLIST を空配列 [] にすると「ログイン本人のみ・全員許可」に戻る。
+    // ※ 下のメールは仮置き。自分のログイン用Gmailと知人のメールに置き換えること。
+    function isAllowed() {
+      let ALLOWLIST = [
+        "kururin100542@gmail.com"
+        // , "friend1@gmail.com"
+        // , "friend2@gmail.com"
+      ];
+      return ALLOWLIST.size() == 0
+             || (request.auth.token.email_verified == true
+                 && request.auth.token.email in ALLOWLIST);
     }
   }
 }
