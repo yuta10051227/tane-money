@@ -102,6 +102,14 @@ function deadlineSignal(dateISO) {
 }
 
 /* 「今日の要対応」集約：遅れ(late) と もうすぐ(soon) を抽出（取りこぼし防止） */
+// VAPID公開鍵(Base64URL)を Push API が要求する Uint8Array へ変換
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
 function computeAlerts(data) {
   const late = [];
   const soon = [];
@@ -299,6 +307,7 @@ function makeSeed() {
     birth: { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 },
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
+    sampleNotice: true, // サンプルデータ識別フラグ
     updatedAt: Date.now(),
   };
 }
@@ -364,8 +373,8 @@ function Check({ done, onClick }) {
       onClick={onClick}
       aria-label={done ? "完了を取消" : "完了にする"}
       style={{
-        width: 28,
-        height: 28,
+        width: 40,
+        height: 40,
         borderRadius: 8,
         border: `1.5px solid ${done ? C.green : C.line}`,
         background: done ? C.green : "transparent",
@@ -420,8 +429,8 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <strong style={{ fontSize: 14 }}>{trip.title}</strong>
-                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 6, padding: "1px 6px" }}>🤖自動</span>}
-                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 6, padding: "1px 6px" }}>{trip.template}</span>
+                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
+                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
                   <span style={{ flex: 1 }} />
                   <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
                   <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
@@ -439,7 +448,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                       <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                         <input value={ie.daysBefore} onChange={(e) => setIe({ ...ie, daysBefore: e.target.value })} inputMode="numeric" title="本番の何日前" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                        <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                        <span style={{ fontSize: 11, color: C.sub }}>日前</span>
                         <button onClick={saveItem} style={chipBtn}>保存</button>
                         <button onClick={() => setEditItem(null)} style={iconBtn} title="取消">✕</button>
                       </div>
@@ -469,7 +478,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                   <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                   <input value={ni.daysBefore} onChange={(e) => setNi({ ...ni, daysBefore: e.target.value })} inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                  <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                  <span style={{ fontSize: 11, color: C.sub }}>日前</span>
                   <button onClick={() => { if (!ni.label.trim()) return; onAddItem(trip.id, { label: ni.label.trim(), daysBefore: Number(ni.daysBefore) || 0 }); setNi({ label: "", daysBefore: 7 }); setAddItemFor(null); }} style={chipBtn}>追加</button>
                   <button onClick={() => setAddItemFor(null)} style={iconBtn} title="閉じる">✕</button>
                 </div>
@@ -529,9 +538,9 @@ function DraftPanel({ context }) {
       try {
         const r = await fetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) });
         const text = await r.text();
-        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
-        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-        if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEYを設定）");
+        let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] draft parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。"); }
+        if (!r.ok || j.error) throw new Error(j.error || "サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。");
+        if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
         if (!cancel) setDrafts(j.drafts || (j.raw ? { line: j.raw } : {}));
       } catch (e) { if (!cancel) setErr(e); }
       if (!cancel) setLoading(false);
@@ -840,9 +849,9 @@ function SwipeView({ slides, accent = C.blue, hint }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前へ">‹</button>
+        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 36, height: 36, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前へ">‹</button>
         <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{cur.label}</div>
-        <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
+        <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 36, height: 36, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
       </div>
       <div ref={scroller} onScroll={onScroll} data-hscroll="1" style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {slides.map((s) => (
@@ -856,7 +865,7 @@ function SwipeView({ slides, accent = C.blue, hint }) {
           ))}
         </div>
       )}
-      {hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: "center" }}>{hint}</div>}
+      {hint && <div aria-hidden="true" style={{ fontSize: 11, color: C.sub, marginTop: 8, textAlign: "center" }}>{hint}</div>}
     </>
   );
 }
@@ -959,7 +968,7 @@ function UpcomingRow({ e, writableIds, onEditEvent, onDeleteEvent, busy }) {
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </>
       ) : (
-        <span style={{ fontSize: 11, color: catColor(e.cat), flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
+        <span style={{ fontSize: 11, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
       )}
     </div>
   );
@@ -1029,7 +1038,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: C.faint, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
 
       {error && (
         <div style={{ fontSize: 12, color: C.red, background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, wordBreak: "break-word" }}>
@@ -1056,7 +1065,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
                 <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
-                    <div style={{ fontSize: 11, color: C.faint }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
                   </div>
                 </a>
               ))}
@@ -1072,8 +1081,8 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
       })()}
 
       {digest && digest.aiEnabled === false && briefLines.length === 0 && (
-        <div style={{ fontSize: 11, color: C.faint, marginTop: 12 }}>
-          ※ AI要約はオフ（GeminiキーをVercelに設定すると自動でオンになります）
+        <div style={{ fontSize: 11, color: C.sub, marginTop: 12 }}>
+          ※ AI機能は現在オフです
         </div>
       )}
 
@@ -1093,7 +1102,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
               <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="RSSのURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
               <button onClick={() => { if (!url.trim()) return; onAddFeed({ name: name.trim(), url: url.trim() }); setName(""); setUrl(""); }} style={chipBtn}>追加</button>
             </div>
-            <div style={{ fontSize: 11, color: C.faint }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
+            <div style={{ fontSize: 11, color: C.sub }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
           </div>
         )}
       </div>
@@ -1157,7 +1166,7 @@ function BirthEditor({ birth, onSave }) {
   };
   return (
     <Acc title="出生情報の編集" color={C.sub}>
-      <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前（任意）" style={inp} />
       <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>生年月日</label>
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
@@ -1204,13 +1213,13 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
         {count > 0 && <button onClick={onClear} style={chipBtn}>取り込み{count}件を消去</button>}
       </div>
       {msg && <div style={{ fontSize: 12, color: C.sub, marginTop: 8, wordBreak: "break-word" }}>{msg}</div>}
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
+      <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
     </Panel>
   );
 }
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab }) {
+function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks }) {
   const t = (fortune && fortune.today) || {};
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
@@ -1226,6 +1235,7 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
     : sc >= 4 ? { label: "攻めの日", color: C.green, tip: t.action }
       : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
         : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
+  const rem = Number(remaining) || 0;
   const Row = ({ icon, label, color, onClick }) => (
     <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
       <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
@@ -1236,6 +1246,27 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
   return (
     <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
       <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
+      {/* 今日の残り件数 KPI */}
+      <button onClick={() => onTab(1)} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.text, font: "inherit", padding: "10px 0 4px" }}>
+        {rem === 0 ? (
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>今日の要対応はありません ✨</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontSize: 13, color: C.sub }}>今日の残り</span>
+              <span style={{ fontSize: 28, fontWeight: 700, color: C.accent, lineHeight: 1 }}>{rem}</span>
+              <span style={{ fontSize: 13, color: C.sub }}>件</span>
+            </div>
+            <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>
+              {late > 0 && <span style={{ color: C.red, fontWeight: 700 }}>遅れ{late}</span>}
+              {late > 0 && soon > 0 && <span>・</span>}
+              {soon > 0 && <span style={{ color: C.orange, fontWeight: 700 }}>もうすぐ{soon}</span>}
+              {(late > 0 || soon > 0) && pendingTasks > 0 && <span>・</span>}
+              {pendingTasks > 0 && <span>タスク{pendingTasks}</span>}
+            </div>
+          </>
+        )}
+      </button>
       {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 4px" }}>{t.theme}</div>}
       {mode && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -1273,7 +1304,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       help="あなたの命式（四柱推命・西洋占星術・インド占星術）を根拠に、AIが年・月・日の運勢を鑑定します。各項目はタップで開閉。占いとして参考程度に。"
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
     >
-      {aiOff && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>※ AI(Gemini)キーが未設定です。Vercelに設定すると運気が出ます。</div>}
+      {aiOff && <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>※ AI機能は現在オフです</div>}
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
       {!fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
@@ -1308,7 +1339,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
           {Array.isArray(m.days) && m.days.length > 0 && (
             <>
               <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
-              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
                 <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
               </div>
             </>
@@ -1324,7 +1355,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
           {Array.isArray(y.months) && y.months.length === 12 && (
             <>
               <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
-              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
                 <span>1月</span><span>今月</span><span>12月</span>
               </div>
             </>
@@ -1334,7 +1365,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 
       <BirthEditor birth={birth} onSave={onSaveBirth} />
 
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>
         VIELE オリジナル鑑定AIを採用しています ・ 占いとして参考に
       </div>
     </Panel>
@@ -1368,7 +1399,7 @@ function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect }) {
                     <button
                       key={r.v}
                       onClick={() => onSetRole(c.id, r.v)}
-                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
+                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
                     >{r.label}</button>
                   ))}
                 </div>
@@ -1478,7 +1509,7 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
         <>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
           {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
-          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind) }}>{it.kind}</span>}
+          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
           <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
           <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
         </>
@@ -1530,7 +1561,7 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
 }
 
 function Empty({ children }) {
-  return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
+  return <div style={{ fontSize: 13, color: C.sub, padding: "6px 2px" }}>{children}</div>;
 }
 
 /* 今日の要対応（遅れ・締切間近の集約）。任意でブラウザ通知をオンにできる。 */
@@ -1559,11 +1590,11 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
           {late.slice(0, 5).map((e, i) => (
             <Row key={"l" + i} dot="🔴" color={C.red} label={e.label} right={`${-e.diff}日遅れ`} />
           ))}
-          {late.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか遅れ {late.length - 5}件</div>}
+          {late.length > 5 && <div style={{ fontSize: 12, color: C.sub }}>ほか遅れ {late.length - 5}件</div>}
           {soon.slice(0, 5).map((e, i) => (
             <Row key={"s" + i} dot="🟠" color={C.orange} label={e.label} right={e.diff === 0 ? "今日" : `あと${e.diff}日`} />
           ))}
-          {soon.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか間近 {soon.length - 5}件</div>}
+          {soon.length > 5 && <div style={{ fontSize: 12, color: C.sub }}>ほか間近 {soon.length - 5}件</div>}
         </div>
       )}
     </Panel>
@@ -1574,7 +1605,7 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
 function CalStatusNote({ source, status, error, count, onConnect, connecting, onRefresh, refreshing }) {
   if (source === "calendar") {
     return (
-      <div style={{ fontSize: 12, color: C.green, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
+      <div style={{ fontSize: 12, color: C.green, fontWeight: 700, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
         <span>✅</span>
         <span style={{ flex: 1 }}>Googleカレンダー連携中（今週 {count}件・自動で最新化）</span>
         {onRefresh && (
@@ -1638,16 +1669,15 @@ function LoginGate({ onLogin, error }) {
 
 /* Firestore等のデータ取得エラー画面 */
 function ErrorScreen({ error, onSignOut }) {
+  // 技術的な詳細はコンソールに残す
+  if (error) { try { console.error("[VIELE] データ接続エラー:", error); } catch { /* ignore */ } }
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
-      <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データに接続できません</h2>
+      <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データの読み込みに失敗しました</h2>
       <p style={{ color: C.sub, fontSize: 13 }}>
-        多くの場合 Firestore のルール未公開が原因です（ルールを公開すると直ります）。
+        通信環境を確認して、しばらくしてからもう一度お試しください。
       </p>
-      <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, background: C.panel, padding: 12, borderRadius: 8 }}>
-        {String(error?.code || "")} {String(error?.message || error)}
-      </pre>
       <button onClick={onSignOut} style={{ ...chipBtn, marginTop: 8 }}>ログアウト</button>
     </div>
   );
@@ -1735,10 +1765,11 @@ export default function App() {
     try {
       const r = await fetch("/api/gcal-write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh, action, ...payload }) });
       const text = await r.text();
-      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+      let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-write parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j.error) {
-        if (j.needReconnect) setCalWriteMsg("書き込み権限が必要です。一度「連携を解除」→「連携」で再許可してください。");
-        throw new Error(j.error);
+        if (j.needReconnect) setCalWriteMsg("カレンダーへの書き込み権限が必要です。一度「連携を解除」してから再度「連携」してください。");
+        console.error("[VIELE] gcal-write error", j.error);
+        throw new Error("カレンダーの操作に失敗しました。しばらくしてから再度お試しください。");
       }
       lastCalFetchRef.current = 0; // 直後の再取得を強制
       refreshCalendar();
@@ -1777,15 +1808,33 @@ export default function App() {
   const notifySupported = typeof Notification !== "undefined";
   const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
   const notifiedRef = useRef(false);
-  const enableNotify = async () => {
-    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
-    const p = await Notification.requestPermission();
-    if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
-    else alert("通知が許可されませんでした。端末の設定から許可できます。");
-  };
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
+
+  // 通知ON：許可取得 → プッシュ購読 → 購読をFirestoreに保存（閉じていてもサーバーから届く）
+  // 注意1(iOS): ホーム画面に追加したPWA内でのみプッシュ受信が可能。
+  // 注意2: requestPermission/subscribe はボタンタップの直後に呼ぶ必要がある（このonClick内でOK）。
+  const enableNotify = async () => {
+    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") { alert("通知が許可されませんでした。端末の設定から許可できます。"); return; }
+    setNotify(true); localStorage.setItem("viele-notify", "1");
+    // プッシュ購読（SW対応時のみ。未対応でも「開いた時の通知」は有効なので致命的にしない）
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) { console.warn("VITE_VAPID_PUBLIC_KEY 未設定のためプッシュ購読をスキップ"); return; }
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe(); // 鍵変更に追従するため再購読
+      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+      if (firebaseEnabled && update) update({ pushSub: subscription.toJSON() });
+    } catch (err) {
+      console.error("プッシュ購読エラー:", err); // iOS(ホーム画面未追加)等。許可だけ通った状態で続行
+    }
+  };
 
   // ── Googleカレンダー連携（refresh token方式・data宣言後に置く）──
   // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ・ループ防止でガードを先に立てる）
@@ -1807,12 +1856,13 @@ export default function App() {
       try {
         const r = await fetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
         const text = await r.text();
-        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+        let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-events parse error", r.status, text.slice(0, 200)); throw new Error("カレンダーの取得に失敗しました。しばらくしてから『更新』を押してください。"); }
         if (cancelled) return;
         if (j.error) {
           // 連携が切れている場合は保存済みトークンを破棄して再連携を促す
           if (j.needReconnect) update({ gcalRefresh: null });
-          throw new Error(j.error);
+          console.error("[VIELE] gcal-events error", j.error);
+          throw new Error("カレンダーの取得に失敗しました。再連携が必要な場合は「Googleカレンダーを連携」を押してください。");
         }
         setCalList(j.calendars || []);
         setCalEvents(j.events || []);
@@ -1900,8 +1950,8 @@ export default function App() {
       const urls = [...catUrls, ...customUrls];
       const fp = urls.map((u) => encodeURIComponent(u)).join(",");
       const r = await fetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
+      let j; try { j = await r.json(); } catch { console.error("[VIELE] digest parse error", r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      if (j.error) { console.error("[VIELE] digest error", j.error); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ digest: { date: iso(new Date()), briefing: j.briefing || "", items: (j.items || []).slice(0, 40), aiEnabled: !!j.aiEnabled } });
     } catch (e) {
       setDigestError(e);
@@ -1934,8 +1984,8 @@ export default function App() {
       const text = await r.text();
       let j;
       try { j = JSON.parse(text); }
-      catch { throw new Error(`サーバー応答が不正(HTTP ${r.status}): ${text.slice(0, 200)}`); }
-      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      catch { console.error("[VIELE] fortune parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      if (!r.ok || j.error) { console.error("[VIELE] fortune error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
     } catch (e) {
       setFortuneError(e);
@@ -1952,9 +2002,9 @@ export default function App() {
       const dataUrl = await downscaleImage(file, 1280, 0.7);
       const r = await fetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
       const text = await r.text();
-      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
-      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-      if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEY）");
+      let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] import-schedule parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
+      if (!r.ok || j.error) { console.error("[VIELE] import-schedule error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
+      if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
       const ev = (j.events || []).map((e, i) => ({ id: "mv" + Date.now() + "_" + i, date: e.date, time: e.time || "終日", title: e.title }));
       const existing = data.manualEvents || [];
       const keyOf = (e) => `${e.date}|${e.time}|${e.title}`;
@@ -2025,28 +2075,40 @@ export default function App() {
     update({ trips: [...data.trips, trip] });
   };
   // 削除は誤操作防止のため確認を挟む
-  const confirmDelete = (fn) => { if (window.confirm("削除しますか？この操作は取り消せません。")) fn(); };
-  const removeTrip = (id) => confirmDelete(() => {
+  const confirmDelete = (fn, label) => {
+    const name = label ? `『${label}』` : "この項目";
+    if (window.confirm(`${name}を削除しますか？この操作は取り消せません。`)) fn();
+  };
+  const removeTrip = (id) => {
     const t = data.trips.find((x) => x.id === id);
-    const patch = { trips: data.trips.filter((x) => x.id !== id) };
-    // 自動検知の出張を消したら、同じ予定からは再生成しない
-    if (t && t.auto && t.srcId) patch.tripIgnore = [...(data.tripIgnore || []), t.srcId];
-    update(patch);
-  });
+    confirmDelete(() => {
+      const patch = { trips: data.trips.filter((x) => x.id !== id) };
+      // 自動検知の出張を消したら、同じ予定からは再生成しない
+      if (t && t.auto && t.srcId) patch.tripIgnore = [...(data.tripIgnore || []), t.srcId];
+      update(patch);
+    }, t && t.title);
+  };
   const editTrip = (id, patch) => update({ trips: data.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
   const mapTripItems = (tripId, fn) =>
     update({ trips: data.trips.map((t) => (t.id === tripId ? { ...t, items: fn(t.items) } : t)) });
   const addTripItem = (tripId, item) => mapTripItems(tripId, (items) => [...items, { ...item, done: false }]);
   const editTripItem = (tripId, idx, patch) =>
     mapTripItems(tripId, (items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  const removeTripItem = (tripId, idx) => confirmDelete(() => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx)));
+  const removeTripItem = (tripId, idx) => {
+    const t = data.trips.find((x) => x.id === tripId);
+    const item = t && t.items && t.items[idx];
+    confirmDelete(() => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx)), item && item.label);
+  };
 
   // ── 締切（二段ローンチ）操作 ──
   const addDeadline = (d) => update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] });
   const addDeadlinesBulk = (arr) =>
     update({ deadlines: [...(data.deadlines || []), ...arr.map((d, i) => ({ id: "d" + Date.now() + "_" + i, ...d }))] });
   const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const removeDeadline = (id) => confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }));
+  const removeDeadline = (id) => {
+    const d = (data.deadlines || []).find((x) => x.id === id);
+    confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }), d && d.title);
+  };
 
   // ── 汎用リスト操作（content / money / tasks / feeds）──
   // 既存ユーザーで未定義のキーでも落ちないよう (data[key] || []) で防御
@@ -2057,7 +2119,10 @@ export default function App() {
       update({ [key]: [...(data[key] || []), { id: key[0] + Date.now(), done: false, ...base }] });
     },
     edit: (id, patch) => update({ [key]: (data[key] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
-    remove: (id) => confirmDelete(() => update({ [key]: (data[key] || []).filter((x) => x.id !== id) })),
+    remove: (id) => {
+      const item = (data[key] || []).find((x) => x.id === id);
+      confirmDelete(() => update({ [key]: (data[key] || []).filter((x) => x.id !== id) }), item && item.title);
+    },
   });
   const content = makeListOps("content");
   const money = makeListOps("money");
@@ -2184,7 +2249,7 @@ export default function App() {
             <button
               key={t}
               onClick={() => setTab(i)}
-              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.sub, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
+              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.text, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
             >{t}</button>
           ))}
         </div>
@@ -2198,18 +2263,46 @@ export default function App() {
           </div>
         )}
 
-        {tab === 0 && (
-          <>
-            <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} />
-            <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
-            {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
-            <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
-            <TimeMeter entries={scheduleEntries} {...calProps} />
-            {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
-            <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
-            {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
-          </>
-        )}
+        {tab === 0 && (() => {
+          const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
+          const remaining = alerts.late.length + alerts.soon.length + pendingTasks;
+          return (
+            <>
+              {/* サンプルデータ識別バナー */}
+              {data.sampleNotice && (
+                <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
+                    いま表示されているデータはサンプルです（「大阪セミナー登壇」など）。
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.red}`, background: "transparent", color: C.red, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                      onClick={() => {
+                        if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
+                          update({ trips: [], deadlines: [], content: [], money: [], tasks: [], manualEvents: [], sampleNotice: false });
+                        }
+                      }}
+                    >サンプルを全部消す</button>
+                    <button
+                      style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.line}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                      onClick={() => update({ sampleNotice: false })}
+                    >これは自分のデータ</button>
+                  </div>
+                </div>
+              )}
+              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} />
+              <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
+              {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
+              <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
+              <TimeMeter entries={scheduleEntries} {...calProps} />
+              {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
+              <Acc title="設定・取り込み" defaultOpen={false}>
+                <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
+                {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+              </Acc>
+            </>
+          );
+        })()}
 
         {tab === 1 && (
           <>
@@ -2233,7 +2326,7 @@ export default function App() {
               onEdit={content.edit}
               onRemove={content.remove}
               placeholder="制作物を追加…"
-              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
+              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>{it.phase}</span>}
             />
           </>
         )}
@@ -2334,9 +2427,12 @@ const chipBtn = {
 const iconBtn = {
   background: "transparent",
   border: "none",
-  color: C.faint,
+  color: C.sub,
   cursor: "pointer",
-  fontSize: 13,
-  width: 24,
+  fontSize: 15,
+  width: 40,
+  height: 40,
   flex: "0 0 auto",
+  display: "grid",
+  placeItems: "center",
 };
