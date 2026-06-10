@@ -9,7 +9,7 @@
 
 // ── プッシュ受信 ──────────────────────────────────────────────────
 self.addEventListener("push", (event) => {
-  let payload = { title: "VIELE secretary", body: "", url: "/" };
+  let payload = { title: "ひとり秘書", body: "", url: "/" };
   try {
     if (event.data) {
       payload = { ...payload, ...event.data.json() };

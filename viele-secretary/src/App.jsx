@@ -1374,7 +1374,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       <BirthEditor birth={birth} onSave={onSaveBirth} />
 
       <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>
-        VIELE オリジナル鑑定AIを採用しています ・ 占いとして参考に
+        ひとり秘書の鑑定AIによる占いです ・ 参考程度に
       </div>
     </Panel>
   );
@@ -1654,10 +1654,10 @@ function LoginGate({ onLogin, error }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.text }}>
       <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
-        <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>VIELE</div>
-        <h1 style={{ fontSize: 26, margin: "8px 0 6px" }}>secretary</h1>
-        <p style={{ color: C.sub, fontSize: 14, marginBottom: 16 }}>
-          一人社長のための秘書ダッシュボード。<br />本人だけが閲覧・全端末で同期。
+        <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>ひとりビジネスの</div>
+        <h1 style={{ fontSize: 28, margin: "6px 0 8px" }}>ひとり秘書</h1>
+        <p style={{ color: C.sub, fontSize: 14, marginBottom: 16, lineHeight: 1.7 }}>
+          一人で全部やっているあなたへ。<br />ぜんぶ見て、考えて、確認する。<br />お母さんみたいな、あなた専属の秘書です。
         </p>
         <p style={{ color: C.sub, fontSize: 13, marginBottom: 28, lineHeight: 1.6 }}>
           ログインすると、あなた専用のデータ領域が作られます。他の人のデータとは完全に分かれています。
@@ -1685,7 +1685,7 @@ function ErrorScreen({ error, onSignOut }) {
   if (error) { try { console.error("[VIELE] データ接続エラー:", error); } catch { /* ignore */ } }
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
+      <div style={{ fontSize: 13, letterSpacing: 2, color: C.accent }}>ひとり秘書</div>
       <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データの読み込みに失敗しました</h2>
       <p style={{ color: C.sub, fontSize: 13 }}>
         通信環境を確認して、しばらくしてからもう一度お試しください。
@@ -1936,7 +1936,7 @@ export default function App() {
     const { late, soon } = computeAlerts(data);
     if (late.length + soon.length > 0) {
       try {
-        new Notification("VIELE secretary｜今日の要対応", {
+        new Notification("ひとり秘書｜今日の確認です", {
           body: `遅れ ${late.length}件・もうすぐ ${soon.length}件`,
           icon: "/icon-512.png",
         });
@@ -2254,8 +2254,7 @@ export default function App() {
       {/* ヘッダー＋タブバー */}
       <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(15,17,21,0.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: C.accent }}>VIELE</div>
-          <strong style={{ fontSize: 15 }}>secretary</strong>
+          <strong style={{ fontSize: 16, letterSpacing: 1 }}>ひとり秘書</strong>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: C.sub }}>{dateLabel}</span>
           <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
@@ -2429,7 +2428,7 @@ function Splash({ text }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.sub }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
+        <div style={{ fontSize: 13, letterSpacing: 2, color: C.accent }}>ひとり秘書</div>
         <div style={{ marginTop: 8, fontSize: 14 }}>{text}</div>
       </div>
     </div>

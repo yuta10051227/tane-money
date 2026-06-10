@@ -160,7 +160,7 @@ export default async function handler(req, res) {
         }
 
         const payload = JSON.stringify({
-          title: `VIELE secretary｜今日の残り ${remaining}件`,
+          title: `ひとり秘書｜今日の残り ${remaining}件`,
           body: `遅れ${late}・もうすぐ${soon}・タスク${pendingTasks}`,
           url: "/",
         });

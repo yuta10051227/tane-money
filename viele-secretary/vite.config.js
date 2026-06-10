@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon-512.png"],
       manifest: {
-        name: "VIELE secretary",
-        short_name: "VIELE",
-        description: "一人社長のための秘書ダッシュボード",
+        name: "ひとり秘書",
+        short_name: "ひとり秘書",
+        description: "一人社長のための、お母さんみたいなAI秘書。ぜんぶ見て、考えて、確認します。",
         theme_color: "#0F1115",
         background_color: "#0F1115",
         display: "standalone",
