@@ -101,6 +101,16 @@ function deadlineSignal(dateISO) {
   return { color: C.green, dot: "🟢", label: `あと${diff}日` };
 }
 
+/* ローンチの締切を正規化して返す（旧 deadline は本申込締切として後方互換）。
+   返り値: [{ stage:"先行登録", date }, { stage:"本申込", date }]（存在するものだけ） */
+function launchDeadlines(L) {
+  const out = [];
+  if (L.deadlineReg) out.push({ stage: "先行登録", date: L.deadlineReg });
+  const cv = L.deadlineCv || L.deadline;
+  if (cv) out.push({ stage: "本申込", date: cv });
+  return out;
+}
+
 /* 「今日の要対応」集約：遅れ(late) と もうすぐ(soon) を抽出（取りこぼし防止） */
 // VAPID公開鍵(Base64URL)を Push API が要求する Uint8Array へ変換
 function urlBase64ToUint8Array(base64String) {
@@ -126,27 +136,29 @@ function computeAlerts(data) {
     const diff = daysUntil(d.date);
     if (diff >= 0 && diff <= 7) soon.push({ label: d.title, diff });
   });
-  // ローンチKPI：締切が近い(7日以内)/過ぎた のに進捗が目標の80%未満なら要対応に出す
+  // ローンチKPI：段ごとに「その段の締切が近い(7日以内)/過ぎた のに進捗が目標の80%未満」なら要対応に出す
   (data.launches || []).forEach((L) => {
-    if (!L.deadline) return;
-    const diff = daysUntil(L.deadline);
-    if (diff > 7 || diff < -30) return; // まだ先 / 終わって久しい ものは出さない
     const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
     const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
     const rev = cv * (Number(L.price) || 0), goalRev = Number(L.goalRev) || 0;
     const regPct = goalReg ? (reg / goalReg) * 100 : 100;
     const cvPct = goalCv ? (cv / goalCv) * 100 : 100;
     const revPct = goalRev ? (rev / goalRev) * 100 : 100;
-    const worst = Math.min(regPct, cvPct, revPct);
-    if (worst >= 80) return; // どの段も8割以上届いていれば警告しない
-    // 一番遅れている段を文言にする
-    const lag =
-      regPct <= cvPct && regPct <= revPct ? `先行登録 ${reg}/${goalReg}人`
-      : cvPct <= revPct ? `本申込 ${cv}/${goalCv}人`
-      : `売上 ${Math.round(revPct)}%`;
-    const label = `📣 ${L.name}：${lag}（達成${Math.round(worst)}%）`;
-    if (diff < 0) late.push({ label, diff });
-    else soon.push({ label, diff });
+    // 各段の締切と進捗をチェックして、遅れていれば要対応へ
+    const check = (dl, pct, lag) => {
+      if (!dl) return;
+      const diff = daysUntil(dl);
+      if (diff > 7 || diff < -30) return; // まだ先 / 終わって久しい ものは出さない
+      if (pct >= 80) return;             // 8割以上届いていれば警告しない
+      const item = { label: `📣 ${L.name}：${lag}（達成${Math.round(pct)}%）`, diff };
+      if (diff < 0) late.push(item); else soon.push(item);
+    };
+    check(L.deadlineReg, regPct, `先行登録 ${reg}/${goalReg}人`);
+    // 本申込締切（旧 deadline は本申込締切扱い）には 本申込・売上 の遅れを集約
+    const cvDL = L.deadlineCv || L.deadline;
+    const stagePct = Math.min(cvPct, revPct);
+    const lag = cvPct <= revPct ? `本申込 ${cv}/${goalCv}人` : `売上 ${Math.round(revPct)}%`;
+    check(cvDL, stagePct, lag);
   });
   late.sort((a, b) => a.diff - b.diff);
   soon.sort((a, b) => a.diff - b.diff);
@@ -167,15 +179,15 @@ function buildSituation(data) {
   if (tk.length) lines.push(`未完タスク${tk.length}件: ${tk.slice(0, 2).map((x) => x.title).join("、")}`);
   const trip = (data.trips || []).map((t) => ({ t, d: daysUntil(t.date) })).filter((x) => x.d >= 0).sort((a, b) => a.d - b.d)[0];
   if (trip) lines.push(`次の遠征/イベント: ${trip.t.title}(あと${trip.d}日)`);
-  // 進行中ローンチ（締切が近い順に1件）の進捗を要約
+  // 進行中ローンチ（本申込締切が近い順に1件）の進捗を要約
   const lc = (data.launches || [])
-    .map((L) => ({ L, d: L.deadline ? daysUntil(L.deadline) : 9999 }))
-    .filter((x) => x.d >= -30 && x.d <= 30)
+    .map((L) => ({ L, d: daysUntil((L.deadlineCv || L.deadline || L.deadlineReg)) }))
+    .filter((x) => Number.isFinite(x.d) && x.d >= -30 && x.d <= 60)
     .sort((a, b) => a.d - b.d)[0];
   if (lc) {
     const L = lc.L;
     const rev = (Number(L.cv) || 0) * (Number(L.price) || 0);
-    lines.push(`進行中ローンチ: ${L.name}（先行登録${Number(L.reg) || 0}/${Number(L.goalReg) || 0}人・本申込${Number(L.cv) || 0}/${Number(L.goalCv) || 0}人・売上¥${rev.toLocaleString("ja-JP")}/¥${(Number(L.goalRev) || 0).toLocaleString("ja-JP")}・${lc.d >= 0 ? `締切あと${lc.d}日` : `締切${-lc.d}日経過`}）`);
+    lines.push(`進行中ローンチ: ${L.name}（先行登録${Number(L.reg) || 0}/${Number(L.goalReg) || 0}人・本申込${Number(L.cv) || 0}/${Number(L.goalCv) || 0}人・売上¥${rev.toLocaleString("ja-JP")}/¥${(Number(L.goalRev) || 0).toLocaleString("ja-JP")}・本申込${lc.d >= 0 ? `締切あと${lc.d}日` : `締切${-lc.d}日経過`}）`);
   }
   return lines.join("\n");
 }
@@ -320,7 +332,8 @@ function makeSeed() {
         goalCv: 30, cv: 12,      // 本申込：目標/実績（人）
         price: 40000,            // 客単価（円）
         goalRev: 800000,         // 売上目標（円）
-        deadline: iso(addDays(now, 3)),
+        deadlineReg: iso(addDays(now, 1)),  // 先行登録 締切
+        deadlineCv: iso(addDays(now, 10)),  // 本申込 締切
       },
     ],
     content: [
@@ -604,8 +617,9 @@ function DraftPanel({ context }) {
   );
 }
 
-function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
-  const sorted = [...(deadlines || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+function DeadlineBoard({ deadlines, linked, onAdd, onAddBulk, onEdit, onRemove }) {
+  // 手動の締切＋売上タブのローンチ締切(linked)を時系列に統合表示
+  const sorted = [...(deadlines || []), ...(linked || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
   const [mode, setMode] = useState(null); // null | "single" | "template"
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
@@ -622,7 +636,7 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
     <Panel
       title="締切からの逆算（二段ローンチ）"
       accent={C.purple}
-      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。"
+      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。売上タブで登録したローンチの『先行登録/本申込 締切』(📣)も、ここに自動で並びます（編集は売上タブ側）。"
       right={
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => setMode(mode === "template" ? null : "template")} style={chipBtn}>型で一括</button>
@@ -665,7 +679,7 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
       {sorted.length === 0 && <Empty>締切は登録されていません。右上から追加できます。</Empty>}
       <div style={{ display: "grid", gap: 10 }}>
         {sorted.map((d, i) => {
-          if (editId === d.id) {
+          if (!d.linked && editId === d.id) {
             return (
               <div key={d.id} style={{ background: C.panel2, borderRadius: 12, padding: 12 }}>
                 <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="締切名" style={inp} />
@@ -681,18 +695,18 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
           const sig = deadlineSignal(d.date);
           return (
             <div key={d.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px", borderLeft: d.linked ? `3px solid ${C.accent}` : undefined }}>
                 <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
                   {i + 1}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15 }}>{d.title}</div>
-                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
+                  <div style={{ fontSize: 15 }}>{d.linked ? "📣 " : ""}{d.title}</div>
+                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
                 </div>
                 <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                 <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
-                <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
-                <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
+                {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>}
+                {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
               </div>
               {draftId === d.id && <DraftPanel context={`${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`} />}
             </div>
@@ -1560,14 +1574,17 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
   const cvPct = goalCv ? (cv / goalCv) * 100 : 0;
   const revPct = goalRev ? (rev / goalRev) * 100 : 0;
   const cvRate = reg ? Math.round((cv / reg) * 100) : 0; // 本申込/先行登録 の転換率
-  const sig = L.deadline ? deadlineSignal(L.deadline) : null;
+  const sigReg = L.deadlineReg ? deadlineSignal(L.deadlineReg) : null;       // 先行登録締切
+  const cvDL = L.deadlineCv || L.deadline;
+  const sigCv = cvDL ? deadlineSignal(cvDL) : null;                          // 本申込締切（＝売上の締切）
   const done = (p) => (p >= 100 ? C.green : null);
 
-  const stage = (no, name, color, sub, pct, width) => (
+  const stage = (no, name, color, sub, pct, width, sig) => (
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
         <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{no}</span>
         <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{name}</span>
+        {sig && <span style={{ fontSize: 11, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot}{sig.label}</span>}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: done(pct) || color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{sub}</span>
         <span style={{ fontSize: 12, color: C.sub, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct)}%</span>
@@ -1582,13 +1599,12 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
     <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{L.name}</span>
-        {sig && <span style={{ fontSize: 13, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot} {sig.label}</span>}
         <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✎</button>
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
-      {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%")}
-      {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%")}
-      {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%")}
+      {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
+      {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv)}
+      {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null)}
       <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
     </div>
   );
@@ -1596,7 +1612,7 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
 
 function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
   const list = launches || [];
-  const blankNew = { name: "", goalReg: 100, reg: 0, goalCv: 30, cv: 0, price: 30000, goalRev: 800000, deadline: iso(addDays(new Date(), 21)) };
+  const blankNew = { name: "", goalReg: 100, reg: 0, goalCv: 30, cv: 0, price: 30000, goalRev: 800000, deadlineReg: iso(addDays(new Date(), 14)), deadlineCv: iso(addDays(new Date(), 21)) };
   const [mode, setMode] = useState(null); // null | "new"
   const [f, setF] = useState(blankNew);
   const [editId, setEditId] = useState(null);
@@ -1605,14 +1621,18 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
   const numF = (obj, set, key) => (ev) => set({ ...obj, [key]: ev.target.value });
   const startEdit = (L) => {
     setEditId(L.id);
-    setE({ name: L.name, goalReg: L.goalReg, reg: L.reg, goalCv: L.goalCv, cv: L.cv, price: L.price, goalRev: L.goalRev, deadline: L.deadline || iso(addDays(new Date(), 21)) });
+    setE({
+      name: L.name, goalReg: L.goalReg, reg: L.reg, goalCv: L.goalCv, cv: L.cv, price: L.price, goalRev: L.goalRev,
+      deadlineReg: L.deadlineReg || iso(addDays(new Date(), 14)),
+      deadlineCv: L.deadlineCv || L.deadline || iso(addDays(new Date(), 21)), // 旧 deadline を本申込締切として移行
+    });
   };
   const toNums = (o) => ({
     name: (o.name || "").trim(),
     goalReg: Number(o.goalReg) || 0, reg: Number(o.reg) || 0,
     goalCv: Number(o.goalCv) || 0, cv: Number(o.cv) || 0,
     price: Number(o.price) || 0, goalRev: Number(o.goalRev) || 0,
-    deadline: o.deadline,
+    deadlineReg: o.deadlineReg, deadlineCv: o.deadlineCv,
   });
   const saveEdit = () => { if (e.name.trim()) onEdit(editId, toNums(e)); setEditId(null); };
 
@@ -1632,7 +1652,10 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
         <label style={lbl}>客単価（円）<input value={obj.price} onChange={numF(obj, set, "price")} inputMode="numeric" style={inp} /></label>
         <label style={lbl}>売上目標（円）<input value={obj.goalRev} onChange={numF(obj, set, "goalRev")} inputMode="numeric" style={inp} /></label>
       </div>
-      <label style={{ ...lbl, width: "100%" }}>締切日<input type="date" value={obj.deadline} onChange={numF(obj, set, "deadline")} style={inp} /></label>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>先行登録 締切<input type="date" value={obj.deadlineReg} onChange={numF(obj, set, "deadlineReg")} style={inp} /></label>
+        <label style={lbl}>本申込 締切<input type="date" value={obj.deadlineCv} onChange={numF(obj, set, "deadlineCv")} style={inp} /></label>
+      </div>
     </>
   );
 
@@ -2413,6 +2436,10 @@ export default function App() {
   const writableCalIds = new Set((calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer").map((c) => c.id));
 
   const alerts = computeAlerts(data);
+  // 売上タブのローンチ締切を、仕事タブの締切ボードに読み取り専用で並べるためのリンク項目
+  const launchLinked = (data.launches || []).flatMap((L) =>
+    launchDeadlines(L).map((d) => ({ id: `lk:${L.id}:${d.stage}`, title: L.name, stage: `${d.stage}締切`, date: d.date, linked: true }))
+  );
   const moneyOutstanding = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const briefFirst = (data.digest && data.digest.briefing ? data.digest.briefing.split("\n").filter((l) => l.trim())[0] : "");
 
@@ -2537,7 +2564,7 @@ export default function App() {
               onEditItem={editTripItem}
               onRemoveItem={removeTripItem}
             />
-            <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
             <CheckList
               title="コンテンツ制作サイクル"
               accent={C.blue}
