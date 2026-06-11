@@ -327,6 +327,26 @@ const MONSTER_TREE = {
           desc:"究極体・天使のクー。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
   cku_ultB:   { id:"cku_ultB",   name:"星界神クーゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
           desc:"究極体・星界の神クー。", edu:"目標をかなえ続けた者だけが届く伝説のすがた。" },
+  // ── 猫タネもん：シー(cshi) 白黒猫 ──
+  cshi_egg:    { id:"cshi_egg",    name:"シーのタマゴ", rarity:1, line:"cat", stage:0, evolveTo:"cshi_b1",
+          desc:"白と黒のもようの、ねこのタマゴ。", edu:"いきものを育てるには毎日のお世話が大切。お金も毎日コツコツ。" },
+  cshi_b1:     { id:"cshi_b1",     name:"こねこシー", rarity:1, line:"cat", stage:1, evolveTo:"cshi_b2",
+          desc:"生まれたての白黒こねこ。あしあとが大きい。", edu:"小さな一歩のつみ重ねが大きな成長に。" },
+  cshi_b2:     { id:"cshi_b2",     name:"わんぱくシー", rarity:2, line:"cat", stage:2, evolveTo:"cshi_mature",
+          desc:"げんきな白黒ねこ。とびはねるのが大すき。", edu:"毎日つづけると習慣になる。続ける力はお金を育てる力。" },
+  cshi_mature: { id:"cshi_mature", name:"つぶらのシー", rarity:3, line:"cat", stage:3, branch:["cshi_perfA","cshi_perfB"],
+          desc:"成熟期のシー。育て方で2つの道に分かれる。",
+          edu:"ここで分岐！れんぞく7日で『森の力』、もくひょう達成で『星の力』へ。" },
+  cshi_perfA:  { id:"cshi_perfA",  name:"森導士シー", rarity:4, line:"cat", stage:4, evolveTo:"cshi_ultA",
+          branchHint:"まいにちつづけて さいこう7日れんぞくで こっちに進化！",
+          desc:"森の力にめざめた完全体のシー。剣と盾の騎士。", edu:"続ける力が大きな実りを生む。" },
+  cshi_perfB:  { id:"cshi_perfB",  name:"星見導師シー", rarity:4, line:"cat", stage:4, evolveTo:"cshi_ultB",
+          branchHint:"もくひょうを たっせいすると こっちに進化！",
+          desc:"星の力にめざめた完全体のシー。", edu:"目標をやりとげる力は夢への第一歩。" },
+  cshi_ultA:   { id:"cshi_ultA",   name:"聖天使シーエル", rarity:5, line:"cat", stage:5, evolveTo:null,
+          desc:"究極体・天使のシー。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
+  cshi_ultB:   { id:"cshi_ultB",   name:"星界神シーゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
+          desc:"究極体・星界の神シー。", edu:"目標をかなえ続けた者だけが届く伝説のすがた。" },
 };
 
 // 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
@@ -384,6 +404,23 @@ const CAT_LINES = [
       { force:"星の力", color:"#7B61C9", stages:[
         { id:"perfB", label:"星見導師クー（完全体）", rarity:4 },
         { id:"ultB",  label:"星界神クーゾーン（究極体）", rarity:5 },
+      ]},
+    ] },
+  { id:"cshi", name:"シー", emoji:"🐈‍⬛",
+    stages:[
+      { id:"egg",   label:"タマゴ",   rarity:1 },
+      { id:"b1",    label:"ベビーI",  rarity:1 },
+      { id:"b2",    label:"ベビーII", rarity:2 },
+      { id:"mature",label:"つぶらのシー（成熟期）", rarity:3 },
+    ],
+    branches:[
+      { force:"森の力", color:"#34C77B", stages:[
+        { id:"perfA", label:"森導士シー（完全体）", rarity:4 },
+        { id:"ultA",  label:"聖天使シーエル（究極体）", rarity:5 },
+      ]},
+      { force:"星の力", color:"#7B61C9", stages:[
+        { id:"perfB", label:"星見導師シー（完全体）", rarity:4 },
+        { id:"ultB",  label:"星界神シーゾーン（究極体）", rarity:5 },
       ]},
     ] },
 ];
@@ -5253,7 +5290,7 @@ function SeedMonster({ child, data, size=90, update }) {
   const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
   // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
-  const isCat          = /^(cpurin|cku)_/.test(String(dispId));
+  const isCat          = /^(cpurin|cku|cshi)_/.test(String(dispId));
   const frontFrames    = MON_FRAMES6[dispId] ? 6 : isCat ? 4 : 0;
   const multiFront     = frontFrames > 0;   // 前向き多コマ(歩行はするが左右反転しない)
   // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
