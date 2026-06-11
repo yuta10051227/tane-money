@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon-512.png"],
       manifest: {
-        name: "VIELE secretary",
-        short_name: "VIELE",
-        description: "一人社長のための秘書ダッシュボード",
+        name: "ひとり秘書",
+        short_name: "ひとり秘書",
+        description: "一人社長のための、お母さんみたいなAI秘書。ぜんぶ見て、考えて、確認します。",
         theme_color: "#0F1115",
         background_color: "#0F1115",
         display: "standalone",
@@ -30,6 +30,9 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,png,svg}"],
         // /api/* への画面遷移(OAuth等)はSWのSPAフォールバックで横取りせず、サーバーへ通す
         navigateFallbackDenylist: [/^\/api\//],
+        // プッシュ受信ロジックを外部スクリプトとして読み込む
+        // public/push-sw.js は vite build で dist/ にコピーされる
+        importScripts: ["push-sw.js"],
       },
     }),
   ],

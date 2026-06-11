@@ -101,7 +101,25 @@ function deadlineSignal(dateISO) {
   return { color: C.green, dot: "🟢", label: `あと${diff}日` };
 }
 
+/* ローンチの締切を正規化して返す（旧 deadline は本申込締切として後方互換）。
+   返り値: [{ stage:"先行登録", date }, { stage:"本申込", date }]（存在するものだけ） */
+function launchDeadlines(L) {
+  const out = [];
+  if (L.deadlineReg) out.push({ stage: "先行登録", date: L.deadlineReg });
+  const cv = L.deadlineCv || L.deadline;
+  if (cv) out.push({ stage: "本申込", date: cv });
+  return out;
+}
+
 /* 「今日の要対応」集約：遅れ(late) と もうすぐ(soon) を抽出（取りこぼし防止） */
+// VAPID公開鍵(Base64URL)を Push API が要求する Uint8Array へ変換
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
 function computeAlerts(data) {
   const late = [];
   const soon = [];
@@ -117,6 +135,30 @@ function computeAlerts(data) {
   (data.deadlines || []).forEach((d) => {
     const diff = daysUntil(d.date);
     if (diff >= 0 && diff <= 7) soon.push({ label: d.title, diff });
+  });
+  // ローンチKPI：段ごとに「その段の締切が近い(7日以内)/過ぎた のに進捗が目標の80%未満」なら要対応に出す
+  (data.launches || []).forEach((L) => {
+    const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+    const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+    const rev = cv * (Number(L.price) || 0), goalRev = Number(L.goalRev) || 0;
+    const regPct = goalReg ? (reg / goalReg) * 100 : 100;
+    const cvPct = goalCv ? (cv / goalCv) * 100 : 100;
+    const revPct = goalRev ? (rev / goalRev) * 100 : 100;
+    // 各段の締切と進捗をチェックして、遅れていれば要対応へ
+    const check = (dl, pct, lag) => {
+      if (!dl) return;
+      const diff = daysUntil(dl);
+      if (diff > 7 || diff < -30) return; // まだ先 / 終わって久しい ものは出さない
+      if (pct >= 80) return;             // 8割以上届いていれば警告しない
+      const item = { label: `📣 ${L.name}：${lag}（達成${Math.round(pct)}%）`, diff };
+      if (diff < 0) late.push(item); else soon.push(item);
+    };
+    check(L.deadlineReg, regPct, `先行登録 ${reg}/${goalReg}人`);
+    // 本申込締切（旧 deadline は本申込締切扱い）には 本申込・売上 の遅れを集約
+    const cvDL = L.deadlineCv || L.deadline;
+    const stagePct = Math.min(cvPct, revPct);
+    const lag = cvPct <= revPct ? `本申込 ${cv}/${goalCv}人` : `売上 ${Math.round(revPct)}%`;
+    check(cvDL, stagePct, lag);
   });
   late.sort((a, b) => a.diff - b.diff);
   soon.sort((a, b) => a.diff - b.diff);
@@ -137,6 +179,16 @@ function buildSituation(data) {
   if (tk.length) lines.push(`未完タスク${tk.length}件: ${tk.slice(0, 2).map((x) => x.title).join("、")}`);
   const trip = (data.trips || []).map((t) => ({ t, d: daysUntil(t.date) })).filter((x) => x.d >= 0).sort((a, b) => a.d - b.d)[0];
   if (trip) lines.push(`次の遠征/イベント: ${trip.t.title}(あと${trip.d}日)`);
+  // 進行中ローンチ（本申込締切が近い順に1件）の進捗を要約
+  const lc = (data.launches || [])
+    .map((L) => ({ L, d: daysUntil((L.deadlineCv || L.deadline || L.deadlineReg)) }))
+    .filter((x) => Number.isFinite(x.d) && x.d >= -30 && x.d <= 60)
+    .sort((a, b) => a.d - b.d)[0];
+  if (lc) {
+    const L = lc.L;
+    const rev = (Number(L.cv) || 0) * (Number(L.price) || 0);
+    lines.push(`進行中ローンチ: ${L.name}（先行登録${Number(L.reg) || 0}/${Number(L.goalReg) || 0}人・本申込${Number(L.cv) || 0}/${Number(L.goalCv) || 0}人・売上¥${rev.toLocaleString("ja-JP")}/¥${(Number(L.goalRev) || 0).toLocaleString("ja-JP")}・本申込${lc.d >= 0 ? `締切あと${lc.d}日` : `締切${-lc.d}日経過`}）`);
+  }
   return lines.join("\n");
 }
 
@@ -253,41 +305,47 @@ function makeSeed() {
     trips: [
       {
         id: "t1",
-        title: "大阪セミナー登壇",
+        title: "（例）登壇イベント",
         template: "遠方登壇",
         date: iso(addDays(now, 21)),
         items: templateItems("遠方登壇").map((it, i) => ({ ...it, done: i < 2 })),
       },
       {
         id: "t2",
-        title: "福岡 日帰り施術会",
+        title: "（例）日帰り出張",
         template: "日帰り",
         date: iso(addDays(now, 9)),
         items: templateItems("日帰り").map((it, i) => ({ ...it, done: i < 1 })),
       },
+    ],
+    // 二段ローンチサンプル
+    deadlines: [
+      { id: "d1", title: "（例）先行登録 開始", date: iso(addDays(now, 25)), stage: "先行登録" },
+      { id: "d2", title: "（例）本申込 開始", date: iso(addDays(now, 40)), stage: "本申込" },
+    ],
+    // ローンチKPI（先行登録→本申込CV→売上 の三角ファネル）
+    launches: [
       {
-        id: "t3",
-        title: "バリ 海外実習",
-        template: "海外実習",
-        date: iso(addDays(now, 75)),
-        items: templateItems("海外実習").map((it, i) => ({ ...it, done: i < 1 })),
+        id: "L1",
+        name: "（例）春の新講座ローンチ",
+        goalReg: 100, reg: 67,   // 先行登録：目標/実績（人）
+        goalCv: 30, cv: 12,      // 本申込：目標/実績（人）
+        price: 40000,            // 客単価（円）
+        goalRev: 800000,         // 売上目標（円）
+        deadlineReg: iso(addDays(now, 1)),  // 先行登録 締切
+        deadlineCv: iso(addDays(now, 10)),  // 本申込 締切
       },
     ],
-    // 二段ローンチ：LINE先行登録 → セミナー本申込
-    deadlines: [
-      { id: "d1", title: "LINE先行登録 開始", date: iso(addDays(now, 25)), stage: "先行登録" },
-      { id: "d2", title: "セミナー本申込 開始", date: iso(addDays(now, 40)), stage: "本申込" },
-    ],
     content: [
-      { id: "c1", title: "YouTube 長尺（今週分）", phase: "撮影", done: false },
-      { id: "c2", title: "ショート 切り抜き 3本", phase: "編集", done: false },
-      { id: "c3", title: "ブログ 1本（SEO）", phase: "執筆", done: true },
+      { id: "c1", title: "（例）動画コンテンツ", phase: "撮影", done: false },
+      { id: "c2", title: "（例）SNS投稿", phase: "編集", done: false },
+      { id: "c3", title: "（例）ブログ記事", phase: "執筆", done: true },
     ],
     money: [
-      { id: "m1", title: "MF請求書 今月分 発行", amount: 0, kind: "請求", done: false },
-      { id: "m2", title: "Academy 月額 入金確認", amount: 0, kind: "入金", done: false },
+      { id: "m1", title: "（例）請求書 発行", amount: 0, kind: "請求", done: false },
+      { id: "m2", title: "（例）入金確認", amount: 0, kind: "入金", done: false },
     ],
-    tasks: [{ id: "k1", title: "確定申告まわりの資料整理", done: false }],
+    tasks: [{ id: "k1", title: "（例）まず『サンプルを全部消す』で自分の予定に入れ替える", done: false }],
     // まとめ(ニュース)の情報源（編集可）
     feeds: [
       { id: "f1", name: "Googleニュース", url: "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja" },
@@ -296,9 +354,10 @@ function makeSeed() {
     ],
     digest: null,
     newsCats: ["top", "business", "marketing", "solo"],
-    birth: { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 },
+    birth: null,
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
+    sampleNotice: true, // サンプルデータ識別フラグ
     updatedAt: Date.now(),
   };
 }
@@ -364,8 +423,8 @@ function Check({ done, onClick }) {
       onClick={onClick}
       aria-label={done ? "完了を取消" : "完了にする"}
       style={{
-        width: 28,
-        height: 28,
+        width: 40,
+        height: 40,
         borderRadius: 8,
         border: `1.5px solid ${done ? C.green : C.line}`,
         background: done ? C.green : "transparent",
@@ -420,8 +479,8 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <strong style={{ fontSize: 14 }}>{trip.title}</strong>
-                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 6, padding: "1px 6px" }}>🤖自動</span>}
-                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 6, padding: "1px 6px" }}>{trip.template}</span>
+                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
+                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
                   <span style={{ flex: 1 }} />
                   <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
                   <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
@@ -439,7 +498,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                       <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                         <input value={ie.daysBefore} onChange={(e) => setIe({ ...ie, daysBefore: e.target.value })} inputMode="numeric" title="本番の何日前" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                        <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                        <span style={{ fontSize: 11, color: C.sub }}>日前</span>
                         <button onClick={saveItem} style={chipBtn}>保存</button>
                         <button onClick={() => setEditItem(null)} style={iconBtn} title="取消">✕</button>
                       </div>
@@ -469,7 +528,7 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                   <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                   <input value={ni.daysBefore} onChange={(e) => setNi({ ...ni, daysBefore: e.target.value })} inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                  <span style={{ fontSize: 11, color: C.faint }}>日前</span>
+                  <span style={{ fontSize: 11, color: C.sub }}>日前</span>
                   <button onClick={() => { if (!ni.label.trim()) return; onAddItem(trip.id, { label: ni.label.trim(), daysBefore: Number(ni.daysBefore) || 0 }); setNi({ label: "", daysBefore: 7 }); setAddItemFor(null); }} style={chipBtn}>追加</button>
                   <button onClick={() => setAddItemFor(null)} style={iconBtn} title="閉じる">✕</button>
                 </div>
@@ -529,9 +588,9 @@ function DraftPanel({ context }) {
       try {
         const r = await fetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) });
         const text = await r.text();
-        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
-        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-        if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEYを設定）");
+        let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] draft parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。"); }
+        if (!r.ok || j.error) throw new Error(j.error || "サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。");
+        if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
         if (!cancel) setDrafts(j.drafts || (j.raw ? { line: j.raw } : {}));
       } catch (e) { if (!cancel) setErr(e); }
       if (!cancel) setLoading(false);
@@ -558,8 +617,9 @@ function DraftPanel({ context }) {
   );
 }
 
-function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
-  const sorted = [...(deadlines || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+function DeadlineBoard({ deadlines, linked, onAdd, onAddBulk, onEdit, onRemove }) {
+  // 手動の締切＋売上タブのローンチ締切(linked)を時系列に統合表示
+  const sorted = [...(deadlines || []), ...(linked || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
   const [mode, setMode] = useState(null); // null | "single" | "template"
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
@@ -576,7 +636,7 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
     <Panel
       title="締切からの逆算（二段ローンチ）"
       accent={C.purple}
-      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。"
+      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。売上タブで登録したローンチの『先行登録/本申込 締切』(📣)も、ここに自動で並びます（編集は売上タブ側）。"
       right={
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => setMode(mode === "template" ? null : "template")} style={chipBtn}>型で一括</button>
@@ -619,7 +679,7 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
       {sorted.length === 0 && <Empty>締切は登録されていません。右上から追加できます。</Empty>}
       <div style={{ display: "grid", gap: 10 }}>
         {sorted.map((d, i) => {
-          if (editId === d.id) {
+          if (!d.linked && editId === d.id) {
             return (
               <div key={d.id} style={{ background: C.panel2, borderRadius: 12, padding: 12 }}>
                 <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="締切名" style={inp} />
@@ -635,18 +695,18 @@ function DeadlineBoard({ deadlines, onAdd, onAddBulk, onEdit, onRemove }) {
           const sig = deadlineSignal(d.date);
           return (
             <div key={d.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px", borderLeft: d.linked ? `3px solid ${C.accent}` : undefined }}>
                 <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
                   {i + 1}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15 }}>{d.title}</div>
-                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}</div>
+                  <div style={{ fontSize: 15 }}>{d.linked ? "📣 " : ""}{d.title}</div>
+                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
                 </div>
                 <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                 <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
-                <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>
-                <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>
+                {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>}
+                {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
               </div>
               {draftId === d.id && <DraftPanel context={`${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`} />}
             </div>
@@ -840,9 +900,9 @@ function SwipeView({ slides, accent = C.blue, hint }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前へ">‹</button>
+        <button onClick={() => goTo(idx - 1)} disabled={idx === 0} style={{ ...iconBtn, width: 36, height: 36, fontSize: 18, opacity: idx === 0 ? 0.3 : 1 }} aria-label="前へ">‹</button>
         <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 700 }}>{cur.label}</div>
-        <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 32, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
+        <button onClick={() => goTo(idx + 1)} disabled={idx >= slides.length - 1} style={{ ...iconBtn, width: 36, height: 36, fontSize: 18, opacity: idx >= slides.length - 1 ? 0.3 : 1 }} aria-label="次へ">›</button>
       </div>
       <div ref={scroller} onScroll={onScroll} data-hscroll="1" style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
         {slides.map((s) => (
@@ -856,7 +916,7 @@ function SwipeView({ slides, accent = C.blue, hint }) {
           ))}
         </div>
       )}
-      {hint && <div style={{ fontSize: 11, color: C.faint, marginTop: 8, textAlign: "center" }}>{hint}</div>}
+      {hint && <div aria-hidden="true" style={{ fontSize: 11, color: C.sub, marginTop: 8, textAlign: "center" }}>{hint}</div>}
     </>
   );
 }
@@ -959,7 +1019,7 @@ function UpcomingRow({ e, writableIds, onEditEvent, onDeleteEvent, busy }) {
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </>
       ) : (
-        <span style={{ fontSize: 11, color: catColor(e.cat), flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
+        <span style={{ fontSize: 11, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
       )}
     </div>
   );
@@ -983,8 +1043,8 @@ const NEWS_CATEGORIES = [
 ];
 const DEFAULT_NEWS_CATS = ["top", "business", "marketing", "solo"];
 
-/* 既定の出生データ（運気の命式計算に使用。data.birth があればそちら優先） */
-const DEFAULT_BIRTH = { name: "山口勇太", date: "1990-10-05", time: "01:24", place: "鹿児島", lat: 31.5602, lon: 130.5571, utcOffset: 9 };
+/* 既定の出生データ — 配布版では null（各ユーザーが自分で入力） */
+const DEFAULT_BIRTH = null;
 
 /* 都道府県→緯度経度（県庁所在地）。出生地選択で命式の精度を確保 */
 const PREFS = [
@@ -1029,7 +1089,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: C.faint, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
+      <div style={{ fontSize: 11, color: C.sub, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
 
       {error && (
         <div style={{ fontSize: 12, color: C.red, background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, wordBreak: "break-word" }}>
@@ -1056,7 +1116,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
                 <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
-                    <div style={{ fontSize: 11, color: C.faint }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+                    <div style={{ fontSize: 11, color: C.sub }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
                   </div>
                 </a>
               ))}
@@ -1072,8 +1132,8 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
       })()}
 
       {digest && digest.aiEnabled === false && briefLines.length === 0 && (
-        <div style={{ fontSize: 11, color: C.faint, marginTop: 12 }}>
-          ※ AI要約はオフ（GeminiキーをVercelに設定すると自動でオンになります）
+        <div style={{ fontSize: 11, color: C.sub, marginTop: 12 }}>
+          ※ AI機能は現在オフです
         </div>
       )}
 
@@ -1093,7 +1153,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
               <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="RSSのURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
               <button onClick={() => { if (!url.trim()) return; onAddFeed({ name: name.trim(), url: url.trim() }); setName(""); setUrl(""); }} style={chipBtn}>追加</button>
             </div>
-            <div style={{ fontSize: 11, color: C.faint }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
+            <div style={{ fontSize: 11, color: C.sub }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
           </div>
         )}
       </div>
@@ -1155,9 +1215,10 @@ function BirthEditor({ birth, onSave }) {
     if (!date) { alert("生年月日を入れてください"); return; }
     onSave({ name: name.trim(), date, time: time || "12:00", place: pref, lat: p[1], lon: p[2], utcOffset: 9 });
   };
+  const hasDate = !!(birth && birth.date);
   return (
-    <Acc title="出生情報の編集" color={C.sub}>
-      <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
+    <Acc title={hasDate ? "出生情報の編集" : "出生情報を入力（あなたの運勢を占います）"} color={hasDate ? C.sub : C.purple} defaultOpen={!hasDate}>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>一度入力して保存すれば、以後ずっと反映されます（全端末で同期）。</div>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前（任意）" style={inp} />
       <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>生年月日</label>
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
@@ -1204,13 +1265,13 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
         {count > 0 && <button onClick={onClear} style={chipBtn}>取り込み{count}件を消去</button>}
       </div>
       {msg && <div style={{ fontSize: 12, color: C.sub, marginTop: 8, wordBreak: "break-word" }}>{msg}</div>}
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
+      <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
     </Panel>
   );
 }
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab }) {
+function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks }) {
   const t = (fortune && fortune.today) || {};
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
@@ -1226,6 +1287,7 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
     : sc >= 4 ? { label: "攻めの日", color: C.green, tip: t.action }
       : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
         : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
+  const rem = Number(remaining) || 0;
   const Row = ({ icon, label, color, onClick }) => (
     <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
       <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
@@ -1236,6 +1298,27 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab })
   return (
     <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
       <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
+      {/* 今日の残り件数 KPI */}
+      <button onClick={() => onTab(1)} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.text, font: "inherit", padding: "10px 0 4px" }}>
+        {rem === 0 ? (
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>今日の要対応はありません ✨</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontSize: 13, color: C.sub }}>今日の残り</span>
+              <span style={{ fontSize: 28, fontWeight: 700, color: C.accent, lineHeight: 1 }}>{rem}</span>
+              <span style={{ fontSize: 13, color: C.sub }}>件</span>
+            </div>
+            <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>
+              {late > 0 && <span style={{ color: C.red, fontWeight: 700 }}>遅れ{late}</span>}
+              {late > 0 && soon > 0 && <span>・</span>}
+              {soon > 0 && <span style={{ color: C.orange, fontWeight: 700 }}>もうすぐ{soon}</span>}
+              {(late > 0 || soon > 0) && pendingTasks > 0 && <span>・</span>}
+              {pendingTasks > 0 && <span>タスク{pendingTasks}</span>}
+            </div>
+          </>
+        )}
+      </button>
       {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 4px" }}>{t.theme}</div>}
       {mode && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -1273,69 +1356,83 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       help="あなたの命式（四柱推命・西洋占星術・インド占星術）を根拠に、AIが年・月・日の運勢を鑑定します。各項目はタップで開閉。占いとして参考程度に。"
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
     >
-      {aiOff && <div style={{ fontSize: 12, color: C.faint, marginBottom: 8 }}>※ AI(Gemini)キーが未設定です。Vercelに設定すると運気が出ます。</div>}
+      {aiOff && <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>※ AI機能は現在オフです</div>}
+      {(!birth || !birth.date) && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.purple}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple, marginBottom: 6 }}>
+            まず、あなたの出生情報を入力してください
+          </div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
+            占いはあなたの命式から計算します。下の「出生情報を入力」を開いて生年月日を登録すると、あなた専用の運気が出ます。
+          </div>
+        </div>
+      )}
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
-      {!fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
+      {birth && birth.date && !fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
 
-      {t.theme && (
-        <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
-          <Line label="仕事運" value={t.work} color={C.green} />
-          <Line label="金運" value={t.money} color={C.accent} />
-          <Line label="対人運" value={t.social} color={C.blue} />
-          <Line label="やるべき" value={t.action} color={C.purple} />
-          <Line label="戒め" value={t.caution} color={C.red} />
-          <Line label="ラッキー" value={t.color} color={C.sub} />
-        </Acc>
-      )}
-
-      {tm.theme && (
-        <Acc title="明日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
-          <Line label="仕事運" value={tm.work} color={C.green} />
-          <Line label="金運" value={tm.money} color={C.accent} />
-          <Line label="対人運" value={tm.social} color={C.blue} />
-          <Line label="やるべき" value={tm.action} color={C.purple} />
-          <Line label="ラッキー" value={tm.color} color={C.sub} />
-        </Acc>
-      )}
-
-      {m.theme && (
-        <Acc title={`今月 ・ ${m.theme}`} color={C.blue}>
-          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{m.flow}</div>
-          {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
-          {Array.isArray(m.days) && m.days.length > 0 && (
-            <>
-              <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
-              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
-              </div>
-            </>
+      {birth && birth.date && (
+        <>
+          {t.theme && (
+            <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
+              <Line label="仕事運" value={t.work} color={C.green} />
+              <Line label="金運" value={t.money} color={C.accent} />
+              <Line label="対人運" value={t.social} color={C.blue} />
+              <Line label="やるべき" value={t.action} color={C.purple} />
+              <Line label="戒め" value={t.caution} color={C.red} />
+              <Line label="ラッキー" value={t.color} color={C.sub} />
+            </Acc>
           )}
-        </Acc>
-      )}
 
-      {y.theme && (
-        <Acc title={`今年 ・ ${y.theme}`} color={C.purple}>
-          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{y.flow}</div>
-          {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
-          {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
-          {Array.isArray(y.months) && y.months.length === 12 && (
-            <>
-              <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
-              <div style={{ fontSize: 10, color: C.faint, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span>1月</span><span>今月</span><span>12月</span>
-              </div>
-            </>
+          {tm.theme && (
+            <Acc title="明日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(tm.score)}</span>}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{tm.theme}</div>
+              <Line label="仕事運" value={tm.work} color={C.green} />
+              <Line label="金運" value={tm.money} color={C.accent} />
+              <Line label="対人運" value={tm.social} color={C.blue} />
+              <Line label="やるべき" value={tm.action} color={C.purple} />
+              <Line label="ラッキー" value={tm.color} color={C.sub} />
+            </Acc>
           )}
-        </Acc>
+
+          {m.theme && (
+            <Acc title={`今月 ・ ${m.theme}`} color={C.blue}>
+              <div style={{ fontSize: 13, lineHeight: 1.6 }}>{m.flow}</div>
+              {m.advice && <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>指針：{m.advice}</div>}
+              {Array.isArray(m.days) && m.days.length > 0 && (
+                <>
+                  <FortuneBars values={m.days} highlight={now.getDate() - 1} color={C.blue} />
+                  <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                    <span>1日</span><span>今日={now.getMonth() + 1}/{now.getDate()}</span><span>{m.days.length}日</span>
+                  </div>
+                </>
+              )}
+            </Acc>
+          )}
+
+          {y.theme && (
+            <Acc title={`今年 ・ ${y.theme}`} color={C.purple}>
+              <div style={{ fontSize: 13, lineHeight: 1.6 }}>{y.flow}</div>
+              {y.peak && <Line label="好機" value={y.peak} color={C.green} />}
+              {y.caution && <Line label="慎む時期" value={y.caution} color={C.red} />}
+              {Array.isArray(y.months) && y.months.length === 12 && (
+                <>
+                  <FortuneBars values={y.months} highlight={now.getMonth()} color={C.purple} />
+                  <div style={{ fontSize: 12, color: C.sub, display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                    <span>1月</span><span>今月</span><span>12月</span>
+                  </div>
+                </>
+              )}
+            </Acc>
+          )}
+        </>
       )}
 
       <BirthEditor birth={birth} onSave={onSaveBirth} />
 
-      <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
-        VIELE オリジナル鑑定AIを採用しています ・ 占いとして参考に
+      <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>
+        ひとり秘書の鑑定AIによる占いです ・ 参考程度に
       </div>
     </Panel>
   );
@@ -1368,7 +1465,7 @@ function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect }) {
                     <button
                       key={r.v}
                       onClick={() => onSetRole(c.id, r.v)}
-                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
+                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
                     >{r.label}</button>
                   ))}
                 </div>
@@ -1446,7 +1543,156 @@ function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, re
 
 /* 請求・お金（金額・種別つき。未処理合計を表示） */
 const yen = (n) => "¥" + (Number(n) || 0).toLocaleString("ja-JP");
+// 万円表記（1万以上は「¥48万」のように圧縮。それ未満は通常表記）
+const manYen = (n) => {
+  n = Number(n) || 0;
+  if (n >= 10000) return "¥" + (Math.round(n / 1000) / 10).toLocaleString("ja-JP") + "万";
+  return yen(n);
+};
 const MONEY_KINDS = ["請求", "入金", "支払"];
+
+/* ──────────────────────────────────────────────────────────────
+   ローンチKPI：先行登録 → 本申込(CV) → 売上 の三角ファネル
+   各ローンチごとに「目標 vs 実績」を1枚で俯瞰し、締切まで何日かを信号表示。
+   売上実績は 本申込数 × 客単価 で自動計算。
+   ────────────────────────────────────────────────────────────── */
+function FunnelBar({ pct, color, width }) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div style={{ width: width || "100%", height: 12, background: C.panel, borderRadius: 6, overflow: "hidden", border: `1px solid ${C.line}` }}>
+      <div style={{ width: `${p}%`, height: "100%", background: color, borderRadius: 6, transition: "width .3s" }} />
+    </div>
+  );
+}
+
+function LaunchFunnel({ L, onEdit, onRemove }) {
+  const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+  const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+  const price = Number(L.price) || 0;
+  const rev = cv * price, goalRev = Number(L.goalRev) || 0;
+  const regPct = goalReg ? (reg / goalReg) * 100 : 0;
+  const cvPct = goalCv ? (cv / goalCv) * 100 : 0;
+  const revPct = goalRev ? (rev / goalRev) * 100 : 0;
+  const cvRate = reg ? Math.round((cv / reg) * 100) : 0; // 本申込/先行登録 の転換率
+  const sigReg = L.deadlineReg ? deadlineSignal(L.deadlineReg) : null;       // 先行登録締切
+  const cvDL = L.deadlineCv || L.deadline;
+  const sigCv = cvDL ? deadlineSignal(cvDL) : null;                          // 本申込締切（＝売上の締切）
+  const done = (p) => (p >= 100 ? C.green : null);
+
+  const stage = (no, name, color, sub, pct, width, sig) => (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+        <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{no}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{name}</span>
+        {sig && <span style={{ fontSize: 11, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot}{sig.label}</span>}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 13, color: done(pct) || color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{sub}</span>
+        <span style={{ fontSize: 12, color: C.sub, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct)}%</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <FunnelBar pct={pct} color={done(pct) || color} width={width} />
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{L.name}</span>
+        <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✎</button>
+        <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
+      </div>
+      {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
+      {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv)}
+      {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null)}
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
+    </div>
+  );
+}
+
+function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
+  const list = launches || [];
+  const blankNew = { name: "", goalReg: 100, reg: 0, goalCv: 30, cv: 0, price: 30000, goalRev: 800000, deadlineReg: iso(addDays(new Date(), 14)), deadlineCv: iso(addDays(new Date(), 21)) };
+  const [mode, setMode] = useState(null); // null | "new"
+  const [f, setF] = useState(blankNew);
+  const [editId, setEditId] = useState(null);
+  const [e, setE] = useState(blankNew);
+
+  const numF = (obj, set, key) => (ev) => set({ ...obj, [key]: ev.target.value });
+  const startEdit = (L) => {
+    setEditId(L.id);
+    setE({
+      name: L.name, goalReg: L.goalReg, reg: L.reg, goalCv: L.goalCv, cv: L.cv, price: L.price, goalRev: L.goalRev,
+      deadlineReg: L.deadlineReg || iso(addDays(new Date(), 14)),
+      deadlineCv: L.deadlineCv || L.deadline || iso(addDays(new Date(), 21)), // 旧 deadline を本申込締切として移行
+    });
+  };
+  const toNums = (o) => ({
+    name: (o.name || "").trim(),
+    goalReg: Number(o.goalReg) || 0, reg: Number(o.reg) || 0,
+    goalCv: Number(o.goalCv) || 0, cv: Number(o.cv) || 0,
+    price: Number(o.price) || 0, goalRev: Number(o.goalRev) || 0,
+    deadlineReg: o.deadlineReg, deadlineCv: o.deadlineCv,
+  });
+  const saveEdit = () => { if (e.name.trim()) onEdit(editId, toNums(e)); setEditId(null); };
+
+  // 入力フォーム（新規/編集 共通レイアウト）
+  const formFields = (obj, set) => (
+    <>
+      <input value={obj.name} onChange={numF(obj, set, "name")} placeholder="ローンチ名（例：春の新講座）" style={inp} />
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>先行登録 目標<input value={obj.goalReg} onChange={numF(obj, set, "goalReg")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>登録 実績<input value={obj.reg} onChange={numF(obj, set, "reg")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>本申込 目標<input value={obj.goalCv} onChange={numF(obj, set, "goalCv")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>本申込 実績<input value={obj.cv} onChange={numF(obj, set, "cv")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>客単価（円）<input value={obj.price} onChange={numF(obj, set, "price")} inputMode="numeric" style={inp} /></label>
+        <label style={lbl}>売上目標（円）<input value={obj.goalRev} onChange={numF(obj, set, "goalRev")} inputMode="numeric" style={inp} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={lbl}>先行登録 締切<input type="date" value={obj.deadlineReg} onChange={numF(obj, set, "deadlineReg")} style={inp} /></label>
+        <label style={lbl}>本申込 締切<input type="date" value={obj.deadlineCv} onChange={numF(obj, set, "deadlineCv")} style={inp} /></label>
+      </div>
+    </>
+  );
+
+  return (
+    <Panel
+      title="ローンチ進捗（先行登録→申込→売上）"
+      accent={C.accent}
+      help="ローンチ（新しい講座・商品の募集や販売）ごとに『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✎からいつでも更新できます。"
+      right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
+    >
+      {mode === "new" && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8, lineHeight: 1.6 }}>まず「名前」と「締切日」だけ入れればOK。人数や金額の数字は、あとから✎でいつでも更新できます。</div>
+          {formFields(f, setF)}
+          <button
+            style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
+            onClick={() => { if (!f.name.trim()) return; onAdd(toNums(f)); setF(blankNew); setMode(null); }}
+          >追加</button>
+        </div>
+      )}
+      {list.length === 0 && <Empty>ローンチがありません。右上の「＋ローンチ」から、先行登録の目標人数・客単価・売上目標を入れると進捗ファネルが出ます。</Empty>}
+      {list.map((L) =>
+        editId === L.id ? (
+          <div key={L.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+            {formFields(e, setE)}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={saveEdit} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存</button>
+              <button onClick={() => setEditId(null)} style={chipBtn}>取消</button>
+            </div>
+          </div>
+        ) : (
+          <LaunchFunnel key={L.id} L={L} onEdit={startEdit} onRemove={onRemove} />
+        )
+      )}
+    </Panel>
+  );
+}
 
 function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const list = items || [];
@@ -1478,7 +1724,7 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
         <>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
           {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
-          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind) }}>{it.kind}</span>}
+          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
           <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
           <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
         </>
@@ -1519,18 +1765,19 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
         style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
       >
         <input value={title} onChange={(ev) => setTitle(ev.target.value)} placeholder="請求・入金項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
-        <input value={amount} onChange={(ev) => setAmount(ev.target.value)} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+        <input value={amount} onChange={(ev) => setAmount(ev.target.value)} placeholder="例: 30000" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
         <select value={kind} onChange={(ev) => setKind(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 70 }}>
           {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
         </select>
         <button type="submit" style={chipBtn}>追加</button>
       </form>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>請求＝出した請求書 ／ 入金＝受け取り ／ 支払＝経費</div>
     </Panel>
   );
 }
 
 function Empty({ children }) {
-  return <div style={{ fontSize: 13, color: C.faint, padding: "6px 2px" }}>{children}</div>;
+  return <div style={{ fontSize: 13, color: C.sub, padding: "8px 2px", lineHeight: 1.6 }}>{children}</div>;
 }
 
 /* 今日の要対応（遅れ・締切間近の集約）。任意でブラウザ通知をオンにできる。 */
@@ -1559,11 +1806,11 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
           {late.slice(0, 5).map((e, i) => (
             <Row key={"l" + i} dot="🔴" color={C.red} label={e.label} right={`${-e.diff}日遅れ`} />
           ))}
-          {late.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか遅れ {late.length - 5}件</div>}
+          {late.length > 5 && <div style={{ fontSize: 12, color: C.sub }}>ほか遅れ {late.length - 5}件</div>}
           {soon.slice(0, 5).map((e, i) => (
             <Row key={"s" + i} dot="🟠" color={C.orange} label={e.label} right={e.diff === 0 ? "今日" : `あと${e.diff}日`} />
           ))}
-          {soon.length > 5 && <div style={{ fontSize: 12, color: C.faint }}>ほか間近 {soon.length - 5}件</div>}
+          {soon.length > 5 && <div style={{ fontSize: 12, color: C.sub }}>ほか間近 {soon.length - 5}件</div>}
         </div>
       )}
     </Panel>
@@ -1574,7 +1821,7 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
 function CalStatusNote({ source, status, error, count, onConnect, connecting, onRefresh, refreshing }) {
   if (source === "calendar") {
     return (
-      <div style={{ fontSize: 12, color: C.green, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
+      <div style={{ fontSize: 12, color: C.green, fontWeight: 700, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 12, display: "flex", gap: 6, alignItems: "center" }}>
         <span>✅</span>
         <span style={{ flex: 1 }}>Googleカレンダー連携中（今週 {count}件・自動で最新化）</span>
         {onRefresh && (
@@ -1614,10 +1861,13 @@ function LoginGate({ onLogin, error }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.text }}>
       <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
-        <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>VIELE</div>
-        <h1 style={{ fontSize: 26, margin: "8px 0 6px" }}>secretary</h1>
-        <p style={{ color: C.sub, fontSize: 14, marginBottom: 28 }}>
-          一人社長のための秘書ダッシュボード。<br />本人だけが閲覧・全端末で同期。
+        <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>ひとりビジネスの</div>
+        <h1 style={{ fontSize: 28, margin: "6px 0 8px" }}>ひとり秘書</h1>
+        <p style={{ color: C.sub, fontSize: 14, marginBottom: 16, lineHeight: 1.7 }}>
+          一人で全部やっているあなたへ。<br />ぜんぶ見て、考えて、確認する。<br />お母さんみたいな、あなた専属の秘書です。
+        </p>
+        <p style={{ color: C.sub, fontSize: 13, marginBottom: 28, lineHeight: 1.6 }}>
+          ログインすると、あなた専用のデータ領域が作られます。他の人のデータとは完全に分かれています。
         </p>
         <button
           onClick={onLogin}
@@ -1638,16 +1888,15 @@ function LoginGate({ onLogin, error }) {
 
 /* Firestore等のデータ取得エラー画面 */
 function ErrorScreen({ error, onSignOut }) {
+  // 技術的な詳細はコンソールに残す
+  if (error) { try { console.error("[VIELE] データ接続エラー:", error); } catch { /* ignore */ } }
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
-      <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データに接続できません</h2>
+      <div style={{ fontSize: 13, letterSpacing: 2, color: C.accent }}>ひとり秘書</div>
+      <h2 style={{ color: C.red, fontSize: 16, marginTop: 8 }}>データの読み込みに失敗しました</h2>
       <p style={{ color: C.sub, fontSize: 13 }}>
-        多くの場合 Firestore のルール未公開が原因です（ルールを公開すると直ります）。
+        通信環境を確認して、しばらくしてからもう一度お試しください。
       </p>
-      <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, background: C.panel, padding: 12, borderRadius: 8 }}>
-        {String(error?.code || "")} {String(error?.message || error)}
-      </pre>
       <button onClick={onSignOut} style={{ ...chipBtn, marginTop: 8 }}>ログアウト</button>
     </div>
   );
@@ -1735,10 +1984,11 @@ export default function App() {
     try {
       const r = await fetch("/api/gcal-write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh, action, ...payload }) });
       const text = await r.text();
-      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+      let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-write parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j.error) {
-        if (j.needReconnect) setCalWriteMsg("書き込み権限が必要です。一度「連携を解除」→「連携」で再許可してください。");
-        throw new Error(j.error);
+        if (j.needReconnect) setCalWriteMsg("カレンダーへの書き込み権限が必要です。一度「連携を解除」してから再度「連携」してください。");
+        console.error("[VIELE] gcal-write error", j.error);
+        throw new Error("カレンダーの操作に失敗しました。しばらくしてから再度お試しください。");
       }
       lastCalFetchRef.current = 0; // 直後の再取得を強制
       refreshCalendar();
@@ -1777,15 +2027,33 @@ export default function App() {
   const notifySupported = typeof Notification !== "undefined";
   const [notify, setNotify] = useState(() => localStorage.getItem("viele-notify") === "1");
   const notifiedRef = useRef(false);
-  const enableNotify = async () => {
-    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
-    const p = await Notification.requestPermission();
-    if (p === "granted") { setNotify(true); localStorage.setItem("viele-notify", "1"); }
-    else alert("通知が許可されませんでした。端末の設定から許可できます。");
-  };
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
+
+  // 通知ON：許可取得 → プッシュ購読 → 購読をFirestoreに保存（閉じていてもサーバーから届く）
+  // 注意1(iOS): ホーム画面に追加したPWA内でのみプッシュ受信が可能。
+  // 注意2: requestPermission/subscribe はボタンタップの直後に呼ぶ必要がある（このonClick内でOK）。
+  const enableNotify = async () => {
+    if (!notifySupported) { alert("この端末/ブラウザは通知に対応していません。"); return; }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") { alert("通知が許可されませんでした。端末の設定から許可できます。"); return; }
+    setNotify(true); localStorage.setItem("viele-notify", "1");
+    // プッシュ購読（SW対応時のみ。未対応でも「開いた時の通知」は有効なので致命的にしない）
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) { console.warn("VITE_VAPID_PUBLIC_KEY 未設定のためプッシュ購読をスキップ"); return; }
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe(); // 鍵変更に追従するため再購読
+      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+      if (firebaseEnabled && update) update({ pushSub: subscription.toJSON() });
+    } catch (err) {
+      console.error("プッシュ購読エラー:", err); // iOS(ホーム画面未追加)等。許可だけ通った状態で続行
+    }
+  };
 
   // ── Googleカレンダー連携（refresh token方式・data宣言後に置く）──
   // OAuth戻り値(refresh token)を本人のFirestoreへ保存（初回のみ・ループ防止でガードを先に立てる）
@@ -1807,12 +2075,13 @@ export default function App() {
       try {
         const r = await fetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
         const text = await r.text();
-        let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
+        let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-events parse error", r.status, text.slice(0, 200)); throw new Error("カレンダーの取得に失敗しました。しばらくしてから『更新』を押してください。"); }
         if (cancelled) return;
         if (j.error) {
           // 連携が切れている場合は保存済みトークンを破棄して再連携を促す
           if (j.needReconnect) update({ gcalRefresh: null });
-          throw new Error(j.error);
+          console.error("[VIELE] gcal-events error", j.error);
+          throw new Error("カレンダーの取得に失敗しました。再連携が必要な場合は「Googleカレンダーを連携」を押してください。");
         }
         setCalList(j.calendars || []);
         setCalEvents(j.events || []);
@@ -1874,7 +2143,7 @@ export default function App() {
     const { late, soon } = computeAlerts(data);
     if (late.length + soon.length > 0) {
       try {
-        new Notification("VIELE secretary｜今日の要対応", {
+        new Notification("ひとり秘書｜今日の確認です", {
           body: `遅れ ${late.length}件・もうすぐ ${soon.length}件`,
           icon: "/icon-512.png",
         });
@@ -1900,8 +2169,8 @@ export default function App() {
       const urls = [...catUrls, ...customUrls];
       const fp = urls.map((u) => encodeURIComponent(u)).join(",");
       const r = await fetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
+      let j; try { j = await r.json(); } catch { console.error("[VIELE] digest parse error", r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      if (j.error) { console.error("[VIELE] digest error", j.error); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ digest: { date: iso(new Date()), briefing: j.briefing || "", items: (j.items || []).slice(0, 40), aiEnabled: !!j.aiEnabled } });
     } catch (e) {
       setDigestError(e);
@@ -1920,10 +2189,14 @@ export default function App() {
   // ── 運気 ──
   const refreshFortune = async (birthOverride) => {
     if (!data) return;
+    const birth = birthOverride || data.birth;
+    if (!birth || !birth.date) {
+      setFortuneError(new Error("先に出生情報を入力してください"));
+      return;
+    }
     setFortuneLoading(true);
     setFortuneError(null);
     try {
-      const birth = birthOverride || data.birth || DEFAULT_BIRTH;
       const chartText = computeChart(birth).text; // 命式はブラウザ側で計算
       const energy = dayEnergy(birth, iso(new Date())); // その日の気（決定論的にスコア＆スタンス）
       const r = await fetch("/api/fortune", {
@@ -1934,8 +2207,8 @@ export default function App() {
       const text = await r.text();
       let j;
       try { j = JSON.parse(text); }
-      catch { throw new Error(`サーバー応答が不正(HTTP ${r.status}): ${text.slice(0, 200)}`); }
-      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      catch { console.error("[VIELE] fortune parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      if (!r.ok || j.error) { console.error("[VIELE] fortune error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
     } catch (e) {
       setFortuneError(e);
@@ -1952,9 +2225,9 @@ export default function App() {
       const dataUrl = await downscaleImage(file, 1280, 0.7);
       const r = await fetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
       const text = await r.text();
-      let j; try { j = JSON.parse(text); } catch { throw new Error(`応答が不正(HTTP ${r.status})`); }
-      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
-      if (j.aiEnabled === false) throw new Error("AIキー未設定（VercelにGEMINI_API_KEY）");
+      let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] import-schedule parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
+      if (!r.ok || j.error) { console.error("[VIELE] import-schedule error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
+      if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
       const ev = (j.events || []).map((e, i) => ({ id: "mv" + Date.now() + "_" + i, date: e.date, time: e.time || "終日", title: e.title }));
       const existing = data.manualEvents || [];
       const keyOf = (e) => `${e.date}|${e.time}|${e.title}`;
@@ -1971,6 +2244,7 @@ export default function App() {
 
   useEffect(() => {
     if (!data || fortuneRef.current) return;
+    if (!(data.birth && data.birth.date)) return; // birth 未設定時は自動 fetch しない
     if (!data.fortune || data.fortune.date !== iso(new Date())) {
       fortuneRef.current = true;
       refreshFortune();
@@ -2025,28 +2299,40 @@ export default function App() {
     update({ trips: [...data.trips, trip] });
   };
   // 削除は誤操作防止のため確認を挟む
-  const confirmDelete = (fn) => { if (window.confirm("削除しますか？この操作は取り消せません。")) fn(); };
-  const removeTrip = (id) => confirmDelete(() => {
+  const confirmDelete = (fn, label) => {
+    const name = label ? `『${label}』` : "この項目";
+    if (window.confirm(`${name}を削除しますか？この操作は取り消せません。`)) fn();
+  };
+  const removeTrip = (id) => {
     const t = data.trips.find((x) => x.id === id);
-    const patch = { trips: data.trips.filter((x) => x.id !== id) };
-    // 自動検知の出張を消したら、同じ予定からは再生成しない
-    if (t && t.auto && t.srcId) patch.tripIgnore = [...(data.tripIgnore || []), t.srcId];
-    update(patch);
-  });
+    confirmDelete(() => {
+      const patch = { trips: data.trips.filter((x) => x.id !== id) };
+      // 自動検知の出張を消したら、同じ予定からは再生成しない
+      if (t && t.auto && t.srcId) patch.tripIgnore = [...(data.tripIgnore || []), t.srcId];
+      update(patch);
+    }, t && t.title);
+  };
   const editTrip = (id, patch) => update({ trips: data.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
   const mapTripItems = (tripId, fn) =>
     update({ trips: data.trips.map((t) => (t.id === tripId ? { ...t, items: fn(t.items) } : t)) });
   const addTripItem = (tripId, item) => mapTripItems(tripId, (items) => [...items, { ...item, done: false }]);
   const editTripItem = (tripId, idx, patch) =>
     mapTripItems(tripId, (items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
-  const removeTripItem = (tripId, idx) => confirmDelete(() => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx)));
+  const removeTripItem = (tripId, idx) => {
+    const t = data.trips.find((x) => x.id === tripId);
+    const item = t && t.items && t.items[idx];
+    confirmDelete(() => mapTripItems(tripId, (items) => items.filter((_, i) => i !== idx)), item && item.label);
+  };
 
   // ── 締切（二段ローンチ）操作 ──
   const addDeadline = (d) => update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] });
   const addDeadlinesBulk = (arr) =>
     update({ deadlines: [...(data.deadlines || []), ...arr.map((d, i) => ({ id: "d" + Date.now() + "_" + i, ...d }))] });
   const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const removeDeadline = (id) => confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }));
+  const removeDeadline = (id) => {
+    const d = (data.deadlines || []).find((x) => x.id === id);
+    confirmDelete(() => update({ deadlines: data.deadlines.filter((x) => x.id !== id) }), d && d.title);
+  };
 
   // ── 汎用リスト操作（content / money / tasks / feeds）──
   // 既存ユーザーで未定義のキーでも落ちないよう (data[key] || []) で防御
@@ -2057,9 +2343,13 @@ export default function App() {
       update({ [key]: [...(data[key] || []), { id: key[0] + Date.now(), done: false, ...base }] });
     },
     edit: (id, patch) => update({ [key]: (data[key] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }),
-    remove: (id) => confirmDelete(() => update({ [key]: (data[key] || []).filter((x) => x.id !== id) })),
+    remove: (id) => {
+      const item = (data[key] || []).find((x) => x.id === id);
+      confirmDelete(() => update({ [key]: (data[key] || []).filter((x) => x.id !== id) }), item && item.title);
+    },
   });
   const content = makeListOps("content");
+  const launches = makeListOps("launches");
   const money = makeListOps("money");
   const tasks = makeListOps("tasks");
   const feedsOps = makeListOps("feeds");
@@ -2146,6 +2436,10 @@ export default function App() {
   const writableCalIds = new Set((calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer").map((c) => c.id));
 
   const alerts = computeAlerts(data);
+  // 売上タブのローンチ締切を、仕事タブの締切ボードに読み取り専用で並べるためのリンク項目
+  const launchLinked = (data.launches || []).flatMap((L) =>
+    launchDeadlines(L).map((d) => ({ id: `lk:${L.id}:${d.stage}`, title: L.name, stage: `${d.stage}締切`, date: d.date, linked: true }))
+  );
   const moneyOutstanding = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const briefFirst = (data.digest && data.digest.briefing ? data.digest.briefing.split("\n").filter((l) => l.trim())[0] : "");
 
@@ -2168,12 +2462,11 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif", overflowX: "hidden" }}>
       {/* ヘッダー＋タブバー */}
       <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(15,17,21,0.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: C.accent }}>VIELE</div>
-          <strong style={{ fontSize: 15 }}>secretary</strong>
+          <strong style={{ fontSize: 16, letterSpacing: 1 }}>ひとり秘書</strong>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 11, color: C.sub }}>{dateLabel}</span>
           <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
@@ -2184,13 +2477,13 @@ export default function App() {
             <button
               key={t}
               onClick={() => setTab(i)}
-              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.sub, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
+              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.text, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
             >{t}</button>
           ))}
         </div>
       </header>
 
-      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ maxWidth: 760, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
+      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
@@ -2198,18 +2491,66 @@ export default function App() {
           </div>
         )}
 
-        {tab === 0 && (
-          <>
-            <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} />
-            <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
-            {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
-            <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
-            <TimeMeter entries={scheduleEntries} {...calProps} />
-            {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
-            <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
-            {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
-          </>
-        )}
+        {tab === 0 && (() => {
+          const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
+          const remaining = alerts.late.length + alerts.soon.length + pendingTasks;
+          return (
+            <>
+              {/* サンプルデータ識別バナー */}
+              {data.sampleNotice && (
+                <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
+                    いま表示されているデータはサンプルです（「（例）」と付いた項目）。
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.red}`, background: "transparent", color: C.red, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                      onClick={() => {
+                        if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
+                          update({ trips: [], deadlines: [], launches: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
+                        }
+                      }}
+                    >サンプルを全部消す</button>
+                    <button
+                      style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.line}`, background: "transparent", color: C.text, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                      onClick={() => update({ sampleNotice: false })}
+                    >これは自分のデータ</button>
+                  </div>
+                </div>
+              )}
+              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} />
+              <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
+              {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
+              <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
+              <TimeMeter entries={scheduleEntries} {...calProps} />
+              {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
+              <Acc title="設定・取り込み" defaultOpen={false}>
+                <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
+                {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <button
+                    style={{ ...chipBtn, display: "inline-flex", alignItems: "center", minHeight: 40, padding: "9px 14px", fontSize: 13 }}
+                    onClick={() => {
+                      try {
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        const d = iso(new Date());
+                        a.href = url;
+                        a.download = `viele-backup-${d}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        alert("エクスポートに失敗しました: " + String(e && e.message || e));
+                      }
+                    }}
+                  >データをJSONで書き出す</button>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>全データを viele-backup-YYYY-MM-DD.json としてダウンロードします。</div>
+                </div>
+              </Acc>
+            </>
+          );
+        })()}
 
         {tab === 1 && (
           <>
@@ -2223,7 +2564,7 @@ export default function App() {
               onEditItem={editTripItem}
               onRemoveItem={removeTripItem}
             />
-            <DeadlineBoard deadlines={data.deadlines} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
             <CheckList
               title="コンテンツ制作サイクル"
               accent={C.blue}
@@ -2233,19 +2574,27 @@ export default function App() {
               onEdit={content.edit}
               onRemove={content.remove}
               placeholder="制作物を追加…"
-              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue }}>{it.phase}</span>}
+              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>{it.phase}</span>}
             />
           </>
         )}
 
         {tab === 2 && (
-          <MoneyList
-            items={data.money}
-            onToggle={money.toggle}
-            onAdd={money.add}
-            onEdit={money.edit}
-            onRemove={money.remove}
-          />
+          <>
+            <LaunchKpi
+              launches={data.launches}
+              onAdd={launches.add}
+              onEdit={launches.edit}
+              onRemove={launches.remove}
+            />
+            <MoneyList
+              items={data.money}
+              onToggle={money.toggle}
+              onAdd={money.add}
+              onEdit={money.edit}
+              onRemove={money.remove}
+            />
+          </>
         )}
 
         {tab === 3 && (
@@ -2282,7 +2631,7 @@ export default function App() {
             error={fortuneError}
             aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
             onRefresh={() => refreshFortune()}
-            birth={data.birth || DEFAULT_BIRTH}
+            birth={data.birth}
             onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
           />
         )}
@@ -2299,7 +2648,7 @@ function Splash({ text }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.sub }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 11, letterSpacing: 4, color: C.accent }}>VIELE</div>
+        <div style={{ fontSize: 13, letterSpacing: 2, color: C.accent }}>ひとり秘書</div>
         <div style={{ marginTop: 8, fontSize: 14 }}>{text}</div>
       </div>
     </div>
@@ -2321,22 +2670,37 @@ const inp = {
   marginBottom: 8,
   outline: "none",
 };
+const lbl = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 13,
+  color: C.sub,
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+};
 const chipBtn = {
   background: "transparent",
   border: `1px solid ${C.line}`,
   color: C.text,
   borderRadius: 8,
-  padding: "6px 12px",
-  fontSize: 12,
+  padding: "9px 14px",
+  fontSize: 13,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  minHeight: 40,
+  display: "inline-flex",
+  alignItems: "center",
 };
 const iconBtn = {
   background: "transparent",
   border: "none",
-  color: C.faint,
+  color: C.sub,
   cursor: "pointer",
-  fontSize: 13,
-  width: 24,
+  fontSize: 15,
+  width: 40,
+  height: 40,
   flex: "0 0 auto",
+  display: "grid",
+  placeItems: "center",
 };
