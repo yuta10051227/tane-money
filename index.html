@@ -18,7 +18,7 @@
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet"/>
-<meta name="tane-version" content="1436cfc">
+<meta name="tane-version" content="b082cc7">
 </head>
 <body>
   <div id="root"></div>
@@ -15015,12 +15015,14 @@ function SeedMonster({
   const skinDef = skinId ? HIDDEN_MONSTERS.find(h => h.id === skinId) : null;
   const skinActive = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId = skinActive ? skinId : monsterId;
-  // 6コマ素材持ちは前向きアニメ(特徴パーツが動く)を順送り。それ以外は従来の横向き2コマ
-  const sixFrame = !!MON_FRAMES6[dispId];
+  // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
+  const isCat = /^(cpurin|cku)_/.test(String(dispId));
+  const frontFrames = MON_FRAMES6[dispId] ? 6 : isCat ? 4 : 0;
+  const multiFront = frontFrames > 0; // 前向き多コマ(歩行はするが左右反転しない)
   // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
   const hatching = evolving && monsterId === "egg";
-  const fIdx = hatching ? 3 + Math.floor(frame / 2) % 3 : sixFrame ? Math.floor(frame / 3) % 6 : Math.floor(frame / 5) % 2;
-  const imgSrc = sixFrame || hatching ? `/assets/monster_${dispId}_f${fIdx}.png` : `/assets/monster_${dispId}_side_f${fIdx}.png`;
+  const fIdx = hatching ? 3 + Math.floor(frame / 2) % 3 : multiFront ? Math.floor(frame / 3) % frontFrames : Math.floor(frame / 5) % 2;
+  const imgSrc = multiFront || hatching ? `/assets/monster_${dispId}_f${fIdx}.png` : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
   // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
   // 分岐は乱数なしの固定ルール=「子どもの行動」で決まる(図鑑のbranchHintと必ず一致させること)
@@ -15340,7 +15342,7 @@ function SeedMonster({
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      transform: `translateX(${walkX}px) scaleX(${sixFrame ? 1 : face})`,
+      transform: `translateX(${walkX}px) scaleX(${multiFront ? 1 : face})`,
       transition: "transform 1.8s ease-in-out",
       willChange: "transform"
     }

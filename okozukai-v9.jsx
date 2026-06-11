@@ -5252,14 +5252,16 @@ function SeedMonster({ child, data, size=90, update }) {
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
   const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
-  // 6コマ素材持ちは前向きアニメ(特徴パーツが動く)を順送り。それ以外は従来の横向き2コマ
-  const sixFrame       = !!MON_FRAMES6[dispId];
+  // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
+  const isCat          = /^(cpurin|cku)_/.test(String(dispId));
+  const frontFrames    = MON_FRAMES6[dispId] ? 6 : isCat ? 4 : 0;
+  const multiFront     = frontFrames > 0;   // 前向き多コマ(歩行はするが左右反転しない)
   // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
   const hatching       = evolving && monsterId === "egg";
   const fIdx           = hatching ? (3 + Math.floor(frame/2) % 3)
-                       : sixFrame ? Math.floor(frame / 3) % 6
+                       : multiFront ? Math.floor(frame / 3) % frontFrames
                        : Math.floor(frame / 5) % 2;
-  const imgSrc         = (sixFrame || hatching)
+  const imgSrc         = (multiFront || hatching)
     ? `/assets/monster_${dispId}_f${fIdx}.png`
     : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
@@ -5449,7 +5451,7 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
 
       {/* モンスター画像（デジモン風に横移動） */}
-      <div style={{transform:`translateX(${walkX}px) scaleX(${sixFrame?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
+      <div style={{transform:`translateX(${walkX}px) scaleX(${multiFront?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
         <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
           <div style={{
             animation:hatching?"shk 0.3s ease-in-out infinite":evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
