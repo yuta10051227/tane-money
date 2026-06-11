@@ -1,8 +1,11 @@
 // VIELE secretary — 予定スクショ取り込みAPI。TimeTree等のスクリーンショットから予定をGemini Visionで抽出。
 import { geminiParts } from "./_gemini.js";
+import { requireUser } from "./_auth.js";
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};

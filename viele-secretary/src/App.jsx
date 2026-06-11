@@ -9,6 +9,17 @@ import { computeChart, dayEnergy } from "./natal";
 
 const STORE_KEY = "viele-secretary";
 
+// 認証付き fetch：ログイン中なら Firebase IDトークンを Authorization ヘッダに付与してAPIを呼ぶ。
+// サーバー(api/_auth.js)が検証し、未ログイン/許可リスト外の第三者からの呼び出しを弾く。
+async function authedFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  try {
+    const u = auth && auth.currentUser;
+    if (u) headers.Authorization = `Bearer ${await u.getIdToken()}`;
+  } catch { /* トークン取得に失敗してもそのまま投げ、サーバー側で401を返させる */ }
+  return fetch(url, { ...options, headers });
+}
+
 // OAuthコールバックから戻った refresh token をURLフラグメントから回収（Firestoreへ保存して永続化）
 const PENDING_GCAL_REFRESH = (() => {
   try {
@@ -586,7 +597,7 @@ function DraftPanel({ context }) {
     (async () => {
       setLoading(true); setErr(null);
       try {
-        const r = await fetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) });
+        const r = await authedFetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context }) });
         const text = await r.text();
         let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] draft parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。"); }
         if (!r.ok || j.error) throw new Error(j.error || "サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。");
@@ -1982,7 +1993,7 @@ export default function App() {
     if (!refresh) { setCalWriteMsg("連携が必要です"); return false; }
     setCalWriteBusy(true); setCalWriteMsg(null);
     try {
-      const r = await fetch("/api/gcal-write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh, action, ...payload }) });
+      const r = await authedFetch("/api/gcal-write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh, action, ...payload }) });
       const text = await r.text();
       let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-write parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j.error) {
@@ -2073,7 +2084,7 @@ export default function App() {
     setCalStatus("loading"); setCalError(null);
     (async () => {
       try {
-        const r = await fetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
+        const r = await authedFetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
         const text = await r.text();
         let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-events parse error", r.status, text.slice(0, 200)); throw new Error("カレンダーの取得に失敗しました。しばらくしてから『更新』を押してください。"); }
         if (cancelled) return;
@@ -2168,7 +2179,7 @@ export default function App() {
       const customUrls = (data.feeds || []).map((f) => f.url);
       const urls = [...catUrls, ...customUrls];
       const fp = urls.map((u) => encodeURIComponent(u)).join(",");
-      const r = await fetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
+      const r = await authedFetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
       let j; try { j = await r.json(); } catch { console.error("[VIELE] digest parse error", r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j.error) { console.error("[VIELE] digest error", j.error); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ digest: { date: iso(new Date()), briefing: j.briefing || "", items: (j.items || []).slice(0, 40), aiEnabled: !!j.aiEnabled } });
@@ -2199,7 +2210,7 @@ export default function App() {
     try {
       const chartText = computeChart(birth).text; // 命式はブラウザ側で計算
       const energy = dayEnergy(birth, iso(new Date())); // その日の気（決定論的にスコア＆スタンス）
-      const r = await fetch("/api/fortune", {
+      const r = await authedFetch("/api/fortune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chart: chartText, situation: buildSituation(data), today: iso(new Date()), energy }),
@@ -2223,7 +2234,7 @@ export default function App() {
     setImportMsg(null);
     try {
       const dataUrl = await downscaleImage(file, 1280, 0.7);
-      const r = await fetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
+      const r = await authedFetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
       const text = await r.text();
       let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] import-schedule parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
       if (!r.ok || j.error) { console.error("[VIELE] import-schedule error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
@@ -2483,7 +2494,7 @@ export default function App() {
         </div>
       </header>
 
-      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
+      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, boxSizing: "border-box", position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>

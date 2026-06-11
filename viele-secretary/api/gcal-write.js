@@ -1,5 +1,7 @@
 // アプリからGoogleカレンダーへ予定を作成・更新・削除する。
 // リフレッシュトークンからアクセストークンを発行して書き込む（calendar.events スコープが必要）。
+import { requireUser } from "./_auth.js";
+
 const CLIENT_ID = "752964285770-94aqtjgb7v33g854l7osvndvgh26jc70.apps.googleusercontent.com";
 
 async function accessFromRefresh(refresh) {
@@ -38,6 +40,8 @@ function addHourISO(iso, h) { const d = new Date(iso); d.setHours(d.getHours() +
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};

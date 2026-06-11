@@ -113,13 +113,14 @@ function setupWebPush() {
 
 // ── メインハンドラ ───────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // ── 認証チェック ──
+  // ── 認証チェック（CRON_SECRET は必須。未設定なら誰でも全ユーザーへ送信できてしまうため停止）──
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers["authorization"] || "";
-    if (auth !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+  if (!cronSecret) {
+    return res.status(500).json({ error: "CRON_SECRET 未設定（Vercel環境変数に設定してください）" });
+  }
+  const auth = req.headers["authorization"] || "";
+  if (auth !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   // GET / POST 以外は弾く

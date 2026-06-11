@@ -4,9 +4,12 @@
 // スコア・運気の波は命式由来の決定論値で確定させ、毎日きちんと変化させる。外部占い文は再配信しない。
 
 import { geminiText } from "./_gemini.js";
+import { requireUser } from "./_auth.js";
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};
