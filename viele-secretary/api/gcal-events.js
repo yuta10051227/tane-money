@@ -1,5 +1,7 @@
 // リフレッシュトークンから毎回アクセストークンを発行し、今週〜約3ヶ月先のカレンダー予定を返す。
 // これにより「一度連携すれば維持され続ける」（トークン失効しても自動再発行）。
+import { requireUser } from "./_auth.js";
+
 const CLIENT_ID = "752964285770-94aqtjgb7v33g854l7osvndvgh26jc70.apps.googleusercontent.com";
 
 async function accessFromRefresh(refresh) {
@@ -34,6 +36,8 @@ async function getEvents(at, calId, timeMin, timeMax) {
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};

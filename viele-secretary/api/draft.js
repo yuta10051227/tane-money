@@ -1,8 +1,11 @@
 // VIELE secretary — 告知文の下書きAPI。締切/イベントの内容から、LINE/SNS/メールの下書きをGeminiで生成。
 import { geminiText } from "./_gemini.js";
+import { requireUser } from "./_auth.js";
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};

@@ -4,12 +4,36 @@
 // キーが無ければ要約なしで見出しだけ返す（＝無料で動く）。
 
 import { geminiText } from "./_gemini.js";
+import { requireUser } from "./_auth.js";
 
 const DEFAULT_FEEDS = [
   "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
   "https://news.google.com/rss/search?q=SNS%20マーケティング%20集客&hl=ja&gl=JP&ceid=JP:ja",
   "https://news.google.com/rss/search?q=個人事業主%20フリーランス&hl=ja&gl=JP&ceid=JP:ja",
 ];
+
+// SSRF対策：http(s) かつ 内部/予約アドレスでない公開URLだけを許可する。
+// （クラウドのメタデータ 169.254.169.254 や localhost/内部ネットへのフェッチを遮断）
+function isSafeFeedUrl(furl) {
+  let u;
+  try { u = new URL(furl); } catch { return false; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  const host = (u.hostname || "").toLowerCase();
+  if (!host) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  if (host === "0.0.0.0" || host.includes(":")) return false; // IPv6リテラル(::1等)は一律拒否
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    const p = host.split(".").map(Number);
+    if (
+      p[0] === 0 || p[0] === 127 || p[0] === 10 ||
+      (p[0] === 169 && p[1] === 254) ||              // link-local / クラウドメタデータ
+      (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
+      (p[0] === 192 && p[1] === 168) ||
+      (p[0] === 100 && p[1] >= 64 && p[1] <= 127)    // CGNAT
+    ) return false;
+  }
+  return true;
+}
 
 function decodeEntities(s) {
   return String(s || "")
@@ -50,12 +74,15 @@ async function geminiBriefing(apiKey, items) {
 
 export default async function handler(req, res) {
   try {
+    const user = await requireUser(req, res);
+    if (!user) return;
     const u = new URL(req.url, "http://localhost");
     const feedsParam = u.searchParams.get("feeds");
     const summarize = u.searchParams.get("summarize") === "1";
-    const feeds = feedsParam
+    const feeds = (feedsParam
       ? feedsParam.split(",").map((s) => { try { return decodeURIComponent(s); } catch { return s; } }).filter(Boolean)
-      : DEFAULT_FEEDS;
+      : DEFAULT_FEEDS
+    ).filter(isSafeFeedUrl); // SSRF対策：内部アドレス等を除外
 
     const results = await Promise.all(
       feeds.slice(0, 8).map(async (furl) => {
