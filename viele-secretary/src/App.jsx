@@ -2494,7 +2494,7 @@ export default function App() {
         </div>
       </header>
 
-      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, position: "relative", zoom: fontScale }}>
+      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, boxSizing: "border-box", position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
