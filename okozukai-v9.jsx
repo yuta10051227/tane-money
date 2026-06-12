@@ -1189,10 +1189,11 @@ function GachaAnim({ result, onClose }) {
   const isSuper = result.rate <= 3;             // 激レア(虹)
   const isSR    = result.rate <= 12;            // スーパーレア以上(金以上)
   const tier    = isSuper ? "super" : isSR ? "sr" : result.rate <= 25 ? "rare" : "normal";
-  const AURA    = { normal:"#d8d0bb", rare:"#4a9eff", sr:"#f5c842", super:"#f5c842" }[tier];
+  const AURA    = { normal:"#eae2c8", rare:"#4a9eff", sr:"#f5c842", super:"#f5c842" }[tier];
+  const PLANT   = `/assets/gacha_grow_${tier}.png`;
 
-  const [phase, setPhase]       = useState("charge");   // charge→tap→aura→burst→show
-  const [upgraded, setUpgraded] = useState(false);      // 激レアの「金→虹」昇格演出
+  const [phase, setPhase]       = useState("charge");   // charge→tap→grow→burst→show
+  const [upgraded, setUpgraded] = useState(false);      // 激レアの「金→虹」昇格
   const timers = useRef([]);
   const at = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
   useEffect(()=>()=>timers.current.forEach(clearTimeout), []);
@@ -1202,133 +1203,140 @@ function GachaAnim({ result, onClose }) {
 
   const reveal = () => {
     if(phase!=="tap") return;
-    setPhase("aura");
+    setPhase("grow");
     if(isSuper){
       buzz([80,60,80,60,120]);
-      at(()=>{ setUpgraded(true); buzz([0,500]); }, 1100);  // タメ→虹に昇格(ドキッ)
+      at(()=>{ setUpgraded(true); buzz([0,500]); }, 1100);
       at(()=>setPhase("burst"), 2100);
       at(()=>setPhase("show"),  2550);
     } else if(isSR){
       buzz([100,60,180]);
-      at(()=>setPhase("burst"), 1200);
-      at(()=>setPhase("show"),  1650);
+      at(()=>setPhase("burst"), 1300);
+      at(()=>setPhase("show"),  1750);
     } else {
       buzz([60]);
-      at(()=>setPhase("burst"), 500);
-      at(()=>setPhase("show"),  850);
+      at(()=>setPhase("burst"), 700);
+      at(()=>setPhase("show"),  1050);
     }
   };
   const skip = () => { timers.current.forEach(clearTimeout); if(isSuper) setUpgraded(true); setPhase("show"); };
 
   const rainbow   = isSuper && upgraded;
-  const ringColor = AURA;
-  const starCount = isSuper ? 34 : isSR ? 16 : 0;
+  const grown     = phase==="grow" || phase==="burst" || phase==="show";
+  const starCount = isSuper ? 30 : isSR ? 16 : 0;
 
-  // 放射状パーティクル（バースト用・初期化時に固定）
-  const N = isSuper ? 22 : isSR ? 14 : 8;
+  const N = isSuper ? 24 : isSR ? 16 : 10;
   const [parts] = useState(()=> [...Array(N)].map((_,i)=>{
     const a = (Math.PI*2*i)/N + Math.random()*0.4;
-    const d = 110 + Math.random()*150;
-    return { tx:(Math.cos(a)*d).toFixed(0), ty:(Math.sin(a)*d).toFixed(0), e:"✨⭐🌟💫"[i%4], s:14+Math.round(Math.random()*14) };
+    const d = 130 + Math.random()*170;
+    return { tx:(Math.cos(a)*d).toFixed(0), ty:(Math.sin(a)*d).toFixed(0),
+             e:(i%3===0?"🪙":"🌸🌼✨💫"[i%4]), s:16+Math.round(Math.random()*16) };
   }));
 
-  const Orb = ({ size }) => (
-    <div style={{position:"relative",width:size,height:size,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{position:"absolute",inset:-16,borderRadius:"50%",
-        background: rainbow
-          ? "conic-gradient(from 0deg,#ff3b3b,#ffb02e,#ffe53b,#3bd16f,#3b9eff,#9b5bff,#ff3b3b)"
-          : `radial-gradient(circle,${ringColor}00 55%,${ringColor}cc 70%,${ringColor}00 80%)`,
-        animation: rainbow ? "gRing 2.2s linear infinite" : "gPulse .7s ease-in-out infinite",
-        filter:"blur(3px)"}}/>
-      <div style={{position:"relative",width:size*0.7,height:size*0.7,borderRadius:"50% 50% 47% 47%",
-        background: rainbow
-          ? "conic-gradient(from 0deg,#ff6b6b,#ffd166,#fff3a0,#7be0a0,#6bb8ff,#b18bff,#ff6b6b)"
-          : `radial-gradient(circle at 38% 30%,#ffffff,${ringColor})`,
-        boxShadow:`0 0 32px ${rainbow?"#ffffff":ringColor}aa, inset 0 -8px 14px rgba(0,0,0,.18)`,
-        animation: phase==="aura" ? "gShake .5s ease-in-out infinite" : "none"}}/>
-    </div>
-  );
+  const stop = (e)=>{ e.stopPropagation(); };
 
   return (
-    <div onClick={(phase==="aura"||phase==="burst")?skip:undefined}
-      style={{position:"fixed",inset:0,background:"#000e",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,overflow:"hidden"}}>
+    <div onClick={(phase==="grow"||phase==="burst")?skip:undefined}
+      style={{position:"fixed",inset:0,zIndex:999,fontFamily:F,overflow:"hidden",background:"#1a1024"}}>
 
-      {(phase==="aura"||phase==="burst") && isSR && (
-        <div style={{position:"absolute",top:0,bottom:0,left:"50%",width:rainbow?170:90,transform:"translateX(-50%)",
-          background:`linear-gradient(${rainbow?"#ffffff":AURA}00,${rainbow?"#ffffff":AURA}66,${rainbow?"#ffffff":AURA}00)`,
-          filter:"blur(7px)",animation:"gPillar .6s ease-out",pointerEvents:"none"}}/>
+      <img src="/assets/gacha_stage_bg.png" alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",
+        filter: phase==="charge"?"brightness(.7)":"brightness(1)",transition:"filter .6s ease"}}
+        onError={e=>{e.target.style.display="none";}}/>
+      <div style={{position:"absolute",inset:0,background:phase==="show"?"rgba(10,6,18,.35)":"rgba(10,6,18,.18)",transition:"background .5s"}}/>
+
+      {grown && isSR && (
+        <div style={{position:"absolute",top:0,bottom:"18%",left:"50%",width:rainbow?190:110,transform:"translateX(-50%)",
+          background:`linear-gradient(${rainbow?"#ffffff":AURA}00,${rainbow?"#ffffff":AURA}77,${rainbow?"#ffffff":AURA}00)`,
+          filter:"blur(8px)",animation:"gPillar .7s ease-out",pointerEvents:"none"}}/>
       )}
 
-      {phase==="charge" && (
-        <div style={{textAlign:"center"}}>
-          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:18,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
-          <Orb size={140}/>
-          <p style={{color:"#fff",fontWeight:800,fontSize:17,marginTop:18,animation:"fadePulse .8s ease-in-out infinite"}}>エネルギーをためてるよ…</p>
+      {grown && (
+        <div style={{position:"absolute",left:"50%",bottom:"22%",transform:"translateX(-50%)",width:isSuper?340:240,height:isSuper?340:240,borderRadius:"50%",
+          background: rainbow
+            ? "conic-gradient(from 0deg,#ff3b3b,#ffb02e,#ffe53b,#3bd16f,#3b9eff,#9b5bff,#ff3b3b)"
+            : `radial-gradient(circle,${AURA}aa 0%,${AURA}00 65%)`,
+          filter:"blur(10px)",opacity:.85,animation: rainbow?"gRing 2.4s linear infinite":"gPulse 1s ease-in-out infinite",pointerEvents:"none"}}/>
+      )}
+
+      {(phase==="charge"||phase==="tap") && (
+        <div style={{position:"absolute",left:"50%",bottom:"22%",transform:"translateX(-50%)",textAlign:"center",cursor:phase==="tap"?"pointer":"default"}}
+             onClick={phase==="tap"?reveal:undefined}>
+          {phase==="tap" && <img src="/assets/gacha_can.png" alt="" style={{position:"absolute",left:-92,top:-62,width:98,transformOrigin:"bottom right",animation:"gPour 1.7s ease-in-out infinite",pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>}
+          <img src="/assets/gacha_seed.png" alt="" style={{width:86,display:"block",margin:"0 auto",animation:phase==="tap"?"gSeedBob 1.1s ease-in-out infinite":"gSeedBob 1.6s ease-in-out infinite",filter:`drop-shadow(0 6px 12px ${AURA}cc)`}} onError={e=>{e.target.style.display="none";}}/>
         </div>
       )}
 
-      {phase==="tap" && (
-        <div style={{textAlign:"center",cursor:"pointer"}} onClick={reveal}>
-          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:18,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
-          <div style={{animation:"heartbeat .9s ease-in-out infinite"}}><Orb size={150}/></div>
-          <p style={{color:"#fff",fontWeight:900,fontSize:20,marginTop:20,animation:"fadePulse .8s ease-in-out infinite"}}>タップしてあけよう！</p>
-        </div>
-      )}
-
-      {phase==="aura" && (
-        <div style={{textAlign:"center"}}>
-          <Orb size={162}/>
-          <div style={{color: rainbow?"#fff":AURA,fontSize:isSuper?26:18,fontWeight:900,marginTop:24,animation:"fadePulse .55s ease-in-out infinite",textShadow:rainbow?"0 0 16px #fff":"none"}}>
-            {rainbow ? "にじいろだ‼" : isSuper ? "きん…？いや…⁉" : isSR ? "キラキラしてる…！" : "なにが出るかな？"}
-          </div>
-          <div style={{color:"rgba(255,255,255,.4)",fontSize:11,marginTop:14}}>タップでスキップ</div>
-        </div>
+      {grown && (
+        <img src={PLANT} alt={result.label}
+          style={{position:"absolute",left:"50%",bottom:"21%",transform:"translateX(-50%)",transformOrigin:"bottom center",
+            height:isSuper?"56vh":"44vh",width:"auto",maxWidth:"92vw",objectFit:"contain",
+            animation:"gGrow .9s cubic-bezier(.2,.85,.3,1.15) forwards",
+            filter:`drop-shadow(0 0 18px ${rainbow?"#ffffff":AURA}cc)`}}
+          onError={e=>{e.target.style.display="none";}}/>
       )}
 
       {phase==="burst" && (
-        <div style={{position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{position:"absolute",inset:0,background:"#fff",animation:"gFlash .5s ease-out"}}/>
+        <div style={{position:"absolute",inset:0,pointerEvents:"none"}}>
+          <div style={{position:"absolute",inset:0,background:"#fff",animation:"gFlash .55s ease-out"}}/>
           {parts.map((p,i)=>(
-            <span key={i} style={{position:"absolute",left:"50%",top:"50%",fontSize:p.s,["--tx"]:`${p.tx}px`,["--ty"]:`${p.ty}px`,animation:"gBurst .5s ease-out forwards"}}>{p.e}</span>
+            <span key={i} style={{position:"absolute",left:"50%",top:"50%",fontSize:p.s,["--tx"]:`${p.tx}px`,["--ty"]:`${p.ty}px`,animation:"gBurst .6s ease-out forwards"}}>{p.e}</span>
           ))}
         </div>
       )}
 
-      {phase==="show" && (
-        <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
-          {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
-          <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%",animation:isSR?"gachaShimmer 1.2s ease-in-out infinite":"none"}}>
-            <div style={{fontSize:12,color:theme.color,fontWeight:700,background:theme.bg,display:"inline-block",padding:"3px 12px",borderRadius:999,marginBottom:10}}>{theme.emoji} {theme.name}ガチャ</div>
-            <p style={{color:result.color,fontWeight:900,fontSize:14,letterSpacing:2,margin:"0 0 8px"}}>{result.emoji} {result.label}</p>
-            {result.collItem ? (
-              <div style={{position:"relative",margin:"0 auto 4px"}}>
-                {result.isNewItem&&<div style={{position:"absolute",top:-10,right:"calc(50% - 42px)",background:R,color:"#fff",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:900,zIndex:1,letterSpacing:.5}}>NEW!</div>}
-                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.png`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14,animation:"pop .45s cubic-bezier(.2,.8,.3,1.4)"}}/>
-                <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:2}}>{result.collItem.name}</div>
-                <div style={{fontSize:11,color:MUTED,marginBottom:8}}>{result.collItem.desc}</div>
-              </div>
-            ) : <div style={{fontSize:isSuper?72:60,margin:"4px 0",animation:"pop .45s cubic-bezier(.2,.8,.3,1.4)"}}>{isSuper?"👑":"🎁"}</div>}
-            <div style={{color:result.color,fontSize:44,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
-            <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:14}}>ptゲット！</div>
-            {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:12,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
-            <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
+      {(phase==="charge"||phase==="tap"||phase==="grow") && (
+        <div style={{position:"absolute",top:"9%",left:0,right:0,textAlign:"center",pointerEvents:"none"}}>
+          <div style={{fontSize:15,color:"rgba(255,255,255,0.75)",letterSpacing:1,marginBottom:6,textShadow:"0 2px 8px #000"}}>{theme.emoji} {theme.name}ガチャ</div>
+          <div style={{fontSize:phase==="grow"&&isSuper?24:19,fontWeight:900,color:rainbow?"#fff":phase==="grow"?AURA:"#fff",textShadow:rainbow?"0 0 16px #fff,0 2px 8px #000":"0 2px 8px #000",animation:"fadePulse .8s ease-in-out infinite"}}>
+            {phase==="charge" ? "タネを植えるよ…"
+             : phase==="tap" ? "タップして水をあげよう！💧"
+             : rainbow ? "にじいろの大樹だ‼"
+             : isSuper ? "きん…？いや…⁉"
+             : isSR ? "おおきく育ってる…！"
+             : "なにが育つかな？"}
           </div>
+          {(phase==="grow") && <div style={{color:"rgba(255,255,255,.5)",fontSize:11,marginTop:12}}>タップでスキップ</div>}
+        </div>
+      )}
+
+      {phase==="show" && (
+        <div style={{position:"absolute",left:0,right:0,bottom:0,padding:"30px 22px calc(28px + env(safe-area-inset-bottom))",
+          background:"linear-gradient(to top,rgba(8,5,16,.92) 60%,rgba(8,5,16,0))",animation:"gCardUp .5s cubic-bezier(.2,.8,.3,1.1) forwards",textAlign:"center"}}>
+          {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:"-5%",fontSize:isSuper?22:16,animation:`fall ${1.4+Math.random()*1.6}s ${Math.random()*.6}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
+          <div style={{display:"inline-block",fontSize:12,color:"#1a1024",fontWeight:900,background:result.color,padding:"4px 16px",borderRadius:999,marginBottom:10,boxShadow:`0 0 18px ${result.color}aa`}}>{result.emoji} {result.label}</div>
+          <div style={{position:"relative",width:130,height:130,margin:"0 auto 8px"}}>
+            <img src={`/assets/gacha_frame_${tier}.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",filter:`drop-shadow(0 0 12px ${result.color}aa)`,animation:isSuper?"gPulse2 1.6s ease-in-out infinite":"none"}} onError={e=>{e.target.style.display="none";}}/>
+            <span style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,filter:`drop-shadow(0 0 8px ${result.color})`}}>{result.collItem?result.collItem.emoji:(isSuper?"👑":"🎁")}</span>
+            {result.isNewItem&&<span style={{position:"absolute",top:2,right:2,background:R,color:"#fff",borderRadius:999,padding:"2px 9px",fontSize:10,fontWeight:900}}>NEW!</span>}
+          </div>
+          {result.collItem && <div style={{fontWeight:900,fontSize:17,color:"#fff",marginBottom:2}}>{result.collItem.name}</div>}
+          {result.collItem && <div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:8}}>{result.collItem.desc}</div>}
+          <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:6,marginBottom:result.bonusPts>0?6:16}}>
+            <span style={{fontSize:24}}>🪙</span>
+            <span style={{color:GOLD,fontSize:46,fontWeight:900,lineHeight:1,textShadow:"0 2px 10px #000"}}>+{result.pts}</span>
+            <span style={{color:"rgba(255,255,255,.8)",fontSize:14,fontWeight:700}}>pt</span>
+          </div>
+          {result.bonusPts>0&&<div style={{display:"inline-block",background:GOLDS,borderRadius:10,padding:"5px 14px",marginBottom:14,fontSize:12,fontWeight:800,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
+          <button onClick={(e)=>{stop(e);onClose();}} style={{display:"block",width:"100%",maxWidth:340,margin:"0 auto",background:result.color,border:"none",borderRadius:16,padding:"15px 36px",color:"#1a1024",fontWeight:900,fontSize:17,cursor:"pointer",fontFamily:F,boxShadow:`0 6px 24px ${result.color}66`}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
         </div>
       )}
 
       <style>{`
         @keyframes sp{to{transform:rotate(360deg)}}
         @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
-        @keyframes fall{to{transform:translateY(100vh) rotate(360deg);opacity:0}}
-        @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
-        @keyframes gachaShimmer{0%,100%{box-shadow:0 20px 60px ${result.color}60}50%{box-shadow:0 20px 80px ${result.color}cc,0 0 40px ${result.color}88}}
-        @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.25}}
-        @keyframes gRing{to{transform:rotate(360deg)}}
-        @keyframes gPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.13);opacity:1}}
-        @keyframes gShake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-4px) rotate(-3deg)}75%{transform:translateX(4px) rotate(3deg)}}
+        @keyframes fall{to{transform:translateY(110vh) rotate(360deg);opacity:0}}
+        @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1.08)}42%{transform:scale(1.26)}70%{transform:scale(1)}}
+        @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.45}}
+        @keyframes gRing{to{transform:translateX(-50%) rotate(360deg)}}
+        @keyframes gPulse{0%,100%{transform:translateX(-50%) scale(1);opacity:.75}50%{transform:translateX(-50%) scale(1.1);opacity:.95}}
         @keyframes gPillar{from{opacity:0;transform:translateX(-50%) scaleY(.25)}to{opacity:1;transform:translateX(-50%) scaleY(1)}}
-        @keyframes gFlash{0%{opacity:0}12%{opacity:.92}100%{opacity:0}}
+        @keyframes gFlash{0%{opacity:0}14%{opacity:.92}100%{opacity:0}}
         @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
+        @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
+        @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
+        @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
+        @keyframes gPulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        @keyframes gCardUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
       `}</style>
     </div>
   );
