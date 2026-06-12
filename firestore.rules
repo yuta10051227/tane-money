@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Tane Money: 家族データ ──
+    // 前提: アプリは匿名認証(signInAnonymously)でサインインする。
+    // ファミリーコード(TANE-XXXX-XXXX, 暗号乱数8文字)を知っていることが参加証明。
+    // 認証必須にすることで、未認証のREST直叩き・スクレイパーを遮断し、
+    // App Check併用でアプリ外クライアントからの総当たりを抑止する。
+    match /families/{code} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.data.keys().hasOnly(['data','updatedAt'])
+                   && request.resource.data.data is string
+                   && request.resource.data.data.size() < 900000; // 1MB制限の手前で停止
+      allow delete: if request.auth != null;
+
+      // ログ（追記専用コレクション）
+      match /logs/{logId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.date is string
+                      && request.resource.data.pts is number;
+        // ログは改ざん・削除不可（取り消しは逆仕訳エントリの追記で行う設計）
+        allow update, delete: if false;
+      }
+    }
+
+    // それ以外（viele-secretary等の別アプリのコレクションを含む）は
+    // このルールファイルでは一切許可しない
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,13 +1,14 @@
-const CACHE = 'tane-money-v4';
+const CACHE = 'tane-money-v5';
 // バージョン固定のCDN資産(React/Firebase/フォントCSS)はimmutable扱いでprecache。
 // install時に取りに行き、以降のリピート起動はネットワーク無しで即起動できる。
 const CDN_PRECACHE = [
   'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js',
 ];
-const PRECACHE = ['/', '/index.html', '/manifest.json'];
+const PRECACHE = ['/', '/index.html', '/manifest.json', '/icon.svg', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/icon-512-maskable.png'];
 
 // バージョン固定でキャッシュ優先にしてよいCDN(=URLにバージョンが含まれ中身が変わらない)。
 // 注意: firestore(データAPI)は常にネットワークにするため対象外。

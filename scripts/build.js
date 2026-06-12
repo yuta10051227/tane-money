@@ -32,7 +32,7 @@ const js = fs.readFileSync(appJsPath, "utf8");
 const html = fs.readFileSync(htmlPath, "utf8");
 const START =
   "<script>\nconst { useState, useEffect, useCallback, useRef } = React;\n\n";
-const END = "\nfunction FamilySetup({";
+const END = "\n/*__TANE_BOOTSTRAP__*/";
 const si = html.indexOf(START);
 const ei = html.indexOf(END);
 if (si === -1 || ei === -1) {

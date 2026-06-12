@@ -27,11 +27,23 @@ let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_
 const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode=null; // ファミリーコードのキャッシュ
 
+// 匿名認証（Firestoreルールの前提）。Auth未有効・オフラインでも従来動作を維持（fail-safe）
+let _authTried=false;
+function ensureAuth(){
+  try{
+    if(typeof firebase==="undefined"||!firebase.auth)return;
+    if(_authTried)return; _authTried=true;
+    const a=firebase.auth();
+    if(!a.currentUser)a.signInAnonymously().catch(()=>{_authTried=false;});
+  }catch(e){}
+}
+
 function getDB(){
   if(_db)return _db;
   try{
     if(typeof firebase==="undefined"||!firebase.firestore)return null; // 遅延ロード中
     if(!_fbInit){try{firebase.app();}catch(e){firebase.initializeApp(FIREBASE_CONFIG);}_fbInit=true;}
+    ensureAuth();
     _db=firebase.firestore();return _db;
   }catch(e){return null;}
 }
@@ -52,14 +64,85 @@ function getFamilyCode(){
   return _familyCode;
 }
 
+// ═══ PIN保護（SHA-256ハッシュ化。Firestoreに平文PINを保存しない）═══
+// 同期版SHA-256（PinPadのcheckが同期APIのため）。定数は素数から実行時導出（転記ミス防止）
+const _SHA=(()=>{
+  const P=[];for(let n=2;P.length<64;n++){let ok=true;for(let i=0;i<P.length&&P[i]*P[i]<=n;i++)if(n%P[i]===0){ok=false;break;}if(ok)P.push(n);}
+  const frac=(x)=>Math.floor((x-Math.floor(x))*4294967296)>>>0;
+  return {K:P.map(p=>frac(Math.cbrt(p))),H0:P.slice(0,8).map(p=>frac(Math.sqrt(p)))};
+})();
+function sha256Hex(str){
+  const rotr=(x,n)=>((x>>>n)|(x<<(32-n)))>>>0;
+  const bytes=[];for(let i=0;i<str.length;i++){let c=str.codePointAt(i);if(c>0xFFFF)i++;
+    if(c<0x80)bytes.push(c);
+    else if(c<0x800)bytes.push(0xC0|(c>>6),0x80|(c&63));
+    else if(c<0x10000)bytes.push(0xE0|(c>>12),0x80|((c>>6)&63),0x80|(c&63));
+    else bytes.push(0xF0|(c>>18),0x80|((c>>12)&63),0x80|((c>>6)&63),0x80|(c&63));}
+  const bitLen=bytes.length*8;
+  bytes.push(0x80);while(bytes.length%64!==56)bytes.push(0);
+  const hi=Math.floor(bitLen/4294967296)>>>0,lo=bitLen>>>0;
+  bytes.push((hi>>>24)&255,(hi>>>16)&255,(hi>>>8)&255,hi&255,(lo>>>24)&255,(lo>>>16)&255,(lo>>>8)&255,lo&255);
+  const H=_SHA.H0.slice(),K=_SHA.K,W=new Array(64);
+  for(let off=0;off<bytes.length;off+=64){
+    for(let t=0;t<16;t++)W[t]=((bytes[off+t*4]<<24)|(bytes[off+t*4+1]<<16)|(bytes[off+t*4+2]<<8)|bytes[off+t*4+3])>>>0;
+    for(let t=16;t<64;t++){
+      const s0=rotr(W[t-15],7)^rotr(W[t-15],18)^(W[t-15]>>>3);
+      const s1=rotr(W[t-2],17)^rotr(W[t-2],19)^(W[t-2]>>>10);
+      W[t]=(W[t-16]+s0+W[t-7]+s1)>>>0;
+    }
+    let[a,b,c,d2,e,f,g,h]=H;
+    for(let t=0;t<64;t++){
+      const S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g);
+      const t1=(h+S1+ch+K[t]+W[t])>>>0;
+      const S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+maj)>>>0;
+      h=g;g=f;f=e;e=(d2+t1)>>>0;d2=c;c=b;b=a;a=(t1+t2)>>>0;
+    }
+    H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d2)>>>0;
+    H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
+  }
+  return H.map(x=>x.toString(16).padStart(8,"0")).join("");
+}
+const PIN_SALT="tane-money:pin:v1:";
+function pinHash(p){ return sha256Hex(PIN_SALT+String(p)); }
+// メンバーのPIN照合。pinh(ハッシュ)優先、旧形式の平文pinにもフォールバック（移行期間の互換）
+function pinMatches(input,member){
+  if(!member)return false;
+  if(member.pinh)return pinHash(input)===member.pinh;
+  return String(input)===String(member.pin||"");
+}
+function parentPinMatches(input,data){
+  if(data&&data.parentPinH)return pinHash(input)===data.parentPinH;
+  return String(input)===String((data&&data.parentPin)||"0000");
+}
+// 親PINが初期値(0000)のままか（変更促しバッジ用）
+function parentPinIsDefault(data){
+  if(data&&data.parentPinH)return data.parentPinH===pinHash("0000");
+  return ((data&&data.parentPin)||"0000")==="0000";
+}
+
 async function cloudSave(d) {
   const code = getFamilyCode()||"default";
   const json = JSON.stringify(d);
   // 1. コード固有のローカルストレージ（即時・他コードと分離）
   try { localStorage.setItem(LOCAL_KEY+"_"+code, json); } catch(e) {}
   try { localStorage.setItem(LOCAL_KEY2+"_"+code, json); } catch(e) {}
-  // 2. Firestore（デバウンス2秒・家族間リアルタイム同期）
-  _pendingSave = json;
+  // 2. Firestore（デバウンス・家族間リアルタイム同期）
+  // ログが溜まりすぎたらドキュメント側は古い分を「くりこし」1行に集約（1MB上限で保存が
+  // 静かに失敗するのを防ぐ）。全ログはlogsサブコレクションに恒久保存されている。
+  let docJson = json;
+  if((d.logs||[]).length > 4000){
+    const keep = d.logs.slice(0,3600);
+    const old = d.logs.slice(3600).filter(l=>!String(l.id||"").startsWith("carry_"));
+    const sums = {};
+    d.logs.slice(3600).forEach(l=>{ sums[l.cid]=(sums[l.cid]||0)+(l.pts||0); });
+    const oldestDate = d.logs[d.logs.length-1]?.date || new Date().toISOString();
+    const carry = Object.entries(sums).map(([cid,pts])=>({
+      id:"carry_"+cid, cid, type:"grant", label:"くりこし（これより前の合計）", pts, date:oldestDate
+    }));
+    docJson = JSON.stringify({...d, logs:[...keep, ...carry]});
+  }
+  _pendingSave = docJson;
   if(_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async()=>{
     if(!code||code==="default")return;
@@ -89,8 +172,7 @@ async function cloudLoad() {
           const parsed=JSON.parse(doc.data().data);
           if(parsed&&parsed.children&&parsed.children.length>0){
             try{localStorage.setItem(LOCAL_KEY+"_"+code,doc.data().data);}catch(e){}
-            console.log("Loaded from Firestore:",code);
-            return parsed;
+                        return parsed;
           }
         }
       }catch(e){console.warn("Firestore load failed:",e);}
@@ -190,12 +272,10 @@ function startRealtimeSync(updateFn){
             }
             return merged;
           });
-          console.log("Realtime sync:",t);
-        }
+                  }
       }catch(e){}
     },err=>console.warn("Realtime sync error:",err));
-    console.log("Realtime sync started:",code);
-  }catch(e){console.warn("Could not start realtime sync:",e);}
+      }catch(e){console.warn("Could not start realtime sync:",e);}
 }
 
 // ── ログ1件をFirestoreに直接追記（上書きなし・衝突なし）──
@@ -257,12 +337,10 @@ function startLogsRealtimeSync(updateFn) {
           if(added.length === 0) return prev;
           const merged = [...added, ...(prev.logs||[])];
           merged.sort((a,b) => new Date(b.date) - new Date(a.date));
-          console.log(`Realtime: ${added.length}件の新ログを追加`);
-          return {...prev, logs: merged};
+                    return {...prev, logs: merged};
         });
       }, err => console.warn("Logs realtime sync error:", err));
-    console.log("Logs realtime sync started:", code);
-  } catch(e) { console.warn("Could not start logs realtime sync:", e); }
+      } catch(e) { console.warn("Could not start logs realtime sync:", e); }
 }
 
 
@@ -534,14 +612,14 @@ function fmtTimeRemain(ms){
 }
 
 const INIT = {
-  parentPin: "0000",
+  parentPinH: pinHash("0000"),
   children: [
-    { id: "c1", name: "れいか", emoji: "🌸", pin: "1111", ageMode: "middle",
+    { id: "c1", name: "れいか", emoji: "🌸", pinh: pinHash("1111"), ageMode: "middle",
       displayMode: "teen", role: "child", gradeLabel: "中学生",
       permissions: { investment: "trade", forex: "trade", dailyBonus: true, ranking: true },
       visibility: { balanceToFamily: "hidden", goalToFamily: "progress_only", investmentResultToFamily: "ranking_only", rankingParticipation: true, operationRankingParticipation: true, rankingMetric: "approved_activity_points" }
     },
-    { id: "c2", name: "かなと", emoji: "⚡", pin: "2222", ageMode: "senior",
+    { id: "c2", name: "かなと", emoji: "⚡", pinh: pinHash("2222"), ageMode: "senior",
       displayMode: "teen", role: "child", gradeLabel: "高校生",
       permissions: { investment: "trade", forex: "trade", dailyBonus: true, ranking: true },
       visibility: { balanceToFamily: "hidden", goalToFamily: "progress_only", investmentResultToFamily: "ranking_only", rankingParticipation: true, operationRankingParticipation: true, rankingMetric: "approved_activity_points" }
@@ -569,8 +647,8 @@ const INIT = {
     {id:"g19",emoji:"📐",label:"自分の机の上・下の整理整頓",pts:50,over:{}},
     {id:"g20",emoji:"👔",label:"洗濯物を洗濯機から出す&干す",pts:50,over:{}},
     {id:"g21",emoji:"👚",label:"クローゼットの整理整頓",pts:50,over:{}},
-    {id:"g22",emoji:"🛏",label:"じいちゃんの布団を直す",pts:30,over:{}},
-    {id:"g23",emoji:"🛏",label:"じいちゃんの布団を出す",pts:30,over:{}},
+    {id:"g22",emoji:"🛏",label:"家族の布団を整える",pts:30,over:{}},
+    {id:"g23",emoji:"🧺",label:"洗濯物をたたむ",pts:30,over:{}},
     {id:"g24",emoji:"🍽",label:"食洗機に食器を入れて回す&片付け",pts:30,over:{}},
     {id:"g25",emoji:"🌀",label:"換気扇フィルターを変える",pts:30,over:{}},
     {id:"g26",emoji:"🗑",label:"ゴミの日にゴミを集める",pts:10,over:{}},
@@ -583,7 +661,7 @@ const INIT = {
     {id:"g33",emoji:"🗑",label:"ゴミ袋をゴミ箱にセットする",pts:5,over:{}},
     {id:"g34",emoji:"🗑",label:"落ちているゴミを2個捨てる",pts:5,over:{}},
     {id:"g35",emoji:"👶",label:"おむつを捨てる",pts:5,over:{}},
-    {id:"g36",emoji:"📝",label:"県版テスト満点",pts:1000,over:{}},
+    {id:"g36",emoji:"📝",label:"テストで満点を取る",pts:1000,over:{}},
   ],
   badTasks: [
     {id:"b01",emoji:"📺",label:"勝手にYouTubeを見る",pts:-50,over:{}},
@@ -654,13 +732,13 @@ const INIT = {
   activeSetIds: ["set_default"],  // 同時アクティブ(最大2)
   dailyProgress: {},
   parents: [
-    {id:"p1",name:"パパ",emoji:"👨",pin:"3333",
+    {id:"p1",name:"パパ",emoji:"👨",pinh:pinHash("3333"),
       displayMode:"adult", role:"parent", gradeLabel:"",
       participationMode:"player_and_guardian",
       permissions:{investment:"trade",forex:"trade",dailyBonus:true,ranking:true},
       visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"}
     },
-    {id:"p2",name:"ママ",emoji:"👩",pin:"4444",
+    {id:"p2",name:"ママ",emoji:"👩",pinh:pinHash("4444"),
       displayMode:"adult", role:"parent", gradeLabel:"",
       participationMode:"player_and_guardian",
       permissions:{investment:"trade",forex:"trade",dailyBonus:true,ranking:true},
@@ -769,6 +847,10 @@ function migrate(d) {
   const defaultParentVis={balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"};
   d.children=d.children.map(c=>({displayMode:"teen",role:"child",gradeLabel:"",permissions:defaultChildPerms,visibility:defaultChildVis,...c}));
   if(d.parents) d.parents=d.parents.map(p=>({displayMode:"adult",role:"parent",gradeLabel:"",participationMode:"player_and_guardian",permissions:defaultParentPerms,visibility:defaultParentVis,...p}));
+  // PIN平文→ハッシュ移行（クラウドに平文PINを残さない。旧データは初回ロード時に自動変換）
+  d.children=d.children.map(c=>{ if(c.pin&&!c.pinh){const{pin,...rest}=c;return{...rest,pinh:pinHash(pin)};} return c; });
+  if(d.parents) d.parents=d.parents.map(p=>{ if(p.pin&&!p.pinh){const{pin,...rest}=p;return{...rest,pinh:pinHash(pin)};} return p; });
+  if(d.parentPin&&!d.parentPinH){ d.parentPinH=pinHash(d.parentPin); delete d.parentPin; }
   // dailyTaskSetsがなければdailyTasksから自動生成
   if(!d.dailyTaskSets||d.dailyTaskSets.length===0){
     d.dailyTaskSets=[{
@@ -1545,10 +1627,10 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
     const next = pin + k;
     setPin(next);
     if(next.length === 4) {
-      if(next === data.parentPin) {
+      if(parentPinMatches(next, data)) {
         setTimeout(()=>{
           setAuthed(true);
-          if(data.parentPin==="0000"){ setSettingsGroup("adv"); setSettingsTab("members"); }
+          if(parentPinIsDefault(data)){ setSettingsGroup("adv"); setSettingsTab("members"); }
         }, 200);
       } else {
         setTimeout(()=>{setPinErr(true);setPin("");}, 300);
@@ -1566,7 +1648,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
         <div style={{fontSize:44,marginBottom:8}}>🔐</div>
         <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 4px"}}>設定・管理</h3>
         <p style={{color:MUTED,fontSize:12,margin:"0 0 12px"}}>おや用PIN（初期：0000）</p>
-        {data.parentPin==="0000"&&(
+        {parentPinIsDefault(data)&&(
           <div style={{background:`${R}12`,border:`1.5px solid ${R}50`,borderRadius:12,padding:"10px 14px",marginBottom:14,textAlign:"left"}}>
             <p style={{margin:0,fontSize:12,color:R,fontWeight:700}}>⚠ PINが初期値のままです</p>
             <p style={{margin:"3px 0 0",fontSize:11,color:MUTED}}>認証後、すぐに変更してください</p>
@@ -1862,7 +1944,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {settingsTab==="members"&&(
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>メンバーとPIN管理</p>
-              {[{id:"parent",name:"おや管理",emoji:"🔐",pin:data.parentPin,isParent:true},...data.children,(data.parents||[])].flat().filter((x,i,a)=>x&&a.findIndex(y=>y&&y.id===x.id)===i).map(m=>{
+              {[{id:"parent",name:"おや管理",emoji:"🔐",isParent:true},...data.children,(data.parents||[])].flat().filter((x,i,a)=>x&&a.findIndex(y=>y&&y.id===x.id)===i).map(m=>{
                 if(!m) return null;
                 return(
                   <div key={m.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
@@ -1874,8 +1956,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <button onClick={()=>{
                       const np=prompt(`${m.name}の新しいPIN（4桁）`);
                       if(!np||np.length!==4||isNaN(Number(np))){alert("4桁の数字を入力してください");return;}
-                      if(m.isParent||m.id==="parent") update(d=>({...d,parentPin:np}));
-                      else update(d=>({...d,children:d.children.map(c=>c.id===m.id?{...c,pin:np}:c),parents:(d.parents||[]).map(p=>p.id===m.id?{...p,pin:np}:p)}));
+                      if(m.isParent||m.id==="parent") update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(np)};});
+                      else update(d=>({...d,children:d.children.map(c=>c.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(c):c),parents:(d.parents||[]).map(p=>p.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(p):p),pinChanged:{...(d.pinChanged||{}),[m.id]:true}}));
                     }} style={{padding:"6px 12px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
                       PIN変更
                     </button>
@@ -1905,23 +1987,24 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 <p style={{fontWeight:900,fontSize:16,letterSpacing:3,margin:"0 0 8px"}}>{(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}</p>
                 <p style={{color:MUTED,fontSize:10,margin:"0 0 10px"}}>このコードを家族に共有してください</p>
                 <button onClick={()=>{
-                  const newCode=prompt("新しいファミリーコードを入力（例：TANE-YUTA）");
+                  const newCode=prompt("参加したいファミリーコードを入力（家族の端末の設定画面で確認できます）");
                   if(!newCode)return;
                   const code=newCode.trim().toUpperCase();
+                  if(!/^[A-Z0-9\-]{8,20}$/.test(code)){alert("コードの形式が正しくありません（8文字以上の英数字）");return;}
+                  if(!confirm(`「${code}」のファミリーに切り替えますか？\n今のファミリーのデータはクラウドに残ります。`))return;
                   try{localStorage.setItem("tane_money_family_code",code);}catch(e){}
                   _familyCode=code;
-                  alert("コードを変更しました。ページを再読み込みします。");
                   window.location.reload();
                 }} style={{width:"100%",padding:"9px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:10,color:B,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}>
                   🔗 ファミリーコードを変更
                 </button>
                 <button onClick={()=>{
-                  if(!confirm("このiPhoneからログアウトしますか？\nファミリーコード入力画面に戻ります。"))return;
+                  if(!confirm("この端末からログアウトしますか？\nファミリーコード入力画面に戻ります。"))return;
                   try{localStorage.removeItem("tane_money_family_code");}catch(e){}
                   _familyCode=null;
                   window.location.reload();
                 }} style={{width:"100%",padding:"9px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,color:R,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>
-                  🚪 このiPhoneからログアウト
+                  🚪 この端末からログアウト
                 </button>
               </div>
             </div>
@@ -2153,11 +2236,11 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               </div>
               {/* ログアウト */}
               <button onClick={()=>{
-                if(!confirm("このiPhoneからログアウトしますか？\nコードを入力すれば再びアクセスできます。"))return;
+                if(!confirm("この端末からログアウトしますか？\nコードを入力すれば再びアクセスできます。"))return;
                 try{localStorage.removeItem(FAMILY_CODE_KEY);}catch(e){}
                 _familyCode=null;window.location.reload();
               }} style={{width:"100%",padding:"11px",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:12,color:R,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,marginTop:14}}>
-                🚪 このiPhoneからログアウト
+                🚪 この端末からログアウト
               </button>
             </div>);
           })()}
@@ -2237,7 +2320,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       const entry={id:uid(),cid:child.id,taskId:task.id,taskLabel:task.label,taskEmoji:task.emoji,pts,date:new Date().toISOString()};
       update(d=>({...d,pendingApprovals:[...(d.pendingApprovals||[]),entry]}));
       if(fs.approvalNotification && "Notification" in window && Notification.permission==="granted"){
-        new Notification("承認リクエスト 📬",{body:`${child.name}が「${task.label}」を完了しました（+${pts}pt）`,icon:"/assets/tab_daily.png"});
+        try{new Notification("承認リクエスト 📬",{body:`${child.name}が「${task.label}」を完了しました（+${pts}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}
       }
     } else {
       showFlash(pts, task.emoji);
@@ -3360,74 +3443,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── TIPS (learn タブに移動済み) ── */}
 
       {/* ── RANKING ── */}
-      {false&&(()=>{
-        const month=monthKey();
-        const allMembers=[...data.children,...(data.parents||[])];
-        const rankings=allMembers.map(m=>{
-          const isChild=data.children.some(c=>c.id===m.id);
-          const monthLogs=(data.logs||[]).filter(l=>l.cid===m.id&&(l.date||"").startsWith(month));
-          const totalLogs=(data.logs||[]).filter(l=>l.cid===m.id);
-          const monthPts=monthLogs.reduce((s,l)=>s+l.pts,0);
-          const totalPts=bal(data.logs,m.id);
-          const taskCount=monthLogs.filter(l=>l.type==="good").length;
-          const streak=(data.streak||{})[m.id]?.cur||0;
-          return{...m,monthPts,totalPts,taskCount,streak,isChild};
-        }).sort((a,b)=>b.monthPts-a.monthPts);
-
-        const medals=["🥇","🥈","🥉"];
-        const myRank=rankings.findIndex(r=>r.id===child.id);
-        const maxPts=Math.max(...rankings.map(r=>r.monthPts),1);
-
-        return(<div style={{padding:16}}>
-          {/* 自分の順位ハイライト */}
-          <div style={{background:`linear-gradient(135deg,${Y}30,${G}20)`,border:`2px solid ${Y}`,borderRadius:18,padding:"14px 18px",marginBottom:16,textAlign:"center"}}>
-            <div style={{fontSize:40}}>{medals[myRank]||"🏅"}</div>
-            <div style={{fontWeight:900,fontSize:22,color:TEXT}}>{myRank+1}位</div>
-            <div style={{color:MUTED,fontSize:12}}>今月 {rankings[myRank]?.monthPts?.toLocaleString()}pt獲得</div>
-          </div>
-
-          {/* ランキング一覧 */}
-          <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>今月のランキング</p>
-          {rankings.map((r,i)=>{
-            const isMe=r.id===child.id;
-            const pct=Math.round(r.monthPts/maxPts*100);
-            return(
-              <div key={r.id} style={{background:isMe?`${Y}15`:CARD,border:`2px solid ${isMe?Y:BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                  <span style={{fontSize:24,flexShrink:0,minWidth:32,textAlign:"center"}}>{medals[i]||`${i+1}`}</span>
-                  <ChildAvatar child={r} size={34}/>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:800,fontSize:14,color:isMe?TEXT:TEXT}}>{r.name}{isMe&&" 👈"}</div>
-                    <div style={{color:MUTED,fontSize:11}}>お手伝い {r.taskCount}回 · 🔥{r.streak}日連続</div>
-                  </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontWeight:900,fontSize:16,color:r.monthPts>=0?G:R}}>{r.monthPts>=0?"+":""}{r.monthPts.toLocaleString()}pt</div>
-                    <div style={{color:MUTED,fontSize:10}}>合計 {r.totalPts.toLocaleString()}pt</div>
-                  </div>
-                </div>
-                {/* プログレスバー */}
-                <div style={{height:6,background:BORDER,borderRadius:3,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:isMe?Y:G,borderRadius:3,transition:"width .5s"}}/>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* 総合残高ランキング */}
-          <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"16px 0 10px"}}>総合残高ランキング</p>
-          {[...rankings].sort((a,b)=>b.totalPts-a.totalPts).map((r,i)=>{
-            const isMe=r.id===child.id;
-            return(
-              <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,background:isMe?`${G}10`:BG,border:`1.5px solid ${isMe?G:BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:6}}>
-                <span style={{fontSize:20,minWidth:28,textAlign:"center"}}>{medals[i]||`${i+1}`}</span>
-                <ChildAvatar child={r} size={30}/>
-                <div style={{flex:1,fontWeight:700,fontSize:13}}>{r.name}{isMe&&" 👈"}</div>
-                <div style={{fontWeight:900,fontSize:15,color:r.totalPts>=0?G:R}}>{r.totalPts.toLocaleString()}pt</div>
-              </div>
-            );
-          })}
-        </div>);
-      })()}
 
       <style>{`@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
       {showSettings&&<SettingsModal data={data} update={update} onClose={()=>setShowSettings(false)} currentMemberId={child.id}/>}
@@ -3733,6 +3748,20 @@ function AiAdvisorTab({data}){
   const [result,setResult]=useState(null);
   const [error,setError]=useState(null);
 
+  // 本番(Vercel)ではAPIキー無しの直接呼び出しが401になるため機能を停止。
+  // 子どもの行動データを外部AIへ送る導線でもあり、サーバ経由化するまで「準備中」を表示
+  if(!hasCloudStorage()){
+    return (
+      <div style={{textAlign:"center",padding:"40px 20px"}}>
+        <div style={{fontSize:48,marginBottom:10}}>🤖</div>
+        <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:6}}>AI分析はじゅんび中です</div>
+        <p style={{color:MUTED,fontSize:13,lineHeight:1.8,maxWidth:300,margin:"0 auto"}}>
+          家族のがんばりをAIが分析してアドバイスする機能を準備しています。もうしばらくお待ちください！
+        </p>
+      </div>
+    );
+  }
+
   const buildPrompt=()=>{
     const logs=data.logs||[];
     const children=data.children||[];
@@ -3900,6 +3929,7 @@ function InvestLearnTab({child, data, update, onRanking}){
           <div style={{textAlign:"right"}}>
             <div style={{fontWeight:700,fontSize:14,color:TEXT}}>{s.price?.toLocaleString()}{s.currency==="JPY"?"円":"$"}</div>
             <div style={{fontSize:11,fontWeight:600,color:(s.lastChange||0)>=0?G:R}}>{(s.lastChange||0)>=0?"+":""}{(s.lastChange||0).toFixed(1)}%</div>
+            {s.realData===false&&<div style={{fontSize:9,color:R,fontWeight:700}}>サンプル値</div>}
           </div>
         </div>
       ))}
@@ -3910,7 +3940,7 @@ function InvestLearnTab({child, data, update, onRanking}){
           <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{fx.name||fx.code}</div><div style={{fontSize:10,color:MUTED}}>1 {fx.code} = ¥{(fx.price||0).toFixed(fx.code==="KRW"?3:2)}</div></div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:11,fontWeight:600,color:(fx.changePct||0)>=0?G:R}}>{(fx.changePct||0)>=0?"+":""}{(fx.changePct||0).toFixed(2)}%</div>
-            {fx.realData&&<div style={{fontSize:9,color:G,fontWeight:600}}>LIVE</div>}
+            {fx.realData?<div style={{fontSize:9,color:G,fontWeight:600}}>LIVE</div>:<div style={{fontSize:9,color:R,fontWeight:700}}>サンプル値</div>}
           </div>
         </div>
       ))}
@@ -4183,12 +4213,17 @@ function ParentScreen({ data, update, onBack }) {
 
   const addChild = () => {
     if(!ncName||ncPin.length!==4)return;
-    update(d=>({...d,children:[...d.children,{id:uid(),name:ncName,emoji:ncEmoji,pin:ncPin,ageMode:ncMode}]}));
+    const newId=uid();
+    update(d=>({...d,children:[...d.children,{id:newId,name:ncName,emoji:ncEmoji,pinh:pinHash(ncPin),ageMode:ncMode}],pinChanged:{...(d.pinChanged||{}),[newId]:true}}));
     setShowAddChild(false); setNcName(""); setNcEmoji("😊"); setNcPin(""); setNcMode("middle");
   };
   const saveChild = () => {
-    if(!editChild||editChild.pin.length!==4)return;
-    update(d=>({...d,children:d.children.map(c=>c.id===editChild.id?editChild:c)}));
+    if(!editChild)return;
+    const np=(editChild.pin||"");
+    if(np.length>0&&np.length!==4)return;
+    const {pin,...rest}=editChild;
+    const saved=np.length===4?{...rest,pinh:pinHash(np)}:rest;
+    update(d=>({...d,children:d.children.map(c=>c.id===editChild.id?saved:c)}));
     setEditChild(null);
   };
   const confirmDelChild = id => {
@@ -4430,8 +4465,8 @@ function ParentScreen({ data, update, onBack }) {
                     </div>
                   </div>
                   <input value={editChild.name} onChange={e=>setEditChild(c=>({...c,name:e.target.value}))} placeholder="なまえ" style={{...INP,marginBottom:8}}/>
-                  <input value={editChild.pin} onChange={e=>setEditChild(c=>({...c,pin:e.target.value.slice(0,4)}))} type="number" placeholder="暗証番号（4けた）" style={{...INP,marginBottom:8}}/>
-                  {editChild.pin.length!==4 && <p style={{color:R,fontSize:11,margin:"0 0 8px"}}>4けたで入力してください</p>}
+                  <input value={editChild.pin} onChange={e=>setEditChild(c=>({...c,pin:e.target.value.slice(0,4)}))} type="number" placeholder="新しい暗証番号（変更する時だけ入力）" style={{...INP,marginBottom:8}}/>
+                  {(editChild.pin||"").length>0&&(editChild.pin||"").length!==4 && <p style={{color:R,fontSize:11,margin:"0 0 8px"}}>4けたで入力してください</p>}
                   {/* ロック設定 */}
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,padding:"8px 12px",background:BG,borderRadius:10}}>
                     <span style={{color:MUTED,fontSize:12,fontWeight:700,flex:1}}>暗証番号ロック</span>
@@ -4450,10 +4485,15 @@ function ParentScreen({ data, update, onBack }) {
                     ))}
                   </div>
                   <div style={{display:"flex",gap:8}}>{sb(G,"保存",()=>{
+                    const np=(editChild.pin||"");
+                    if(np.length>0&&np.length!==4)return;
+                    const {pin,...rest}=editChild;
+                    const saved=np.length===4?{...rest,pinh:pinHash(np)}:rest;
                     // lockEnabledをdataにも反映
                     update(d=>({...d,
-                      children:d.children.map(c=>c.id===editChild.id?editChild:c),
-                      lockEnabled:{...(d.lockEnabled||{}),[editChild.id]:!!editChild.lockEnabled}
+                      children:d.children.map(c=>c.id===editChild.id?saved:c),
+                      lockEnabled:{...(d.lockEnabled||{}),[editChild.id]:!!editChild.lockEnabled},
+                      ...(np.length===4?{pinChanged:{...(d.pinChanged||{}),[editChild.id]:true}}:{})
                     }));
                     setEditChild(null);
                   })}{sb(MUTED,"キャンセル",()=>setEditChild(null))}</div>
@@ -4466,14 +4506,14 @@ function ParentScreen({ data, update, onBack }) {
                       <div style={{fontWeight:800,fontSize:15}}>{child.name}</div>
                       <div style={{color:MUTED,fontSize:12}}>{AGE_MODES[child.ageMode||"middle"].emoji} {AGE_MODES[child.ageMode||"middle"].label} · {bal(data.logs,child.id).toLocaleString()}pt</div>
                     </div>
-                    <div style={{display:"flex",gap:6}}>{sb(B,"✏",()=>setEditChild({...child,lockEnabled:!!(data.lockEnabled&&data.lockEnabled[child.id])}))}
+                    <div style={{display:"flex",gap:6}}>{sb(B,"✏",()=>setEditChild({...child,pin:"",lockEnabled:!!(data.lockEnabled&&data.lockEnabled[child.id])}))}
                     {sb(R,"🗑",()=>setDelChild(child.id))}</div>
                   </div>
                   <div style={{background:BG,borderRadius:10,padding:"7px 12px",display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:14}}>🔐</span>
                     <span style={{color:MUTED,fontSize:11,fontWeight:700}}>暗証番号ロック:</span>
                     <span style={{fontWeight:800,fontSize:12,color:data.lockEnabled&&data.lockEnabled[child.id]?G:MUTED}}>
-                      {data.lockEnabled&&data.lockEnabled[child.id]?"ON（{child.pin}）":"OFF（ロックなし）"}
+                      {data.lockEnabled&&data.lockEnabled[child.id]?"ON":"OFF（ロックなし）"}
                     </span>
                   </div>
                 </div>
@@ -4827,7 +4867,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
   };
 
   const onboardChecks = {
-    pin: data.parentPin !== "0000",
+    pin: !parentPinIsDefault(data),
     tasks: !!(data.onboardingChecks?.tasksOpened),
     rewards: !!(data.onboardingChecks?.rewardsOpened),
   };
@@ -4849,7 +4889,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
           <button onClick={()=>setShowSettings(true)}
             style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)",position:"relative"}}>
             ⚙
-            {data.parentPin==="0000"&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
+            {parentPinIsDefault(data)&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
           </button>
         </div>
         <div style={{fontSize:13,fontWeight:700,color:TEXT}}>メンバーを選択</div>
@@ -4995,7 +5035,6 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
                 {(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}
               </p>
             </div>
-            <p style={{color:MUTED,fontSize:11,textAlign:"center",margin:0}}>初期PIN：れいか＝1111、かなと＝2222、おや＝0000</p>
           </div>
         </div>
       )}
@@ -5015,8 +5054,8 @@ function PinResetScreen({ data, update, onBack }) {
 
   const doReset = () => {
     if (newPin.length!==4) return;
-    if (target==="parent") update(d=>({...d,parentPin:newPin}));
-    else update(d=>({...d,children:d.children.map(c=>c.id===target?{...c,pin:newPin}:c)}));
+    if (target==="parent") update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(newPin)};});
+    else update(d=>({...d,children:d.children.map(c=>c.id===target?(({pin,...r})=>({...r,pinh:pinHash(newPin)}))(c):c),pinChanged:{...(d.pinChanged||{}),[target]:true}}));
     onBack();
   };
 
@@ -6896,7 +6935,16 @@ function SetupWizard({ data, update, onComplete }) {
   const [goalSkipped, setGoalSkipped]= useState(false);
   const [notifDone,   setNotifDone]  = useState(false);
 
-  const [familyCode] = useState(()=>`TANE-${Math.random().toString(36).slice(2,6).toUpperCase()}`);
+  const [familyCode] = useState(()=>{
+    // 暗号学的乱数で8文字（ゼロ・オー等の紛らわしい文字を除外）。旧形式(4文字)は約168万通りで総当たり可能だった
+    const chars="ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let c="";
+    try{
+      const buf=new Uint32Array(8); crypto.getRandomValues(buf);
+      for(let i=0;i<8;i++) c+=chars[buf[i]%chars.length];
+    }catch(e){ for(let i=0;i<8;i++) c+=chars[Math.floor(Math.random()*chars.length)]; }
+    return `TANE-${c.slice(0,4)}-${c.slice(4)}`;
+  });
   const [joinMode, setJoinMode] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinErr,  setJoinErr]  = useState("");
@@ -6920,7 +6968,7 @@ function SetupWizard({ data, update, onComplete }) {
 
     const newChild = {
       id:childId, name:childName.trim()||"こども", emoji:childEmoji,
-      pin:"0000", displayMode:childMode, role:"child",
+      pinh:pinHash("0000"), displayMode:childMode, role:"child",
       gradeLabel:childMode==="junior"?"小学生":"中学生",
       ageMode:childMode==="junior"?"young":"middle",
       permissions:{canChangePin:true,canViewBalance:true,canCreateGoals:true,canRedeemRewards:true},
@@ -6929,7 +6977,7 @@ function SetupWizard({ data, update, onComplete }) {
 
     const newParent = parentJoin && parentName.trim() ? {
       id:parentId, name:parentName.trim(), emoji:parentEmoji,
-      pin:parentPin, displayMode:"adult", role:"parent", gradeLabel:"",
+      pinh:pinHash(parentPin), displayMode:"adult", role:"parent", gradeLabel:"",
       participationMode:"player_and_guardian",
       permissions:{investment:"trade",forex:"trade",dailyBonus:true,ranking:true},
       visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
@@ -6959,13 +7007,13 @@ function SetupWizard({ data, update, onComplete }) {
       myTaskIds:childTaskIds.length>0?{[childId]:childTaskIds}:{},
       tutorialSeen:{[childId]:true},
       setupComplete:true,
-      parentPin:parentPin||"0000",
+      parentPinH:pinHash(parentPin||"0000"),
       logs:[bonusLog],
       gachaDate:{}, streak:{},
       firstActionPending:true,
     }));
     addLogToFirestore(bonusLog);
-    onComplete();
+    onComplete("create");
   };
 
   const btnStyle = (ok) => ({
@@ -7014,7 +7062,7 @@ function SetupWizard({ data, update, onComplete }) {
             <div style={{width:"100%",maxWidth:320,background:CARD,borderRadius:18,padding:"20px",border:`1.5px solid ${BORDER}`,textAlign:"left",marginTop:4}}>
               <p style={{fontWeight:800,fontSize:14,color:TEXT,margin:"0 0 10px",textAlign:"center"}}>🔗 ファミリーコードを入力</p>
               <input value={joinCode} onChange={e=>{setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g,""));setJoinErr("");}}
-                placeholder="TANE-XXXX"
+                placeholder="TANE-XXXX-XXXX"
                 style={{...{width:"100%",padding:"12px 14px",border:`1.5px solid ${joinErr?R:BORDER}`,borderRadius:10,fontSize:16,fontFamily:F,background:BG,outline:"none",textAlign:"center",letterSpacing:3,fontWeight:900,color:GP,boxSizing:"border-box"},marginBottom:8}}/>
               {joinErr&&<p style={{color:R,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>{joinErr}</p>}
               <button onClick={()=>{
@@ -7022,7 +7070,7 @@ function SetupWizard({ data, update, onComplete }) {
                 if(!code||code.length<4){setJoinErr("コードを入力してください");return;}
                 try{localStorage.setItem(FAMILY_CODE_KEY,code);}catch(e){}
                 _familyCode=code;
-                onComplete();
+                onComplete("join");
               }} style={{...btnStyle(joinCode.trim().length>=4),marginBottom:8}}>
                 参加する →
               </button>
@@ -7045,9 +7093,9 @@ function SetupWizard({ data, update, onComplete }) {
             style={{...INP,fontSize:15,marginBottom:14}}/>
           {familyName.trim()&&(
             <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"12px 16px",marginBottom:22}}>
-              <div style={{fontSize:11,color:MUTED,marginBottom:4}}>接続コード（家族でシェアして使います）</div>
-              <div style={{fontWeight:900,fontSize:18,color:GP,letterSpacing:2}}>{familyCode}</div>
-              <div style={{fontSize:10,color:MUTED,marginTop:4}}>家族に伝えると同じアプリを一緒に使えます。あとでも確認できます</div>
+              <div style={{fontSize:11,color:MUTED,marginBottom:4}}>ファミリーコード（家族の合言葉）</div>
+              <div style={{fontWeight:900,fontSize:17,color:GP,letterSpacing:1.5}}>{familyCode}</div>
+              <div style={{fontSize:11,color:TEXTS,marginTop:6,lineHeight:1.6}}>家族のスマホでこのコードを入力すると、同じデータを一緒に使えます。<b>スクリーンショットかメモで保存しておいてください</b>（設定画面でいつでも確認できます）</div>
             </div>
           )}
           <button onClick={()=>setStep(2)} style={btnStyle(!!familyName.trim())} disabled={!familyName.trim()}>
@@ -7074,13 +7122,14 @@ function SetupWizard({ data, update, onComplete }) {
             placeholder="名前（例：かなと）"
             style={{...INP,fontSize:15,marginBottom:12}}/>
           <div style={{fontSize:12,fontWeight:700,color:MUTED,marginBottom:8}}>年代</div>
-          <div style={{display:"flex",gap:8,marginBottom:28}}>
-            {[["junior","小学生"],["teen","中学生・高校生"]].map(([v,l])=>(
+          <div style={{display:"flex",gap:8,marginBottom:6}}>
+            {[["junior","小学生","かんたん表示"],["teen","中学生・高校生","投資・家計簿つき"]].map(([v,l,desc])=>(
               <button key={v} onClick={()=>setChildMode(v)} style={{flex:1,padding:"11px 0",border:`2px solid ${childMode===v?GP:BORDER}`,borderRadius:12,background:childMode===v?`${GP}15`:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,color:childMode===v?GP:MUTED,transition:"all .15s"}}>
-                {l}
+                {l}<br/><span style={{fontSize:10,fontWeight:600,color:MUTED}}>{desc}</span>
               </button>
             ))}
           </div>
+          <p style={{color:MUTED,fontSize:11,margin:"0 0 22px"}}>あとから設定画面で変更できます</p>
           <button onClick={()=>setStep(3)} style={btnStyle(!!childName.trim())} disabled={!childName.trim()}>
             つぎへ →
           </button>
@@ -7232,6 +7281,12 @@ function SetupWizard({ data, update, onComplete }) {
             <div style={{fontWeight:800,fontSize:13,color:GP,marginBottom:6}}>📱 ホーム画面に追加すると便利！</div>
             <div style={{color:TEXTS,fontSize:12,lineHeight:1.7}}>
               ブラウザの「共有」→「ホーム画面に追加」でアプリのようにすぐ開けます
+            </div>
+          </div>
+          <div style={{background:BS,border:`1.5px solid ${B}40`,borderRadius:14,padding:"13px 16px",marginBottom:14,textAlign:"left"}}>
+            <div style={{fontWeight:800,fontSize:13,color:B,marginBottom:6}}>☁ データは自動でクラウドに保存されます</div>
+            <div style={{color:TEXTS,fontSize:12,lineHeight:1.7}}>
+              端末を変えてもファミリーコードで復元できます。子どもがはじめて自分のカードをタップすると、自分で暗証番号を決めます
             </div>
           </div>
         </div>
@@ -7485,6 +7540,34 @@ export default function App() {
   const [activeChild, setActiveChild] = useState(null);
 
   // Load from cloud on mount
+  // リアルタイム同期＋5秒ポーリングの開始（マウント時と、セットアップ完了直後の両方から呼ぶ）
+  // ※従来はマウントeffect内に閉じていたため、セットアップ完了後に同期が永遠に始まらないバグがあった
+  const pollRef = useRef(null);
+  const startSync = useCallback(()=>{
+    whenFirebaseReady(()=>{
+      if(!getFamilyCode()) return;
+      startRealtimeSync((updater)=>{
+        setData(prev => typeof updater === 'function' ? updater(prev) : updater);
+      });
+      startLogsRealtimeSync(setData);
+      // 5秒ごとにFirestoreから最新ログを取得（確実な同期）
+      if(pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async()=>{
+        const firestoreLogs = await loadLogsFromFirestore();
+        if(!firestoreLogs || firestoreLogs.length===0) return;
+        setData(prev=>{
+          if(!prev) return prev;
+          const existingIds = new Set((prev.logs||[]).map(l=>l.id));
+          const added = firestoreLogs.filter(l=>!existingIds.has(l.id));
+          if(added.length===0) return prev;
+          const merged = [...added,...(prev.logs||[])];
+          merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+          return {...prev, logs: merged};
+        });
+      }, 5000);
+    });
+  },[]);
+
   useEffect(()=>{
     // _familyCodeをlocalStorageから直接設定してからcloudLoadを呼ぶ
     try {
@@ -7513,40 +7596,18 @@ export default function App() {
           const merged = [...newLogs, ...(migrated.logs||[])];
           merged.sort((a,b) => new Date(b.date) - new Date(a.date));
           migrated.logs = merged;
-          console.log(`初回ロード: Firestoreから${newLogs.length}件の追加ログ`);
         }
       }
       setData(migrated);
       if(!shownLocal) setLoading(false);
-      // リアルタイム同期開始（configデータ）
-      startRealtimeSync((updater)=>{
-        setData(prev => {
-          const next = typeof updater === 'function' ? updater(prev) : updater;
-          return next;
-        });
-      });
-      // ログのリアルタイム同期開始（ログデータ）
-      startLogsRealtimeSync(setData);
-      // 5秒ごとにFirestoreから最新ログを取得（確実な同期）
-      const pollTimer = setInterval(async()=>{
-        const firestoreLogs = await loadLogsFromFirestore();
-        if(!firestoreLogs || firestoreLogs.length===0) return;
-        setData(prev=>{
-          if(!prev) return prev;
-          const existingIds = new Set((prev.logs||[]).map(l=>l.id));
-          const added = firestoreLogs.filter(l=>!existingIds.has(l.id));
-          if(added.length===0) return prev;
-          const merged = [...added,...(prev.logs||[])];
-          merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
-          return {...prev, logs: merged};
-        });
-      }, 5000);
-      return ()=>clearInterval(pollTimer);
+      startSync();
     }).catch(()=>{
       // Firestore失敗時：ローカル未表示のときだけINITで起動（ローカル表示済みなら維持）
       if(!shownLocal){ setData({...INIT}); setLoading(false); }
     });
     });
+    // クリーンアップ：アンマウント時にポーリング停止（旧実装はthen内returnでReactに届かずリークしていた）
+    return ()=>{ if(pollRef.current){ clearInterval(pollRef.current); pollRef.current=null; } };
   },[]);
 
   // Save to cloud whenever data changes
@@ -7580,7 +7641,7 @@ export default function App() {
         </p>
         <PinInput onDone={newPin=>{
           update(d=>({...d,
-            children:d.children.map(c=>c.id===forcePin.id?{...c,pin:newPin}:c),
+            children:d.children.map(c=>c.id===forcePin.id?(({pin,...r})=>({...r,pinh:pinHash(newPin)}))(c):c),
             pinChanged:{...(d.pinChanged||{}),[forcePin.id]:true}
           }));
           setForcePin(null);
@@ -7603,7 +7664,16 @@ export default function App() {
   if (!loading && !getFamilyCode() && !data?.setupComplete) {
     return (
       <ErrorBoundary>
-        <SetupWizard data={data} update={update} onComplete={()=>setScreen("home")}/>
+        <SetupWizard data={data} update={update} onComplete={(mode)=>{
+          if(mode==="join"){
+            // 既存ファミリー参加：コード設定済みの状態でフルリロードし、クラウドから正しいデータを取得
+            location.reload();
+            return;
+          }
+          // 新規作成：作ったばかりのdataを上書きしないよう、リロードせずに同期だけ開始
+          startSync();
+          setScreen("home");
+        }}/>
       </ErrorBoundary>
     );
   }
@@ -7680,8 +7750,7 @@ export default function App() {
             // 子どものPINまたは親のPINをチェック
             const isChild = data.children.some(c=>c.id===activeChild.id);
             const isParent = (data.parents||[]).some(p=>p.id===activeChild.id);
-            if(isChild) return p===activeChild.pin;
-            if(isParent) return p===activeChild.pin;
+            if(isChild||isParent) return pinMatches(p, activeChild);
             return false;
           }}
           onOk={()=>{
@@ -7694,7 +7763,7 @@ export default function App() {
           onBack={()=>setScreen("home")}/>
       )}
       {screen==="pin-parent" && (
-        <PinPad title="おや管理画面" emoji="🔐" hint="4けたの暗証番号を入力（初期：0000）" check={p=>p===data.parentPin}
+        <PinPad title="おや管理画面" emoji="🔐" hint="4けたの暗証番号を入力（初期：0000）" check={p=>parentPinMatches(p, data)}
           onOk={()=>{
             if(!(data.tutorialSeen||{})["parent"]){
               setScreen("tutorial-parent");
