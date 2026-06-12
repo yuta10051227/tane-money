@@ -107,6 +107,29 @@ async function cloudLoad() {
   return null;
 }
 
+// ローカル即時ロード（同期・ネット往復なし）＝起動時の初回描画用。
+// cloudLoad()のstep2,3と同じローカル参照を、awaitせず即返す。
+function localLoadSync() {
+  const code = getFamilyCode();
+  if(code){
+    try{
+      const local=localStorage.getItem(LOCAL_KEY+"_"+code);
+      if(local){const p=JSON.parse(local);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+    try{
+      const local2=localStorage.getItem(LOCAL_KEY2+"_"+code);
+      if(local2){const p=JSON.parse(local2);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+  }
+  if(!code||code==="TANE-YUTA"){
+    try{
+      const old=localStorage.getItem(LOCAL_KEY);
+      if(old){const p=JSON.parse(old);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+  }
+  return null;
+}
+
 // リアルタイム同期（他デバイスの変更を即反映）
 function startRealtimeSync(updateFn){
   const code=getFamilyCode();
@@ -7458,6 +7481,14 @@ export default function App() {
       if(code) { _familyCode = code; }
     } catch(e) {}
 
+    // ① ローカル即時表示：手元にデータがあればネットを待たずに描画（起動高速化）
+    let shownLocal = false;
+    try {
+      const local = localLoadSync();
+      if(local){ setData(migrate(local)); setLoading(false); shownLocal = true; }
+    } catch(e) {}
+
+    // ② バックグラウンドでFirestoreから最新を取得して上書き＋同期開始
     cloudLoad().then(async d=>{
       const migrated = migrate(d);
       // Firestoreのlogsコレクションからログを追加読み込み
@@ -7474,7 +7505,7 @@ export default function App() {
         }
       }
       setData(migrated);
-      setLoading(false);
+      if(!shownLocal) setLoading(false);
       // リアルタイム同期開始（configデータ）
       startRealtimeSync((updater)=>{
         setData(prev => {
@@ -7500,8 +7531,8 @@ export default function App() {
       }, 5000);
       return ()=>clearInterval(pollTimer);
     }).catch(()=>{
-      setData({...INIT});
-      setLoading(false);
+      // Firestore失敗時：ローカル未表示のときだけINITで起動（ローカル表示済みなら維持）
+      if(!shownLocal){ setData({...INIT}); setLoading(false); }
     });
   },[]);
 
