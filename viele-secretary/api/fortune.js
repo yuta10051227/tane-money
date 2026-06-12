@@ -5,6 +5,7 @@
 
 import { geminiText } from "./_gemini.js";
 import { requireUser } from "./_auth.js";
+import { consumeQuota, quotaExceededBody } from "./_quota.js";
 
 export default async function handler(req, res) {
   try {
@@ -60,6 +61,9 @@ export default async function handler(req, res) {
       `"tomorrow":{"score":整数,"theme":"明日の一言","work":"仕事運1文","money":"金運1文","social":"対人運1文","action":"明日の一手1文","caution":"やさしい気づき1文","color":"ラッキーカラー"},` +
       `"month":{"theme":"今月のテーマ","flow":"今月の流れ2〜3文","advice":"今月の指針1文","days":[${dim}個の整数スコア配列(1日〜${dim}日)]},` +
       `"year":{"theme":"今年のテーマ","flow":"今年の大きな流れ2〜3文","peak":"好機の時期","caution":"慎むべき時期","months":[12個の整数スコア配列(1月〜12月)]}}`;
+
+    const quota = await consumeQuota(user.uid);
+    if (!quota.ok) { res.status(429).json(quotaExceededBody(quota.limit)); return; }
 
     let txt;
     try { txt = await geminiText(key, prompt); }

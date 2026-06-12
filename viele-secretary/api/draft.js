@@ -1,6 +1,7 @@
 // VIELE secretary — 告知文の下書きAPI。締切/イベントの内容から、LINE/SNS/メールの下書きをGeminiで生成。
 import { geminiText } from "./_gemini.js";
 import { requireUser } from "./_auth.js";
+import { consumeQuota, quotaExceededBody } from "./_quota.js";
 
 export default async function handler(req, res) {
   try {
@@ -15,6 +16,9 @@ export default async function handler(req, res) {
     const key = process.env.GEMINI_API_KEY;
     if (!key) { res.status(200).json({ aiEnabled: false }); return; }
     if (!context) { res.status(200).json({ aiEnabled: true, error: "告知内容が未設定です" }); return; }
+
+    const quota = await consumeQuota(user.uid);
+    if (!quota.ok) { res.status(429).json(quotaExceededBody(quota.limit)); return; }
 
     const prompt =
       `あなたは施術家・コンテンツ発信の一人社長の秘書兼コピーライターです。次の告知について、温かく信頼感のある日本語で投稿の下書きを作ってください。` +
