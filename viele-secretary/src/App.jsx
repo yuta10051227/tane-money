@@ -6,6 +6,7 @@ import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
 import { computeChart, dayEnergy } from "./natal";
+import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
 
@@ -602,6 +603,7 @@ function DraftPanel({ context }) {
         let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] draft parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。"); }
         if (!r.ok || j.error) throw new Error(j.error || "サーバーとの通信に失敗しました。少し時間をおいて再度お試しください。");
         if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
+        track("ai_used", { feature: "draft" });
         if (!cancel) setDrafts(j.drafts || (j.raw ? { line: j.raw } : {}));
       } catch (e) { if (!cancel) setErr(e); }
       if (!cancel) setLoading(false);
@@ -2041,6 +2043,7 @@ export default function App() {
 
   // ログアウト（共有端末対策でカレンダートークンも破棄）
   const logout = () => {
+    resetAnalytics();
     revokeToken(calToken);
     localStorage.removeItem("viele-cal-token");
     signOut(auth);
@@ -2243,6 +2246,7 @@ export default function App() {
       catch { console.error("[VIELE] fortune parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j && j.quotaExceeded) { throw new Error(j.error || "本日のAI利用上限に達しました。"); }
       if (!r.ok || j.error) { console.error("[VIELE] fortune error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      track("ai_used", { feature: "fortune" });
       update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
     } catch (e) {
       setFortuneError(e);
@@ -2294,6 +2298,13 @@ export default function App() {
     return unsub;
   }, []);
 
+  // 製品計測（PostHog）の初期化。キー未設定なら何もしない（無料・無送信）
+  useEffect(() => { initAnalytics(); track("app_opened"); }, []);
+  // ログインしたら匿名uidで識別（PIIは送らない）。ファネル: app_opened → signed_in
+  useEffect(() => {
+    if (user && user.uid) { identifyUser(user.uid); track("signed_in"); }
+  }, [user]);
+
   // スマホSafari等ではポップアップがブロックされやすいので、失敗時はリダイレクト方式で再試行
   const login = async () => {
     setAuthError(null);
@@ -2332,6 +2343,7 @@ export default function App() {
   const addTrip = ({ title, template, date }) => {
     const trip = { id: "t" + Date.now(), title, template, date, items: templateItems(template) };
     update({ trips: [...data.trips, trip] });
+    track("chain_created", { kind: "trip", template: template || "" }); // 売りコア（段取り逆算）の利用
   };
   // 削除は誤操作防止のため確認を挟む
   const confirmDelete = (fn, label) => {
@@ -2360,7 +2372,7 @@ export default function App() {
   };
 
   // ── 締切（二段ローンチ）操作 ──
-  const addDeadline = (d) => update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] });
+  const addDeadline = (d) => { update({ deadlines: [...(data.deadlines || []), { id: "d" + Date.now(), ...d }] }); track("deadline_created"); }; // 売りコア（締切逆算）の利用
   const addDeadlinesBulk = (arr) =>
     update({ deadlines: [...(data.deadlines || []), ...arr.map((d, i) => ({ id: "d" + Date.now() + "_" + i, ...d }))] });
   const editDeadline = (id, patch) => update({ deadlines: data.deadlines.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
@@ -2490,6 +2502,8 @@ export default function App() {
   ];
   const TABS = ALL_TABS.filter((t) => !hiddenTabs[t.key]);
   const activeTab = TABS.some((t) => t.key === tab) ? tab : "home"; // 非表示タブ選択中はホームへ寄せる
+  // どのタブが見られているか（匿名）。次に磨く場所をデータで決めるための主要指標
+  useEffect(() => { track("tab_viewed", { tab: activeTab }); }, [activeTab]);
   const onTouchStart = (ev) => {
     if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
     const t = ev.touches[0];
@@ -2555,6 +2569,7 @@ export default function App() {
                       onClick={() => {
                         if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
                           update({ trips: [], deadlines: [], launches: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
+                          track("sample_cleared"); // アクティベーション（自分のデータで使い始めた合図）
                         }
                       }}
                     >サンプルを全部消す</button>
