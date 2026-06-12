@@ -16,7 +16,9 @@ https://console.firebase.google.com/project/tane-money
 - またはローカルで: `firebase deploy --only firestore:rules`
 - 適用後、アプリで読み書きできることを必ず実機確認（匿名認証が効いていれば動く）
 
-### 3. App Check を有効化（推奨・総当たり対策の仕上げ）
+### 3. App Check を有効化（必須・総当たり対策の仕上げ）
+- ※セキュリティ監査により「推奨」から**必須**に格上げ。匿名認証だけでは
+  「アプリを開いた誰でも」になり、コード総当たりのレート制限が無いため
 - App Check → アプリを登録（reCAPTCHA v3 / Enterprise）
 - まず「モニタリングモード」で開始し、正常を確認してから「適用」に切り替え
 

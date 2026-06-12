@@ -3805,6 +3805,7 @@ function AiAdvisorTab({data}){
   };
 
   const runAnalysis=async()=>{
+    if(!hasCloudStorage())return; // 二重ガード: 本番では外部AIへ送信しない（UIゲートと独立に保証）
     setLoading(true);setResult(null);setError(null);
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{
@@ -4216,15 +4217,6 @@ function ParentScreen({ data, update, onBack }) {
     const newId=uid();
     update(d=>({...d,children:[...d.children,{id:newId,name:ncName,emoji:ncEmoji,pinh:pinHash(ncPin),ageMode:ncMode}],pinChanged:{...(d.pinChanged||{}),[newId]:true}}));
     setShowAddChild(false); setNcName(""); setNcEmoji("😊"); setNcPin(""); setNcMode("middle");
-  };
-  const saveChild = () => {
-    if(!editChild)return;
-    const np=(editChild.pin||"");
-    if(np.length>0&&np.length!==4)return;
-    const {pin,...rest}=editChild;
-    const saved=np.length===4?{...rest,pinh:pinHash(np)}:rest;
-    update(d=>({...d,children:d.children.map(c=>c.id===editChild.id?saved:c)}));
-    setEditChild(null);
   };
   const confirmDelChild = id => {
     update(d=>({...d,children:d.children.filter(c=>c.id!==id),logs:d.logs.filter(l=>l.cid!==id),expenses:(d.expenses||[]).filter(e=>e.cid!==id),goals:(d.goals||[]).filter(g=>g.cid!==id)}));
@@ -5235,8 +5227,7 @@ async function fetchRealStockPrices(data,update){
       // 取得できたら即座にupdateで反映
       const snapshot={...forexMap};
       update(d=>({...d,forex:snapshot}));
-      console.log(`Forex OK: ${ticker} = ${price}`);
-    }catch(e){
+          }catch(e){
       const fb=FOREX_FALLBACKS[ticker];
       forexMap[ticker]={
         ...FOREX_LABELS[ticker],
@@ -7606,8 +7597,12 @@ export default function App() {
       if(!shownLocal){ setData({...INIT}); setLoading(false); }
     });
     });
-    // クリーンアップ：アンマウント時にポーリング停止（旧実装はthen内returnでReactに届かずリークしていた）
-    return ()=>{ if(pollRef.current){ clearInterval(pollRef.current); pollRef.current=null; } };
+    // クリーンアップ：アンマウント時にポーリング・リスナー停止（Strict Mode二重マウント対策）
+    return ()=>{
+      if(pollRef.current){ clearInterval(pollRef.current); pollRef.current=null; }
+      try{ if(_unsubscribe){_unsubscribe();_unsubscribe=null;} }catch(e){}
+      try{ if(_logsUnsubscribe){_logsUnsubscribe();_logsUnsubscribe=null;} }catch(e){}
+    };
   },[]);
 
   // Save to cloud whenever data changes
