@@ -1,11 +1,8 @@
 // VIELE secretary — まとめ(ニュース)取得API（Vercelサーバーレス関数）
-// RSSをサーバー側で取得・統合して返す（ブラウザのCORS制約を回避）。
-// GEMINI_API_KEY が設定されていれば、見出しから「今日の3行ブリーフィング」も生成。
-// キーが無ければ要約なしで見出しだけ返す（＝無料で動く）。
+// RSSをサーバー側で取得・統合して見出しを返す（ブラウザのCORS制約を回避）。
+// ※ニュースはコア機能（売り）ではないため、AI要約は行わない＝Gemini課金ゼロ・見出しのみ。
 
-import { geminiText } from "./_gemini.js";
 import { requireUser } from "./_auth.js";
-import { consumeQuota } from "./_quota.js";
 
 const DEFAULT_FEEDS = [
   "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
@@ -65,21 +62,12 @@ function parseFeed(xml, sourceName) {
   return out;
 }
 
-async function geminiBriefing(apiKey, items) {
-  const titles = items.slice(0, 20).map((it, i) => `${i + 1}. ${it.title}`).join("\n");
-  const prompt =
-    `あなたは一人社長の優秀な秘書です。次のニュース見出しから、今日おさえるべき要点を日本語で3つ、各1文で簡潔にまとめてください。` +
-    `箇条書き（・）のみ、前置き・結びは不要。\n\n${titles}`;
-  return await geminiText(apiKey, prompt);
-}
-
 export default async function handler(req, res) {
   try {
     const user = await requireUser(req, res);
     if (!user) return;
     const u = new URL(req.url, "http://localhost");
     const feedsParam = u.searchParams.get("feeds");
-    const summarize = u.searchParams.get("summarize") === "1";
     const feeds = (feedsParam
       ? feedsParam.split(",").map((s) => { try { return decodeURIComponent(s); } catch { return s; } }).filter(Boolean)
       : DEFAULT_FEEDS
@@ -105,20 +93,9 @@ export default async function handler(req, res) {
     items.sort((a, b) => b.ts - a.ts);
     items = items.slice(0, 40);
 
-    let briefing = "";
-    let quotaExceeded = false;
-    const key = process.env.GEMINI_API_KEY;
-    if (summarize && key && items.length) {
-      const quota = await consumeQuota(user.uid);
-      if (quota.ok) {
-        try { briefing = await geminiBriefing(key, items); } catch { briefing = ""; }
-      } else {
-        quotaExceeded = true; // 上限超過時は見出しのみ返す（エラーにはしない）
-      }
-    }
-
+    // ニュースは見出しのみ（AI要約なし＝コスト0）。briefing は後方互換で空文字を返す。
     res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
-    res.status(200).json({ briefing, items, aiEnabled: !!key, quotaExceeded, count: items.length, generatedAt: Date.now() });
+    res.status(200).json({ briefing: "", items, aiEnabled: false, count: items.length, generatedAt: Date.now() });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e) });
   }

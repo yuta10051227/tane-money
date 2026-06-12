@@ -1142,12 +1142,6 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
         return <SwipeView slides={slides} accent={C.blue} hint="← 横スワイプで 情報源を切替 →" />;
       })()}
 
-      {digest && digest.aiEnabled === false && briefLines.length === 0 && (
-        <div style={{ fontSize: 11, color: C.sub, marginTop: 12 }}>
-          ※ AI機能は現在オフです
-        </div>
-      )}
-
       {/* 情報源の編集 */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
         <button onClick={() => setOpen((o) => !o)} style={{ ...chipBtn, fontSize: 11 }}>{open ? "情報源を閉じる" : "情報源を編集"}</button>
@@ -2203,7 +2197,7 @@ export default function App() {
       const customUrls = (data.feeds || []).map((f) => f.url);
       const urls = [...catUrls, ...customUrls];
       const fp = urls.map((u) => encodeURIComponent(u)).join(",");
-      const r = await authedFetch(`/api/digest?summarize=1${fp ? `&feeds=${fp}` : ""}`);
+      const r = await authedFetch(`/api/digest${fp ? `?feeds=${fp}` : ""}`);
       let j; try { j = await r.json(); } catch { console.error("[VIELE] digest parse error", r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       if (j.error) { console.error("[VIELE] digest error", j.error); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ digest: { date: iso(new Date()), briefing: j.briefing || "", items: (j.items || []).slice(0, 40), aiEnabled: !!j.aiEnabled } });
