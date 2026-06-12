@@ -1188,6 +1188,7 @@ function DailyTasks({ child, data, update }) {
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
   const [combo, setCombo] = useState(0);
+  const [openOverride, setOpenOverride] = useState(null);   // null=自動(未完で開く/完了で畳む), true/false=手動
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _rawMonStage = ((data.monsterEvolved||{})[child.id]) || "egg";
@@ -1217,6 +1218,9 @@ function DailyTasks({ child, data, update }) {
   const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
     tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
   const allBonusGiven = activeSets.length>0 && activeSets.every(s => !s.bonus || prog[bonusKey(s)]);
+  // 開閉: 既定は「未完なら開く・全部できたら畳む」。タップで手動上書き。
+  const open = openOverride !== null ? openOverride : !allDone;
+  const toggleOpen = () => setOpenOverride(!open);
 
   const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
   const setDailyProg = (d, extra) => ({
@@ -1278,8 +1282,8 @@ function DailyTasks({ child, data, update }) {
         </div>
       )}
 
-      {/* Progress bar */}
-      <div style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14}}>
+      {/* Progress bar（タップで下のタスク一覧を開閉するヘッダー） */}
+      <div onClick={toggleOpen} role="button" style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14,cursor:"pointer",userSelect:"none"}}>
         {/* アクティブセット名（最大2つ） */}
         {activeSets.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
           {activeSets.map(s=>(
@@ -1293,7 +1297,10 @@ function DailyTasks({ child, data, update }) {
           <p style={{fontWeight:900,fontSize:14,margin:0,color:allDone?G:TEXT}}>
             {allDone ? "🌟 今日は全部できた！" : "📋 今日のやること"}
           </p>
-          <span style={{fontWeight:800,fontSize:13,color:allDone?G:MUTED}}>{doneCount}/{tasks.length}</span>
+          <span style={{fontWeight:800,fontSize:13,color:allDone?G:MUTED,display:"flex",alignItems:"center",gap:6}}>
+            {doneCount}/{tasks.length}
+            <span style={{fontSize:11,opacity:.7,transition:"transform .25s",transform:open?"rotate(0deg)":"rotate(-90deg)"}}>▼</span>
+          </span>
         </div>
         <div style={{height:10,background:BORDER,borderRadius:5,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${tasks.length?doneCount/tasks.length*100:0}%`,background:allDone?G:Y,borderRadius:5,transition:"width .5s ease"}}/>
@@ -1306,7 +1313,8 @@ function DailyTasks({ child, data, update }) {
         {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
-      {/* Task list（セットごとに見出しを付けて2セットまとめ表示） */}
+      {/* Task list（開いているときだけ表示。セットごとに見出しを付けて2セットまとめ表示） */}
+      {open && <>
       {tasks.length === 0 && (
         <p style={{color:MUTED,textAlign:"center",fontSize:13,marginTop:20}}>まだデイリータスクがないよ</p>
       )}
@@ -1350,6 +1358,7 @@ function DailyTasks({ child, data, update }) {
           </React.Fragment>
         );
       })}
+      </>}
       <style>{`@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
     </div>
   );
