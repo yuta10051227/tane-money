@@ -5,6 +5,7 @@
 
 import { geminiText } from "./_gemini.js";
 import { requireUser } from "./_auth.js";
+import { consumeQuota } from "./_quota.js";
 
 const DEFAULT_FEEDS = [
   "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
@@ -105,11 +106,19 @@ export default async function handler(req, res) {
     items = items.slice(0, 40);
 
     let briefing = "";
+    let quotaExceeded = false;
     const key = process.env.GEMINI_API_KEY;
-    if (summarize && key && items.length) { try { briefing = await geminiBriefing(key, items); } catch { briefing = ""; } }
+    if (summarize && key && items.length) {
+      const quota = await consumeQuota(user.uid);
+      if (quota.ok) {
+        try { briefing = await geminiBriefing(key, items); } catch { briefing = ""; }
+      } else {
+        quotaExceeded = true; // 上限超過時は見出しのみ返す（エラーにはしない）
+      }
+    }
 
     res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
-    res.status(200).json({ briefing, items, aiEnabled: !!key, count: items.length, generatedAt: Date.now() });
+    res.status(200).json({ briefing, items, aiEnabled: !!key, quotaExceeded, count: items.length, generatedAt: Date.now() });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e) });
   }

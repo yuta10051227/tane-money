@@ -2243,6 +2243,7 @@ export default function App() {
       let j;
       try { j = JSON.parse(text); }
       catch { console.error("[VIELE] fortune parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
+      if (j && j.quotaExceeded) { throw new Error(j.error || "本日のAI利用上限に達しました。"); }
       if (!r.ok || j.error) { console.error("[VIELE] fortune error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。少し時間をおいて『更新』を押してください。"); }
       update({ fortune: { date: iso(new Date()), aiEnabled: !!j.aiEnabled, ...(j.fortune || {}) } });
     } catch (e) {
@@ -2261,6 +2262,7 @@ export default function App() {
       const r = await authedFetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
       const text = await r.text();
       let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] import-schedule parse error", r.status, text.slice(0, 200)); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
+      if (j && j.quotaExceeded) { throw new Error(j.error || "本日のAI利用上限に達しました。"); }
       if (!r.ok || j.error) { console.error("[VIELE] import-schedule error", j && j.error, r.status); throw new Error("サーバーとの通信に失敗しました。しばらくしてから再度お試しください。"); }
       if (j.aiEnabled === false) throw new Error("AI機能は現在オフです");
       const ev = (j.events || []).map((e, i) => ({ id: "mv" + Date.now() + "_" + i, date: e.date, time: e.time || "終日", title: e.title }));
