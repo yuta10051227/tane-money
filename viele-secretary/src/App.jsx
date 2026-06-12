@@ -2572,7 +2572,6 @@ export default function App() {
               <TimeMeter entries={scheduleEntries} {...calProps} />
               {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
               <Acc title="設定・取り込み" defaultOpen={false}>
-                <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
