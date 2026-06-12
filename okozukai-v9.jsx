@@ -1011,6 +1011,9 @@ const parentBal= (pLogs, pid) => ((pLogs||{})[pid]||[]).reduce((s,l)=>s+(l.pts||
 const weekKey  = (d=new Date())=>{const jan1=new Date(d.getFullYear(),0,1);const w=Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);return `${d.getFullYear()}-${String(w).padStart(2,"0")}`;};
 const taskPts  = (task, cid) => task.over?.[cid] ?? task.pts;
 
+// 【一時テスト】この時刻まではガチャ回し放題（保存なし＝データを汚さない）。過ぎたら自動で通常の1日1回に戻る
+const GACHA_TEST_UNTIL = 1781303680266; // JST 07:34頃まで
+
 function rollGacha(gacha) {
   const total = gacha.reduce((s,g)=>s+g.rate,0);
   let r = Math.random()*total;
@@ -2366,6 +2369,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const myBal    = bal(data.logs, child.id);
   const myLogs   = (data.logs||[]).filter(l=>l.cid===child.id);
   const todayDone= data.gachaDate?.[child.id] === todayKey();
+  const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
   const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayKey())).map(l=>l.rid));
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayKey()));
@@ -2423,7 +2427,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doGacha = () => {
-    if (todayDone) return;
+    if (todayDone && !gachaTest) return;
     const res = rollGacha(data.gacha);
     const theme = getMonthTheme();
     const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
@@ -2432,6 +2436,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
     const finalRes = {...res, pts:res.pts+bonusPts, bonusPts, theme, collItem, isNewItem};
     setGachaRes(finalRes);
+    if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
     const yesterday = (()=>{ const d=new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; })();
@@ -2761,7 +2766,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && <>
         {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
         {(()=>{ const ft=getMonthTheme(); return (
-          <button onClick={()=>{ if(!todayDone) doGacha(); }} disabled={todayDone} aria-label="デイリーガチャ"
+          <button onClick={()=>{ if(!todayDone||gachaTest) doGacha(); }} disabled={todayDone&&!gachaTest} aria-label="デイリーガチャ"
             style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
               border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
               background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
@@ -2872,7 +2877,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
-                <button onClick={doGacha} disabled={todayDone}
+                <button onClick={doGacha} disabled={todayDone&&!gachaTest}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
                     fontSize:28,cursor:todayDone?"default":"pointer",
@@ -2882,11 +2887,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </button>
                 <div style={{flex:1}}>
                   <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
-                  <div style={{fontWeight:800,fontSize:14,color:darkBG?(todayDone?"rgba(255,255,255,0.35)":"#fff"):(todayDone?MUTED:TEXT)}}>
-                    {todayDone?(darkBG?"CLAIMED":"✅ 今日は引き済み！"):"デイリーガチャ"}
+                  <div style={{fontWeight:800,fontSize:14,color:darkBG?((todayDone&&!gachaTest)?"rgba(255,255,255,0.35)":"#fff"):((todayDone&&!gachaTest)?MUTED:TEXT)}}>
+                    {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"CLAIMED":"✅ 今日は引き済み！"):"デイリーガチャ")}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
-                    {todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+                    {gachaTest?"何回でもOK（記録は残りません・〜07:34）":(todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
                   </div>
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
