@@ -1192,12 +1192,13 @@ function GachaAnim({ result, onClose }) {
   const isSuper = result.rate <= 3;             // 激レア(虹)
   const isSR    = result.rate <= 12;            // スーパーレア以上(金以上)
   const tier    = isSuper ? "super" : isSR ? "sr" : result.rate <= 25 ? "rare" : "normal";
-  const AURA    = { normal:"#eae2c8", rare:"#4a9eff", sr:"#f5c842", super:"#f5c842" }[tier];
-  const TF      = ({normal:"n",rare:"r",sr:"sr",super:"super"})[tier];
-  const PLANT   = `/assets/gacha_grow_${TF}.png`;
+  const TF      = ({normal:"n",rare:"r",sr:"sr",super:"super"})[tier]; // 最終レア度(額縁用)
+  // レア度が上がるほど多段階でニョキニョキ育つ: 芽→つぼみ(青)→花(金)→大樹(虹)
+  const STAGES  = isSuper ? ["n","r","sr","super"] : isSR ? ["n","r","sr"] : (result.rate<=25 ? ["n","r"] : ["n"]);
+  const AURA_OF = { n:"#eae2c8", r:"#4a9eff", sr:"#f5c842", super:"#f5c842" };
 
   const [phase, setPhase]       = useState("charge");   // charge→tap→grow→burst→show
-  const [upgraded, setUpgraded] = useState(false);      // 激レアの「金→虹」昇格
+  const [stage, setStage]       = useState(0);          // 成長段階(STAGESのindex)
   const timers = useRef([]);
   const at = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
   useEffect(()=>()=>timers.current.forEach(clearTimeout), []);
@@ -1205,27 +1206,20 @@ function GachaAnim({ result, onClose }) {
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
+  const HOLD = 880; // 段階ごとのタメ
   const reveal = () => {
     if(phase!=="tap") return;
-    setPhase("grow");
-    if(isSuper){
-      buzz([80,60,80,60,120]);
-      at(()=>{ setUpgraded(true); buzz([0,500]); }, 1100);
-      at(()=>setPhase("burst"), 2100);
-      at(()=>setPhase("show"),  2950);
-    } else if(isSR){
-      buzz([100,60,180]);
-      at(()=>setPhase("burst"), 1300);
-      at(()=>setPhase("show"),  2150);
-    } else {
-      buzz([60]);
-      at(()=>setPhase("burst"), 800);
-      at(()=>setPhase("show"),  1450);
-    }
+    setPhase("grow"); setStage(0); buzz([60]);
+    STAGES.forEach((_,i)=>{ if(i>0) at(()=>{ setStage(i); buzz(i===STAGES.length-1&&isSuper?[0,420]:[80]); }, i*HOLD); });
+    const endT = (STAGES.length-1)*HOLD + 820;
+    at(()=>setPhase("burst"), endT);
+    at(()=>setPhase("show"),  endT+460);
   };
-  const skip = () => { timers.current.forEach(clearTimeout); if(isSuper) setUpgraded(true); setPhase("show"); };
+  const skip = () => { timers.current.forEach(clearTimeout); setStage(STAGES.length-1); setPhase("show"); };
 
-  const rainbow   = isSuper && upgraded;
+  const curTier   = STAGES[Math.min(stage, STAGES.length-1)];
+  const AURA      = AURA_OF[curTier];
+  const rainbow   = curTier === "super";
   const grown     = phase==="grow" || phase==="burst" || phase==="show";
   const starCount = isSuper ? 30 : isSR ? 16 : 0;
 
@@ -1251,8 +1245,8 @@ function GachaAnim({ result, onClose }) {
         onError={e=>{e.target.style.display="none";}}/>
       <div style={{position:"absolute",inset:0,background:phase==="show"?"rgba(10,6,18,.35)":"rgba(10,6,18,.18)",transition:"background .5s"}}/>
 
-      {grown && isSR && (
-        <div style={{position:"absolute",top:0,bottom:"18%",left:"50%",width:rainbow?190:110,transform:"translateX(-50%)",
+      {grown && (curTier==="sr"||curTier==="super") && (
+        <div key={"p"+stage} style={{position:"absolute",top:0,bottom:"18%",left:"50%",width:rainbow?190:110,transform:"translateX(-50%)",
           background:`linear-gradient(${rainbow?"#ffffff":AURA}00,${rainbow?"#ffffff":AURA}77,${rainbow?"#ffffff":AURA}00)`,
           filter:"blur(8px)",animation:"gPillar .7s ease-out",pointerEvents:"none"}}/>
       )}
@@ -1277,11 +1271,11 @@ function GachaAnim({ result, onClose }) {
       )}
 
       {grown && (
-        <img src={PLANT} alt={result.label}
+        <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt={result.label}
           style={{position:"absolute",left:"50%",bottom:"21%",transform:"translateX(-50%)",transformOrigin:"bottom center",
-            height:isSuper?"56vh":"44vh",width:"auto",maxWidth:"92vw",objectFit:"contain",
-            animation:"gGrow .9s cubic-bezier(.2,.85,.3,1.15) forwards",
-            filter:`drop-shadow(0 0 18px ${rainbow?"#ffffff":AURA}cc)`}}
+            height:`${38+stage*7}vh`,width:"auto",maxWidth:"94vw",objectFit:"contain",
+            animation:(phase==="grow")?"gNyoki .6s cubic-bezier(.2,.9,.3,1.4) forwards":"none",
+            filter:`drop-shadow(0 0 20px ${rainbow?"#ffffff":AURA}cc)`}}
           onError={e=>{e.target.style.display="none";}}/>
       )}
 
@@ -1301,9 +1295,9 @@ function GachaAnim({ result, onClose }) {
             {phase==="charge" ? "タネを植えるよ…"
              : phase==="tap" ? "タップして水をあげよう！💧"
              : rainbow ? "にじいろの大樹だ‼"
-             : isSuper ? "きん…？いや…⁉"
-             : isSR ? "おおきく育ってる…！"
-             : "なにが育つかな？"}
+             : curTier==="sr" ? "金の花が さいた…⁉"
+             : curTier==="r" ? "ニョキッ！まだ育つ…！？"
+             : "なにが育つかな…？"}
           </div>
           {(phase==="grow") && <div style={{color:"rgba(255,255,255,.5)",fontSize:11,marginTop:12}}>タップでスキップ</div>}
         </div>
@@ -1343,6 +1337,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes gFlash{0%{opacity:0}12%{opacity:.7}100%{opacity:0}}
         @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
         @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
+        @keyframes gNyoki{0%{transform:translateX(-50%) scaleY(.12) scaleX(.6);opacity:.3}50%{transform:translateX(-50%) scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:translateX(-50%) scaleY(.94) scaleX(.99)}88%{transform:translateX(-50%) scaleY(1.04)}100%{transform:translateX(-50%) scale(1);opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
         @keyframes gWdrop{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translateY(78px) scale(1);opacity:0}}
