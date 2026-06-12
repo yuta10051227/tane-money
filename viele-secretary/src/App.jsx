@@ -1282,7 +1282,7 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
 }
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks }) {
+function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews }) {
   const t = (fortune && fortune.today) || {};
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
@@ -1310,7 +1310,7 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, r
     <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
       <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
       {/* 今日の残り件数 KPI */}
-      <button onClick={() => onTab(1)} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.text, font: "inherit", padding: "10px 0 4px" }}>
+      <button onClick={() => onTab("work")} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.text, font: "inherit", padding: "10px 0 4px" }}>
         {rem === 0 ? (
           <div style={{ fontSize: 15, fontWeight: 700, color: C.green }}>今日の要対応はありません ✨</div>
         ) : (
@@ -1337,11 +1337,11 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, r
           {mode.tip && <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.sub, lineHeight: 1.4 }}>{mode.tip}</span>}
         </div>
       )}
-      <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab(5)} />
-      <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab(0)} />
-      {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab(0)} />}
-      {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab(2)} />}
-      {brief && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab(4)} />}
+      {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
+      <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
+      {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab("home")} />}
+      {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab("money")} />}
+      {brief && !hideNews && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab("news")} />}
     </section>
   );
 }
@@ -1869,23 +1869,47 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
    ログインゲート
    ────────────────────────────────────────────────────────────── */
 function LoginGate({ onLogin, error }) {
+  const FEATURES = [
+    { icon: "⏳", title: "締切を、勝手に逆算", desc: "本申込日を1つ入れるだけで、予告・先行登録・リマインド・締切まで自動で並びます。" },
+    { icon: "📣", title: "ローンチを取りこぼさない", desc: "先行登録→申込→売上をファネルで可視化。遅れていると朝に教えてくれます。" },
+    { icon: "✅", title: "今日やる事だけ、1画面に", desc: "遅れ・締切間近を毎朝まとめて表示。送り忘れ・公開遅れをなくします。" },
+  ];
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: C.bg, color: C.text }}>
-      <div style={{ textAlign: "center", maxWidth: 360, padding: 24 }}>
-        <div style={{ fontSize: 13, letterSpacing: 4, color: C.accent }}>ひとりビジネスの</div>
-        <h1 style={{ fontSize: 28, margin: "6px 0 8px" }}>ひとり秘書</h1>
-        <p style={{ color: C.sub, fontSize: 14, marginBottom: 16, lineHeight: 1.7 }}>
-          一人で全部やっているあなたへ。<br />ぜんぶ見て、考えて、確認する。<br />お母さんみたいな、あなた専属の秘書です。
-        </p>
-        <p style={{ color: C.sub, fontSize: 13, marginBottom: 28, lineHeight: 1.6 }}>
-          ログインすると、あなた専用のデータ領域が作られます。他の人のデータとは完全に分かれています。
-        </p>
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: C.bg, color: C.text, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: 420, padding: "40px 24px 48px", boxSizing: "border-box" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 12, letterSpacing: 4, color: C.accent }}>ひとり社長のための</div>
+          <h1 style={{ fontSize: 30, margin: "6px 0 12px" }}>ひとり秘書</h1>
+          <p style={{ color: C.text, fontSize: 16, fontWeight: 700, lineHeight: 1.7, margin: "0 0 6px" }}>
+            ローンチの締切も、出張の段取りも。<br />ぜんぶ逆算して「抜け漏れ」を防ぐ秘書。
+          </p>
+          <p style={{ color: C.sub, fontSize: 13, lineHeight: 1.7, margin: "0 0 24px" }}>
+            講座・コーチング・サロンを<strong style={{ color: C.text }}>ひとりで回す人</strong>のための、<br />段取り＆ローンチ管理ツールです。
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
+          {FEATURES.map((f) => (
+            <div key={f.title} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
+              <span style={{ fontSize: 22, flex: "0 0 auto", lineHeight: 1.2 }}>{f.icon}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{f.title}</div>
+                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <button
           onClick={onLogin}
-          style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "none", background: C.text, color: "#0B0D11", fontWeight: 700, cursor: "pointer", fontSize: 15 }}
+          style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "none", background: C.accent, color: "#0B0D11", fontWeight: 700, cursor: "pointer", fontSize: 16 }}
         >
-          Googleでログイン
+          Googleではじめる
         </button>
+        <p style={{ color: C.faint, fontSize: 12, lineHeight: 1.7, textAlign: "center", margin: "12px 0 0" }}>
+          ログインすると、あなた専用のデータ領域が作られます。<br />他の人のデータとは完全に分かれています。
+        </p>
+
         {error && (
           <div style={{ marginTop: 18, textAlign: "left", background: "#2A1715", border: `1px solid ${C.red}`, borderRadius: 10, padding: 12 }}>
             <div style={{ color: C.red, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>ログインできませんでした</div>
@@ -1940,7 +1964,7 @@ export default function App() {
   const refreshCalendar = () => setCalNonce((n) => n + 1);
   const [calWriteBusy, setCalWriteBusy] = useState(false); // 予定の追加・編集・削除中
   const [calWriteMsg, setCalWriteMsg] = useState(null);
-  const [tab, setTab] = useState(0); // トップのタブ（ホーム/仕事/売上/タスク/ニュース）
+  const [tab, setTab] = useState("home"); // トップのタブ（キー: home/work/money/tasks/news/fortune）
   const tabTouch = useRef(null);
 
   // トークンが取れたら今週〜約2ヶ月分を取得
@@ -2454,8 +2478,18 @@ export default function App() {
   const moneyOutstanding = (data.money || []).filter((x) => !x.done).reduce((s, x) => s + (Number(x.amount) || 0), 0);
   const briefFirst = (data.digest && data.digest.briefing ? data.digest.briefing.split("\n").filter((l) => l.trim())[0] : "");
 
-  // トップのタブ
-  const TABS = ["ホーム", "仕事", "売上", "タスク", "ニュース", "運気"];
+  // トップのタブ（キー方式。ニュース/運気は設定で非表示にできる＝販売時はコアに集中できる）
+  const hiddenTabs = (data && data.hiddenTabs) || {};
+  const ALL_TABS = [
+    { key: "home", label: "ホーム" },
+    { key: "work", label: "仕事" },
+    { key: "money", label: "売上" },
+    { key: "tasks", label: "タスク" },
+    { key: "news", label: "ニュース" },
+    { key: "fortune", label: "運気" },
+  ];
+  const TABS = ALL_TABS.filter((t) => !hiddenTabs[t.key]);
+  const activeTab = TABS.some((t) => t.key === tab) ? tab : "home"; // 非表示タブ選択中はホームへ寄せる
   const onTouchStart = (ev) => {
     if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
     const t = ev.touches[0];
@@ -2468,7 +2502,9 @@ export default function App() {
     const dy = t.clientY - tabTouch.current.y;
     tabTouch.current = null;
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      setTab((v) => Math.max(0, Math.min(TABS.length - 1, v + (dx < 0 ? 1 : -1))));
+      const idx = TABS.findIndex((t) => t.key === activeTab);
+      const ni = Math.max(0, Math.min(TABS.length - 1, idx + (dx < 0 ? 1 : -1)));
+      setTab(TABS[ni].key);
     }
   };
 
@@ -2484,12 +2520,12 @@ export default function App() {
           {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
         </div>
         <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
-          {TABS.map((t, i) => (
+          {TABS.map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(i)}
-              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${tab === i ? C.accent : C.line}`, background: tab === i ? C.accent : "transparent", color: tab === i ? "#0B0D11" : C.text, fontSize: 13, fontWeight: tab === i ? 700 : 400, cursor: "pointer" }}
-            >{t}</button>
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{ flex: "0 0 auto", padding: "6px 14px", borderRadius: 999, border: `1px solid ${activeTab === t.key ? C.accent : C.line}`, background: activeTab === t.key ? C.accent : "transparent", color: activeTab === t.key ? "#0B0D11" : C.text, fontSize: 13, fontWeight: activeTab === t.key ? 700 : 400, cursor: "pointer" }}
+            >{t.label}</button>
           ))}
         </div>
       </header>
@@ -2502,7 +2538,7 @@ export default function App() {
           </div>
         )}
 
-        {tab === 0 && (() => {
+        {activeTab === "home" && (() => {
           const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
           const remaining = alerts.late.length + alerts.soon.length + pendingTasks;
           return (
@@ -2529,7 +2565,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} />
+              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
@@ -2538,6 +2574,21 @@ export default function App() {
               <Acc title="設定・取り込み" defaultOpen={false}>
                 <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>
+                  {[{ key: "news", label: "ニュース" }, { key: "fortune", label: "運気" }].map((t) => (
+                    <label key={t.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={!hiddenTabs[t.key]}
+                        onChange={(ev) => update({ hiddenTabs: { ...hiddenTabs, [t.key]: !ev.target.checked } })}
+                        style={{ width: 18, height: 18, flex: "0 0 auto" }}
+                      />
+                      <span style={{ fontSize: 14 }}>「{t.label}」タブを表示する</span>
+                    </label>
+                  ))}
+                </div>
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <button
                     style={{ ...chipBtn, display: "inline-flex", alignItems: "center", minHeight: 40, padding: "9px 14px", fontSize: 13 }}
@@ -2563,7 +2614,7 @@ export default function App() {
           );
         })()}
 
-        {tab === 1 && (
+        {activeTab === "work" && (
           <>
             <TripChain
               trips={data.trips}
@@ -2590,7 +2641,7 @@ export default function App() {
           </>
         )}
 
-        {tab === 2 && (
+        {activeTab === "money" && (
           <>
             <LaunchKpi
               launches={data.launches}
@@ -2608,7 +2659,7 @@ export default function App() {
           </>
         )}
 
-        {tab === 3 && (
+        {activeTab === "tasks" && (
           <CheckList
             title="追加タスク"
             accent={C.purple}
@@ -2621,7 +2672,7 @@ export default function App() {
           />
         )}
 
-        {tab === 4 && (
+        {activeTab === "news" && (
           <DigestPanel
             digest={data.digest}
             loading={digestLoading}
@@ -2635,7 +2686,7 @@ export default function App() {
           />
         )}
 
-        {tab === 5 && (
+        {activeTab === "fortune" && (
           <FortunePanel
             fortune={data.fortune}
             loading={fortuneLoading}
