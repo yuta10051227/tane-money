@@ -1194,7 +1194,7 @@ function GachaAnim({ result, onClose }) {
   const tier    = isSuper ? "super" : isSR ? "sr" : result.rate <= 25 ? "rare" : "normal";
   const TF      = ({normal:"n",rare:"r",sr:"sr",super:"super"})[tier]; // 最終レア度(額縁用)
   // レア度が上がるほど多段階でニョキニョキ育つ: 芽→つぼみ(青)→花(金)→大樹(虹)
-  const STAGES  = isSuper ? ["n","r","sr","super"] : isSR ? ["n","r","sr"] : (result.rate<=25 ? ["n","r"] : ["n"]);
+  const STAGES  = isSuper ? ["n","r","super"] : isSR ? ["n","r","sr"] : (result.rate<=25 ? ["n","r"] : ["n"]);
   const AURA_OF = { n:"#eae2c8", r:"#4a9eff", sr:"#f5c842", super:"#f5c842" };
 
   const [phase, setPhase]       = useState("charge");   // charge→tap→grow→burst→show
@@ -1206,21 +1206,33 @@ function GachaAnim({ result, onClose }) {
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
-  const HOLD = 880; // 段階ごとのタメ
+  const HOLD = 880, HUSH = 680;          // 段階ごとのタメ / 暗転の静寂
+  const hasHush = isSR;                   // SR以上で「期待値の裏切り＋暗転→解放」
   const reveal = () => {
     if(phase!=="tap") return;
     setPhase("grow"); setStage(0); buzz([60]);
-    STAGES.forEach((_,i)=>{ if(i>0) at(()=>{ setStage(i); buzz(i===STAGES.length-1&&isSuper?[0,420]:[80]); }, i*HOLD); });
-    const endT = (STAGES.length-1)*HOLD + 820;
-    at(()=>setPhase("burst"), endT);
-    at(()=>setPhase("show"),  endT+460);
+    const last = STAGES.length-1;
+    // 最終段の手前まで順に育てる＝わざと低レアっぽく見せる（裏切りの布石）
+    for(let i=1;i<last;i++){ const j=i; at(()=>{ setStage(j); buzz([70]); }, i*HOLD); }
+    if(hasHush){
+      const hushT = last*HOLD;             // 最後の手前で暗転(一瞬の静寂)
+      at(()=>{ setPhase("hush"); buzz([0]); }, hushT);
+      const releaseT = hushT + HUSH;       // タメの後、爆発的に解放
+      at(()=>{ setStage(last); setPhase("burst"); buzz(isSuper?[0,90,40,40,560]:[0,340]); }, releaseT);
+      at(()=>setPhase("show"), releaseT + 760);
+    } else {
+      if(last>0) at(()=>setStage(last), last*HOLD);
+      const endT = last*HOLD + 760;
+      at(()=>setPhase("burst"), endT);
+      at(()=>setPhase("show"),  endT+440);
+    }
   };
   const skip = () => { timers.current.forEach(clearTimeout); setStage(STAGES.length-1); setPhase("show"); };
 
   const curTier   = STAGES[Math.min(stage, STAGES.length-1)];
   const AURA      = AURA_OF[curTier];
   const rainbow   = curTier === "super";
-  const grown     = phase==="grow" || phase==="burst" || phase==="show";
+  const grown     = phase==="grow" || phase==="hush" || phase==="burst" || phase==="show";
   const starCount = isSuper ? 30 : isSR ? 16 : 0;
 
   const PETALS = ["gacha_petal_pink1","gacha_petal_pink2","gacha_petal_pink3","gacha_petal_gold1","gacha_petal_gold2","gacha_petal_gold3","gacha_petal_blue1","gacha_petal_blue2"];
@@ -1262,9 +1274,9 @@ function GachaAnim({ result, onClose }) {
       {(phase==="charge"||phase==="tap") && (
         <div style={{position:"absolute",left:"50%",bottom:"22%",transform:"translateX(-50%)",textAlign:"center",cursor:phase==="tap"?"pointer":"default"}}
              onClick={phase==="tap"?reveal:undefined}>
-          {phase==="tap" && <img src="/assets/gacha_can.png" alt="" style={{position:"absolute",left:24,top:-74,width:92,transformOrigin:"34% 72%",animation:"gPour 1.8s ease-in-out infinite",pointerEvents:"none",filter:"drop-shadow(0 4px 8px rgba(0,0,0,.35))"}} onError={e=>{e.target.style.display="none";}}/>}
+          {phase==="tap" && <img src="/assets/gacha_can.png" alt="" style={{position:"absolute",left:-2,top:-70,width:78,transformOrigin:"30% 72%",animation:"gPour 1.8s ease-in-out infinite",pointerEvents:"none",filter:"drop-shadow(0 4px 8px rgba(0,0,0,.35))"}} onError={e=>{e.target.style.display="none";}}/>}
           {phase==="tap" && [0,1,2,3,4].map(i=>(
-            <img key={"wd"+i} src="/assets/gacha_waterdrop.png" alt="" style={{position:"absolute",left:30+i*4,top:-14,width:11+(i%2)*4,animation:`gWdrop 1s ease-in ${(i*0.2).toFixed(2)}s infinite`,pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>
+            <img key={"wd"+i} src="/assets/gacha_waterdrop.png" alt="" style={{position:"absolute",left:18+i*5,top:-12,width:10+(i%2)*4,animation:`gWdrop 1s ease-in ${(i*0.2).toFixed(2)}s infinite`,pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>
           ))}
           <img src="/assets/gacha_seed.png" alt="" style={{width:86,display:"block",margin:"0 auto",animation:phase==="tap"?"gSeedBob 1.1s ease-in-out infinite":"gSeedBob 1.6s ease-in-out infinite",filter:`drop-shadow(0 6px 12px ${AURA}cc)`}} onError={e=>{e.target.style.display="none";}}/>
         </div>
@@ -1274,12 +1286,24 @@ function GachaAnim({ result, onClose }) {
         <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt={result.label}
           style={{position:"absolute",left:"50%",bottom:"21%",transform:"translateX(-50%)",transformOrigin:"bottom center",
             height:`${38+stage*7}vh`,width:"auto",maxWidth:"94vw",objectFit:"contain",
-            animation:(phase==="grow")?"gNyoki .6s cubic-bezier(.2,.9,.3,1.4) forwards":"none",
+            animation:(phase==="grow")?"gNyoki .6s cubic-bezier(.2,.9,.3,1.4) forwards":(phase==="burst"&&hasHush)?"gNyoki .55s cubic-bezier(.15,.9,.3,1.5) forwards":"none",
+            opacity:phase==="hush"?0.25:1,transition:"opacity .15s",
             filter:`drop-shadow(0 0 20px ${rainbow?"#ffffff":AURA}cc)`}}
           onError={e=>{e.target.style.display="none";}}/>
       )}
+      {phase==="grow" && (
+        <div key={"puff"+stage} style={{position:"absolute",left:"50%",bottom:`${30+stage*6}%`,transform:"translateX(-50%)",pointerEvents:"none",zIndex:4}}>
+          <div style={{position:"absolute",left:-65,top:-65,width:130,height:130,borderRadius:"50%",background:`radial-gradient(circle,${rainbow?"#ffffff":AURA}cc,transparent 66%)`,animation:"gPuff .6s ease-out forwards"}}/>
+          {[...Array(rainbow?12:8)].map((_,i)=>{const ang=Math.PI*2*i/(rainbow?12:8);const dx=Math.round(Math.cos(ang)*(70+stage*8));const dy=Math.round(Math.sin(ang)*(70+stage*8));return <img key={i} src={`/assets/${PETALS[(i+stage)%PETALS.length]}.png`} alt="" style={{position:"absolute",left:0,top:0,width:22+stage*4,["--tx"]:`${dx}px`,["--ty"]:`${dy}px`,["--rot"]:`${i*44}deg`,animation:"gPetal .62s ease-out forwards"}} onError={e=>{e.target.style.display="none";}}/>;})}
+        </div>
+      )}
 
-      {phase==="burst" && <div style={{position:"absolute",inset:0,background:"radial-gradient(circle at 50% 46%,#fff 0%,#fff8 45%,#fff0 75%)",animation:"gFlash .45s ease-out",pointerEvents:"none"}}/>}
+      {phase==="hush" && (
+        <div style={{position:"absolute",inset:0,background:"rgba(2,1,6,0.92)",animation:"gHush .45s ease-in forwards",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:7}}>
+          <div style={{color:"rgba(255,255,255,.85)",fontSize:34,fontWeight:900,letterSpacing:4,animation:"fadePulse .5s ease-in-out infinite",textShadow:"0 0 18px #fff"}}>…！？</div>
+        </div>
+      )}
+      {phase==="burst" && <div style={{position:"absolute",inset:0,background: hasHush?"#fff":"radial-gradient(circle at 50% 46%,#fff 0%,#fff8 45%,#fff0 75%)",animation:hasHush?"gFlash .6s ease-out":"gFlash .45s ease-out",pointerEvents:"none",zIndex:8}}/>}
       {(phase==="burst"||phase==="show") && (
         <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:6}}>
           {parts.map((p,i)=>(
@@ -1338,6 +1362,8 @@ function GachaAnim({ result, onClose }) {
         @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
         @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
         @keyframes gNyoki{0%{transform:translateX(-50%) scaleY(.12) scaleX(.6);opacity:.3}50%{transform:translateX(-50%) scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:translateX(-50%) scaleY(.94) scaleX(.99)}88%{transform:translateX(-50%) scaleY(1.04)}100%{transform:translateX(-50%) scale(1);opacity:1}}
+        @keyframes gPuff{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+        @keyframes gHush{from{opacity:0}to{opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
         @keyframes gWdrop{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translateY(78px) scale(1);opacity:0}}
