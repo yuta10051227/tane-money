@@ -30,9 +30,20 @@ let _familyCode=null; // ファミリーコードのキャッシュ
 function getDB(){
   if(_db)return _db;
   try{
+    if(typeof firebase==="undefined"||!firebase.firestore)return null; // 遅延ロード中
     if(!_fbInit){try{firebase.app();}catch(e){firebase.initializeApp(FIREBASE_CONFIG);}_fbInit=true;}
     _db=firebase.firestore();return _db;
   }catch(e){return null;}
+}
+
+// Firebase(遅延ロード)の準備完了を待つ。準備済みなら即時、未ロードなら最大10秒ポーリング。
+function whenFirebaseReady(cb){
+  if(typeof firebase!=="undefined"&&firebase.firestore){cb();return;}
+  let tries=0;
+  const t=setInterval(()=>{
+    if(typeof firebase!=="undefined"&&firebase.firestore){clearInterval(t);cb();}
+    else if(++tries>100){clearInterval(t);cb();} // 10秒で諦め(ローカル表示は維持済み)
+  },100);
 }
 
 function getFamilyCode(){
@@ -104,6 +115,29 @@ async function cloudLoad() {
     }catch(e){}
   }
   // 4. 新規コード → nullを返してINITから始める
+  return null;
+}
+
+// ローカル即時ロード（同期・ネット往復なし）＝起動時の初回描画用。
+// cloudLoad()のstep2,3と同じローカル参照を、awaitせず即返す。
+function localLoadSync() {
+  const code = getFamilyCode();
+  if(code){
+    try{
+      const local=localStorage.getItem(LOCAL_KEY+"_"+code);
+      if(local){const p=JSON.parse(local);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+    try{
+      const local2=localStorage.getItem(LOCAL_KEY2+"_"+code);
+      if(local2){const p=JSON.parse(local2);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+  }
+  if(!code||code==="TANE-YUTA"){
+    try{
+      const old=localStorage.getItem(LOCAL_KEY);
+      if(old){const p=JSON.parse(old);if(p&&p.children&&p.children.length>0)return p;}
+    }catch(e){}
+  }
   return null;
 }
 
@@ -1188,6 +1222,7 @@ function DailyTasks({ child, data, update }) {
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
   const [combo, setCombo] = useState(0);
+  const [openOverride, setOpenOverride] = useState(null);   // null=自動(未完で開く/完了で畳む), true/false=手動
   const comboTimer = useRef(null);
   const totalDoneMon = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
   const _rawMonStage = ((data.monsterEvolved||{})[child.id]) || "egg";
@@ -1217,6 +1252,9 @@ function DailyTasks({ child, data, update }) {
   const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
     tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
   const allBonusGiven = activeSets.length>0 && activeSets.every(s => !s.bonus || prog[bonusKey(s)]);
+  // 開閉: 既定は「未完なら開く・全部できたら畳む」。タップで手動上書き。
+  const open = openOverride !== null ? openOverride : !allDone;
+  const toggleOpen = () => setOpenOverride(!open);
 
   const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
   const setDailyProg = (d, extra) => ({
@@ -1278,8 +1316,8 @@ function DailyTasks({ child, data, update }) {
         </div>
       )}
 
-      {/* Progress bar */}
-      <div style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14}}>
+      {/* Progress bar（タップで下のタスク一覧を開閉するヘッダー） */}
+      <div onClick={toggleOpen} role="button" style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14,cursor:"pointer",userSelect:"none"}}>
         {/* アクティブセット名（最大2つ） */}
         {activeSets.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
           {activeSets.map(s=>(
@@ -1293,7 +1331,10 @@ function DailyTasks({ child, data, update }) {
           <p style={{fontWeight:900,fontSize:14,margin:0,color:allDone?G:TEXT}}>
             {allDone ? "🌟 今日は全部できた！" : "📋 今日のやること"}
           </p>
-          <span style={{fontWeight:800,fontSize:13,color:allDone?G:MUTED}}>{doneCount}/{tasks.length}</span>
+          <span style={{fontWeight:800,fontSize:13,color:allDone?G:MUTED,display:"flex",alignItems:"center",gap:6}}>
+            {doneCount}/{tasks.length}
+            <span style={{fontSize:11,opacity:.7,transition:"transform .25s",transform:open?"rotate(0deg)":"rotate(-90deg)"}}>▼</span>
+          </span>
         </div>
         <div style={{height:10,background:BORDER,borderRadius:5,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${tasks.length?doneCount/tasks.length*100:0}%`,background:allDone?G:Y,borderRadius:5,transition:"width .5s ease"}}/>
@@ -1306,7 +1347,8 @@ function DailyTasks({ child, data, update }) {
         {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
-      {/* Task list（セットごとに見出しを付けて2セットまとめ表示） */}
+      {/* Task list（開いているときだけ表示。セットごとに見出しを付けて2セットまとめ表示） */}
+      {open && <>
       {tasks.length === 0 && (
         <p style={{color:MUTED,textAlign:"center",fontSize:13,marginTop:20}}>まだデイリータスクがないよ</p>
       )}
@@ -1350,6 +1392,7 @@ function DailyTasks({ child, data, update }) {
           </React.Fragment>
         );
       })}
+      </>}
       <style>{`@keyframes popIn{from{transform:translate(-50%,-50%) scale(.5);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}`}</style>
     </div>
   );
@@ -7449,6 +7492,15 @@ export default function App() {
       if(code) { _familyCode = code; }
     } catch(e) {}
 
+    // ① ローカル即時表示：手元にデータがあればネットを待たずに描画（起動高速化）
+    let shownLocal = false;
+    try {
+      const local = localLoadSync();
+      if(local){ setData(migrate(local)); setLoading(false); shownLocal = true; }
+    } catch(e) {}
+
+    // ② Firebase(遅延ロード)の準備ができ次第、Firestoreから最新を取得して上書き＋同期開始
+    whenFirebaseReady(()=>{
     cloudLoad().then(async d=>{
       const migrated = migrate(d);
       // Firestoreのlogsコレクションからログを追加読み込み
@@ -7465,7 +7517,7 @@ export default function App() {
         }
       }
       setData(migrated);
-      setLoading(false);
+      if(!shownLocal) setLoading(false);
       // リアルタイム同期開始（configデータ）
       startRealtimeSync((updater)=>{
         setData(prev => {
@@ -7491,8 +7543,9 @@ export default function App() {
       }, 5000);
       return ()=>clearInterval(pollTimer);
     }).catch(()=>{
-      setData({...INIT});
-      setLoading(false);
+      // Firestore失敗時：ローカル未表示のときだけINITで起動（ローカル表示済みなら維持）
+      if(!shownLocal){ setData({...INIT}); setLoading(false); }
+    });
     });
   },[]);
 
