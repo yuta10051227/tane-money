@@ -1185,60 +1185,116 @@ const GACHA_ITEMS = [
 // GACHA ANIMATION
 // ═══════════════════════════════════════════════════════
 function GachaAnim({ result, onClose }) {
-  const [phase, setPhase] = useState("spin");
   const theme = result.theme || getMonthTheme();
-  const isSuper = result.rate <= 3;
-  const isSR    = result.rate <= 12;
-  const hasSuspense = isSR;
+  const isSuper = result.rate <= 3;             // 激レア(虹)
+  const isSR    = result.rate <= 12;            // スーパーレア以上(金以上)
+  const tier    = isSuper ? "super" : isSR ? "sr" : result.rate <= 25 ? "rare" : "normal";
+  const AURA    = { normal:"#d8d0bb", rare:"#4a9eff", sr:"#f5c842", super:"#f5c842" }[tier];
 
-  const revealResult = () => {
+  const [phase, setPhase]       = useState("charge");   // charge→tap→aura→burst→show
+  const [upgraded, setUpgraded] = useState(false);      // 激レアの「金→虹」昇格演出
+  const timers = useRef([]);
+  const at = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
+  useEffect(()=>()=>timers.current.forEach(clearTimeout), []);
+  useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 1000); }, []);
+
+  const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
+
+  const reveal = () => {
     if(phase!=="tap") return;
-    if(hasSuspense){
-      setPhase("suspense");
-      try{ if(isSuper) navigator.vibrate([150,80,150,80,300,80,500]); else navigator.vibrate([100,60,180]); }catch(e){}
-      setTimeout(()=>setPhase("show"), isSuper?2200:1400);
+    setPhase("aura");
+    if(isSuper){
+      buzz([80,60,80,60,120]);
+      at(()=>{ setUpgraded(true); buzz([0,500]); }, 1100);  // タメ→虹に昇格(ドキッ)
+      at(()=>setPhase("burst"), 2100);
+      at(()=>setPhase("show"),  2550);
+    } else if(isSR){
+      buzz([100,60,180]);
+      at(()=>setPhase("burst"), 1200);
+      at(()=>setPhase("show"),  1650);
     } else {
-      setPhase("show");
+      buzz([60]);
+      at(()=>setPhase("burst"), 500);
+      at(()=>setPhase("show"),  850);
     }
   };
+  const skip = () => { timers.current.forEach(clearTimeout); if(isSuper) setUpgraded(true); setPhase("show"); };
 
-  useEffect(()=>{
-    const t=setTimeout(()=>setPhase("tap"), 1100);
-    return()=>clearTimeout(t);
-  },[]);
+  const rainbow   = isSuper && upgraded;
+  const ringColor = AURA;
+  const starCount = isSuper ? 34 : isSR ? 16 : 0;
 
-  const starCount = isSuper ? 30 : isSR ? 15 : 0;
+  // 放射状パーティクル（バースト用・初期化時に固定）
+  const N = isSuper ? 22 : isSR ? 14 : 8;
+  const [parts] = useState(()=> [...Array(N)].map((_,i)=>{
+    const a = (Math.PI*2*i)/N + Math.random()*0.4;
+    const d = 110 + Math.random()*150;
+    return { tx:(Math.cos(a)*d).toFixed(0), ty:(Math.sin(a)*d).toFixed(0), e:"✨⭐🌟💫"[i%4], s:14+Math.round(Math.random()*14) };
+  }));
+
+  const Orb = ({ size }) => (
+    <div style={{position:"relative",width:size,height:size,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{position:"absolute",inset:-16,borderRadius:"50%",
+        background: rainbow
+          ? "conic-gradient(from 0deg,#ff3b3b,#ffb02e,#ffe53b,#3bd16f,#3b9eff,#9b5bff,#ff3b3b)"
+          : `radial-gradient(circle,${ringColor}00 55%,${ringColor}cc 70%,${ringColor}00 80%)`,
+        animation: rainbow ? "gRing 2.2s linear infinite" : "gPulse .7s ease-in-out infinite",
+        filter:"blur(3px)"}}/>
+      <div style={{position:"relative",width:size*0.7,height:size*0.7,borderRadius:"50% 50% 47% 47%",
+        background: rainbow
+          ? "conic-gradient(from 0deg,#ff6b6b,#ffd166,#fff3a0,#7be0a0,#6bb8ff,#b18bff,#ff6b6b)"
+          : `radial-gradient(circle at 38% 30%,#ffffff,${ringColor})`,
+        boxShadow:`0 0 32px ${rainbow?"#ffffff":ringColor}aa, inset 0 -8px 14px rgba(0,0,0,.18)`,
+        animation: phase==="aura" ? "gShake .5s ease-in-out infinite" : "none"}}/>
+    </div>
+  );
+
   return (
-    <div style={{position:"fixed",inset:0,background:"#000e",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
-      {phase==="spin"&&(
+    <div onClick={(phase==="aura"||phase==="burst")?skip:undefined}
+      style={{position:"fixed",inset:0,background:"#000e",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,overflow:"hidden"}}>
+
+      {(phase==="aura"||phase==="burst") && isSR && (
+        <div style={{position:"absolute",top:0,bottom:0,left:"50%",width:rainbow?170:90,transform:"translateX(-50%)",
+          background:`linear-gradient(${rainbow?"#ffffff":AURA}00,${rainbow?"#ffffff":AURA}66,${rainbow?"#ffffff":AURA}00)`,
+          filter:"blur(7px)",animation:"gPillar .6s ease-out",pointerEvents:"none"}}/>
+      )}
+
+      {phase==="charge" && (
         <div style={{textAlign:"center"}}>
-          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:8,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
-          <div style={{fontSize:80,animation:"sp .4s linear infinite"}}>🎰</div>
-          <p style={{color:"#fff",fontWeight:800,fontSize:18,marginTop:12}}>ガチャ中…</p>
+          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:18,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
+          <Orb size={140}/>
+          <p style={{color:"#fff",fontWeight:800,fontSize:17,marginTop:18,animation:"fadePulse .8s ease-in-out infinite"}}>エネルギーをためてるよ…</p>
         </div>
       )}
-      {phase==="tap"&&(
-        <div style={{textAlign:"center",cursor:"pointer"}} onClick={revealResult}>
-          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:16,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
-          <div style={{width:130,height:130,borderRadius:"50%",margin:"0 auto",background:`radial-gradient(circle at 40% 35%,${theme.color}dd,${theme.color}55)`,animation:"heartbeat .8s ease-in-out infinite",boxShadow:`0 0 0 16px ${theme.color}22,0 0 50px ${theme.color}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:60}}>🎁</div>
-          <p style={{color:"#fff",fontWeight:900,fontSize:20,marginTop:20,animation:"fadePulse .8s ease-in-out infinite"}}>タップして開ける！</p>
+
+      {phase==="tap" && (
+        <div style={{textAlign:"center",cursor:"pointer"}} onClick={reveal}>
+          <div style={{fontSize:18,color:"rgba(255,255,255,0.6)",marginBottom:18,letterSpacing:1}}>{theme.emoji} {theme.name}ガチャ</div>
+          <div style={{animation:"heartbeat .9s ease-in-out infinite"}}><Orb size={150}/></div>
+          <p style={{color:"#fff",fontWeight:900,fontSize:20,marginTop:20,animation:"fadePulse .8s ease-in-out infinite"}}>タップしてあけよう！</p>
         </div>
       )}
-      {phase==="suspense"&&(
+
+      {phase==="aura" && (
         <div style={{textAlign:"center"}}>
-          <div style={{
-            width:130,height:130,borderRadius:"50%",margin:"0 auto",
-            background:`radial-gradient(circle at 40% 35%,${result.color}ff,${result.color}88)`,
-            animation:"heartbeat .65s ease-in-out infinite",
-            boxShadow:`0 0 0 20px ${result.color}22,0 0 60px ${result.color}66`,
-          }}/>
-          <div style={{color:"rgba(255,255,255,0.85)",fontSize:isSuper?24:18,fontWeight:900,marginTop:22,animation:"fadePulse .65s ease-in-out infinite"}}>
-            {isSuper?"‼ もしかして…":"あれ…？"}
+          <Orb size={162}/>
+          <div style={{color: rainbow?"#fff":AURA,fontSize:isSuper?26:18,fontWeight:900,marginTop:24,animation:"fadePulse .55s ease-in-out infinite",textShadow:rainbow?"0 0 16px #fff":"none"}}>
+            {rainbow ? "にじいろだ‼" : isSuper ? "きん…？いや…⁉" : isSR ? "キラキラしてる…！" : "なにが出るかな？"}
           </div>
-          {isSuper&&<div style={{color:result.color,fontSize:13,fontWeight:700,marginTop:8,animation:"fadePulse .65s ease-in-out infinite .3s"}}>なにか来るかも…！</div>}
+          <div style={{color:"rgba(255,255,255,.4)",fontSize:11,marginTop:14}}>タップでスキップ</div>
         </div>
       )}
-      {phase==="show"&&(
+
+      {phase==="burst" && (
+        <div style={{position:"fixed",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{position:"absolute",inset:0,background:"#fff",animation:"gFlash .5s ease-out"}}/>
+          {parts.map((p,i)=>(
+            <span key={i} style={{position:"absolute",left:"50%",top:"50%",fontSize:p.s,["--tx"]:`${p.tx}px`,["--ty"]:`${p.ty}px`,animation:"gBurst .5s ease-out forwards"}}>{p.e}</span>
+          ))}
+        </div>
+      )}
+
+      {phase==="show" && (
         <div style={{textAlign:"center",animation:"pop .35s cubic-bezier(.2,.8,.3,1.3)",padding:"0 20px",width:"100%",maxWidth:340}}>
           {starCount>0 && <div style={{position:"fixed",inset:0,pointerEvents:"none"}}>{[...Array(starCount)].map((_,i)=><span key={i} style={{position:"absolute",left:`${Math.random()*100}%`,top:0,fontSize:isSuper?24:18,animation:`fall ${1+Math.random()*1.5}s ${Math.random()*.8}s linear forwards`}}>{"⭐✨🌟💫🎊"[i%5]}</span>)}</div>}
           <div style={{background:CARD,borderRadius:28,padding:"28px 32px",border:`4px solid ${result.color}`,boxShadow:`0 20px 60px ${result.color}60`,width:"100%",animation:isSR?"gachaShimmer 1.2s ease-in-out infinite":"none"}}>
@@ -1247,18 +1303,19 @@ function GachaAnim({ result, onClose }) {
             {result.collItem ? (
               <div style={{position:"relative",margin:"0 auto 4px"}}>
                 {result.isNewItem&&<div style={{position:"absolute",top:-10,right:"calc(50% - 42px)",background:R,color:"#fff",borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:900,zIndex:1,letterSpacing:.5}}>NEW!</div>}
-                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.png`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14}}/>
+                <img src={`/assets/${result.collItem.id.replace("gi_","gacha_")}.png`} alt={result.collItem.name} style={{width:isSuper?110:88,height:isSuper?110:88,objectFit:"contain",display:"block",margin:"4px auto",borderRadius:14,animation:"pop .45s cubic-bezier(.2,.8,.3,1.4)"}}/>
                 <div style={{fontWeight:900,fontSize:16,color:TEXT,marginBottom:2}}>{result.collItem.name}</div>
                 <div style={{fontSize:11,color:MUTED,marginBottom:8}}>{result.collItem.desc}</div>
               </div>
-            ) : <div style={{fontSize:isSuper?72:60,margin:"4px 0"}}>{isSuper?"👑":"🎁"}</div>}
+            ) : <div style={{fontSize:isSuper?72:60,margin:"4px 0",animation:"pop .45s cubic-bezier(.2,.8,.3,1.4)"}}>{isSuper?"👑":"🎁"}</div>}
             <div style={{color:result.color,fontSize:44,fontWeight:900,lineHeight:1}}>+{result.pts}</div>
             <div style={{color:MUTED,fontSize:14,marginBottom:result.bonusPts>0?6:14}}>ptゲット！</div>
             {result.bonusPts>0&&<div style={{background:GOLDS,borderRadius:10,padding:"5px 12px",marginBottom:12,fontSize:12,fontWeight:700,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
-            <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 すごい！":"やったー🎉"}</button>
+            <button onClick={onClose} style={{background:result.color,border:"none",borderRadius:14,padding:"13px 36px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,width:"100%"}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
           </div>
         </div>
       )}
+
       <style>{`
         @keyframes sp{to{transform:rotate(360deg)}}
         @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
@@ -1266,6 +1323,12 @@ function GachaAnim({ result, onClose }) {
         @keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
         @keyframes gachaShimmer{0%,100%{box-shadow:0 20px 60px ${result.color}60}50%{box-shadow:0 20px 80px ${result.color}cc,0 0 40px ${result.color}88}}
         @keyframes fadePulse{0%,100%{opacity:1}50%{opacity:0.25}}
+        @keyframes gRing{to{transform:rotate(360deg)}}
+        @keyframes gPulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.13);opacity:1}}
+        @keyframes gShake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-4px) rotate(-3deg)}75%{transform:translateX(4px) rotate(3deg)}}
+        @keyframes gPillar{from{opacity:0;transform:translateX(-50%) scaleY(.25)}to{opacity:1;transform:translateX(-50%) scaleY(1)}}
+        @keyframes gFlash{0%{opacity:0}12%{opacity:.92}100%{opacity:0}}
+        @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
       `}</style>
     </div>
   );
