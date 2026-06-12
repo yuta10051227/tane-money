@@ -423,7 +423,7 @@ const CAT_LINES = [
         { id:"ultB",  label:"星界神プリンゾーン（究極体）", rarity:5 },
       ]},
     ] },
-  { id:"cku", name:"クー", emoji:"🐈‍⬛",
+  { id:"cku", name:"クー", emoji:"🐈⬛",
     stages:[
       { id:"egg",   label:"タマゴ",   rarity:1 },
       { id:"b1",    label:"ベビーI",  rarity:1 },
@@ -440,7 +440,7 @@ const CAT_LINES = [
         { id:"ultB",  label:"星界神クーゾーン（究極体）", rarity:5 },
       ]},
     ] },
-  { id:"cshi", name:"シー", emoji:"🐈‍⬛",
+  { id:"cshi", name:"シー", emoji:"🐈⬛",
     stages:[
       { id:"egg",   label:"タマゴ",   rarity:1 },
       { id:"b1",    label:"ベビーI",  rarity:1 },
