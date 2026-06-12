@@ -18,6 +18,18 @@ service cloud.firestore {
       }
     }
 
+    // ── 事前登録（waitlist）──────────────────────────────────────
+    // 許可リスト外の人でも、ログインさえすれば「自分の事前登録」だけは作れる。
+    //   ・LPから入って許可リスト外だった人を“行き止まり”にせず、見込み客として名簿に貯める。
+    //   ・他人の登録の閲覧・一覧・削除はクライアントから不可（名簿はオーナーがコンソールで見る）。
+    //   ・保存できるのは email / name / ts の3項目のみ（巨大データ書き込み等の悪用を防ぐ）。
+    match /waitlist/{uid} {
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.data.keys().hasOnly(['email', 'name', 'ts']);
+      allow read, delete: if false;
+    }
+
     // ── ALLOWLIST（メール許可リスト）─────────────────────────────
     // 「使わせたい知人のGoogleメール」をここに列挙する。
     //   ・各自は自分のアカウント・自分のデータで利用する（制限ではなく入場許可）。

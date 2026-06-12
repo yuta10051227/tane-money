@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, GoogleAuthProvider } from "firebase/auth";
-import { auth, googleProvider, firebaseEnabled } from "./firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, googleProvider, firebaseEnabled, db } from "./firebase";
 import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
@@ -1921,6 +1922,53 @@ function LoginGate({ onLogin, error }) {
   );
 }
 
+/* 事前登録（waitlist）画面 — 許可リスト外でログインした人を見込み客として記録し、丁寧に案内する */
+function WaitlistScreen({ user, onSignOut }) {
+  const [status, setStatus] = useState("saving"); // saving | saved | failed
+  useEffect(() => {
+    if (!user || !user.uid || !db) { setStatus("failed"); return; }
+    const ref = doc(db, "waitlist", user.uid);
+    setDoc(ref, { email: user.email || "", name: user.displayName || "", ts: Date.now() }, { merge: true })
+      .then(() => setStatus("saved"))
+      .catch((e) => { try { console.error("waitlist write failed", e); } catch { /* ignore */ } setStatus("failed"); });
+    track("waitlist_joined"); // 需要シグナル（LPに惹かれて入った人の数）
+  }, [user]);
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: C.bg, color: C.text, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: 420, padding: "48px 24px", boxSizing: "border-box", textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>{status === "failed" ? "🙏" : "✉️"}</div>
+        <h1 style={{ fontSize: 24, margin: "0 0 12px" }}>
+          {status === "failed" ? "ご登録ありがとうございます" : "事前登録を受け付けました"}
+        </h1>
+        <p style={{ color: C.sub, fontSize: 14, lineHeight: 1.8, margin: "0 0 20px" }}>
+          いまは少人数で動作を確かめている<strong style={{ color: C.text }}>招待制テスト中</strong>です。<br />
+          準備ができ次第、順番にご案内します。
+        </p>
+        {user && user.email && (
+          <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 20 }}>
+            <div style={{ fontSize: 11, color: C.faint, marginBottom: 4 }}>ご案内の送り先</div>
+            <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-all" }}>{user.email}</div>
+          </div>
+        )}
+        {status === "failed" && (
+          <p style={{ color: C.sub, fontSize: 12, lineHeight: 1.7, margin: "0 0 20px" }}>
+            ※ 登録の保存に問題が起きた可能性があります。お手数ですが、しばらくして再度お試しください。
+          </p>
+        )}
+        <button
+          onClick={onSignOut}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: `1px solid ${C.line}`, background: "transparent", color: C.text, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+        >
+          別のアカウントでログインする
+        </button>
+        <p style={{ color: C.faint, fontSize: 11, lineHeight: 1.7, margin: "16px 0 0" }}>
+          すでに招待済みの場合は、招待を受けたGoogleアカウントでログインし直してください。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* Firestore等のデータ取得エラー画面 */
 function ErrorScreen({ error, onSignOut }) {
   // 技術的な詳細はコンソールに残す
@@ -2330,6 +2378,8 @@ export default function App() {
 
   if (firebaseEnabled && user === undefined) return <Splash text="読み込み中…" />;
   if (firebaseEnabled && user === null) return <LoginGate onLogin={login} error={authError} />;
+  // 許可リスト外でログインした人は“行き止まり”にせず、事前登録（waitlist）へ案内する
+  if (error && error.code === "permission-denied") return <WaitlistScreen user={user} onSignOut={logout} />;
   if (error) return <ErrorScreen error={error} onSignOut={logout} />;
   if (loading || !data) return <Splash text="読み込み中…" />;
 
