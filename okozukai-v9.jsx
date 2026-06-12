@@ -1264,6 +1264,9 @@ function GachaAnim({ result, onClose }) {
         <div style={{position:"absolute",left:"50%",bottom:"22%",transform:"translateX(-50%)",textAlign:"center",cursor:phase==="tap"?"pointer":"default"}}
              onClick={phase==="tap"?reveal:undefined}>
           {phase==="tap" && <img src="/assets/gacha_can.png" alt="" style={{position:"absolute",left:-92,top:-62,width:98,transformOrigin:"bottom right",animation:"gPour 1.7s ease-in-out infinite",pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>}
+          {phase==="tap" && [0,1,2,3].map(i=>(
+            <img key={"wd"+i} src="/assets/gacha_waterdrop.png" alt="" style={{position:"absolute",left:-74+i*5,top:-6,width:12+(i%2)*4,animation:`gWdrop .95s ease-in ${(i*0.24).toFixed(2)}s infinite`,pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>
+          ))}
           <img src="/assets/gacha_seed.png" alt="" style={{width:86,display:"block",margin:"0 auto",animation:phase==="tap"?"gSeedBob 1.1s ease-in-out infinite":"gSeedBob 1.6s ease-in-out infinite",filter:`drop-shadow(0 6px 12px ${AURA}cc)`}} onError={e=>{e.target.style.display="none";}}/>
         </div>
       )}
@@ -1337,6 +1340,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
+        @keyframes gWdrop{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translateY(78px) scale(1);opacity:0}}
         @keyframes gPetal{0%{transform:translate(-50%,-50%) rotate(0deg) scale(.4);opacity:0}18%{opacity:1}100%{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty) + 50px)) rotate(var(--rot)) scale(1);opacity:0}}
         @keyframes gPulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes gCardUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
