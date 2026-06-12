@@ -30,9 +30,20 @@ let _familyCode=null; // ファミリーコードのキャッシュ
 function getDB(){
   if(_db)return _db;
   try{
+    if(typeof firebase==="undefined"||!firebase.firestore)return null; // 遅延ロード中
     if(!_fbInit){try{firebase.app();}catch(e){firebase.initializeApp(FIREBASE_CONFIG);}_fbInit=true;}
     _db=firebase.firestore();return _db;
   }catch(e){return null;}
+}
+
+// Firebase(遅延ロード)の準備完了を待つ。準備済みなら即時、未ロードなら最大10秒ポーリング。
+function whenFirebaseReady(cb){
+  if(typeof firebase!=="undefined"&&firebase.firestore){cb();return;}
+  let tries=0;
+  const t=setInterval(()=>{
+    if(typeof firebase!=="undefined"&&firebase.firestore){clearInterval(t);cb();}
+    else if(++tries>100){clearInterval(t);cb();} // 10秒で諦め(ローカル表示は維持済み)
+  },100);
 }
 
 function getFamilyCode(){
@@ -7488,7 +7499,8 @@ export default function App() {
       if(local){ setData(migrate(local)); setLoading(false); shownLocal = true; }
     } catch(e) {}
 
-    // ② バックグラウンドでFirestoreから最新を取得して上書き＋同期開始
+    // ② Firebase(遅延ロード)の準備ができ次第、Firestoreから最新を取得して上書き＋同期開始
+    whenFirebaseReady(()=>{
     cloudLoad().then(async d=>{
       const migrated = migrate(d);
       // Firestoreのlogsコレクションからログを追加読み込み
@@ -7533,6 +7545,7 @@ export default function App() {
     }).catch(()=>{
       // Firestore失敗時：ローカル未表示のときだけINITで起動（ローカル表示済みなら維持）
       if(!shownLocal){ setData({...INIT}); setLoading(false); }
+    });
     });
   },[]);
 
