@@ -1864,8 +1864,8 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
    ────────────────────────────────────────────────────────────── */
 function LoginGate({ onLogin, error }) {
   const FEATURES = [
-    { icon: "⏳", title: "締切を、勝手に逆算", desc: "本申込日を1つ入れるだけで、予告・先行登録・リマインド・締切まで自動で並びます。" },
-    { icon: "📣", title: "ローンチを取りこぼさない", desc: "先行登録→申込→売上をファネルで可視化。遅れていると朝に教えてくれます。" },
+    { icon: "⏳", title: "締切を、勝手に逆算", desc: "本番の申込締切を1つ入れるだけで、予告・先行案内・リマインド・締切まで自動で並びます。" },
+    { icon: "📣", title: "告知から締切まで、抜け漏れゼロ", desc: "先行案内→申込→売上の流れを見える化。遅れていると朝に教えてくれます。" },
     { icon: "✅", title: "今日やる事だけ、1画面に", desc: "遅れ・締切間近を毎朝まとめて表示。送り忘れ・公開遅れをなくします。" },
   ];
   return (
@@ -1875,10 +1875,10 @@ function LoginGate({ onLogin, error }) {
           <div style={{ fontSize: 12, letterSpacing: 4, color: C.accent }}>ひとり社長のための</div>
           <h1 style={{ fontSize: 30, margin: "6px 0 12px" }}>ひとり秘書</h1>
           <p style={{ color: C.text, fontSize: 16, fontWeight: 700, lineHeight: 1.7, margin: "0 0 6px" }}>
-            ローンチの締切も、出張の段取りも。<br />ぜんぶ逆算して「抜け漏れ」を防ぐ秘書。
+            講座の締切も、告知の段取りも。<br />ぜんぶ逆算して「抜け漏れ」を防ぐ秘書。
           </p>
           <p style={{ color: C.sub, fontSize: 13, lineHeight: 1.7, margin: "0 0 24px" }}>
-            講座・コーチング・サロンを<strong style={{ color: C.text }}>ひとりで回す人</strong>のための、<br />段取り＆ローンチ管理ツールです。
+            講座・コーチング・サロンを<strong style={{ color: C.text }}>ひとりで回す人</strong>のための、<br />段取り＆集客スケジュール管理ツールです。
           </p>
         </div>
 
@@ -1894,6 +1894,9 @@ function LoginGate({ onLogin, error }) {
           ))}
         </div>
 
+        <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
+          ✓ 今は無料・クレジットカード登録なし
+        </div>
         <button
           onClick={onLogin}
           style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "none", background: C.accent, color: "#0B0D11", fontWeight: 700, cursor: "pointer", fontSize: 16 }}
@@ -1901,6 +1904,7 @@ function LoginGate({ onLogin, error }) {
           Googleではじめる
         </button>
         <p style={{ color: C.faint, fontSize: 12, lineHeight: 1.7, textAlign: "center", margin: "12px 0 0" }}>
+          お試し中の機能です（β版）。気に入らなければいつでもやめられます。<br />
           ログインすると、あなた専用のデータ領域が作られます。<br />他の人のデータとは完全に分かれています。
         </p>
 
