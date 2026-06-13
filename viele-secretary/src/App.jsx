@@ -231,6 +231,33 @@ const TEMPLATES = {
     { label: "両替・eSIM手配", daysBefore: 7 },
     { label: "持ち物パッキング", daysBefore: 1 },
   ],
+  打ち合わせ: [
+    { label: "アジェンダ・議題を整理", daysBefore: 5 },
+    { label: "必要な資料を準備", daysBefore: 3 },
+    { label: "場所／オンラインURLを確定・共有", daysBefore: 2 },
+    { label: "参加者へリマインド送信", daysBefore: 1 },
+  ],
+  旅行: [
+    { label: "宿・交通を予約", daysBefore: 30 },
+    { label: "行程・プランを作成", daysBefore: 14 },
+    { label: "持ち物リストを作成", daysBefore: 7 },
+    { label: "天気・現地情報をチェック", daysBefore: 3 },
+    { label: "パッキング", daysBefore: 1 },
+  ],
+  "入学式・式典": [
+    { label: "服装・スーツ・靴を準備", daysBefore: 30 },
+    { label: "提出書類・持ち物を確認", daysBefore: 21 },
+    { label: "写真・カメラの準備", daysBefore: 7 },
+    { label: "集合時間・場所・交通を確認", daysBefore: 3 },
+    { label: "持ち物の最終チェック", daysBefore: 1 },
+  ],
+  "誕生日・記念日": [
+    { label: "プレゼントを決める", daysBefore: 14 },
+    { label: "プレゼントを購入・予約", daysBefore: 7 },
+    { label: "ケーキ・お店を予約", daysBefore: 5 },
+    { label: "メッセージカード・飾り付けを準備", daysBefore: 2 },
+    { label: "当日の段取りを確認", daysBefore: 1 },
+  ],
 };
 
 /* 二段ローンチ等の「逆算テンプレ」。基準日(offset 0)からの相対日数で締切群を自動生成 */
@@ -282,12 +309,27 @@ function templateItems(name) {
   return (TEMPLATES[name] || []).map((it) => ({ ...it, done: false }));
 }
 
-// 「出張」予定のタイトルから最適な逆算チェーンの型を推定
-function pickTripTemplate(title) {
+// カレンダーのタイトルから逆算チェーンの型を自動判定するルール（上から順にマッチ）
+// ※「打ち合わせ」は頻出しすぎて自動生成だと邪魔になるため、ここには入れず手動専用にしている
+const AUTO_RULES = [
+  { kw: /海外|外国|バリ|ハワイ|台湾|韓国|セブ|タイ|ベトナム|シンガポール|インドネシア/, tpl: "海外実習" },
+  { kw: /入学式|入園式|卒業式|卒園式|入社式|式典|セレモニー/, tpl: "入学式・式典" },
+  { kw: /誕生日|誕生会|バースデー|記念日|アニバーサリー|birthday/i, tpl: "誕生日・記念日" },
+  { kw: /旅行|家族旅行|帰省| travel|trip/i, tpl: "旅行" },
+  { kw: /日帰り/, tpl: "日帰り" },
+  { kw: /出張|登壇|遠征|遠方|セミナー|講演|イベント/, tpl: "遠方登壇" },
+];
+
+// タイトルにマッチする型名を返す（なければ null）。自動逆算チェーンの生成判定に使う
+function matchAutoTemplate(title) {
   const s = String(title || "");
-  if (/海外|外国|バリ|ハワイ|台湾|韓国|セブ|タイ|ベトナム|シンガポール|インドネシア/.test(s)) return "海外実習";
-  if (/日帰り/.test(s)) return "日帰り";
-  return "遠方登壇";
+  const hit = AUTO_RULES.find((r) => r.kw.test(s));
+  return hit ? hit.tpl : null;
+}
+
+// 自動検知でタイトルから最適な型を推定（未マッチ時は出張の標準型へフォールバック）
+function pickTripTemplate(title) {
+  return matchAutoTemplate(title) || "遠方登壇";
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -472,8 +514,8 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
   const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
 
   return (
-    <Panel title="出張・遠征の逆算チェーン" accent={C.green} help="本番日から逆算して、各手配の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。Googleカレンダーに『出張』を含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
-      {(!trips || trips.length === 0) && <Empty>遠征予定はありません。右上の「＋型から追加」で作成。</Empty>}
+    <Panel title="予定の逆算チェーン" accent={C.green} help="本番日から逆算して、各準備の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。出張・旅行・打ち合わせ・入学式・誕生日など、前もって準備が要る予定に対応。Googleカレンダーに『出張・旅行・式典・誕生日』などを含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
+      {(!trips || trips.length === 0) && <Empty>逆算したい予定はまだありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
           const dleft = daysUntil(trip.date);
@@ -564,7 +606,7 @@ function AddTrip({ onAdd }) {
   if (!open) return <button onClick={() => setOpen(true)} style={chipBtn}>＋型から追加</button>;
   return (
     <div style={{ position: "absolute", right: 18, marginTop: 36, zIndex: 5, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, width: 240 }}>
-      <input placeholder="タイトル（例：大阪登壇）" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
+      <input placeholder="タイトル（例：大阪登壇／家族旅行）" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
       <select value={template} onChange={(e) => setTemplate(e.target.value)} style={inp}>
         {Object.keys(TEMPLATES).map((t) => <option key={t}>{t}</option>)}
       </select>
@@ -2197,7 +2239,7 @@ export default function App() {
     };
   }, [data && data.gcalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 出張の自動検知：カレンダー予定に「出張」を含むものがあれば、逆算チェーンを自動生成（3ヶ月先まで）
+  // 予定の自動検知：カレンダー予定のタイトルが逆算ルール(AUTO_RULES)にマッチすれば、逆算チェーンを自動生成（3ヶ月先まで）
   // ※ data を依存に入れると update→再実行の無限ループになるため、calEvents/calStatus のみを依存にし、
   //    処理済みIDは ref に蓄積して二重生成・ループを防ぐ。
   const tripSeenRef = useRef(new Set());
@@ -2212,7 +2254,7 @@ export default function App() {
     const ignore = d.tripIgnore || []; // 削除した自動出張は再生成しない
     const seen = tripSeenRef.current;
     const newTrips = calEvents
-      .filter((ev) => ev.id && ev.title && ev.title.includes("出張"))
+      .filter((ev) => ev.id && ev.title && matchAutoTemplate(ev.title))
       .filter((ev) => { const s = new Date(ev.startISO); return s >= now0 && s <= horizon; })
       .filter((ev) => !existing.has(ev.id) && !ignore.includes(ev.id) && !seen.has(ev.id))
       .map((ev) => {
