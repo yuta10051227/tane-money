@@ -168,3 +168,16 @@ export function dayEnergy(birth, todayISO) {
   return { me, today, tomorrow: tmr, monthDays };
 }
 
+// 複数の日付の「気」をまとめて返す（命式計算は1回だけ）。逆算チェーンの本番日コンディション用。
+// 返り値: { "YYYY-MM-DD": { stance, score, relation, focus, ... } }
+export function stancesFor(birth, dateISOs) {
+  const out = {};
+  try {
+    const me = FIVE[computeChart(birth).dayMaster] || "水";
+    for (const d of dateISOs || []) {
+      if (d && !out[d]) out[d] = relationFor(me, String(d).slice(0, 10));
+    }
+  } catch { /* 出生情報が不正なら何も返さない */ }
+  return out;
+}
+
