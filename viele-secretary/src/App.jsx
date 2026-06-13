@@ -1375,6 +1375,7 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
     try { return birth && birth.date ? dayEnergy(birth, iso(new Date())) : null; }
     catch { return null; }
   }, [birth && birth.date, birth && birth.time]);
+  const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
   // 今週（今日から7日）の攻めの日 → 発信・営業を寄せる狙い目として提示
   const weekAttack = useMemo(() => {
     if (!(birth && birth.date)) return [];
@@ -1405,9 +1406,10 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
     if (!mode) return null;
     const s = t.stance || (sc >= 4 ? "攻め" : sc > 0 && sc <= 2 ? "守り" : "整える");
     if (s === "攻め") {
-      if (outstanding > 0) return `攻めどき。未処理の¥${outstanding.toLocaleString("ja-JP")}を回収して、売上を取りにいきましょう。`;
-      if (next) return `攻めどき。発信・営業は今日の前半に。まず「${next.time} ${next.title}」へ集中を。`;
-      return "攻めどき。発信・営業・締切の前倒しを今日の前半に寄せましょう。";
+      const tip = sm && sm.attack ? ` ${sm.emoji}${sm.attack}` : "";
+      if (outstanding > 0) return `攻めどき。未処理の¥${outstanding.toLocaleString("ja-JP")}を回収して、売上を取りにいきましょう。${tip}`;
+      if (next) return `攻めどき。まず「${next.time} ${next.title}」に集中を。${tip}`;
+      return `攻めどき。発信・営業を今日の前半に寄せましょう。${tip}`;
     }
     if (s === "守り") {
       if (late + soon > 0) return `守りの日。まず${late ? `遅れ${late}件` : ""}${late && soon ? "・" : ""}${soon ? `もうすぐ${soon}件` : ""}の抜け漏れを片付けて、足場を固めましょう。`;
@@ -1484,6 +1486,7 @@ const STANCE_UI = {
 function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
+  const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
   const base = new Date();
   const view = new Date(base.getFullYear(), base.getMonth() + offset, 1);
   const yy = view.getFullYear(), mm = view.getMonth();
@@ -1564,6 +1567,7 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
               <button onClick={() => setSel(null)} style={iconBtn} title="閉じる">✕</button>
             </div>
             {st && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 6 }}>{st.focus}</div>}
+            {st && st.stance === "攻め" && sm && sm.attack && <div style={{ fontSize: 12, color: C.green, lineHeight: 1.6, marginTop: 4 }}>{sm.emoji}あなたは{sm.star}。{sm.attack}</div>}
             {marks[sel] && (
               <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>📌 この日の予定：{marks[sel].join(" / ")}</div>
             )}
@@ -1587,7 +1591,7 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
         <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 4 }}>🟢 {isCurrent ? "この先の" : "今月の"}狙い目（攻めの日）</div>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{attackDays.map((d) => `${mm + 1}/${d}`).join("・")}</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・ローンチの開始日をここに寄せると伸びやすい流れです。</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・ローンチの開始日をここに寄せると伸びやすい流れです。{sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}</div>
         </div>
       )}
       {/* 守りの日に重なった締切の警告 */}
