@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -1375,6 +1375,13 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
     try { return birth && birth.date ? dayEnergy(birth, iso(new Date())) : null; }
     catch { return null; }
   }, [birth && birth.date, birth && birth.time]);
+  // 今週（今日から7日）の攻めの日 → 発信・営業を寄せる狙い目として提示
+  const weekAttack = useMemo(() => {
+    if (!(birth && birth.date)) return [];
+    const days = Array.from({ length: 7 }, (_, i) => iso(addDays(new Date(), i)));
+    const s = stancesFor(birth, days);
+    return days.filter((d) => s[d] && s[d].stance === "攻め");
+  }, [birth && birth.date, birth && birth.time]);
   const af = (fortune && fortune.today) || {};
   const et = (energy && energy.today) || {};
   const t = { ...af, ...et }; // 決定論の値(stance/score/focus)を優先しつつ、AIのtheme/action等を温存
@@ -1453,6 +1460,9 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}><b style={{ color: mode.color }}>今日の一手</b>　{advice}</span>
         </button>
       )}
+      {!hideFortune && weekAttack.length > 0 && (
+        <Row icon="🟢" color={C.green} label={`今週の攻めの日 ${weekAttack.map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`).join("・")}（発信・営業を寄せて）`} onClick={() => onTab("fortune")} />
+      )}
       {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
       {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab("home")} />}
@@ -1471,8 +1481,9 @@ const STANCE_UI = {
   整える: { color: C.accent, mark: "整", tip: "淡々と整える日" },
   守り: { color: C.red, mark: "守", tip: "守りを固める・背伸びしない" },
 };
-function BizCalendar({ birth, trips, deadlines, launches }) {
+function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
+  const [sel, setSel] = useState(null); // 選択中の日(ISO)
   const base = new Date();
   const view = new Date(base.getFullYear(), base.getMonth() + offset, 1);
   const yy = view.getFullYear(), mm = view.getMonth();
@@ -1528,15 +1539,40 @@ function BizCalendar({ birth, trips, deadlines, launches }) {
           const ui = st ? STANCE_UI[st.stance] : null;
           const isToday = isCurrent && d === todayD;
           const hasMark = !!marks[k];
+          const isSel = sel === k;
           return (
-            <div key={k} title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
-              style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: ui ? ui.color + "22" : C.panel2, border: isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center" }}>
+            <button key={k} onClick={() => setSel(isSel ? null : k)}
+              title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
+              style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: ui ? ui.color + (isSel ? "44" : "22") : C.panel2, border: isSel ? `2px solid ${C.purple}` : isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, font: "inherit" }}>
               <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: ui ? ui.color : C.sub }}>{d}</span>
               {hasMark && <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: C.purple }} />}
-            </div>
+            </button>
           );
         })}
       </div>
+      {/* 選択した日の詳細 */}
+      {sel && (() => {
+        const st = stances[sel];
+        const ui = st ? STANCE_UI[st.stance] : null;
+        const md = Number(sel.slice(5, 7)), dd = Number(sel.slice(8, 10));
+        return (
+          <div style={{ background: C.panel2, border: `1px solid ${ui ? ui.color : C.line}`, borderRadius: 10, padding: "12px 14px", marginTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong style={{ fontSize: 14 }}>{md}/{dd}</strong>
+              {ui && <span style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: ui.color, borderRadius: 999, padding: "1px 10px" }}>{st.stance}の日</span>}
+              <span style={{ flex: 1 }} />
+              <button onClick={() => setSel(null)} style={iconBtn} title="閉じる">✕</button>
+            </div>
+            {st && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 6 }}>{st.focus}</div>}
+            {marks[sel] && (
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>📌 この日の予定：{marks[sel].join(" / ")}</div>
+            )}
+            {onPlan && (
+              <button onClick={() => { onPlan(sel); setSel(null); }} style={{ ...chipBtn, marginTop: 10, background: C.green, color: "#0B0D11", borderColor: C.green }}>＋この日に発信を入れる</button>
+            )}
+          </div>
+        );
+      })()}
       {/* 凡例 */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, fontSize: 11, color: C.sub }}>
         {Object.entries(STANCE_UI).map(([k, v]) => (
@@ -1603,6 +1639,18 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
       {birth && birth.date && !fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
+
+      {birth && birth.date && (() => {
+        const sm = sanmei(birth);
+        return sm ? (
+          <div style={{ background: C.purple + "12", border: `1px solid ${C.purple}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: C.purple, fontWeight: 700, marginBottom: 4 }}>あなたの経営キャラ（算命学・中心星）</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{sm.emoji} {sm.star}・{sm.title}</div>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 4 }}>{sm.desc}</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>💡 {sm.biz}</div>
+          </div>
+        ) : null;
+      })()}
 
       {birth && birth.date && (
         <>
@@ -2978,7 +3026,7 @@ export default function App() {
         )}
 
         {activeTab === "fortune" && (
-          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} />
+          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} onPlan={(d) => addDeadline({ title: "発信・告知", stage: "告知", date: d })} />
         )}
 
         {activeTab === "fortune" && (

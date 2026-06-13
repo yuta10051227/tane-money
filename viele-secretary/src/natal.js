@@ -181,3 +181,51 @@ export function stancesFor(birth, dateISOs) {
   return out;
 }
 
+/* ──────────────────────────────────────────────────────────────
+   算命学：十大主星（中心星）＝ あなたの「経営キャラ」
+   日干 × 月支の蔵干(本気) の通変星から、決定論的に1つの星を算出。
+   占いというより気質の型。遊び心＋自己理解で「毎日開きたくなる」を補強。
+   ────────────────────────────────────────────────────────────── */
+const HIDDEN = { 子: "癸", 丑: "己", 寅: "甲", 卯: "乙", 辰: "戊", 巳: "丙", 午: "丁", 未: "己", 申: "庚", 酉: "辛", 戌: "戊", 亥: "壬" };
+// 通変星 → 算命学・十大主星
+const TEN_GOD_TO_STAR = {
+  比肩: "貫索星", 劫財: "石門星", 食神: "鳳閣星", 傷官: "調舒星", 偏財: "禄存星",
+  正財: "司禄星", 偏官: "車騎星", 正官: "牽牛星", 偏印: "龍高星", 印綬: "玉堂星",
+};
+// 日干(me) と 対象干(other) の通変星を判定
+function tenGod(meStem, otherStem) {
+  const me = FIVE[meStem], ot = FIVE[otherStem];
+  const sameYin = (G.indexOf(meStem) % 2) === (G.indexOf(otherStem) % 2); // 陰陽が同じか
+  if (me === ot) return sameYin ? "比肩" : "劫財";
+  if (GEN[me] === ot) return sameYin ? "食神" : "傷官";   // 我 生 彼
+  if (CTRL[me] === ot) return sameYin ? "偏財" : "正財";  // 我 剋 彼
+  if (CTRL[ot] === me) return sameYin ? "偏官" : "正官";  // 彼 剋 我
+  if (GEN[ot] === me) return sameYin ? "偏印" : "印綬";   // 彼 生 我
+  return "比肩";
+}
+const STAR_DESC = {
+  貫索星: { emoji: "🌳", title: "独立独歩タイプ", desc: "マイペースに一つを貫く人。ブレない軸が最大の強み。", biz: "流行を追うより『自分のやり方をコツコツ続ける』ことで信頼と実績が積み上がります。" },
+  石門星: { emoji: "🤝", title: "輪を広げるタイプ", desc: "人を巻き込み輪を作る社交家。仲間づくりが得意。", biz: "一人で抱えるより、コラボ・コミュニティ・チームで動くと一気に伸びます。" },
+  鳳閣星: { emoji: "🍀", title: "楽しむ表現タイプ", desc: "自然体で楽しみながら表現する人。場を和ませる発信が映える。", biz: "肩肘張らない発信や体験提供が武器。『楽しさ』をそのまま商品にできます。" },
+  調舒星: { emoji: "🎨", title: "こだわり職人タイプ", desc: "繊細で美意識が高い表現者。独自の世界観で深く刺さる。", biz: "量より質。世界観・作品性を磨いて『あなただから』の指名を取りにいきましょう。" },
+  禄存星: { emoji: "💝", title: "奉仕・愛情タイプ", desc: "面倒見がよく与える人。サービス精神で人とお金を引き寄せる。", biz: "手厚いホスピタリティが収益に直結。『尽くす』があなたの集客力です。" },
+  司禄星: { emoji: "🏦", title: "堅実・蓄積タイプ", desc: "地道に積み上げ管理する堅実家。継続・ストック化が得意。", biz: "サブスク・会員制・リピートなど『積み上がる売上』と好相性です。" },
+  車騎星: { emoji: "⚡", title: "行動・突破タイプ", desc: "スピードと行動力で前進する人。動いて道を開く実行派。", biz: "考える前にまず動く。スピード勝負・先陣・営業の現場で力を発揮します。" },
+  牽牛星: { emoji: "🎖️", title: "信頼・実務タイプ", desc: "真面目で責任感が強く、信用を大事にする人。", biz: "きっちりした実務とブランド・権威性で『安心して任せられる』を売りに。" },
+  龍高星: { emoji: "🐉", title: "冒険・革新タイプ", desc: "好奇心旺盛で型破り。新しい挑戦・改造・海外に縁。", biz: "新規開拓や既存のやり方の刷新で輝く。実験を恐れず仕掛けていきましょう。" },
+  玉堂星: { emoji: "📚", title: "知性・教育タイプ", desc: "学びと伝えるのが得意な理論派。教えること全般と好相性。", biz: "講座・体系化したコンテンツ・教える仕事で価値が最大化します。" },
+};
+// あなたの経営キャラ（算命学・中心星）を返す。出生情報が無ければ null。
+export function sanmei(birth) {
+  if (!birth || !birth.date) return null;
+  try {
+    const c = computeChart(birth);
+    const me = c.dayMaster;
+    const monthBranch = String(c.monthPillar).slice(-1);
+    const hidden = HIDDEN[monthBranch] || me;
+    const god = tenGod(me, hidden);
+    const star = TEN_GOD_TO_STAR[god] || "貫索星";
+    return { star, god, ...STAR_DESC[star] };
+  } catch { return null; }
+}
+
