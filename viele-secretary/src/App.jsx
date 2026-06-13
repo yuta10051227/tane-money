@@ -43,8 +43,8 @@ const C = {
   panel2: "#1E222B",
   line: "#2A2F3A",
   text: "#E8EAED",
-  sub: "#A7AEB8",
-  faint: "#8C95A2",
+  sub: "#C5CBD3",
+  faint: "#AAB2BD",
   accent: "#C9A227", // gold
   green: "#3FB984",
   orange: "#E8A13E",
@@ -1547,7 +1547,10 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
             <button key={k} onClick={() => setSel(isSel ? null : k)}
               title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
               style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: ui ? ui.color + (isSel ? "44" : "22") : C.panel2, border: isSel ? `2px solid ${C.purple}` : isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, font: "inherit" }}>
-              <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: ui ? ui.color : C.sub }}>{d}</span>
+              <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.05 }}>
+                <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: ui ? ui.color : C.sub }}>{d}</span>
+                {ui && <span style={{ fontSize: 12, fontWeight: 700, color: ui.color }}>{ui.mark}</span>}
+              </span>
               {hasMark && <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: C.purple }} />}
             </button>
           );
@@ -1581,7 +1584,7 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, fontSize: 11, color: C.sub }}>
         {Object.entries(STANCE_UI).map(([k, v]) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: v.color + "55", border: `1px solid ${v.color}` }} />{k}
+            <span style={{ width: 16, height: 16, borderRadius: 4, background: v.color + "33", border: `1px solid ${v.color}`, color: v.color, fontSize: 11, fontWeight: 700, display: "grid", placeItems: "center" }}>{v.mark}</span>{k}
           </span>
         ))}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定あり</span>
@@ -2268,7 +2271,8 @@ function ErrorScreen({ error, onSignOut }) {
 export default function App() {
   const [user, setUser] = useState(firebaseEnabled ? undefined : null); // undefined=判定中 / null=未ログイン
   const [authError, setAuthError] = useState(null);
-  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("viele-fontscale")) || 1);
+  // 初期値は「大」(1.15)。ITが苦手な層でも初見で読めるように。標準を選べば localStorage に保存され維持される。
+  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("viele-fontscale")) || 1.15);
   const cycleFont = () => {
     const next = fontScale >= 1.3 ? 1 : fontScale === 1 ? 1.15 : 1.3;
     setFontScale(next);
@@ -2918,6 +2922,35 @@ export default function App() {
                   </div>
                 </div>
               )}
+              {/* はじめの3ステップ（セットアップが終わるまで案内。「どこから始めるか」の地図） */}
+              {(data.sampleNotice || !data.birth) && !data.onboardDismissed && (() => {
+                const steps = [
+                  { n: 1, label: "自分のデータにする", hint: "上の「サンプルを全部消す」or「これは自分のデータ」を押す", done: !data.sampleNotice },
+                  { n: 2, label: "生年月日を登録する", hint: "「今日の一手」と経営カレンダーが動き出します", done: !!data.birth, action: () => setTab("fortune"), btn: "運気タブへ" },
+                  { n: 3, label: "Googleカレンダーを連携（任意）", hint: "予定が自動で取り込まれ、逆算の手配も自動生成", done: usingCal, action: connectCalendar, btn: "連携する" },
+                ];
+                return (
+                  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>はじめの3ステップ</div>
+                      <span style={{ flex: 1 }} />
+                      <button onClick={() => update({ onboardDismissed: true })} style={{ ...iconBtn, fontSize: 12, width: "auto", padding: "4px 8px", color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8 }}>閉じる</button>
+                    </div>
+                    {steps.map((s) => (
+                      <div key={s.n} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: s.n === 1 ? "none" : `1px solid ${C.line}` }}>
+                        <span style={{ width: 26, height: 26, flex: "0 0 auto", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700, background: s.done ? C.green : C.panel2, color: s.done ? "#0B0D11" : C.sub, border: `1px solid ${s.done ? C.green : C.line}` }}>{s.done ? "✓" : s.n}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: s.done ? C.sub : C.text, textDecoration: s.done ? "line-through" : "none" }}>{s.label}</div>
+                          <div style={{ fontSize: 12, color: C.faint, lineHeight: 1.4 }}>{s.hint}</div>
+                        </div>
+                        {!s.done && s.action && (
+                          <button onClick={s.action} style={{ flex: "0 0 auto", height: 40, padding: "0 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accent, color: "#0B0D11", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{s.btn}</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
