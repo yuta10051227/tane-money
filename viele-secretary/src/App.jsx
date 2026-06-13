@@ -511,11 +511,17 @@ function tripStanceHint(rel, dleft) {
 }
 
 function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem }) {
-  // 各予定の本番日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
-  const stances = useMemo(
-    () => (birth && birth.date ? stancesFor(birth, (trips || []).map((t) => t.date)) : {}),
-    [birth && birth.date, birth && birth.time, (trips || []).map((t) => t.date).join(",")]
-  );
+  // 各予定の本番日＋各手配の締切日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
+  const stances = useMemo(() => {
+    if (!(birth && birth.date)) return {};
+    const dates = [];
+    for (const t of trips || []) {
+      if (!t.date) continue;
+      dates.push(t.date);
+      for (const it of t.items || []) dates.push(iso(addDays(new Date(t.date), -(it.daysBefore || 0))));
+    }
+    return stancesFor(birth, dates);
+  }, [birth && birth.date, birth && birth.time, JSON.stringify((trips || []).map((t) => [t.date, (t.items || []).map((i) => i.daysBefore)]))]);
   const [editTripId, setEditTripId] = useState(null);
   const [te, setTe] = useState({ title: "", date: "" });
   const [editItem, setEditItem] = useState(null); // { tripId, idx }
@@ -598,6 +604,9 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                           {!item.done && <span style={{ fontSize: 12, color: C.sub }}>締切 {fmt(sig.deadlineISO)}</span>}
                           <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                         </div>
+                        {!item.done && stances[sig.deadlineISO] && stances[sig.deadlineISO].stance === "守り" && (
+                          <div style={{ fontSize: 11, color: C.red, marginTop: 2 }}>🧭 締切が守りの日。1日前倒すと楽です</div>
+                        )}
                       </div>
                     </div>
                   );
@@ -697,9 +706,22 @@ function DraftPanel({ context }) {
   );
 }
 
-function DeadlineBoard({ deadlines, linked, onAdd, onAddBulk, onEdit, onRemove }) {
+// 締切日のコンディション(占術)から、告知トーンの一言を作る（攻め/守りの日のみ）
+function deadlineStanceHint(rel) {
+  if (!rel) return null;
+  if (rel.stance === "攻め") return { color: C.green, text: "攻めの日。締切前の追い込み配信を強めに。" };
+  if (rel.stance === "守り") return { color: C.red, text: "守りの日。煽りすぎず、案内は丁寧に。" };
+  return null;
+}
+
+function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onRemove }) {
   // 手動の締切＋売上タブのローンチ締切(linked)を時系列に統合表示
   const sorted = [...(deadlines || []), ...(linked || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+  // 各締切日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
+  const stances = useMemo(
+    () => (birth && birth.date ? stancesFor(birth, sorted.map((d) => d.date)) : {}),
+    [birth && birth.date, birth && birth.time, sorted.map((d) => d.date).join(",")]
+  );
   const [mode, setMode] = useState(null); // null | "single" | "template"
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
@@ -782,6 +804,7 @@ function DeadlineBoard({ deadlines, linked, onAdd, onAddBulk, onEdit, onRemove }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15 }}>{d.linked ? "📣 " : ""}{d.title}</div>
                   <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
+                  {(() => { const h = deadlineStanceHint(stances[d.date]); return h ? <div style={{ fontSize: 11, color: h.color, marginTop: 2 }}>🧭 {h.text}</div> : null; })()}
                 </div>
                 <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                 <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
@@ -2788,7 +2811,7 @@ export default function App() {
               onEditItem={editTripItem}
               onRemoveItem={removeTripItem}
             />
-            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} birth={data.birth} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
             <CheckList
               title="コンテンツ制作サイクル"
               accent={C.blue}
