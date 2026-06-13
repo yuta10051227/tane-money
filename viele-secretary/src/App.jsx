@@ -1321,8 +1321,16 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
 }
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews }) {
-  const t = (fortune && fortune.today) || {};
+function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews }) {
+  // 占術コンディションは決定論(dayEnergy)で常に算出 → AIが無くても「今日のスタンス」が出る。
+  // AIの鑑定文(fortune.today)は付加情報として併用する。
+  const energy = useMemo(() => {
+    try { return birth && birth.date ? dayEnergy(birth, iso(new Date())) : null; }
+    catch { return null; }
+  }, [birth && birth.date, birth && birth.time]);
+  const af = (fortune && fortune.today) || {};
+  const et = (energy && energy.today) || {};
+  const t = { ...af, ...et }; // 決定論の値(stance/score/focus)を優先しつつ、AIのtheme/action等を温存
   const h = new Date().getHours();
   const greet = h < 5 ? "おつかれさま" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
   const next = (today || [])[0];
@@ -1338,6 +1346,22 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, r
       : sc > 0 && sc <= 2 ? { label: "守りの日", color: C.red, tip: t.caution || t.action }
         : sc ? { label: "整える日", color: C.accent, tip: t.action } : null;
   const rem = Number(remaining) || 0;
+  // 占術コンディション × あなたの実データ → 今日の具体的な「一手」（決定論・AI不使用）
+  const advice = (() => {
+    if (!mode) return null;
+    const s = t.stance || (sc >= 4 ? "攻め" : sc > 0 && sc <= 2 ? "守り" : "整える");
+    if (s === "攻め") {
+      if (outstanding > 0) return `攻めどき。未処理の¥${outstanding.toLocaleString("ja-JP")}を回収して、売上を取りにいきましょう。`;
+      if (next) return `攻めどき。発信・営業は今日の前半に。まず「${next.time} ${next.title}」へ集中を。`;
+      return "攻めどき。発信・営業・締切の前倒しを今日の前半に寄せましょう。";
+    }
+    if (s === "守り") {
+      if (late + soon > 0) return `守りの日。まず${late ? `遅れ${late}件` : ""}${late && soon ? "・" : ""}${soon ? `もうすぐ${soon}件` : ""}の抜け漏れを片付けて、足場を固めましょう。`;
+      return "守りの日。新規を広げるより、既存の見直しと準備の整理を。";
+    }
+    if (s === "労い") return "労いの日。詰め込みすぎず、休む時間も今日の予定に入れましょう。";
+    return "整える日。今日の予定を淡々と。無理に広げないのが吉。";
+  })();
   const Row = ({ icon, label, color, onClick }) => (
     <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "10px 0", cursor: "pointer", color: C.text, font: "inherit" }}>
       <span style={{ flex: "0 0 auto", fontSize: 16 }}>{icon}</span>
@@ -1375,6 +1399,12 @@ function BriefingCard({ fortune, today, late, soon, outstanding, brief, onTab, r
           <span style={{ flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#0B0D11", background: mode.color, borderRadius: 999, padding: "2px 10px" }}>今日は{mode.label}</span>
           {mode.tip && <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.sub, lineHeight: 1.4 }}>{mode.tip}</span>}
         </div>
+      )}
+      {advice && (
+        <button onClick={() => onTab("fortune")} style={{ display: "flex", gap: 8, alignItems: "flex-start", width: "100%", textAlign: "left", background: C.panel2, border: "none", borderRadius: 10, padding: "9px 11px", margin: "2px 0 8px", cursor: "pointer", color: C.text, font: "inherit" }}>
+          <span style={{ flex: "0 0 auto", fontSize: 15 }}>🧭</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}><b style={{ color: mode.color }}>今日の一手</b>　{advice}</span>
+        </button>
       )}
       {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
@@ -2673,7 +2703,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <BriefingCard fortune={data.fortune} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
+              <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
