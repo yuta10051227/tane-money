@@ -2439,7 +2439,17 @@ export default function App() {
       try {
         const r = await authedFetch("/api/gcal-events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh }) });
         const text = await r.text();
-        let j; try { j = JSON.parse(text); } catch { console.error("[VIELE] gcal-events parse error", r.status, text.slice(0, 200)); throw new Error("カレンダーの取得に失敗しました。しばらくしてから『更新』を押してください。"); }
+        let j;
+        try { j = JSON.parse(text); }
+        catch {
+          console.error("[VIELE] gcal-events parse error", r.status, text.slice(0, 200));
+          const hint = (r.status === 401 || r.status === 403 || /authenticat|sign in|log ?in|vercel/i.test(text))
+            ? "（サイトのアクセス保護がAPIを塞いでいる可能性。Vercelの Deployment Protection を確認）"
+            : (r.status >= 500 || r.status === 504)
+              ? "（サーバー側のタイムアウト／一時エラーの可能性。少し待って再度）"
+              : "";
+          throw new Error(`カレンダー取得に失敗（${r.status}）${hint}`);
+        }
         if (cancelled) return;
         if (j.error) {
           // 連携が切れている場合は保存済みトークンを破棄して再連携を促す

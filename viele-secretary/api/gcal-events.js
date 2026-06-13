@@ -2,6 +2,10 @@
 // これにより「一度連携すれば維持され続ける」（トークン失効しても自動再発行）。
 import { requireUser } from "./_auth.js";
 
+// 全カレンダー分のイベントをまとめて取得するため、既定(10秒)では足りずタイムアウト(504/非JSON)に
+// なることがある。Vercelの関数最大実行時間を延ばして「カレンダー取得に失敗」を防ぐ。
+export const maxDuration = 60;
+
 const CLIENT_ID = "752964285770-94aqtjgb7v33g854l7osvndvgh26jc70.apps.googleusercontent.com";
 
 async function accessFromRefresh(refresh) {
