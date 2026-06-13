@@ -1462,6 +1462,112 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
   );
 }
 
+/* 経営カレンダー：その月の各日の「気」を決定論(占術)で色分けし、
+   仕事タブの予定（本番日・締切・ローンチ締切）を重ねて「攻めの日に寄っているか」を可視化。
+   → 発信・ローンチを攻めの日に寄せ、守りの日に重なった締切は前後へずらす提案を出す。 */
+const STANCE_UI = {
+  攻め: { color: C.green, mark: "攻", tip: "発信・営業・ローンチ向き" },
+  労い: { color: C.blue, mark: "労", tip: "人に支えられる・受け取る日" },
+  整える: { color: C.accent, mark: "整", tip: "淡々と整える日" },
+  守り: { color: C.red, mark: "守", tip: "守りを固める・背伸びしない" },
+};
+function BizCalendar({ birth, trips, deadlines, launches }) {
+  const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
+  const base = new Date();
+  const view = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+  const yy = view.getFullYear(), mm = view.getMonth();
+  const dim = new Date(yy, mm + 1, 0).getDate();
+  const firstW = new Date(yy, mm, 1).getDay(); // 0=日..6=土
+  const isCurrent = offset === 0;
+  const todayD = base.getDate();
+  const dateList = useMemo(() => Array.from({ length: dim }, (_, i) => `${yy}-${pad2(mm + 1)}-${pad2(i + 1)}`), [yy, mm, dim]);
+  const stances = useMemo(() => (birth && birth.date ? stancesFor(birth, dateList) : {}), [birth && birth.date, birth && birth.time, dateList.join(",")]);
+  const marks = useMemo(() => {
+    const m = {};
+    const add = (d, label) => { if (!d) return; const k = String(d).slice(0, 10); (m[k] = m[k] || []).push(label); };
+    for (const t of trips || []) add(t.date, t.title);
+    for (const d of deadlines || []) add(d.date, d.title);
+    for (const L of launches || []) { add(L.deadlineReg, `${L.name} 先行締切`); add(L.deadlineCv, `${L.name} 本申込締切`); }
+    return m;
+  }, [trips, deadlines, launches]);
+
+  if (!birth || !birth.date) return null; // 出生情報が無いときは出さない（FortunePanel側で入力導線を出す）
+
+  const inMonth = (k) => k.startsWith(`${yy}-${pad2(mm + 1)}-`);
+  const attackDays = dateList.filter((d) => stances[d] && stances[d].stance === "攻め").map((d) => Number(d.slice(8, 10))).filter((dn) => !isCurrent || dn >= todayD);
+  const misaligned = Object.keys(marks).filter((k) => inMonth(k) && stances[k] && stances[k].stance === "守り");
+  const cells = [];
+  for (let i = 0; i < firstW; i++) cells.push(null);
+  for (let d = 1; d <= dim; d++) cells.push(d);
+
+  return (
+    <Panel
+      title="経営カレンダー"
+      accent={C.green}
+      help="あなたの命式から、その月の各日の『気（攻め/守り/整える/労い）』を計算して色分けします。占いではなくコンディションの傾向です。攻めの日に発信・ローンチを寄せ、守りの日に重なった締切は前後にずらすと進めやすくなります。仕事タブの本番日・締切も●印で重ねて表示します。"
+      right={
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button onClick={() => setOffset((o) => o - 1)} style={iconBtn} title="前の月">‹</button>
+          <span style={{ fontSize: 13, color: C.sub, minWidth: 60, textAlign: "center" }}>{yy}/{mm + 1}</span>
+          <button onClick={() => setOffset((o) => o + 1)} style={iconBtn} title="次の月">›</button>
+        </div>
+      }
+    >
+      {/* 曜日見出し */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
+        {["日", "月", "火", "水", "木", "金", "土"].map((w, i) => (
+          <div key={w} style={{ textAlign: "center", fontSize: 11, color: i === 0 ? C.red : i === 6 ? C.blue : C.sub }}>{w}</div>
+        ))}
+      </div>
+      {/* 日セル */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+        {cells.map((d, i) => {
+          if (d == null) return <div key={`b${i}`} />;
+          const k = `${yy}-${pad2(mm + 1)}-${pad2(d)}`;
+          const st = stances[k];
+          const ui = st ? STANCE_UI[st.stance] : null;
+          const isToday = isCurrent && d === todayD;
+          const hasMark = !!marks[k];
+          return (
+            <div key={k} title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
+              style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: ui ? ui.color + "22" : C.panel2, border: isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: ui ? ui.color : C.sub }}>{d}</span>
+              {hasMark && <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: C.purple }} />}
+            </div>
+          );
+        })}
+      </div>
+      {/* 凡例 */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, fontSize: 11, color: C.sub }}>
+        {Object.entries(STANCE_UI).map(([k, v]) => (
+          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: v.color + "55", border: `1px solid ${v.color}` }} />{k}
+          </span>
+        ))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定あり</span>
+      </div>
+      {/* 狙い目（攻めの日） */}
+      {attackDays.length > 0 && (
+        <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 4 }}>🟢 {isCurrent ? "この先の" : "今月の"}狙い目（攻めの日）</div>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{attackDays.map((d) => `${mm + 1}/${d}`).join("・")}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・ローンチの開始日をここに寄せると伸びやすい流れです。</div>
+        </div>
+      )}
+      {/* 守りの日に重なった締切の警告 */}
+      {misaligned.length > 0 && (
+        <div style={{ background: C.red + "12", border: `1px solid ${C.red}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.red, marginBottom: 4 }}>🔴 守りの日に重なっている予定</div>
+          {misaligned.map((k) => (
+            <div key={k} style={{ fontSize: 12, color: C.text, lineHeight: 1.6 }}>{Number(k.slice(5, 7))}/{Number(k.slice(8, 10))}：{marks[k].join(" / ")}</div>
+          ))}
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>無理に攻めず丁寧に。可能なら前後の攻めの日へずらすと進めやすくなります。</div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth }) {
   const f = fortune || {};
   const t = f.today || {};
@@ -2869,6 +2975,10 @@ export default function App() {
             selectedCats={newsCats}
             onToggleCat={toggleNewsCat}
           />
+        )}
+
+        {activeTab === "fortune" && (
+          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} />
         )}
 
         {activeTab === "fortune" && (
