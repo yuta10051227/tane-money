@@ -2014,6 +2014,9 @@ export default function App() {
   const [calWriteMsg, setCalWriteMsg] = useState(null);
   const [tab, setTab] = useState("home"); // トップのタブ（キー: home/work/money/tasks/news/fortune）
   const tabTouch = useRef(null);
+  // どのタブが見られているか（匿名）。次に磨く場所をデータで決めるための主要指標。
+  // ※フックは早期return（読み込み中/未ログイン/waitlist）より前に置くこと（順序が変わるとReactがクラッシュする）
+  useEffect(() => { track("tab_viewed", { tab }); }, [tab]);
 
   // トークンが取れたら今週〜約2ヶ月分を取得
   useEffect(() => {
@@ -2552,8 +2555,6 @@ export default function App() {
   ];
   const TABS = ALL_TABS.filter((t) => !hiddenTabs[t.key]);
   const activeTab = TABS.some((t) => t.key === tab) ? tab : "home"; // 非表示タブ選択中はホームへ寄せる
-  // どのタブが見られているか（匿名）。次に磨く場所をデータで決めるための主要指標
-  useEffect(() => { track("tab_viewed", { tab: activeTab }); }, [activeTab]);
   const onTouchStart = (ev) => {
     if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
     const t = ev.touches[0];
