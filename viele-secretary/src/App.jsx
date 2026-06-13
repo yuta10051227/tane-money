@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy } from "./natal";
+import { computeChart, dayEnergy, stancesFor } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -500,7 +500,22 @@ function Check({ done, onClick }) {
 /* ──────────────────────────────────────────────────────────────
    逆算チェーン（出張・遠征）
    ────────────────────────────────────────────────────────────── */
-function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem }) {
+// 本番日のコンディション(占術)から、逆算チェーン全体への一言ガイドを作る（決定論・AI不使用）
+function tripStanceHint(rel, dleft) {
+  if (!rel) return null;
+  const s = rel.stance;
+  if (s === "攻め") return { color: C.green, text: dleft < 0 ? "本番は攻めの日。仕上げ・追い込みが伸びる流れ。" : "本番は攻めの日。当日に営業・追い込みを置くと伸びやすい。" };
+  if (s === "守り") return { color: C.red, text: "本番は守りの日。準備は前倒しで、当日は欲張らず守りの段取りに。" };
+  if (s === "労い") return { color: C.blue, text: "本番は労いの日。人や場に支えられる。受け取る姿勢で臨もう。" };
+  return { color: C.accent, text: "本番は整える日。淡々と予定通りに進めるのが吉。" };
+}
+
+function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem }) {
+  // 各予定の本番日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
+  const stances = useMemo(
+    () => (birth && birth.date ? stancesFor(birth, (trips || []).map((t) => t.date)) : {}),
+    [birth && birth.date, birth && birth.time, (trips || []).map((t) => t.date).join(",")]
+  );
   const [editTripId, setEditTripId] = useState(null);
   const [te, setTe] = useState({ title: "", date: "" });
   const [editItem, setEditItem] = useState(null); // { tripId, idx }
@@ -542,9 +557,18 @@ function TripChain({ trips, onToggle, onAdd, onRemove, onEditTrip, onAddItem, on
                   <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
                 </div>
               )}
-              <div style={{ fontSize: 12, color: dleft < 0 ? C.red : C.accent, margin: "4px 0 10px" }}>
+              <div style={{ fontSize: 12, color: dleft < 0 ? C.red : C.accent, margin: "4px 0 8px" }}>
                 {dleft < 0 ? `本番から${-dleft}日経過` : `本番まであと ${dleft}日`} ・ 手配 {doneCount}/{trip.items.length}
               </div>
+              {(() => {
+                const hint = tripStanceHint(stances[trip.date], dleft);
+                return hint ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "flex-start", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 9px", marginBottom: 10 }}>
+                    <span style={{ flex: "0 0 auto", fontSize: 13 }}>🧭</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.45, color: hint.color, fontWeight: 600 }}>{hint.text}</span>
+                  </div>
+                ) : null;
+              })()}
               <div style={{ display: "grid", gap: 6 }}>
                 {trip.items.map((item, idx) => {
                   const sig = itemSignal(item, trip.date);
@@ -2755,6 +2779,7 @@ export default function App() {
           <>
             <TripChain
               trips={data.trips}
+              birth={data.birth}
               onToggle={toggleTripItem}
               onAdd={addTrip}
               onRemove={removeTrip}
