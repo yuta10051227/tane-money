@@ -736,9 +736,9 @@ function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onR
 
   return (
     <Panel
-      title="締切からの逆算（二段ローンチ）"
+      title="締切からの逆算（準備の段取り）"
       accent={C.purple}
-      help="販売や募集の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。売上タブで登録したローンチの『先行登録/本申込 締切』(📣)も、ここに自動で並びます（編集は売上タブ側）。"
+      help="セミナーや出張、講座の販売（ローンチ）など本番の日が決まっている予定について、準備の節目（締切）を時系列に並べ、残り日数を信号で表示します。「型で一括作成」を使うと、本申込日などの基準日を1つ入れるだけで、予告・先行登録・リマインド・締切までを逆算してまとめて作れます。売上タブで登録したローンチの『先行登録/本申込 締切』(📣)も、ここに自動で並びます（編集は売上タブ側）。"
       right={
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => setMode(mode === "template" ? null : "template")} style={chipBtn}>型で一括</button>
@@ -1247,10 +1247,10 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
             ))}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前(任意)" style={{ ...inp, marginBottom: 0, width: 110 }} />
-              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="RSSのURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="ニュース配信先(RSS)のURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
               <button onClick={() => { if (!url.trim()) return; onAddFeed({ name: name.trim(), url: url.trim() }); setName(""); setUrl(""); }} style={chipBtn}>追加</button>
             </div>
-            <div style={{ fontSize: 11, color: C.sub }}>例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
+            <div style={{ fontSize: 11, color: C.sub }}>RSS＝ニュースの自動受信先のこと。例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
           </div>
         )}
       </div>
@@ -1594,7 +1594,7 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
         <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 4 }}>🟢 {isCurrent ? "この先の" : "今月の"}狙い目（攻めの日）</div>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{attackDays.map((d) => `${mm + 1}/${d}`).join("・")}</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・ローンチの開始日をここに寄せると伸びやすい流れです。{sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・新講座の販売開始日をここに寄せると伸びやすい流れです。{sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}</div>
         </div>
       )}
       {/* 守りの日に重なった締切の警告 */}
@@ -1949,9 +1949,9 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
 
   return (
     <Panel
-      title="ローンチ進捗（先行登録→申込→売上）"
+      title="新講座の販売 進捗（先行登録→申込→売上）"
       accent={C.accent}
-      help="ローンチ（新しい講座・商品の募集や販売）ごとに『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✎からいつでも更新できます。"
+      help="「ローンチ」とは新しい講座・商品の期間限定の募集や販売のこと。それ『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✎からいつでも更新できます。"
       right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
     >
       {mode === "new" && (
@@ -1964,7 +1964,7 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
           >追加</button>
         </div>
       )}
-      {list.length === 0 && <Empty>ローンチがありません。右上の「＋ローンチ」から、先行登録の目標人数・客単価・売上目標を入れると進捗ファネルが出ます。</Empty>}
+      {list.length === 0 && <Empty>まだ登録がありません。新しい講座・商品の販売（ローンチ）を始めるとき、右上の「＋ローンチ」から目標人数・客単価・売上目標を入れると、登録→申込→売上の進み具合がグラフで見えます。</Empty>}
       {list.map((L) =>
         editId === L.id ? (
           <div key={L.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
