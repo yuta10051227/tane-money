@@ -1206,7 +1206,7 @@ function GachaAnim({ result, onClose }) {
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
-  const HOLD = 880, HUSH = 680;          // 段階ごとのタメ / 暗転の静寂
+  const HOLD = 950, HUSH = isSuper ? 1500 : 1000;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
   const hasHush = isSR;                   // SR以上で「期待値の裏切り＋暗転→解放」
   const reveal = () => {
     if(phase!=="tap") return;
@@ -1215,11 +1215,15 @@ function GachaAnim({ result, onClose }) {
     // 最終段の手前まで順に育てる＝わざと低レアっぽく見せる（裏切りの布石）
     for(let i=1;i<last;i++){ const j=i; at(()=>{ setStage(j); buzz([70]); }, i*HOLD); }
     if(hasHush){
-      const hushT = last*HOLD;             // 最後の手前で暗転(一瞬の静寂)
-      at(()=>{ setPhase("hush"); buzz([0]); }, hushT);
-      const releaseT = hushT + HUSH;       // タメの後、爆発的に解放
+      const hushT = last*HOLD;             // 最後の手前で暗転(静寂のタメ)
+      at(()=>{ setPhase("hush"); buzz([30]); }, hushT);
+      // 暗転中に加速する鼓動＝緊張を「充電」していく
+      at(()=>buzz([40]), hushT+400);
+      at(()=>buzz([60]), hushT+800);
+      if(isSuper){ at(()=>buzz([90]), hushT+1100); at(()=>buzz([150]), hushT+1350); }
+      const releaseT = hushT + HUSH;       // 限界までタメてから爆発的に解放
       at(()=>{ setStage(last); setPhase("burst"); buzz(isSuper?[0,90,40,40,560]:[0,340]); }, releaseT);
-      at(()=>setPhase("show"), releaseT + 760);
+      at(()=>setPhase("show"), releaseT + 820);
     } else {
       if(last>0) at(()=>setStage(last), last*HOLD);
       const endT = last*HOLD + 760;
@@ -1299,8 +1303,11 @@ function GachaAnim({ result, onClose }) {
       )}
 
       {phase==="hush" && (
-        <div style={{position:"absolute",inset:0,background:"rgba(2,1,6,0.92)",animation:"gHush .45s ease-in forwards",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:7}}>
-          <div style={{color:"rgba(255,255,255,.85)",fontSize:34,fontWeight:900,letterSpacing:4,animation:"fadePulse .5s ease-in-out infinite",textShadow:"0 0 18px #fff"}}>…！？</div>
+        <div style={{position:"absolute",inset:0,background:"rgba(2,1,6,0.94)",animation:"gHush .4s ease-in forwards",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:7,overflow:"hidden"}}>
+          <div style={{position:"absolute",left:"50%",top:"47%",transform:"translate(-50%,-50%)",width:60,height:60,borderRadius:"50%",
+            background: isSuper?"conic-gradient(from 0deg,#ff3b3b,#ffb02e,#ffe53b,#3bd16f,#3b9eff,#9b5bff,#ff3b3b)":"radial-gradient(circle,#ffffff,#f5c842)",
+            filter:"blur(7px)",animation:`gCharge ${isSuper?1.45:0.95}s ease-in forwards`}}/>
+          <div style={{position:"relative",color:"#fff",fontSize:30,fontWeight:900,letterSpacing:5,textShadow:"0 0 22px #fff",animation:"gHushBeat .42s ease-in-out infinite"}}>…！？</div>
         </div>
       )}
       {phase==="burst" && <div style={{position:"absolute",inset:0,background: hasHush?"#fff":"radial-gradient(circle at 50% 46%,#fff 0%,#fff8 45%,#fff0 75%)",animation:hasHush?"gFlash .6s ease-out":"gFlash .45s ease-out",pointerEvents:"none",zIndex:8}}/>}
@@ -1364,6 +1371,8 @@ function GachaAnim({ result, onClose }) {
         @keyframes gNyoki{0%{transform:translateX(-50%) scaleY(.12) scaleX(.6);opacity:.3}50%{transform:translateX(-50%) scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:translateX(-50%) scaleY(.94) scaleX(.99)}88%{transform:translateX(-50%) scaleY(1.04)}100%{transform:translateX(-50%) scale(1);opacity:1}}
         @keyframes gPuff{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.9);opacity:0}}
         @keyframes gHush{from{opacity:0}to{opacity:1}}
+        @keyframes gCharge{0%{transform:translate(-50%,-50%) scale(.25);opacity:.35}70%{opacity:.9}100%{transform:translate(-50%,-50%) scale(8);opacity:1}}
+        @keyframes gHushBeat{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.22);opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
         @keyframes gWdrop{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translateY(78px) scale(1);opacity:0}}
