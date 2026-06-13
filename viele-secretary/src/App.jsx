@@ -835,7 +835,7 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
   const systemPct = total > 0 ? Math.round((system / total) * 100) : 0;
 
   return (
-    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
+    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。役割は自動判定ですが、各予定の区分ボタンで修正でき（同名は記憶）、カレンダー単位の既定区分も『設定・取り込み』で決められます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
       <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} onRefresh={onRefresh} refreshing={refreshing} />
       {total === 0 ? (
         <Empty>{source === "calendar" ? "今週の時間指定の予定が見つかりませんでした。" : "データがありません。"}</Empty>
@@ -874,7 +874,7 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
 /* ──────────────────────────────────────────────────────────────
    今日の予定（カレンダー連携 or サンプルから本日の曜日を抽出）
    ────────────────────────────────────────────────────────────── */
-const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他"];
+const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他", "自動"];
 
 // 予定1件の行（今日の予定／日別ビュー共通）
 function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEvent, busy }) {
@@ -915,8 +915,9 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
       {canCat ? (
         <button
           onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
-          style={{ flex: "0 0 auto", fontSize: 12, color: catColor(e.cat), background: "transparent", border: `1px solid ${C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
-        >{e.cat} ⇄</button>
+          title={e.catSource === "manual" ? "記憶済み（タップで変更・一周すると自動に戻ります）" : e.catSource === "cal" ? "カレンダーの既定区分（タップでこの予定だけ変更）" : "自動判定（タップで記憶できます）"}
+          style={{ flex: "0 0 auto", fontSize: 12, fontWeight: e.catSource === "manual" ? 700 : 400, color: e.catSource === "manual" ? "#0B0D11" : catColor(e.cat), background: e.catSource === "manual" ? catColor(e.cat) : "transparent", border: `1px solid ${e.catSource === "manual" ? catColor(e.cat) : C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+        >{e.cat}{e.catSource === "manual" ? " ✓" : " ⇄"}</button>
       ) : (
         <span style={{ fontSize: 12, color: catColor(e.cat), flex: "0 0 auto" }}>{e.cat}</span>
       )}
@@ -1727,36 +1728,52 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 }
 
 /* どのカレンダーを仕事/家族として取り込むかの設定 */
-function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect }) {
+function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect, catForCal, onSetCat }) {
   const [open, setOpen] = useState(false);
   const ROLES = [
     { v: "work", label: "仕事" },
     { v: "family", label: "家族" },
     { v: "off", label: "取り込まない" },
   ];
+  const CATS_OPT = ["自動", "施術", "制作", "集客", "経営"];
   return (
     <Panel
       title="カレンダー設定"
       accent={C.sub}
-      help="どのGoogleカレンダーを取り込むかを選びます。『仕事』は時間メーターに反映、『家族』は別色でブロッカー表示（メーター除外）、『取り込まない』は非表示。"
+      help="どのGoogleカレンダーを取り込むかを選びます。『仕事』は時間メーターに反映、『家族』は別色でブロッカー表示（メーター除外）、『取り込まない』は非表示。仕事カレンダーには『区分』で既定の役割（施術/制作/集客/経営）を割り当てられます（カレンダーを用途別に分けている人向け。個別の予定はスケジュール側で上書きできます）。"
       right={<button onClick={() => setOpen((o) => !o)} style={chipBtn}>{open ? "閉じる" : "開く"}</button>}
     >
       {open && (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 12 }}>
           {calList.map((c) => {
             const role = roleForCal(c.id);
+            const cat = catForCal ? catForCal(c.id) : "自動";
             return (
-              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>{c.summary}{c.primary ? "（メイン）" : ""}</span>
-                <div style={{ display: "flex", gap: 4, flex: "0 0 auto" }}>
-                  {ROLES.map((r) => (
-                    <button
-                      key={r.v}
-                      onClick={() => onSetRole(c.id, r.v)}
-                      style={{ fontSize: 11, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
-                    >{r.label}</button>
-                  ))}
+              <div key={c.id} style={{ display: "grid", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 14 }}>{c.summary}{c.primary ? "（メイン）" : ""}</span>
+                  <div style={{ display: "flex", gap: 4, flex: "0 0 auto" }}>
+                    {ROLES.map((r) => (
+                      <button
+                        key={r.v}
+                        onClick={() => onSetRole(c.id, r.v)}
+                        style={{ fontSize: 11, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
+                      >{r.label}</button>
+                    ))}
+                  </div>
                 </div>
+                {role === "work" && onSetCat && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: 2 }}>
+                    <span style={{ fontSize: 11, color: C.faint, flex: "0 0 auto" }}>区分</span>
+                    {CATS_OPT.map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => onSetCat(c.id, k)}
+                        style={{ fontSize: 11, padding: "3px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${cat === k ? (catColor(k) || C.accent) : C.line}`, background: cat === k ? (catColor(k) || C.accent) : "transparent", color: cat === k ? "#0B0D11" : C.sub, fontWeight: cat === k ? 700 : 400 }}
+                      >{k}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2390,6 +2407,10 @@ export default function App() {
   const fortuneRef = useRef(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
+  // 予定の役割を記憶/変更したときの一時メッセージ（学習したことを見える化）
+  const [catMsg, setCatMsg] = useState("");
+  const catMsgRef = useRef(null);
+  const flashCatMsg = (m) => { setCatMsg(m); if (catMsgRef.current) clearTimeout(catMsgRef.current); catMsgRef.current = setTimeout(() => setCatMsg(""), 3500); };
 
   // ── 通知（任意）：開いた時に遅れがあればブラウザ通知 ──
   const notifySupported = typeof Notification !== "undefined";
@@ -2752,9 +2773,19 @@ export default function App() {
   const usingCal = calStatus === "ok" && (!!calToken || !!(data && data.gcalRefresh));
   const catMap = data.catMap || {};       // 予定名→役割 の手動上書き（同名は次回も適用）
   const calConfig = data.calConfig || {}; // カレンダーID→ロール(work/family/off)
+  const calCat = data.calCat || {};       // カレンダーID→既定の役割(施術/制作/集客/経営)。未設定はタイトルから自動判定。
   const axisOfCat = (cat) => (cat === "制作" || cat === "集客" ? "仕組み" : "労働");
-  const setEventCat = (title, cat) => update({ catMap: { ...catMap, [title]: cat } });
+  // 予定名→役割を記憶（同名の予定にも次回から自動適用）。"自動"を渡すと記憶を消して自動判定へ戻す。
+  const setEventCat = (title, cat) => {
+    const next = { ...catMap };
+    if (cat === "自動") { delete next[title]; flashCatMsg(`「${title}」を自動判定に戻しました`); }
+    else { next[title] = cat; flashCatMsg(`「${title}」を${cat}として記憶しました（同名の予定にも反映）`); }
+    update({ catMap: next });
+  };
   const setCalRole = (calId, role) => update({ calConfig: { ...calConfig, [calId]: role } });
+  // カレンダー単位の既定区分。"自動"で解除（タイトルから判定に戻す）。
+  const setCalCat = (calId, cat) => { const next = { ...calCat }; if (cat === "自動") delete next[calId]; else next[calId] = cat; update({ calCat: next }); };
+  const catForCal = (calId) => calCat[calId] || "自動";
   const roleForCal = (calId) => {
     if (calConfig[calId]) return calConfig[calId];
     const c = calList.find((x) => x.id === calId);
@@ -2765,14 +2796,13 @@ export default function App() {
     const start = new Date(ev.startISO);
     const end = ev.endISO ? new Date(ev.endISO) : null;
     const hours = ev.allDay ? 0 : end ? Math.max(0.25, (end - start) / 3600000) : 1;
-    let cat, axis;
-    if (role === "family") { cat = "家族"; axis = "家族"; }
-    else {
-      const ov = catMap[ev.title];
-      if (ov) { cat = ov; axis = axisOfCat(ov); }
-      else { const c = classifyEvent(ev.title); cat = c.cat; axis = c.axis; }
-    }
-    return { ...ev, role, start, wd: start.getDay(), time: ev.allDay ? "終日" : `${pad2(start.getHours())}:${pad2(start.getMinutes())}`, hours, cat, axis };
+    // 役割の決定順：①予定名で記憶(manual) ②カレンダー単位の既定(cal) ③タイトルから自動(auto)
+    let cat, axis, catSource;
+    if (role === "family") { cat = "家族"; axis = "家族"; catSource = "family"; }
+    else if (catMap[ev.title]) { cat = catMap[ev.title]; axis = axisOfCat(cat); catSource = "manual"; }
+    else if (calCat[ev.calendarId]) { cat = calCat[ev.calendarId]; axis = axisOfCat(cat); catSource = "cal"; }
+    else { const c = classifyEvent(ev.title); cat = c.cat; axis = c.axis; catSource = "auto"; }
+    return { ...ev, role, start, wd: start.getDay(), time: ev.allDay ? "終日" : `${pad2(start.getHours())}:${pad2(start.getMinutes())}`, hours, cat, axis, catSource };
   };
   const includedEntries = calEvents.filter((ev) => roleForCal(ev.calendarId) !== "off").map(buildEntry);
 
@@ -2954,11 +2984,14 @@ export default function App() {
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
+              {catMsg && (
+                <div style={{ background: C.green + "1A", border: `1px solid ${C.green}`, color: C.text, borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 13 }}>✓ {catMsg}</div>
+              )}
               <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
               <TimeMeter entries={scheduleEntries} {...calProps} />
               {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
               <Acc title="設定・取り込み" defaultOpen={false}>
-                {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} />}
+                {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} catForCal={catForCal} onSetCat={setCalCat} />}
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
                   <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>
