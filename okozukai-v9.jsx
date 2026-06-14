@@ -1164,24 +1164,34 @@ const GACHA_THEMES = [
 function getMonthTheme(){ return GACHA_THEMES[new Date().getMonth()]; }
 
 const GACHA_ITEMS = [
-  {id:"gi_n1",tierId:"gc1",emoji:"🌱",name:"タネっち",  desc:"まいにちのタネ"},
-  {id:"gi_n2",tierId:"gc1",emoji:"🌿",name:"わかば",    desc:"みどりのわかば"},
-  {id:"gi_n3",tierId:"gc1",emoji:"🍀",name:"よつば",    desc:"しあわせのよつば"},
-  {id:"gi_n4",tierId:"gc1",emoji:"🌾",name:"こむぎ",    desc:"ゆたかなみのり"},
-  {id:"gi_n5",tierId:"gc1",emoji:"🍂",name:"おちば",    desc:"あきのきおく"},
-  {id:"gi_n6",tierId:"gc1",emoji:"🌻",name:"ひまわり",  desc:"たいようのちから"},
-  {id:"gi_r1",tierId:"gc2",emoji:"⭐",name:"スター",     desc:"かがやくほし"},
-  {id:"gi_r2",tierId:"gc2",emoji:"🦋",name:"ちょうちょ",desc:"はねのかがやき"},
-  {id:"gi_r3",tierId:"gc2",emoji:"🐠",name:"さかな",    desc:"うみのたから"},
-  {id:"gi_r4",tierId:"gc2",emoji:"🌙",name:"みかづき",  desc:"よるのひかり"},
-  {id:"gi_r5",tierId:"gc2",emoji:"🎵",name:"おんぷ",    desc:"こころのメロディ"},
-  {id:"gi_r6",tierId:"gc2",emoji:"🔮",name:"まほうだま",desc:"ふしぎなちから"},
-  {id:"gi_sr1",tierId:"gc3",emoji:"🌈",name:"にじ",     desc:"そらにかかるにじ"},
-  {id:"gi_sr2",tierId:"gc3",emoji:"💎",name:"ダイヤ",   desc:"しんぴのほうせき"},
-  {id:"gi_sr3",tierId:"gc3",emoji:"🦄",name:"ユニコーン",desc:"まほうのいきもの"},
-  {id:"gi_sr4",tierId:"gc3",emoji:"🐉",name:"ドラゴン", desc:"でんせつのりゅう"},
-  {id:"gi_ur1",tierId:"gc4",emoji:"👑",name:"おうかん",  desc:"さいこうのしるし"},
-  {id:"gi_ur2",tierId:"gc4",emoji:"🌟",name:"ゴールドスター",desc:"きょくちょうのかがやき"},
+  // ── 第0弾「はじめてのタネ図鑑」(setId:s00) 各カードにedu=お金/努力の学び ──
+  {id:"gi_n1",tierId:"gc1",setId:"s00",emoji:"🌱",name:"タネっち",  desc:"まいにちのタネ",   edu:"おかねは タネみたい。少しずつ ためると 大きく そだつよ"},
+  {id:"gi_n2",tierId:"gc1",setId:"s00",emoji:"🌿",name:"わかば",    desc:"みどりのわかば",   edu:"まいにち コツコツ つづけると ちからが ついてくる"},
+  {id:"gi_n3",tierId:"gc1",setId:"s00",emoji:"🍀",name:"よつば",    desc:"しあわせのよつば", edu:"ラッキーも うれしいけど、コツコツが いちばん つよい"},
+  {id:"gi_n4",tierId:"gc1",setId:"s00",emoji:"🌾",name:"こむぎ",    desc:"ゆたかなみのり",   edu:"むかしは こくもつが おかねの かわりだった ことも"},
+  {id:"gi_n5",tierId:"gc1",setId:"s00",emoji:"🍂",name:"おちば",    desc:"あきのきおく",     edu:"おかねは つかうと へる。たいせつに つかおう"},
+  {id:"gi_n6",tierId:"gc1",setId:"s00",emoji:"🌻",name:"ひまわり",  desc:"たいようのちから", edu:"たいようの ように、おかねも はたらくと そだつ"},
+  {id:"gi_r1",tierId:"gc2",setId:"s00",emoji:"⭐",name:"スター",     desc:"かがやくほし",     edu:"もくひょうを きめると ゆめに ちかづくよ"},
+  {id:"gi_r2",tierId:"gc2",setId:"s00",emoji:"🦋",name:"ちょうちょ",desc:"はねのかがやき",   edu:"コツコツが おおきな へんかに なる(さなぎ→ちょう)"},
+  {id:"gi_r3",tierId:"gc2",setId:"s00",emoji:"🐠",name:"さかな",    desc:"うみのたから",     edu:"うみの めぐみも しげん。とりすぎないのが たいせつ"},
+  {id:"gi_r4",tierId:"gc2",setId:"s00",emoji:"🌙",name:"みかづき",  desc:"よるのひかり",     edu:"ねている あいだに 利子で おかねが ふえる ことも"},
+  {id:"gi_r5",tierId:"gc2",setId:"s00",emoji:"🎵",name:"おんぷ",    desc:"こころのメロディ", edu:"すきな ことに つかうと こころが ゆたかに なる"},
+  {id:"gi_r6",tierId:"gc2",setId:"s00",emoji:"🔮",name:"まほうだま",desc:"ふしぎなちから",   edu:"おかねの まほうは『ふくり』。利子に 利子が つく"},
+  {id:"gi_sr1",tierId:"gc3",setId:"s00",emoji:"🌈",name:"にじ",     desc:"そらにかかるにじ", edu:"あめの あとに にじ。がまんの あとに ごほうび"},
+  {id:"gi_sr2",tierId:"gc3",setId:"s00",emoji:"💎",name:"ダイヤ",   desc:"しんぴのほうせき", edu:"みんなが ほしがるほど ねだんが 上がる=きしょうせい"},
+  {id:"gi_sr3",tierId:"gc3",setId:"s00",emoji:"🦄",name:"ユニコーン",desc:"まほうのいきもの",edu:"めずらしい ものは かちが 高い。でも 本当の たからは けいけん"},
+  {id:"gi_sr4",tierId:"gc3",setId:"s00",emoji:"🐉",name:"ドラゴン", desc:"でんせつのりゅう", edu:"むかしの ものがたりでは りゅうが たからを まもった"},
+  {id:"gi_ur1",tierId:"gc4",setId:"s00",emoji:"👑",name:"おうかん",  desc:"さいこうのしるし", edu:"むかし 王さまが おかねを つくった。いまは くにが かんり"},
+  {id:"gi_ur2",tierId:"gc4",setId:"s00",emoji:"🌟",name:"ゴールドスター",desc:"きょくちょうのかがやき",edu:"きんは さびずに かがやく。だから せかいじゅうで たからもの"},
+  // ── 第1弾「世界のお金 図鑑」(setId:s01) お金の知識カード ──
+  {id:"gm_y1",  tierId:"gc1",setId:"s01",emoji:"🪙",name:"1円玉",  desc:"いちばん かるいコイン", edu:"1円玉は アルミ。とても かるくて 水に うくことも あるよ"},
+  {id:"gm_y10", tierId:"gc1",setId:"s01",emoji:"🪙",name:"10円玉", desc:"どうの コイン",       edu:"10円玉は どう(銅)。つかうほど 色が かわっていく"},
+  {id:"gm_y100",tierId:"gc1",setId:"s01",emoji:"🪙",name:"100円玉",desc:"ぎざぎざコイン",     edu:"ふちの ギザギザは けずって ズルするのを ふせぐ くふう"},
+  {id:"gm_bill",tierId:"gc1",setId:"s01",emoji:"💴",name:"おさつ", desc:"かみのお金",         edu:"おさつは とくべつな かみと インク。にせもの ぼうしの ため"},
+  {id:"gm_usd", tierId:"gc2",setId:"s01",emoji:"💵",name:"ドル",   desc:"アメリカのお金",     edu:"ドルは せかいで いちばん つかわれる お金。りょうがえで 円と こうかん"},
+  {id:"gm_eur", tierId:"gc2",setId:"s01",emoji:"💶",name:"ユーロ", desc:"ヨーロッパのお金",   edu:"ヨーロッパの たくさんの くにが おなじ ユーロを つかう"},
+  {id:"gm_koban",tierId:"gc3",setId:"s01",emoji:"🟡",name:"小判",  desc:"江戸のきんか",       edu:"小判は 江戸じだいの きんか。おさむらいが つかった お金"},
+  {id:"gm_oban", tierId:"gc4",setId:"s01",emoji:"🟡",name:"大判",  desc:"でっかいきんか",     edu:"大判は とても 大きな きんか。むかしの さいこうきゅうの お金"},
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -1346,7 +1356,8 @@ function GachaAnim({ result, onClose }) {
             {result.isNewItem&&<span style={{position:"absolute",top:2,right:2,background:R,color:"#fff",borderRadius:999,padding:"2px 9px",fontSize:11,fontWeight:900}}>NEW!</span>}
           </div>
           {result.collItem && <div style={{fontWeight:900,fontSize:17,color:"#fff",marginBottom:2}}>{result.collItem.name}</div>}
-          {result.collItem && <div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:8}}>{result.collItem.desc}</div>}
+          {result.collItem && <div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:result.collItem.edu?6:8}}>{result.collItem.desc}</div>}
+          {result.collItem && result.collItem.edu && <div style={{fontSize:11.5,color:"#bff0c8",fontWeight:700,background:"rgba(52,199,123,.16)",borderRadius:10,padding:"7px 12px",margin:"0 auto 12px",maxWidth:300,lineHeight:1.55}}>💡 {result.collItem.edu}</div>}
           <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:6,marginBottom:result.bonusPts>0?6:16}}>
             <span style={{fontSize:24}}>🪙</span>
             <span style={{color:GOLD,fontSize:46,fontWeight:900,lineHeight:1,textShadow:"0 2px 10px #000"}}>+{result.pts}</span>
@@ -2974,7 +2985,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   {!todayDone&&!gachaTest&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
-                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:11,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,fontSize:11,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</div>;})()}
+                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:11,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</span><span onClick={(e)=>{e.stopPropagation();shareCard({emoji:"🏆",title:"ずかん コンプリート！",subtitle:`${GACHA_ITEMS.length}しゅるい ぜんぶ あつめた`,color:"#fbbf24"});}} style={{fontSize:11,color:"#4a9eff",fontWeight:800,cursor:"pointer"}}>シェア 📤</span></div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
@@ -3012,11 +3023,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         const tc=tierColorMap[item.tierId]||BORDER;
                         return(<div key={item.id} style={{textAlign:"center",background:cnt>0?(darkBG?"rgba(255,255,255,0.08)":CARD):(darkBG?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.04)"),borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,transition:"all .2s"}}>
                           {cnt>0
-                            ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.png`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
+                            ? <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
                           <div style={{fontSize:11,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
-                          {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
+                          {cnt>1&&<div style={{fontSize:11,color:MUTED}}>×{cnt}</div>}
                         </div>);
                       })}
                     </div>
@@ -3464,7 +3475,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                           <img src={`/assets/monster_${m.id}_f0.png`} alt={m.name}
                             style={{width:44,height:44,objectFit:"contain",imageRendering:"pixelated",display:"block",margin:"0 auto"}}
                             onError={e=>{e.target.style.visibility="hidden"}}/>
-                          <div style={{fontSize:7,color:TEXTS,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.name}</div>
+                          <div style={{fontSize:11,color:TEXTS,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.name}</div>
                         </div>
                       ))}
                     </div>
@@ -5908,7 +5919,7 @@ function MonsterZukan({ data, child }) {
         <div style={{fontSize:11,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {found ? def.name : "???"}
         </div>
-        <div style={{fontSize:7,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
+        <div style={{fontSize:11,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
       </div>
     );
   };
