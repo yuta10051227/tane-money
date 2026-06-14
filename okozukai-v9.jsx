@@ -1226,6 +1226,15 @@ const GACHA_ITEMS = [
   {id:"gm_eur", tierId:"gc2",setId:"s01",emoji:"💶",name:"ユーロ", desc:"ヨーロッパのお金",   edu:"ヨーロッパの たくさんの くにが おなじ ユーロを つかう"},
   {id:"gm_koban",tierId:"gc3",setId:"s01",emoji:"🟡",name:"小判",  desc:"江戸のきんか",       edu:"小判は 江戸じだいの きんか。おさむらいが つかった お金"},
   {id:"gm_oban", tierId:"gc4",setId:"s01",emoji:"🟡",name:"大判",  desc:"でっかいきんか",     edu:"大判は とても 大きな きんか。むかしの さいこうきゅうの お金"},
+  // ── 第2弾「ひみつの仲間 図鑑」(setId:s02) どうぶつの仲間がお金を おしえてくれる ──
+  {id:"gs_risu",  tierId:"gc1",setId:"s02",emoji:"🐿",name:"コインリス",   desc:"コツコツやさん",     edu:"リスが 木の実を ためるように コインを コツコツ ためよう"},
+  {id:"gs_pig",   tierId:"gc1",setId:"s02",emoji:"🐷",name:"ブタコ",       desc:"ちょきんばこの精",   edu:"おなかに コインを ためる ちょきんばこ。すこしずつが だいじ"},
+  {id:"gs_cat",   tierId:"gc1",setId:"s02",emoji:"🐱",name:"まねきネコ",   desc:"えんぎのネコ",       edu:"ふくを よぶ ネコ。でも うんに たよりすぎないのが かしこい"},
+  {id:"gs_hari",  tierId:"gc1",setId:"s02",emoji:"🦔",name:"ハリーくん",   desc:"だいじにやさん",     edu:"ハリに たからを さして だいじに する ハリネズミ"},
+  {id:"gs_fox",   tierId:"gc2",setId:"s02",emoji:"🦊",name:"きんギツネ",   desc:"かしこいキツネ",     edu:"よく かんがえて かしこく つかう。むだづかいを しない"},
+  {id:"gs_owl",   tierId:"gc2",setId:"s02",emoji:"🦉",name:"フクロウ博士", desc:"もの知りフクロウ",   edu:"けいかくを たてて つかうと お金が もっと いきる"},
+  {id:"gs_dragon",tierId:"gc3",setId:"s02",emoji:"🐲",name:"たからリュウ", desc:"たからのまもり",     edu:"たからを まもる りゅう。たいせつに する こころが ほんとうの たから"},
+  {id:"gs_lion",  tierId:"gc4",setId:"s02",emoji:"🦁",name:"こがね獅子",   desc:"でんせつのまもりがみ",edu:"金の しし。ねばり強く つづける ものに たからが やってくる"},
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -3118,7 +3127,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         const tc=tierColorMap[item.tierId]||BORDER;
                         return(<div key={item.id} style={{textAlign:"center",background:cnt>0?(darkBG?"rgba(255,255,255,0.08)":CARD):(darkBG?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.04)"),borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,transition:"all .2s"}}>
                           {cnt>0
-                            ? <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
+                            ? <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_").replace("gs_","gacha_gs_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
                           <div style={{fontSize:11,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
