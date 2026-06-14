@@ -63,6 +63,19 @@ const CAT = {
 const FAMILY_COLOR = "#C77B9C"; // 家族・プライベートの色（仕事と区別）
 const catColor = (cat) => CAT[cat] || (cat === "家族" ? FAMILY_COLOR : C.faint);
 
+// 区分の「表示名」だけを業種に合わせて差し替える仕組み（内部キーは施術/制作/集客/経営のまま）。
+// CAT_LABELS は本画面の描画開始時に data.catLabels で更新する（CSR単一画面なので安全）。
+let CAT_LABELS = {};
+const labelOf = (cat) => (CAT_LABELS && CAT_LABELS[cat]) || cat;
+// 業種プリセット：4枠の表示名（色と労働/仕組み軸は不変）。空={}は施術家・サロン(既定)。
+const CAT_PRESETS = [
+  { id: "salon", name: "施術家・サロン", labels: {} },
+  { id: "coach", name: "コーチ・コンサル", labels: { 施術: "セッション", 制作: "コンテンツ", 集客: "集客", 経営: "経営" } },
+  { id: "school", name: "講師・スクール", labels: { 施術: "講座・レッスン", 制作: "教材制作", 集客: "集客", 経営: "運営" } },
+  { id: "creator", name: "クリエイター・制作業", labels: { 施術: "受託・納品", 制作: "自主制作", 集客: "集客", 経営: "経営" } },
+  { id: "shop", name: "物販・ショップ", labels: { 施術: "接客・対応", 制作: "商品準備", 集客: "集客", 経営: "経営" } },
+];
+
 /* ──────────────────────────────────────────────────────────────
    日付ユーティリティ
    ────────────────────────────────────────────────────────────── */
@@ -848,7 +861,7 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
             {cats.filter((c) => byCat[c] > 0).map((cat) => (
               <div key={cat}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: CAT[cat] || C.faint }}>● {cat}</span>
+                  <span style={{ color: CAT[cat] || C.faint }}>● {labelOf(cat)}</span>
                   <span style={{ color: C.sub }}>{r1(byCat[cat])}h</span>
                 </div>
                 <Bar value={byCat[cat]} total={total} color={CAT[cat] || C.faint} />
@@ -922,9 +935,9 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
               onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
               title={e.catSource === "manual" ? "記憶済み（タップで変更・一周すると自動に戻ります）" : e.catSource === "cal" ? "カレンダーの既定区分（タップでこの予定だけ変更）" : "自動判定（タップで記憶できます）"}
               style={{ fontSize: 12, fontWeight: e.catSource === "manual" ? 700 : 400, color: e.catSource === "manual" ? "#0B0D11" : catColor(e.cat), background: e.catSource === "manual" ? catColor(e.cat) : "transparent", border: `1px solid ${e.catSource === "manual" ? catColor(e.cat) : C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
-            >{e.cat}{e.catSource === "manual" ? " ✓" : " ⇄"}</button>
+            >{labelOf(e.cat)}{e.catSource === "manual" ? " ✓" : " ⇄"}</button>
           ) : (
-            <span style={{ fontSize: 12, color: catColor(e.cat) }}>{e.cat}</span>
+            <span style={{ fontSize: 12, color: catColor(e.cat) }}>{labelOf(e.cat)}</span>
           )}
         </div>
       </div>
@@ -1134,7 +1147,7 @@ function UpcomingRow({ e, writableIds, onEditEvent, onDeleteEvent, busy }) {
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </>
       ) : (
-        <span style={{ fontSize: 11, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : e.cat}</span>
+        <span style={{ fontSize: 11, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : labelOf(e.cat)}</span>
       )}
     </div>
   );
@@ -1781,7 +1794,7 @@ function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect, catFor
                         key={k}
                         onClick={() => onSetCat(c.id, k)}
                         style={{ fontSize: 11, padding: "3px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${cat === k ? (catColor(k) || C.accent) : C.line}`, background: cat === k ? (catColor(k) || C.accent) : "transparent", color: cat === k ? "#0B0D11" : C.sub, fontWeight: cat === k ? 700 : 400 }}
-                      >{k}</button>
+                      >{k === "自動" ? "自動" : labelOf(k)}</button>
                     ))}
                   </div>
                 )}
@@ -1795,6 +1808,39 @@ function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect, catFor
           )}
         </div>
       )}
+    </Panel>
+  );
+}
+
+// 区分の表示名を業種に合わせて変える設定（4枠の色と労働/仕組み軸は不変。表示名だけ差し替え）。
+function CatLabelSettings({ labels, onChange }) {
+  const KEYS = Object.keys(CAT); // 施術/制作/集客/経営
+  const axisHint = (k) => (k === "制作" || k === "集客" ? "仕組み（資産になる）" : "労働（自分が動く）");
+  const setOne = (k, v) => { const next = { ...labels }; const t = (v || "").trim(); if (!t || t === k) delete next[k]; else next[k] = t; onChange(next); };
+  return (
+    <Panel
+      title="区分の名前（業種に合わせる）"
+      accent={C.sub}
+      help="時間メーターやスケジュールで使う4つの区分の『表示名』を業種に合わせて変えられます。色と『労働/仕組み』の意味はそのまま。空欄にすると元の名前に戻ります。施術をしない方（コーチ・講師・制作業など）は下のプリセットが便利です。"
+    >
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>業種プリセット（タップで一括設定）</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        {CAT_PRESETS.map((p) => (
+          <button key={p.id} onClick={() => onChange({ ...p.labels })} style={chipBtn}>{p.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "grid", gap: 10 }}>
+        {KEYS.map((k) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT[k], flex: "0 0 auto" }} />
+            <div style={{ flex: "0 0 88px", minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.sub }}>{k}</div>
+              <div style={{ fontSize: 10, color: C.faint }}>{axisHint(k)}</div>
+            </div>
+            <input value={labels[k] || ""} onChange={(e) => setOne(k, e.target.value)} placeholder={`例：${k}`} style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 0 }} />
+          </div>
+        ))}
+      </div>
     </Panel>
   );
 }
@@ -2430,6 +2476,8 @@ export default function App() {
   const cloud = useCloud(firebaseEnabled ? user?.uid || null : null, seed);
   const local = useLocal(STORE_KEY, seed);
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
+  // 区分の表示名を業種設定で差し替え（描画前に反映。子コンポーネントは labelOf() で参照）
+  CAT_LABELS = (data && data.catLabels) || {};
 
   // 通知ON：許可取得 → プッシュ購読 → 購読をFirestoreに保存（閉じていてもサーバーから届く）
   // 注意1(iOS): ホーム画面に追加したPWA内でのみプッシュ受信が可能。
@@ -2790,7 +2838,7 @@ export default function App() {
   const setEventCat = (title, cat) => {
     const next = { ...catMap };
     if (cat === "自動") { delete next[title]; flashCatMsg(`「${title}」を自動判定に戻しました`); }
-    else { next[title] = cat; flashCatMsg(`「${title}」を${cat}として記憶しました（同名の予定にも反映）`); }
+    else { next[title] = cat; flashCatMsg(`「${title}」を${labelOf(cat)}として記憶しました（同名の予定にも反映）`); }
     update({ catMap: next });
   };
   const setCalRole = (calId, role) => update({ calConfig: { ...calConfig, [calId]: role } });
@@ -3003,6 +3051,7 @@ export default function App() {
               {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
               <Acc title="設定・取り込み" defaultOpen={false}>
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} catForCal={catForCal} onSetCat={setCalCat} />}
+                <CatLabelSettings labels={data.catLabels || {}} onChange={(l) => update({ catLabels: l })} />
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
                   <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>
