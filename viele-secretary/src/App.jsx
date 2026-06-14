@@ -305,6 +305,12 @@ const LAUNCH_TEMPLATES = {
   },
 };
 
+// 型の表示名（内部キーは英語混じりの用語を避けて初心者にも分かる日本語に）
+const LAUNCH_TEMPLATE_LABELS = {
+  二段ローンチ標準: "先行登録あり（2段階）",
+  セミナー集客: "セミナー集客",
+  単発ローンチ: "先行登録なし（直販）",
+};
 // テンプレ＋基準日から締切群を生成
 function buildLaunch(name, anchorISO) {
   const tpl = LAUNCH_TEMPLATES[name];
@@ -467,7 +473,7 @@ function Help({ text }) {
       {open && (
         <span
           onClick={() => setOpen(false)}
-          style={{ position: "absolute", top: 34, left: 0, zIndex: 20, width: 240, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: C.text, fontWeight: 400, lineHeight: 1.6, boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}
+          style={{ position: "absolute", top: 36, left: 0, zIndex: 20, width: 260, maxWidth: "80vw", background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 13px", fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.65, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
         >{text}</span>
       )}
     </span>
@@ -793,7 +799,7 @@ function DeadlineBoard({ deadlines, linked, launches, birth, onAdd, onAddBulk, o
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>型を選び、基準日を入れると締切を逆算して一括作成します。</div>
           <select value={tpl} onChange={(ev) => setTpl(ev.target.value)} style={inp}>
-            {Object.keys(LAUNCH_TEMPLATES).map((t) => <option key={t}>{t}</option>)}
+            {Object.keys(LAUNCH_TEMPLATES).map((t) => <option key={t} value={t}>{LAUNCH_TEMPLATE_LABELS[t] || t}</option>)}
           </select>
           <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 4 }}>{LAUNCH_TEMPLATES[tpl].anchorLabel}</label>
           <input type="date" value={anchor} onChange={(ev) => setAnchor(ev.target.value)} style={inp} />
@@ -1508,7 +1514,7 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ fontSize: 13, color: C.sub }}>今日の残り</span>
+              <span style={{ fontSize: 13, color: C.sub }}>要対応</span>
               <span style={{ fontSize: 28, fontWeight: 700, color: C.accent, lineHeight: 1 }}>{rem}</span>
               <span style={{ fontSize: 13, color: C.sub }}>件</span>
             </div>
@@ -1535,9 +1541,8 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}><b style={{ color: mode.color }}>今日の一手</b>　{advice}</span>
         </button>
       )}
-      {/* 主要：今日の予定と要対応は常に表示（ここだけ見れば動ける） */}
+      {/* 主要：今日の予定は常に表示（要対応の内訳は直下の「今日の要対応」パネルに集約して重複を回避） */}
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
-      {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab("home")} />}
       {/* 副次：運気・攻めの日・未処理・ニュースは折りたたみ（情報過多の防止） */}
       {more && (
         <>
@@ -1551,7 +1556,7 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
       )}
       {(!hideFortune || outstanding > 0 || (brief && !hideNews)) && (
         <button onClick={() => setMore((m) => !m)} style={{ width: "100%", textAlign: "center", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "9px 0 2px", cursor: "pointer", color: C.sub, font: "inherit", fontSize: 13 }}>
-          {more ? "閉じる ▲" : "運気・売上・ニュースをもっと見る ▼"}
+          {more ? "閉じる ▲" : "他の情報も見る ▼"}
         </button>
       )}
     </section>
@@ -2102,7 +2107,8 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
           if (!upd) return null;
           const d = Math.floor((Date.now() - upd) / 86400000);
           const stale = d >= 3;
-          return <span title="数字を最後に更新した日。手入力なので鮮度に注意。" style={{ fontSize: 12, fontWeight: stale ? 700 : 400, color: stale ? C.orange : C.faint, flex: "0 0 auto" }}>{stale ? "⚠️ " : ""}{d <= 0 ? "今日更新" : `${d}日前の数字`}</span>;
+          if (stale) return <button onClick={() => onEdit(L)} title="数字が古いままです。タップして最新の人数・売上に更新しましょう。" style={{ fontSize: 12, fontWeight: 700, color: C.invText, background: C.orange, border: "none", borderRadius: 6, padding: "2px 8px", cursor: "pointer", flex: "0 0 auto" }}>⚠️ {d}日前 → 更新</button>;
+          return <span title="数字を最後に更新した日。手入力なので鮮度に注意。" style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{d <= 0 ? "今日更新" : `${d}日前の数字`}</span>;
         })()}
         <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✏️</button>
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
@@ -2144,7 +2150,7 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
   // 入力フォーム（新規/編集 共通レイアウト）
   const formFields = (obj, set) => (
     <>
-      <input value={obj.name} onChange={numF(obj, set, "name")} placeholder="ローンチ名（例：春の新講座）" style={inp} />
+      <input value={obj.name} onChange={numF(obj, set, "name")} placeholder="名前（例：春の新講座）" style={inp} />
       <div style={{ display: "flex", gap: 8 }}>
         <label style={lbl}>先行登録 目標<input value={obj.goalReg} onChange={numF(obj, set, "goalReg")} inputMode="numeric" style={inp} /></label>
         <label style={lbl}>登録 実績<input value={obj.reg} onChange={numF(obj, set, "reg")} inputMode="numeric" style={inp} /></label>
@@ -2169,7 +2175,7 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
       title="新講座の販売 進捗（先行登録→申込→売上）"
       accent={C.accent}
       help="「ローンチ」とは新しい講座・商品の期間限定の募集や販売のこと。それ『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✏️からいつでも更新できます。"
-      right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
+      right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋販売を登録</button>}
     >
       {mode === "new" && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
@@ -2181,7 +2187,7 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
           >追加</button>
         </div>
       )}
-      {list.length === 0 && <Empty>まだ登録がありません。新しい講座・商品の販売（ローンチ）を始めるとき、右上の「＋ローンチ」から目標人数・客単価・売上目標を入れると、登録→申込→売上の進み具合がグラフで見えます。</Empty>}
+      {list.length === 0 && <Empty>まだ登録がありません。新しい講座・商品の販売を始めるとき、右上の「＋販売を登録」から目標人数・客単価・売上目標を入れると、登録→申込→売上の進み具合がグラフで見えます。</Empty>}
       {list.map((L) =>
         editId === L.id ? (
           <div key={L.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
@@ -2306,7 +2312,7 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
 }
 
 function Empty({ children }) {
-  return <div style={{ fontSize: 13, color: C.sub, padding: "8px 2px", lineHeight: 1.6 }}>{children}</div>;
+  return <div style={{ fontSize: 14, color: C.sub, padding: "8px 2px", lineHeight: 1.6 }}>{children}</div>;
 }
 
 /* 今日の要対応（遅れ・締切間近の集約）。任意でブラウザ通知をオンにできる。 */
@@ -2433,7 +2439,7 @@ function LoginGate({ onLogin, error }) {
         </p>
 
         {error && (
-          <div style={{ marginTop: 18, textAlign: "left", background: "#2A1715", border: `1px solid ${C.red}`, borderRadius: 10, padding: 12 }}>
+          <div style={{ marginTop: 18, textAlign: "left", background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 10, padding: 12 }}>
             <div style={{ color: C.red, fontSize: 13, fontWeight: 700, marginBottom: 4 }}>ログインできませんでした</div>
             <div style={{ color: C.sub, fontSize: 12, wordBreak: "break-word" }}>{error.code || ""} {error.message}</div>
           </div>
@@ -3138,13 +3144,13 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif", overflowX: "hidden" }}>
       {/* ヘッダー＋タブバー */}
-      <header style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(15,17,21,0.9)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 10, background: C.bg, borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <strong style={{ fontSize: 16, letterSpacing: 1 }}>ひとり秘書</strong>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
           <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
-          <button onClick={() => update({ theme: data.theme === "light" ? "dark" : "light" })} title="背景の明るさを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>{data.theme === "light" ? "🌞明るい" : "🌙暗い"}</button>
+          <button onClick={() => update({ theme: data.theme === "light" ? "dark" : "light" })} title="背景の明るさを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>{data.theme === "light" ? "🌙暗くする" : "🌞明るくする"}</button>
           {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
         </div>
         <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
@@ -3162,7 +3168,7 @@ export default function App() {
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
-            ローカルモード — この端末に保存中。複数端末で同期するには <code style={{ color: C.text }}>.env</code> にFirebaseの値を設定してください（README参照）。
+この端末だけに保存中です。スマホとパソコンなど複数の端末で同じデータを使うには、初期設定が必要です（詳しくは案内ページへ）。
           </div>
         )}
 
@@ -3235,6 +3241,7 @@ export default function App() {
               <Acc title="設定・取り込み" defaultOpen={false}>
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} catForCal={catForCal} onSetCat={setCalCat} />}
                 <CatLabelSettings labels={data.catLabels || {}} onChange={(l) => update({ catLabels: l })} />
+                <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
                   <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>
@@ -3307,7 +3314,7 @@ export default function App() {
           <>
             <LaunchKpi
               launches={data.launches}
-              onAdd={launches.add}
+              onAdd={(item) => launches.add({ ...item, updatedAt: Date.now() })}
               onEdit={(id, patch) => launches.edit(id, { ...patch, updatedAt: Date.now() })}
               onRemove={launches.remove}
             />
@@ -3391,7 +3398,7 @@ const inp = dyn(() => ({
   borderRadius: 8,
   color: C.text,
   padding: "8px 10px",
-  fontSize: 13,
+  fontSize: 14,
   marginBottom: 8,
   outline: "none",
 }));
@@ -3410,7 +3417,7 @@ const chipBtn = dyn(() => ({
   color: C.text,
   borderRadius: 8,
   padding: "9px 14px",
-  fontSize: 13,
+  fontSize: 14,
   cursor: "pointer",
   whiteSpace: "nowrap",
   minHeight: 40,
