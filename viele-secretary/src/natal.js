@@ -779,13 +779,17 @@ export function familyFortune(members, dateISO) {
   const bestMover = mentionRoles ? top.name : null;
   const supporter = mentionRoles ? bottom.name : null;
 
+  // 名前に既に敬称が付いていれば「さん」を重ねない（例「ゆうたさん」→そのまま）
+  const withSan = (n) => (/(?:さん|様|ちゃん|くん|君)$/.test(String(n || "")) ? n : `${n}さん`);
+
+  // 仕事チームにも家族にも合う中立・前向きなトーン（「攻めの一手」等の業務語を避ける）
   let advice;
-  if (teamScore >= 4) advice = "全体に追い風の日。勢いのある人が前に出て、皆で一気に攻めの一手を進めよう。";
-  else if (teamScore >= 3) advice = "波が分かれる日。攻める人と支える人で役割を分担し、無理なく前進を。";
-  else advice = "全体に守りの日。新規拡大は控え、整理・休息・関係づくりに時間を使うと吉。";
-  // advice 本文と矛盾しないときだけ旗振り・支え役を追記。
+  if (teamScore >= 4) advice = "全体に追い風の日。調子のいい人が中心になって、みんなで前向きに動けると良い日。";
+  else if (teamScore >= 3) advice = "ペースが分かれる日。動ける人と休む人で、自然に役割を分け合うとうまく回ります。";
+  else advice = "全体にゆったりの日。無理に動かず、休息や対話・関係づくりに時間を使うと吉。";
+  // advice 本文と矛盾しないときだけ、中心役・支え役をやわらかく追記。
   if (mentionRoles && bestMover && supporter && bestMover !== supporter) {
-    advice += `今日は${bestMover}さんが旗振り、${supporter}さんは支えに回るとバランスが取れる。`;
+    advice += `今日は${withSan(bestMover)}が中心に、${withSan(supporter)}が支えに回るとバランスが取れます。`;
   }
 
   return {
