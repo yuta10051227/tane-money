@@ -1347,10 +1347,10 @@ function GachaAnim({ result, onClose }) {
       {(phase==="charge"||phase==="tap") && premo==="star" && (
         <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:3,overflow:"hidden"}}>
           {[0,1,2,3].map(i=>(
-            <div key={"shoot"+i} style={{position:"absolute",top:`${5+i*9}%`,left:"-12%",width:130,height:3,
+            <div key={"shoot"+i} style={{position:"absolute",top:`${4+i*11}%`,left:"-14%",width:140,height:3,
               borderRadius:3,background:isSuper?"linear-gradient(90deg,transparent,#bfe6ff,#fff)":"linear-gradient(90deg,transparent,#ffe9a8,#fff)",
               boxShadow:isSuper?"0 0 10px #bfe6ff":"0 0 10px #ffd86b",
-              animation:`gShoot 1.5s ease-in ${(i*0.55).toFixed(2)}s infinite`}}/>
+              animation:`gShoot 2.2s linear ${(i*0.5).toFixed(2)}s infinite`}}/>
           ))}
         </div>
       )}
@@ -1479,7 +1479,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes gHushBeat{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.22);opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
-        @keyframes gShoot{0%{transform:translate(0,0) rotate(20deg);opacity:0}8%{opacity:1}55%{opacity:1}100%{transform:translate(125vw,46vh) rotate(20deg);opacity:0}}
+        @keyframes gShoot{0%{transform:translate(0,0) rotate(20deg);opacity:0}3%{opacity:1}33%{opacity:1;transform:translate(128vw,48vh) rotate(20deg)}38%{opacity:0;transform:translate(128vw,48vh) rotate(20deg)}100%{opacity:0;transform:translate(128vw,48vh) rotate(20deg)}}
         @keyframes gAurora{0%{transform:translateX(-10%) scaleY(.88);opacity:.45}100%{transform:translateX(10%) scaleY(1.12);opacity:.92}}
         @keyframes gCoinFall{0%{transform:translateY(0) rotate(0deg);opacity:0}10%{opacity:1}85%{opacity:1}100%{transform:translateY(118vh) rotate(540deg);opacity:0}}
         @keyframes gRise{0%{transform:translate(0,0) scale(.5);opacity:0}15%{opacity:1}80%{opacity:.9}100%{transform:translate(var(--dx),-72vh) scale(1.1);opacity:0}}
