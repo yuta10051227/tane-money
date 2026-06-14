@@ -501,12 +501,13 @@ const MON_FRAMES6 = { egg:1, m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
 const BG_THEMES = [
   { id:"auto",   name:"じかんたい", emoji:"🕒", need:0,   grad:null, stars:false },
-  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false, img:"/assets/bg_ocean.png" },
-  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false, img:"/assets/bg_sunset.png" },
-  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true, img:"/assets/bg_night.png" },
-  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true, img:"/assets/bg_galaxy.png" },
-  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true, img:"/assets/bg_aurora.png" },
-  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true, img:"/assets/bg_sakura.png" },
+  { id:"forest", name:"もり",       emoji:"🌲", need:8,   grad:"linear-gradient(180deg,#0a1a12 0%,#0e2b1a 45%,#103a22 100%)", stars:false, img:"/assets/bg_forest.jpg" },
+  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false, img:"/assets/bg_ocean.jpg" },
+  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false, img:"/assets/bg_sunset.jpg" },
+  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true, img:"/assets/bg_night.jpg" },
+  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true, img:"/assets/bg_galaxy.jpg" },
+  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true, img:"/assets/bg_aurora.jpg" },
+  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true, img:"/assets/bg_sakura.jpg" },
 ];
 
 // モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
