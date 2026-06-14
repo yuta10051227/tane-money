@@ -384,3 +384,312 @@ export function sanmeiDetail(birth) {
   } catch { return null; }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   算命学・新規4関数（すべて決定論・AI不使用）
+   1) tenchusatsu  天中殺
+   2) daiun        大運（10年ロードマップ）
+   3) aishou       2人の相性
+   4) familyFortune 家族・チーム全体の今日の運気
+   ════════════════════════════════════════════════════════════════ */
+
+// 60干支のindex(0=甲子..59=癸亥)を求めるユーティリティ
+function ganzhiIndex(stem, branch) {
+  // 干支は 10と12の最小公倍数=60周期。stemIdx は 0..9, branchIdx は 0..11。
+  // index は 0..59 で stem=index%10, branch=index%12 を満たす唯一の値。
+  const s = G.indexOf(stem), b = Z.indexOf(branch);
+  for (let i = 0; i < 60; i++) if (i % 10 === s && i % 12 === b) return i;
+  return 0;
+}
+function ganzhiName(idx) {
+  const i = ((idx % 60) + 60) % 60;
+  return G[i % 10] + Z[i % 12];
+}
+
+/* ── 1) 天中殺 ────────────────────────────────────────────────
+   日柱の属する旬（10干支ずつ6グループ）で決まる。
+   旬の起点（甲で始まるindex 0,10,20,30,40,50）→ 抜け落ちる2支=天中殺。
+   甲子旬(0-9): 戌亥 / 甲戌旬(10-19): 申酉 / 甲申旬(20-29): 午未
+   甲午旬(30-39): 辰巳 / 甲辰旬(40-49): 寅卯 / 甲寅旬(50-59): 子丑
+   → 各旬は支を10個しか使わず、12支のうち2支が「空亡(天中殺)」になる。 */
+const JUN_TENCHU = [
+  { jun: "甲子旬", branches: ["戌", "亥"], name: "戌亥天中殺" },
+  { jun: "甲戌旬", branches: ["申", "酉"], name: "申酉天中殺" },
+  { jun: "甲申旬", branches: ["午", "未"], name: "午未天中殺" },
+  { jun: "甲午旬", branches: ["辰", "巳"], name: "辰巳天中殺" },
+  { jun: "甲辰旬", branches: ["寅", "卯"], name: "寅卯天中殺" },
+  { jun: "甲寅旬", branches: ["子", "丑"], name: "子丑天中殺" },
+];
+
+export function tenchusatsu(birth) {
+  const c = computeChart(birth);
+  const dayStem = String(c.dayPillar).slice(0, 1);
+  const dayBranch = String(c.dayPillar).slice(-1);
+  const dayIdx = ganzhiIndex(dayStem, dayBranch);
+  const junIdx = Math.floor(dayIdx / 10); // 0..5
+  const info = JUN_TENCHU[junIdx];
+
+  // branches に当たる十二支の西暦年（今年=2026 以降で近い2つ）を算出。
+  // 年の干支は computeChart の年柱ロジックと同じ基準: index = (year-1984) % 60。
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  let y = thisYear;
+  while (years.length < 2 && y < thisYear + 24) {
+    const yi = (((y - 1984) % 60) + 60) % 60;
+    const yb = Z[yi % 12];
+    if (info.branches.includes(yb)) years.push(y);
+    y++;
+  }
+
+  return {
+    name: info.name,
+    jun: info.jun,
+    branches: info.branches.slice(),
+    years,
+    desc: "運気の休息・充電期。新規拡大より整理・内省が吉。",
+  };
+}
+
+/* ── 2) 大運（10年ロードマップ）─────────────────────────────────
+   月柱を起点に、陽男陰女=順行／陰男陽女=逆行で60干支を10年ごとに進退。
+   立運（開始年齢）= 出生から次の節入りまでの日数 / 3 を近似（簡易: 出生日の太陽黄経が
+   節（30°区切り,起点315°）を越えるまでの度数 → 1日≒1°換算で日数化 → /3 年）。
+   gender 未設定なら順行を仮定し assumed=true。 */
+const DAIUN_THEME = {
+  貫索星: "我が道を貫き、土台を太くする10年。看板事業を磨き込む。",
+  石門星: "仲間・コラボで広げる10年。チームとネットワークが資産になる。",
+  鳳閣星: "楽しみながら発信・体験で広げる10年。遊び心が売上に変わる。",
+  調舒星: "こだわりと世界観を尖らせる10年。指名・ブランド化が進む。",
+  禄存星: "尽くし与えることで人とお金が集まる10年。ホスピタリティ拡大期。",
+  司禄星: "積み上げ・仕組み化の10年。リピート/会員で安定収益を築く。",
+  車騎星: "スピードと行動で攻める10年。先陣を切り市場を取りにいく。",
+  牽牛星: "信頼と実績を固める10年。権威性で大きな仕事を任される。",
+  龍高星: "挑戦・刷新・新規開拓の10年。型を破り新領域へ踏み出す。",
+  玉堂星: "学び・教える・体系化の10年。知の資産で価値を最大化する。",
+};
+
+export function daiun(birth) {
+  const c = computeChart(birth);
+  const me = c.dayMaster;
+  const yearStem = String(c.yearPillar).slice(0, 1);
+  const monthIdx = ganzhiIndex(String(c.monthPillar).slice(0, 1), String(c.monthPillar).slice(-1));
+
+  // 順逆判定: 年干の陰陽 × 性別。陽年干=甲丙戊庚壬(index偶数)。
+  const yangYear = (G.indexOf(yearStem) % 2) === 0;
+  const gender = (birth && birth.gender) || "";
+  let assumed = false, forward;
+  if (gender === "male") forward = yangYear;        // 陽男=順 / 陰男=逆
+  else if (gender === "female") forward = !yangYear; // 陰女=順 / 陽女=逆
+  else { forward = true; assumed = true; }           // 未設定は順行仮定
+
+  // 立運（開始年齢）の近似: 出生時の太陽黄経から次の節（30°境界, 起点315°）までの度数。
+  // 順行なら次の節まで、逆行なら前の節までの度数を使う（簡易）。1°≒1日, 3日=1歳。
+  let startAge = 0;
+  try {
+    const [Y, M, D] = String(birth.date).split("-").map(Number);
+    const [hh = 12, mm = 0] = String(birth.time || "12:00").split(":").map(Number);
+    const utcOffset = birth.utcOffset ?? 9;
+    const utc = new Date(Date.UTC(Y, M - 1, D, hh - utcOffset, mm));
+    const sunLon = norm(A.SunPosition(A.MakeTime(utc)).elon);
+    const fromSetsu = norm(sunLon - 315); // 立春315°起点での節内位置 0..360
+    const within = fromSetsu % 30;        // 直近の節からの経過度数
+    const deg = forward ? (30 - within) : within; // 次/前の節までの度数
+    startAge = Math.max(0, Math.round((deg / 3) * 10) / 10); // 度=日, /3=年
+  } catch { startAge = 0; }
+
+  // 現在年齢
+  const now = new Date();
+  let age = now.getFullYear() - Number(String(birth.date).split("-")[0]);
+  const bm = Number(String(birth.date).split("-")[1]), bd = Number(String(birth.date).split("-")[2]);
+  if (now.getMonth() + 1 < bm || (now.getMonth() + 1 === bm && now.getDate() < bd)) age--;
+
+  // 各大運期(10年)を作る。第1期は startAge から始まる。
+  const period = (k) => {
+    const idx = ((monthIdx + (forward ? k : -k)) % 60 + 60) % 60;
+    const ganzhi = ganzhiName(idx);
+    const stem = ganzhi.slice(0, 1);
+    const god = tenGod(me, stem);
+    const star = TEN_GOD_TO_STAR[god] || "貫索星";
+    const unsei = unseiOf(me, ganzhi.slice(-1));
+    const ageFrom = Math.round((startAge + k * 10) * 10) / 10;
+    const ageTo = Math.round((startAge + (k + 1) * 10) * 10) / 10;
+    return { k, ageFrom, ageTo, ganzhi, god, star, unsei, theme: DAIUN_THEME[star] };
+  };
+
+  // 現在どの期にいるか（k>=0 で ageFrom<=age<ageTo を満たす最初）。startAge前は第1期扱い。
+  let curK = 0;
+  for (let k = 0; k < 12; k++) {
+    const p = period(k);
+    if (age < p.ageTo) { curK = k; break; }
+    curK = k;
+  }
+  const cur = period(curK);
+
+  // ロードマップ: 現在含む前後計5期（現在の2期前〜2期後, ただし k>=0 に丸め）。
+  let from = Math.max(0, curK - 2);
+  if (from + 4 > 11) from = Math.max(0, 11 - 4);
+  const roadmap = [];
+  for (let k = from; k <= from + 4; k++) {
+    const p = period(k);
+    roadmap.push({ ageFrom: p.ageFrom, ageTo: p.ageTo, ganzhi: p.ganzhi, star: p.star, theme: p.theme, current: k === curK });
+  }
+
+  return {
+    assumed,
+    direction: forward ? "順行" : "逆行",
+    startAge,
+    current: { age, ageFrom: cur.ageFrom, ageTo: cur.ageTo, ganzhi: cur.ganzhi, god: cur.god, star: cur.star, unsei: cur.unsei, theme: cur.theme },
+    roadmap,
+  };
+}
+
+/* ── 3) 2人の相性 ──────────────────────────────────────────────
+   日干関係・五行バランス・中心星グループ・日支関係を重み付けで総合。 */
+
+// 干合（天干合）: 甲己/乙庚/丙辛/丁壬/戊癸。陰陽が結びつき新たな五行を生む最良の縁。
+const GANGOU = { 甲: "己", 己: "甲", 乙: "庚", 庚: "乙", 丙: "辛", 辛: "丙", 丁: "壬", 壬: "丁", 戊: "癸", 癸: "戊" };
+// 支合（六合）: 子丑/寅亥/卯戌/辰酉/巳申/午未。
+const SHIGOU = { 子: "丑", 丑: "子", 寅: "亥", 亥: "寅", 卯: "戌", 戌: "卯", 辰: "酉", 酉: "辰", 巳: "申", 申: "巳", 午: "未", 未: "午" };
+// 冲（七冲）: 子午/丑未/寅申/卯酉/辰戌/巳亥。
+const CHONG = { 子: "午", 午: "子", 丑: "未", 未: "丑", 寅: "申", 申: "寅", 卯: "酉", 酉: "卯", 辰: "戌", 戌: "辰", 巳: "亥", 亥: "巳" };
+// 三合: 申子辰(水)/亥卯未(木)/寅午戌(火)/巳酉丑(金)。同グループ2支=三合の縁。
+const SANGOU_GROUPS = [["申", "子", "辰"], ["亥", "卯", "未"], ["寅", "午", "戌"], ["巳", "酉", "丑"]];
+function isSangou(a, b) {
+  if (a === b) return false;
+  return SANGOU_GROUPS.some((g) => g.includes(a) && g.includes(b));
+}
+// 十大主星を3グループに大別（性質の近さ）。守備=貫索/石門/牽牛/司禄, 伝達=鳳閣/調舒/玉堂, 攻撃=禄存/車騎/龍高。
+const STAR_GROUP = {
+  貫索星: "守備", 石門星: "守備", 牽牛星: "守備", 司禄星: "守備",
+  鳳閣星: "伝達", 調舒星: "伝達", 玉堂星: "伝達",
+  禄存星: "行動", 車騎星: "行動", 龍高星: "行動",
+};
+
+export function aishou(birthA, birthB) {
+  const ca = computeChart(birthA), cb = computeChart(birthB);
+  const sa = sanmeiDetail(birthA), sb = sanmeiDetail(birthB);
+  const meA = ca.dayMaster, meB = cb.dayMaster;
+  const elemA = FIVE[meA], elemB = FIVE[meB];
+  const branchA = String(ca.dayPillar).slice(-1), branchB = String(cb.dayPillar).slice(-1);
+  const starA = sa?.center?.star || "貫索星", starB = sb?.center?.star || "貫索星";
+
+  let score = 50;
+  const notes = [];
+
+  // (1) 日干関係（重み最大）
+  let kanRel;
+  if (GANGOU[meA] === meB) { score += 22; kanRel = "干合"; notes.push("日干が干合。惹かれ合い結びつく最良の縁。"); }
+  else if (elemA === elemB) { score += 10; kanRel = "比和"; notes.push("日干が同じ五行。価値観が近く息が合う。"); }
+  else if (GEN[elemA] === elemB) { score += 14; kanRel = "Aが生む"; notes.push("AがBを生かす関係。AはBを育て支える。"); }
+  else if (GEN[elemB] === elemA) { score += 14; kanRel = "Bが生む"; notes.push("BがAを生かす関係。BはAを育て支える。"); }
+  else if (CTRL[elemA] === elemB) { score += 4; kanRel = "Aが剋す"; notes.push("AがBを律する関係。Aが主導しBを引き締める。"); }
+  else if (CTRL[elemB] === elemA) { score += 4; kanRel = "Bが剋す"; notes.push("BがAを律する関係。Bが主導しAを引き締める。"); }
+  else { kanRel = "中立"; }
+
+  // (2) 中心星グループの相性
+  const ga = STAR_GROUP[starA], gb = STAR_GROUP[starB];
+  if (ga === gb) { score += 8; notes.push(`中心星が同系統(${ga})。動き方の感覚が揃う。`); }
+  else { score += 4; notes.push(`中心星が異系統(${ga}×${gb})。役割を分けると強い。`); }
+
+  // (3) 日支の関係
+  let zhiRel;
+  if (SHIGOU[branchA] === branchB) { score += 12; zhiRel = "支合"; notes.push("日支が支合。距離が縮まり安定する組み合わせ。"); }
+  else if (isSangou(branchA, branchB)) { score += 12; zhiRel = "三合"; notes.push("日支が三合。同じ目的に向かい協力しやすい。"); }
+  else if (CHONG[branchA] === branchB) { score += 6; zhiRel = "冲"; notes.push("日支が冲。刺激し合い化学反応を生むが衝突も。"); }
+  else if (branchA === branchB) { score += 6; zhiRel = "同支"; notes.push("日支が同じ。似た者同士で居心地がよい。"); }
+  else { zhiRel = "中立"; score += 2; }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let label;
+  if (score >= 80) label = "名コンビ";
+  else if (score >= 65) label = "補い合う";
+  else if (score >= 50) label = "刺激し合う";
+  else label = "距離が要る";
+
+  // 役割分担 howto（星グループから）
+  const roleOf = (g) => g === "守備" ? "土台・継続・管理" : g === "伝達" ? "発信・企画・伝える" : "突破・開拓・実行";
+  const howto = [];
+  if (ga === gb) howto.push(`二人とも${roleOf(ga)}が得意。逆方向(${ga === "守備" ? "開拓/発信" : ga === "伝達" ? "土台/実行" : "管理/守り"})を外部や仕組みで補うと盤石。`);
+  else howto.push(`Aは${roleOf(ga)}、Bは${roleOf(gb)}を担うと噛み合う。`);
+  if (kanRel === "干合") howto.push("公私が混ざりやすい縁。役割と境界を言語化しておくと長続きする。");
+  if (zhiRel === "冲") howto.push("意見はぶつかって当然と捉え、結論より『論点を出し切る』議論を。");
+  if (kanRel.includes("剋")) howto.push("律する側が言い過ぎないこと。指摘は『提案+理由』のセットで。");
+  if (howto.length < 2) howto.push("定期的に方向性をすり合わせる場を持つと、強みが噛み合い続ける。");
+
+  const summary = `${label}の関係。日干は${kanRel}、日支は${zhiRel}、中心星は${starA}×${starB}。${kanRel === "干合" || zhiRel === "支合" || zhiRel === "三合" ? "自然に手を取り合える相性。" : "違いを役割に変えると伸びる相性。"}`;
+
+  const dirText = (from, to, fe, te) => {
+    if (GEN[fe] === te) return `${from}は${to}を育て支える(生)。`;
+    if (CTRL[fe] === te) return `${from}は${to}を引き締め律する(剋)。`;
+    if (fe === te) return `${from}は${to}と同調し共鳴する(比和)。`;
+    return `${from}は${to}に刺激と気づきを与える。`;
+  };
+
+  return {
+    score,
+    label,
+    summary,
+    howto,
+    aToB: dirText("A", "B", elemA, elemB),
+    bToA: dirText("B", "A", elemB, elemA),
+    detail: {
+      dayStemA: meA, dayStemB: meB, kanRel, zhiRel,
+      centerStarA: starA, centerStarB: starB,
+      elemA, elemB, branchA, branchB, notes,
+    },
+  };
+}
+
+/* ── 4) 家族・チーム全体の今日の運気 ───────────────────────────
+   各メンバーの今日の日運(relationFor)を出し、全体調和と動き方を返す。 */
+export function familyFortune(members, dateISO) {
+  const date = dateISO || new Date().toISOString().slice(0, 10);
+  const list = [];
+  for (const mb of members || []) {
+    try {
+      const c = computeChart(mb.birth);
+      const me = FIVE[c.dayMaster] || "水";
+      const r = relationFor(me, date);
+      const dt = (sanmeiDetail(mb.birth)?.dayType) || null;
+      list.push({
+        name: mb.name,
+        score: r.score,
+        stance: r.stance,
+        focus: r.focus,
+        relation: r.relation,
+        dayType: dt ? dt.label : "",
+        _elem: me,
+      });
+    } catch {
+      list.push({ name: mb.name, score: 3, stance: "整える", focus: "情報不足のため平常運転で。", relation: "", dayType: "" });
+    }
+  }
+
+  const valid = list.filter((m) => typeof m.score === "number");
+  const avg = valid.length ? valid.reduce((s, m) => s + m.score, 0) / valid.length : 3;
+  const teamScore = Math.max(1, Math.min(5, Math.round(avg)));
+
+  // 最も勢い=最高スコア（同点なら攻めスタンス優先）、支え役=最低スコア。
+  const stancePri = { 攻め: 0, 整える: 1, 労い: 2, 守り: 3 };
+  const sorted = [...valid].sort((a, b) => b.score - a.score || stancePri[a.stance] - stancePri[b.stance]);
+  const bestMover = sorted.length ? sorted[0].name : null;
+  const supporter = sorted.length ? sorted[sorted.length - 1].name : null;
+
+  let advice;
+  if (teamScore >= 4) advice = "全体に追い風の日。勢いのある人が前に出て、皆で一気に攻めの一手を進めよう。";
+  else if (teamScore >= 3) advice = "波が分かれる日。攻める人と支える人で役割を分担し、無理なく前進を。";
+  else advice = "全体に守りの日。新規拡大は控え、整理・休息・関係づくりに時間を使うと吉。";
+  if (bestMover && supporter && bestMover !== supporter) {
+    advice += `今日は${bestMover}さんが旗振り、${supporter}さんは支えに回るとバランスが取れる。`;
+  }
+
+  return {
+    date,
+    members: list.map(({ _elem, ...m }) => m),
+    teamScore,
+    advice,
+    bestMover,
+    supporter,
+  };
+}
+

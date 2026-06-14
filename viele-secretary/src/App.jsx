@@ -1393,10 +1393,11 @@ function BirthEditor({ birth, onSave }) {
   const [date, setDate] = useState(b.date || "");
   const [time, setTime] = useState(b.time || "");
   const [pref, setPref] = useState(b.place || "東京");
+  const [gender, setGender] = useState(b.gender || "");
   const save = () => {
     const p = PREFS.find((x) => x[0] === pref) || PREFS.find((x) => x[0] === "東京");
     if (!date) { alert("生年月日を入れてください"); return; }
-    onSave({ name: name.trim(), date, time: time || "12:00", place: pref, lat: p[1], lon: p[2], utcOffset: 9 });
+    onSave({ name: name.trim(), date, time: time || "12:00", place: pref, lat: p[1], lon: p[2], utcOffset: 9, gender });
   };
   const hasDate = !!(birth && birth.date);
   return (
@@ -1410,6 +1411,12 @@ function BirthEditor({ birth, onSave }) {
       <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生地（都道府県）</label>
       <select value={pref} onChange={(e) => setPref(e.target.value)} style={inp}>
         {PREFS.map((p) => <option key={p[0]}>{p[0]}</option>)}
+      </select>
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>性別（大運＝運勢の流れの算出に使用）</label>
+      <select value={gender} onChange={(e) => setGender(e.target.value)} style={inp}>
+        <option value="">未設定</option>
+        <option value="male">男性</option>
+        <option value="female">女性</option>
       </select>
       <button onClick={save} style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}>保存して占う</button>
     </Acc>
