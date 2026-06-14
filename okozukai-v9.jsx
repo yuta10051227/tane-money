@@ -1202,7 +1202,7 @@ function GachaAnim({ result, onClose }) {
   const timers = useRef([]);
   const at = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
   useEffect(()=>()=>timers.current.forEach(clearTimeout), []);
-  useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 1000); }, []);
+  useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 450); }, []);
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
@@ -1303,14 +1303,14 @@ function GachaAnim({ result, onClose }) {
       )}
 
       {phase==="hush" && (
-        <div style={{position:"absolute",inset:0,background:"rgba(2,1,6,0.94)",animation:"gHush .4s ease-in forwards",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:7,overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"rgba(22,10,42,0.8)",animation:"gHush .4s ease-in forwards",display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:7,overflow:"hidden"}}>
           <div style={{position:"absolute",left:"50%",top:"47%",transform:"translate(-50%,-50%)",width:60,height:60,borderRadius:"50%",
             background: isSuper?"conic-gradient(from 0deg,#ff3b3b,#ffb02e,#ffe53b,#3bd16f,#3b9eff,#9b5bff,#ff3b3b)":"radial-gradient(circle,#ffffff,#f5c842)",
             filter:"blur(7px)",animation:`gCharge ${isSuper?1.45:0.95}s ease-in forwards`}}/>
-          <div style={{position:"relative",color:"#fff",fontSize:30,fontWeight:900,letterSpacing:5,textShadow:"0 0 22px #fff",animation:"gHushBeat .42s ease-in-out infinite"}}>…！？</div>
+          <div style={{position:"relative",color:"#fff",fontSize:30,fontWeight:900,letterSpacing:5,textShadow:"0 0 22px #fff",animation:"gHushBeat .42s ease-in-out infinite"}}>なにか 来る…！</div>
         </div>
       )}
-      {phase==="burst" && <div style={{position:"absolute",inset:0,background: hasHush?"#fff":"radial-gradient(circle at 50% 46%,#fff 0%,#fff8 45%,#fff0 75%)",animation:hasHush?"gFlash .6s ease-out":"gFlash .45s ease-out",pointerEvents:"none",zIndex:8}}/>}
+      {phase==="burst" && <div style={{position:"absolute",inset:0,background: hasHush?"radial-gradient(circle at 50% 46%,#ffffff 0%,#fff0c2 28%,#ffd97a66 52%,#ffd97a00 80%)":"radial-gradient(circle at 50% 46%,#fff 0%,#fff8 45%,#fff0 75%)",animation:hasHush?"gFlash .6s ease-out":"gFlash .45s ease-out",pointerEvents:"none",zIndex:8}}/>}
       {(phase==="burst"||phase==="show") && (
         <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:6}}>
           {parts.map((p,i)=>(
@@ -1322,6 +1322,7 @@ function GachaAnim({ result, onClose }) {
       {(phase==="charge"||phase==="tap"||phase==="grow") && (
         <div style={{position:"absolute",top:"9%",left:0,right:0,textAlign:"center",pointerEvents:"none"}}>
           <div style={{fontSize:15,color:"rgba(255,255,255,0.75)",letterSpacing:1,marginBottom:6,textShadow:"0 2px 8px #000"}}>{theme.emoji} {theme.name}ガチャ</div>
+          {(phase==="charge"||phase==="tap") && result.todayTasks>0 && <div style={{fontSize:13,color:"#bff0c8",fontWeight:800,marginBottom:8,textShadow:"0 2px 8px #000"}}>きょう {result.todayTasks}こ おてつだいしたから タネが げんき！🌱</div>}
           <div style={{fontSize:phase==="grow"&&isSuper?24:19,fontWeight:900,color:rainbow?"#fff":phase==="grow"?AURA:"#fff",textShadow:rainbow?"0 0 16px #fff,0 2px 8px #000":"0 2px 8px #000",animation:"fadePulse .8s ease-in-out infinite"}}>
             {phase==="charge" ? "タネを植えるよ…"
              : phase==="tap" ? "タップして水をあげよう！💧"
@@ -1330,7 +1331,7 @@ function GachaAnim({ result, onClose }) {
              : curTier==="r" ? "ニョキッ！まだ育つ…！？"
              : "なにが育つかな…？"}
           </div>
-          {(phase==="grow") && <div style={{color:"rgba(255,255,255,.5)",fontSize:11,marginTop:12}}>タップでスキップ</div>}
+          {(phase==="grow"||phase==="hush") && <div onClick={(e)=>{e.stopPropagation();skip();}} style={{display:"inline-block",marginTop:16,background:"rgba(255,255,255,.16)",border:"1.5px solid rgba(255,255,255,.55)",borderRadius:999,padding:"7px 20px",color:"#fff",fontSize:15,fontWeight:800,pointerEvents:"auto",cursor:"pointer"}}>スキップ ⏭</div>}
         </div>
       )}
 
@@ -2458,13 +2459,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const doGacha = () => {
     if (todayDone && !gachaTest) return;
-    const res = rollGacha(data.gacha);
+    let res = rollGacha(data.gacha);
+    // 連続日数で「がんばりが報われる」確定演出（7日でSR以上・30日で激レア確定）
+    const _gf = (id)=> (data.gacha||[]).find(g=>g.id===id);
+    if(curStreak>0){
+      if(curStreak%30===0 && res.rate>3){ const g=_gf("gc4"); if(g) res={...g, pts:Math.floor(Math.random()*(g.max-g.min+1))+g.min}; }
+      else if(curStreak%7===0 && res.rate>12){ const g=_gf("gc3"); if(g) res={...g, pts:Math.floor(Math.random()*(g.max-g.min+1))+g.min}; }
+    }
     const theme = getMonthTheme();
     const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
+    const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
+    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayKey())).length;
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
     const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
-    const finalRes = {...res, pts:res.pts+bonusPts, bonusPts, theme, collItem, isNewItem};
+    const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks};
     setGachaRes(finalRes);
     if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
@@ -2923,6 +2932,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
                     {gachaTest?"何回でもOK（記録は残りません・〜07:34）":(todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
                   </div>
+                  {!todayDone&&!gachaTest&&<div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
                   {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑残り{rem}体 · COLLECT THEM ALL</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>COLLECTION COMPLETE ★</div>;})()}
