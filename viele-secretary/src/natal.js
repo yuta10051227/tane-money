@@ -229,3 +229,158 @@ export function sanmei(birth) {
   } catch { return null; }
 }
 
+/* ──────────────────────────────────────────────────────────────
+   算命学：人体星図（陽占）の完全版。高尾系・標準マッピングで決定論計算。
+   - 五主星（十大主星）：中央=月支蔵干 / 北=年支蔵干 / 南=日支蔵干 / 東=月干 / 西=年干
+   - 十二大従星（エネルギー）：初年=年支 / 中年=月支 / 晩年=日支 の十二運から変換
+   - 日干タイプ（五行×陰陽の気質）
+   - 干支三柱（陰占の素データ）
+   AI不使用・完全決定論。
+   ────────────────────────────────────────────────────────────── */
+
+// 十二運（十二支星）：陽干は順行・陰干は逆行。長生の起点支から12支を順に当てる。
+// 起点（長生）: 甲=亥, 丙/戊=寅, 庚=巳, 壬=申（陽・順行） / 乙=午, 丁/己=酉, 辛=子, 癸=卯（陰・逆行）
+// 12段階の並び（長生から）: 長生→沐浴→冠帯→建禄→帝旺→衰→病→死→墓→絶→胎→養
+const UNSEI_ORDER = ["長生", "沐浴", "冠帯", "建禄", "帝旺", "衰", "病", "死", "墓", "絶", "胎", "養"];
+const CHANGSHENG = { 甲: "亥", 丙: "寅", 戊: "寅", 庚: "巳", 壬: "申", 乙: "午", 丁: "酉", 己: "酉", 辛: "子", 癸: "卯" };
+// 日干と支から十二運名を返す
+function unseiOf(meStem, branch) {
+  const startBranch = CHANGSHENG[meStem];
+  const startIdx = Z.indexOf(startBranch);
+  const branchIdx = Z.indexOf(branch);
+  const yang = (G.indexOf(meStem) % 2) === 0; // 甲丙戊庚壬=陽
+  // 起点からの支のステップ数（陽=順行 / 陰=逆行）
+  const step = yang
+    ? ((branchIdx - startIdx) % 12 + 12) % 12
+    : ((startIdx - branchIdx) % 12 + 12) % 12;
+  return UNSEI_ORDER[step];
+}
+
+// 十二運 → 十二大従星（名称・エネルギー値1〜12）。高尾系標準対応。
+const UNSEI_TO_JUSEI = {
+  胎: { name: "天報星", energy: 3 },
+  養: { name: "天印星", energy: 6 },
+  長生: { name: "天貴星", energy: 9 },
+  沐浴: { name: "天恍星", energy: 7 },
+  冠帯: { name: "天南星", energy: 10 },
+  建禄: { name: "天禄星", energy: 11 },
+  帝旺: { name: "天将星", energy: 12 },
+  衰: { name: "天堂星", energy: 8 },
+  病: { name: "天胡星", energy: 4 },
+  死: { name: "天極星", energy: 2 },
+  墓: { name: "天庫星", energy: 5 },
+  絶: { name: "天馳星", energy: 1 },
+};
+// 十二大従星の時期別・起業家向けの勢いコメント
+const JUSEI_MEANING = {
+  天報星: "変化と可能性の星。多方向に芽を出す、アイデアの時期。",
+  天印星: "守られ育まれる星。人の助けを借りて素直に伸びる時期。",
+  天貴星: "純粋で真っ直ぐな星。理想を掲げて学び育つ時期。",
+  天恍星: "夢とロマンの星。憧れに動かされ、人を惹きつける時期。",
+  天南星: "若き行動力の星。勢いで一気に攻め込める時期。",
+  天禄星: "現実的な働き者の星。地に足をつけ着実に積む時期。",
+  天将星: "最大エネルギーの星。トップに立ち大きく勝負できる時期。",
+  天堂星: "円熟と知恵の星。経験を生かし、まとめ役で力を発揮する時期。",
+  天胡星: "繊細な感性の星。無理せず内面・専門性を深める時期。",
+  天極星: "精神性の星。手放し、本質に集中して再生する時期。",
+  天庫星: "蓄積と継承の星。資産・ノウハウをストックし守る時期。",
+  天馳星: "スピードと無限の星。型を超え自由に駆け抜ける時期。",
+};
+
+// 日干タイプ（十干10種）。五行×陰陽の気質、起業家向けの一言。
+const DAY_TYPE = {
+  甲: { label: "陽の木＝大樹タイプ", desc: "真っ直ぐ上へ伸びるリーダー気質。曲げない芯で組織を引っ張る。" },
+  乙: { label: "陰の木＝草花タイプ", desc: "しなやかに環境へ適応する世渡り上手。人と絡んで生き残る。" },
+  丙: { label: "陽の火＝太陽タイプ", desc: "明るく目立つ発信者。情熱と存在感で人を巻き込む。" },
+  丁: { label: "陰の火＝灯火タイプ", desc: "繊細で一点を温める集中力。専門性と細やかさで信頼を得る。" },
+  戊: { label: "陽の土＝山岳タイプ", desc: "どっしり構える安定の人。スケールの大きさと包容力が武器。" },
+  己: { label: "陰の土＝田畑タイプ", desc: "実りを育てる現実家。地道に育成・運用して成果を積む。" },
+  庚: { label: "陽の金＝鉄鋼タイプ", desc: "決断と実行の改革者。白黒つける突破力で局面を打開する。" },
+  辛: { label: "陰の金＝宝石タイプ", desc: "磨かれた美意識とプライド。質と完成度で勝負する職人肌。" },
+  壬: { label: "陽の水＝大海タイプ", desc: "発想自由で器が大きい。流れを読み、大胆に動く戦略家。" },
+  癸: { label: "陰の水＝雨露タイプ", desc: "知的で気配り上手。情報・潤いを行き渡らせる調整役。" },
+};
+
+// 主星の位置メタ（高尾系・人体星図の十字配置）。位置の意味は標準的な人体星図の配当に準拠。
+const POS_META = {
+  center: { posLabel: "中央（胸）・中心星", posMeaning: "本質・本来の自分。経営の核となる素の気質。", source: "月支蔵干" },
+  north: { posLabel: "頭・第四命星", posMeaning: "目上・年長者（親／上司）から見たあなた。精神性と仕事への向き合い方。", source: "年支蔵干" },
+  south: { posLabel: "腹・第二命星", posMeaning: "社会的な顔・目下（部下／子）から見たあなた。現実の行動・実務の出方。", source: "日支蔵干" },
+  east: { posLabel: "右手・第一命星", posMeaning: "配偶者・家庭・身近な人から見たあなた。プライベートでの出方。", source: "月干" },
+  west: { posLabel: "左手・第三命星", posMeaning: "友人・兄弟・恋人から見たあなた。仲間うちでの魅力。", source: "年干" },
+};
+
+// 主星を1つ組み立てる
+function buildStar(pos, me, sourceStem) {
+  const god = tenGod(me, sourceStem);
+  const star = TEN_GOD_TO_STAR[god] || "貫索星";
+  const d = STAR_DESC[star];
+  const m = POS_META[pos];
+  return {
+    pos,
+    posLabel: m.posLabel,
+    posMeaning: m.posMeaning,
+    source: m.source,
+    sourceStem,
+    star,
+    god,
+    emoji: d.emoji,
+    title: d.title,
+    desc: d.desc,
+    biz: d.biz,
+  };
+}
+
+// 算命学・人体星図（陽占）の完全データを返す。出生情報が無ければ null。
+export function sanmeiDetail(birth) {
+  if (!birth || !birth.date) return null;
+  try {
+    const c = computeChart(birth);
+    const me = c.dayMaster;
+
+    const yearStem = String(c.yearPillar).slice(0, 1);
+    const yearBranch = String(c.yearPillar).slice(-1);
+    const monthStem = String(c.monthPillar).slice(0, 1);
+    const monthBranch = String(c.monthPillar).slice(-1);
+    const dayBranch = String(c.dayPillar).slice(-1);
+
+    // ── 五主星（十大主星） ──
+    const center = buildStar("center", me, HIDDEN[monthBranch] || me); // 月支蔵干
+    const north = buildStar("north", me, HIDDEN[yearBranch] || me);    // 年支蔵干
+    const south = buildStar("south", me, HIDDEN[dayBranch] || me);     // 日支蔵干
+    const east = buildStar("east", me, monthStem);                     // 月干
+    const west = buildStar("west", me, yearStem);                      // 年干
+    const stars = [center, north, south, east, west];
+
+    // ── 十二大従星（エネルギー）3つ ──
+    const mkEnergy = (phase, branch) => {
+      const unsei = unseiOf(me, branch);
+      const j = UNSEI_TO_JUSEI[unsei];
+      return { phase, name: j.name, energy: j.energy, unsei, meaning: JUSEI_MEANING[j.name] };
+    };
+    const energies = [
+      mkEnergy("初年", yearBranch),  // 初年期=年支
+      mkEnergy("中年", monthBranch), // 中年期=月支
+      mkEnergy("晩年", dayBranch),   // 晩年期=日支
+    ];
+
+    // ── 日干タイプ ──
+    const dt = DAY_TYPE[me];
+    const dayType = {
+      stem: me,
+      element: FIVE[me],
+      yinYang: (G.indexOf(me) % 2) === 0 ? "陽" : "陰",
+      label: dt.label,
+      desc: dt.desc,
+    };
+
+    return {
+      center,
+      stars,
+      energies,
+      dayType,
+      pillars: { year: c.yearPillar, month: c.monthPillar, day: c.dayPillar },
+    };
+  } catch { return null; }
+}
+
