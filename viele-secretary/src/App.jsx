@@ -37,14 +37,12 @@ const PENDING_GCAL_REFRESH = (() => {
 /* ──────────────────────────────────────────────────────────────
    配色（落ち着いた秘書ダッシュボード）
    ────────────────────────────────────────────────────────────── */
-// テーマ：アクセント色(accent/green/orange/red/blue/purple)は両テーマ共通に固定し、
-// 背景・文字などニュートラル色だけを切り替える（モジュール定数CAT/STANCE_UI等が
-// 読み込み時にアクセント色を取り込むため、アクセントを共通化して整合を保つ）。
-const ACCENTS = { accent: "#C9A227", green: "#3FB984", orange: "#E8A13E", red: "#E2554B", blue: "#5B8DEF", purple: "#9A7BE0" };
+// テーマ：暗背景はビビッドなアクセント、明背景は白地で読みやすいよう濃いめのアクセントに最適化。
+// アクセントも含めテーマ単位で切替（CAT/STANCE_UIは下でdynにして読み込み時固定を回避）。
 const THEMES = {
   // invBg/invText: 反転(白抜き)ボタン用。背景に文字色を流用すると light で潰れるため専用トークン化。
-  dark: { ...ACCENTS, bg: "#0F1115", panel: "#171A21", panel2: "#1E222B", line: "#2A2F3A", text: "#E8EAED", sub: "#C5CBD3", faint: "#AAB2BD", invBg: "#E8EAED", invText: "#0B0D11" },
-  light: { ...ACCENTS, bg: "#F4F5F7", panel: "#FFFFFF", panel2: "#EDF0F4", line: "#D2D8E0", text: "#1B1E24", sub: "#444B55", faint: "#66707C", invBg: "#222733", invText: "#FFFFFF" },
+  dark: { bg: "#0F1115", panel: "#171A21", panel2: "#1E222B", line: "#2A2F3A", text: "#E8EAED", sub: "#C5CBD3", faint: "#AAB2BD", invBg: "#E8EAED", invText: "#0B0D11", accent: "#C9A227", green: "#3FB984", orange: "#E8A13E", red: "#E2554B", blue: "#5B8DEF", purple: "#9A7BE0" },
+  light: { bg: "#F4F5F7", panel: "#FFFFFF", panel2: "#EDF0F4", line: "#D2D8E0", text: "#1B1E24", sub: "#444B55", faint: "#66707C", invBg: "#222733", invText: "#FFFFFF", accent: "#9A7B12", green: "#1B8A5A", orange: "#B56A14", red: "#C23B32", blue: "#2F62C8", purple: "#6A4FB8" },
 };
 let THEME_NAME = "dark"; // 本画面の描画開始時に data.theme で更新（CSR単一画面なので安全）
 // テーマに追従する動的スタイル：プロパティ参照のたびに現在テーマの値を返すProxy。
@@ -57,13 +55,8 @@ const dyn = (fn) => new Proxy({}, {
 });
 const C = dyn(() => THEMES[THEME_NAME]);
 
-// 役割カテゴリ（施術/制作/集客/経営）の色
-const CAT = {
-  施術: C.green,
-  制作: C.blue,
-  集客: C.purple,
-  経営: C.accent,
-};
+// 役割カテゴリ（施術/制作/集客/経営）の色。テーマ追従のためdyn（CAT[cat]/Object.keys(CAT)が現在テーマ色を返す）。
+const CAT = dyn(() => { const t = THEMES[THEME_NAME]; return { 施術: t.green, 制作: t.blue, 集客: t.purple, 経営: t.accent }; });
 const FAMILY_COLOR = "#C77B9C"; // 家族・プライベートの色（仕事と区別）
 const catColor = (cat) => CAT[cat] || (cat === "家族" ? FAMILY_COLOR : C.faint);
 
@@ -760,6 +753,8 @@ function DeadlineBoard({ deadlines, linked, launches, birth, onAdd, onAddBulk, o
     [birth && birth.date, birth && birth.time, sorted.map((d) => d.date).join(",")]
   );
   const [mode, setMode] = useState(null); // null | "single" | "template"
+  const [q, setQ] = useState("");          // 締切の絞り込みキーワード
+  const [near, setNear] = useState(false); // 間近(14日以内)・遅れのみ表示
   const blank = { title: "", stage: "", date: iso(addDays(new Date(), 14)) };
   const [f, setF] = useState(blank);
   const [editId, setEditId] = useState(null);
@@ -815,9 +810,24 @@ function DeadlineBoard({ deadlines, linked, launches, birth, onAdd, onAddBulk, o
           >{preview.length}件まとめて追加</button>
         </div>
       )}
-      {sorted.length === 0 && <Empty>締切は登録されていません。右上から追加できます。</Empty>}
+      {sorted.length >= 4 && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="🔍 締切を検索（名前・段階）" style={{ ...inp, marginBottom: 0, flex: "1 1 160px" }} />
+          <button onClick={() => setNear((v) => !v)} title="14日以内・遅れだけ表示" style={{ ...chipBtn, background: near ? C.accent : "transparent", color: near ? C.invText : C.sub, borderColor: near ? C.accent : C.line }}>{near ? "✓ 間近のみ" : "間近のみ"}</button>
+        </div>
+      )}
+      {(() => {
+        const qq = q.trim().toLowerCase();
+        const view = sorted.filter((d) => {
+          if (qq && !(`${d.title} ${d.stage || ""}`.toLowerCase().includes(qq))) return false;
+          if (near) { const diff = Math.ceil((new Date(d.date) - new Date()) / 86400000); if (diff > 14) return false; }
+          return true;
+        });
+        return (<>
+      {sorted.length === 0 ? <Empty>締切は登録されていません。右上から追加できます。</Empty>
+        : view.length === 0 ? <Empty>条件に合う締切はありません。</Empty> : null}
       <div style={{ display: "grid", gap: 10 }}>
-        {sorted.map((d, i) => {
+        {view.map((d, i) => {
           if (!d.linked && editId === d.id) {
             return (
               <div key={d.id} style={{ background: C.panel2, borderRadius: 12, padding: 12 }}>
@@ -854,6 +864,8 @@ function DeadlineBoard({ deadlines, linked, launches, birth, onAdd, onAddBulk, o
           );
         })}
       </div>
+        </>);
+      })()}
     </Panel>
   );
 }
@@ -1549,12 +1561,12 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
 /* 経営カレンダー：その月の各日の「気」を決定論(占術)で色分けし、
    仕事タブの予定（本番日・締切・ローンチ締切）を重ねて「攻めの日に寄っているか」を可視化。
    → 発信・ローンチを攻めの日に寄せ、守りの日に重なった締切は前後へずらす提案を出す。 */
-const STANCE_UI = {
-  攻め: { color: C.green, mark: "攻", tip: "発信・営業・ローンチ向き" },
-  労い: { color: C.blue, mark: "労", tip: "人に支えられる・受け取る日" },
-  整える: { color: C.accent, mark: "整", tip: "淡々と整える日" },
-  守り: { color: C.red, mark: "守", tip: "守りを固める・背伸びしない" },
-};
+const STANCE_UI = dyn(() => { const t = THEMES[THEME_NAME]; return {
+  攻め: { color: t.green, mark: "攻", tip: "発信・営業・ローンチ向き" },
+  労い: { color: t.blue, mark: "労", tip: "人に支えられる・受け取る日" },
+  整える: { color: t.accent, mark: "整", tip: "淡々と整える日" },
+  守り: { color: t.red, mark: "守", tip: "守りを固める・背伸びしない" },
+}; });
 function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
@@ -1950,6 +1962,83 @@ function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, re
   );
 }
 
+/* タスク（締切・優先度つき。並び＝未完了→優先度→締切） */
+const TASK_PRI = ["高", "中", "低"];
+const PRI_W = { 高: 0, 中: 1, 低: 2 };
+function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
+  const list = items || [];
+  const [text, setText] = useState("");
+  const [due, setDue] = useState("");
+  const [pri, setPri] = useState("中");
+  const [editId, setEditId] = useState(null);
+  const [e, setE] = useState({ title: "", due: "", priority: "中" });
+  const dueSig = (d) => {
+    if (!d) return null;
+    const diff = Math.ceil((new Date(d) - new Date()) / 86400000);
+    if (diff < 0) return { c: C.red, t: `${-diff}日超過` };
+    if (diff === 0) return { c: C.red, t: "今日まで" };
+    if (diff <= 3) return { c: C.orange, t: `あと${diff}日` };
+    return { c: C.sub, t: `あと${diff}日` };
+  };
+  const priColor = (p) => (p === "高" ? C.red : p === "低" ? C.faint : C.accent);
+  const sorted = [...list].sort((a, b) =>
+    (a.done ? 1 : 0) - (b.done ? 1 : 0)
+    || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
+    || (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
+  );
+  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, due: it.due || "", priority: it.priority || "中" }); };
+  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), due: e.due || "", priority: e.priority }); setEditId(null); };
+  return (
+    <Panel title="追加タスク" accent={C.purple} help="締切と優先度をつけて管理できます。締切が近い・過ぎたタスクは色で警告。並びは『未完了 → 優先度（高→低）→ 締切が近い順』です。">
+      <div style={{ display: "grid", gap: 8 }}>
+        {sorted.length === 0 && <Empty>タスクはありません。</Empty>}
+        {sorted.map((it) => {
+          const sig = dueSig(it.due);
+          return (
+            <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+              {editId === it.id ? (
+                <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+                  <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+                    <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+                    <button onClick={saveEdit} style={chipBtn}>保存</button>
+                    <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
+                  <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: priColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
+                    {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
+                    {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
+                  </div>
+                </div>
+              )}
+              {editId !== it.id && (
+                <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+                  <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
+                  <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <form onSubmit={(ev) => { ev.preventDefault(); if (!text.trim()) return; onAdd({ title: text.trim(), due: due || "", priority: pri }); setText(""); setDue(""); setPri("中"); }} style={{ display: "grid", gap: 6, marginTop: 12 }}>
+        <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="タスクを追加…" style={{ ...inp, marginBottom: 0 }} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} title="締切（任意）" style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+          <select value={pri} onChange={(ev) => setPri(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+          <button type="submit" style={{ ...chipBtn, background: C.purple, color: C.invText, borderColor: C.purple }}>追加</button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
 /* 請求・お金（金額・種別つき。未処理合計を表示） */
 const yen = (n) => "¥" + (Number(n) || 0).toLocaleString("ja-JP");
 // 万円表記（1万以上は「¥48万」のように圧縮。それ未満は通常表記）
@@ -2008,6 +2097,13 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
     <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{L.name}</span>
+        {(() => {
+          const upd = Number(L.updatedAt) || 0;
+          if (!upd) return null;
+          const d = Math.floor((Date.now() - upd) / 86400000);
+          const stale = d >= 3;
+          return <span title="数字を最後に更新した日。手入力なので鮮度に注意。" style={{ fontSize: 12, fontWeight: stale ? 700 : 400, color: stale ? C.orange : C.faint, flex: "0 0 auto" }}>{stale ? "⚠️ " : ""}{d <= 0 ? "今日更新" : `${d}日前の数字`}</span>;
+        })()}
         <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✏️</button>
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
@@ -3212,7 +3308,7 @@ export default function App() {
             <LaunchKpi
               launches={data.launches}
               onAdd={launches.add}
-              onEdit={launches.edit}
+              onEdit={(id, patch) => launches.edit(id, { ...patch, updatedAt: Date.now() })}
               onRemove={launches.remove}
             />
             <MoneyList
@@ -3226,15 +3322,12 @@ export default function App() {
         )}
 
         {activeTab === "tasks" && (
-          <CheckList
-            title="追加タスク"
-            accent={C.purple}
+          <TaskList
             items={data.tasks}
             onToggle={tasks.toggle}
             onAdd={tasks.add}
             onEdit={tasks.edit}
             onRemove={tasks.remove}
-            placeholder="タスクを追加…"
           />
         )}
 
