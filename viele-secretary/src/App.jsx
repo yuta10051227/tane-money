@@ -37,21 +37,25 @@ const PENDING_GCAL_REFRESH = (() => {
 /* ──────────────────────────────────────────────────────────────
    配色（落ち着いた秘書ダッシュボード）
    ────────────────────────────────────────────────────────────── */
-const C = {
-  bg: "#0F1115",
-  panel: "#171A21",
-  panel2: "#1E222B",
-  line: "#2A2F3A",
-  text: "#E8EAED",
-  sub: "#C5CBD3",
-  faint: "#AAB2BD",
-  accent: "#C9A227", // gold
-  green: "#3FB984",
-  orange: "#E8A13E",
-  red: "#E2554B",
-  blue: "#5B8DEF",
-  purple: "#9A7BE0",
+// テーマ：アクセント色(accent/green/orange/red/blue/purple)は両テーマ共通に固定し、
+// 背景・文字などニュートラル色だけを切り替える（モジュール定数CAT/STANCE_UI等が
+// 読み込み時にアクセント色を取り込むため、アクセントを共通化して整合を保つ）。
+const ACCENTS = { accent: "#C9A227", green: "#3FB984", orange: "#E8A13E", red: "#E2554B", blue: "#5B8DEF", purple: "#9A7BE0" };
+const THEMES = {
+  // invBg/invText: 反転(白抜き)ボタン用。背景に文字色を流用すると light で潰れるため専用トークン化。
+  dark: { ...ACCENTS, bg: "#0F1115", panel: "#171A21", panel2: "#1E222B", line: "#2A2F3A", text: "#E8EAED", sub: "#C5CBD3", faint: "#AAB2BD", invBg: "#E8EAED", invText: "#0B0D11" },
+  light: { ...ACCENTS, bg: "#F4F5F7", panel: "#FFFFFF", panel2: "#EDF0F4", line: "#D2D8E0", text: "#1B1E24", sub: "#444B55", faint: "#66707C", invBg: "#222733", invText: "#FFFFFF" },
 };
+let THEME_NAME = "dark"; // 本画面の描画開始時に data.theme で更新（CSR単一画面なので安全）
+// テーマに追従する動的スタイル：プロパティ参照のたびに現在テーマの値を返すProxy。
+// style={obj} / {...obj} のどちらでも描画時に最新色へ解決される。
+const dyn = (fn) => new Proxy({}, {
+  get: (_, k) => fn()[k],
+  has: (_, k) => k in fn(),
+  ownKeys: () => Reflect.ownKeys(fn()),
+  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
+});
+const C = dyn(() => THEMES[THEME_NAME]);
 
 // 役割カテゴリ（施術/制作/集客/経営）の色
 const CAT = {
@@ -278,12 +282,13 @@ const LAUNCH_TEMPLATES = {
   二段ローンチ標準: {
     anchorLabel: "本申込 開始日",
     steps: [
-      { title: "予告・教育コンテンツ開始", stage: "予告", offset: -14 },
-      { title: "LINE先行登録 開始", stage: "先行登録", offset: -10 },
+      { title: "予告・教育コンテンツ開始", stage: "予告", offset: -28 },
+      { title: "LINE先行登録 開始", stage: "先行登録", offset: -21 },
+      { title: "先行登録 中間リマインド", stage: "先行登録", offset: -10 },
       { title: "先行登録 締切", stage: "先行登録", offset: -1 },
       { title: "本申込 開始", stage: "本申込", offset: 0 },
       { title: "締切リマインド送信", stage: "本申込", offset: 4 },
-      { title: "本申込 締切", stage: "本申込", offset: 6 },
+      { title: "本申込 締切", stage: "本申込", offset: 7 },
     ],
   },
   セミナー集客: {
@@ -729,9 +734,26 @@ function deadlineStanceHint(rel) {
   return null;
 }
 
-function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onRemove }) {
+function DeadlineBoard({ deadlines, linked, launches, birth, onAdd, onAddBulk, onEdit, onRemove }) {
   // 手動の締切＋売上タブのローンチ締切(linked)を時系列に統合表示
   const sorted = [...(deadlines || []), ...(linked || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+  // ローンチKPIを告知文の材料に注入：linked締切(id=lk:ローンチID:段階)から該当ローンチを引く
+  const launchById = {};
+  for (const L of launches || []) launchById[L.id] = L;
+  const draftContext = (d) => {
+    const base = `${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`;
+    const lid = String(d.id).startsWith("lk:") ? String(d.id).split(":")[1] : null;
+    const L = lid ? launchById[lid] : null;
+    if (!L) return base;
+    const parts = [];
+    if (L.name) parts.push(`商品名：${L.name}`);
+    if (Number(L.price)) parts.push(`客単価：¥${Number(L.price).toLocaleString("ja-JP")}`);
+    if (Number(L.goalReg)) parts.push(`先行登録 目標${L.goalReg}人（現在${Number(L.reg) || 0}人）`);
+    if (Number(L.goalCv)) parts.push(`本申込 目標${L.goalCv}人（現在${Number(L.cv) || 0}人）`);
+    const diff = Math.ceil((new Date(d.date) - new Date()) / 86400000);
+    if (Number.isFinite(diff)) parts.push(`この締切まであと${diff}日`);
+    return parts.length ? `${base}。次の情報を踏まえ、行動を促す具体的な告知にしてください：${parts.join(" / ")}` : base;
+  };
   // 各締切日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
   const stances = useMemo(
     () => (birth && birth.date ? stancesFor(birth, sorted.map((d) => d.date)) : {}),
@@ -827,7 +849,7 @@ function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onR
                   {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
                 </div>
               </div>
-              {draftId === d.id && <DraftPanel context={`${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`} />}
+              {draftId === d.id && <DraftPanel context={draftContext(d)} />}
             </div>
           );
         })}
@@ -851,7 +873,7 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
   const systemPct = total > 0 ? Math.round((system / total) * 100) : 0;
 
   return (
-    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。役割は自動判定ですが、各予定の区分ボタンで修正でき（同名は記憶）、カレンダー単位の既定区分も『設定・取り込み』で決められます。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
+    <Panel title="今週の時間配分メーター" accent={C.accent} help="今週の時間を役割（施術/制作/集客/経営）別に表示します。さらに『労働＝自分が動く時間』と『仕組み＝後から自動で売れる資産になる時間』の2軸で、仕組みづくりに時間を回せているかを％で見ます。役割は自動判定ですが、各予定の区分ボタンで修正でき（同名は記憶）、カレンダー単位の既定区分も『設定・取り込み』で決められます。『労働/仕組み』も各予定の隣のボタンで切り替えられます（例：受託の制作は労働、自主コンテンツは仕組み）。" right={<span style={{ fontSize: 13, color: C.sub }}>計 {r1(total)}h</span>}>
       <CalStatusNote source={source} status={status} error={error} count={count} onConnect={onConnect} connecting={connecting} onRefresh={onRefresh} refreshing={refreshing} />
       {total === 0 ? (
         <Empty>{source === "calendar" ? "今週の時間指定の予定が見つかりませんでした。" : "データがありません。"}</Empty>
@@ -891,11 +913,13 @@ function TimeMeter({ entries, source, status, error, count, onConnect, connectin
    今日の予定（カレンダー連携 or サンプルから本日の曜日を抽出）
    ────────────────────────────────────────────────────────────── */
 const CAT_CYCLE = ["施術", "制作", "集客", "経営", "その他", "自動"];
+const AXIS_CYCLE = ["労働", "仕組み", "自動"]; // 労働⟷仕組みの手動切替（"自動"で解除）
 
 // 予定1件の行（今日の予定／日別ビュー共通）
-function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEvent, busy }) {
+function ScheduleRow({ e, source, onSetCat, onSetAxis, writableIds, onEditEvent, onDeleteEvent, busy }) {
   const isFamily = e.role === "family";
   const canCat = source === "calendar" && !!onSetCat && !isFamily;
+  const canAxis = source === "calendar" && !!onSetAxis && !isFamily;
   const editable = source === "calendar" && !e.manual && !!onEditEvent && !!e.id && writableIds && writableIds.has(e.calendarId);
   const [editing, setEditing] = useState(false);
   const [ef, setEf] = useState({ title: "", date: "", allDay: false, start: "10:00" });
@@ -929,7 +953,7 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</div>
-        <div style={{ marginTop: 4 }}>
+        <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {canCat ? (
             <button
               onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
@@ -939,6 +963,17 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
           ) : (
             <span style={{ fontSize: 12, color: catColor(e.cat) }}>{labelOf(e.cat)}</span>
           )}
+          {canAxis && (() => {
+            const axColor = e.axis === "仕組み" ? C.green : C.orange;
+            const manual = e.axisSource === "manual";
+            return (
+              <button
+                onClick={() => onSetAxis(e.title, AXIS_CYCLE[(AXIS_CYCLE.indexOf(e.axis) + 1) % AXIS_CYCLE.length])}
+                title={manual ? "記憶済み（タップで変更・一周すると自動に戻ります）" : "自動判定（タップで「労働/仕組み」を記憶できます）"}
+                style={{ fontSize: 12, fontWeight: manual ? 700 : 400, color: manual ? "#0B0D11" : axColor, background: manual ? axColor : "transparent", border: `1px solid ${manual ? axColor : C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+              >{e.axis === "仕組み" ? "仕組み" : "労働"}{manual ? " ✓" : " ⇄"}</button>
+            );
+          })()}
         </div>
       </div>
       {editable && (
@@ -1000,7 +1035,7 @@ function AddEventBar({ calList, onCreate, busy, msg, onReconnect }) {
       )}
       {msg && <div style={{ fontSize: 12, color: msg.startsWith("失敗") || msg.includes("必要") ? C.red : C.green, marginTop: 6 }}>{msg}</div>}
       {(noWritable || (msg && msg.includes("必要"))) && onReconnect && (
-        <button onClick={onReconnect} style={{ ...chipBtn, marginTop: 8, background: C.text, color: "#0B0D11", borderColor: C.text, fontWeight: 700 }}>
+        <button onClick={onReconnect} style={{ ...chipBtn, marginTop: 8, background: C.invBg, color: C.invText, borderColor: C.invBg, fontWeight: 700 }}>
           書き込みを許可する（再連携）
         </button>
       )}
@@ -1049,14 +1084,14 @@ function SwipeView({ slides, accent = C.blue, hint }) {
   );
 }
 
-function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat, onRefresh, refreshing, writableIds, onEditEvent, onDeleteEvent, editBusy }) {
+function Schedule({ days, source, status, error, count, onConnect, connecting, onSetCat, onSetAxis, onRefresh, refreshing, writableIds, onEditEvent, onDeleteEvent, editBusy }) {
   const list = days || [];
   const slides = list.map((day) => ({
     key: day.key,
     label: `${day.label}（${day.date.getMonth() + 1}/${day.date.getDate()} ${WD[day.date.getDay()]}）`,
     content: day.items.length === 0
       ? <Empty>予定はありません。</Empty>
-      : <div style={{ display: "grid", gap: 10 }}>{day.items.map((e, i) => <ScheduleRow key={e.id || i} e={e} source={source} onSetCat={onSetCat} writableIds={writableIds} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} busy={editBusy} />)}</div>,
+      : <div style={{ display: "grid", gap: 10 }}>{day.items.map((e, i) => <ScheduleRow key={e.id || i} e={e} source={source} onSetCat={onSetCat} onSetAxis={onSetAxis} writableIds={writableIds} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} busy={editBusy} />)}</div>,
   }));
   return (
     <Panel title="予定（横スワイプで先の日へ）" accent={C.blue}>
@@ -1381,7 +1416,7 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
     <Panel title="予定の取り込み（TimeTree等）" accent={FAMILY_COLOR} help="TimeTree等のカレンダーのスクショを選ぶと、AIが予定を読み取って『家族レーン』として今日/今後の予定に反映します。Googleカレンダーは不要。">
       <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; onPick(f); }} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={() => ref.current && ref.current.click()} disabled={importing} style={{ ...chipBtn, background: importing ? "transparent" : C.text, color: importing ? C.sub : "#0B0D11", borderColor: importing ? C.line : C.text, fontWeight: 700 }}>
+        <button onClick={() => ref.current && ref.current.click()} disabled={importing} style={{ ...chipBtn, background: importing ? "transparent" : C.invBg, color: importing ? C.sub : C.invText, borderColor: importing ? C.line : C.invBg, fontWeight: 700 }}>
           {importing ? "読み取り中…" : "📷 スクショから取り込む"}
         </button>
         {count > 0 && <button onClick={onClear} style={chipBtn}>取り込み{count}件を消去</button>}
@@ -2080,6 +2115,20 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), amount: Number(e.amount) || 0, kind: e.kind }); setEditId(null); };
   const kindColor = (k) => (k === "入金" ? C.green : k === "支払" ? C.red : C.accent);
   const sum = (arr) => arr.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  // 月次サマリ：各項目の「年月」を date（無ければidのタイムスタンプ）から推定して集計
+  const monthOf = (it) => {
+    if (it.date) return String(it.date).slice(0, 7);
+    const n = Number(String(it.id || "").slice(1));
+    return n > 1e11 ? iso(new Date(n)).slice(0, 7) : null; // idは "m"+Date.now()
+  };
+  const nowD = new Date();
+  const curYM = `${nowD.getFullYear()}-${pad2(nowD.getMonth() + 1)}`;
+  const pvD = new Date(nowD.getFullYear(), nowD.getMonth() - 1, 1);
+  const prevYM = `${pvD.getFullYear()}-${pad2(pvD.getMonth() + 1)}`;
+  const sumKM = (kind, ym) => sum(list.filter((x) => x.kind === kind && monthOf(x) === ym));
+  const incCur = sumKM("入金", curYM), expCur = sumKM("支払", curYM), incPrev = sumKM("入金", prevYM);
+  const diffCur = incCur - expCur;
+  const incPct = incPrev > 0 ? Math.round(((incCur - incPrev) / incPrev) * 100) : null;
 
   const renderRow = (it) => (
     <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2133,9 +2182,19 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
       help="横スワイプで「すべて / 請求(未回収) / 売上(入金) / 経費(支払)」を切替。各タブに合計が出ます。下のフォームから追加できます。"
       right={<span style={{ fontSize: 12, color: outstanding > 0 ? C.accent : C.sub }}>未処理 {yen(outstanding)}</span>}
     >
+      <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>{nowD.getMonth() + 1}月の集計</div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "baseline", fontSize: 14 }}>
+          <span style={{ color: C.green, fontWeight: 700 }}>入金 {yen(incCur)}</span>
+          <span style={{ color: C.red, fontWeight: 700 }}>支払 {yen(expCur)}</span>
+          <span style={{ color: C.text, fontWeight: 700 }}>差引 {yen(diffCur)}</span>
+          {incPct !== null && <span style={{ fontSize: 12, color: incPct >= 0 ? C.green : C.red }}>前月比 入金 {incPct >= 0 ? "+" : ""}{incPct}%</span>}
+        </div>
+        <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>※登録した日付で集計（過去データは登録日基準）。入金・支払の項目に金額を入れると反映されます。</div>
+      </div>
       <SwipeView slides={slides} accent={C.accent} hint="← 横スワイプで すべて / 請求 / 売上 / 経費 →" />
       <form
-        onSubmit={(ev) => { ev.preventDefault(); if (!title.trim()) return; onAdd({ title: title.trim(), amount: Number(amount) || 0, kind }); setTitle(""); setAmount(""); }}
+        onSubmit={(ev) => { ev.preventDefault(); if (!title.trim()) return; onAdd({ title: title.trim(), amount: Number(amount) || 0, kind, date: iso(new Date()) }); setTitle(""); setAmount(""); }}
         style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
       >
         <input value={title} onChange={(ev) => setTitle(ev.target.value)} placeholder="請求・入金項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
@@ -2220,7 +2279,7 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
       <button
         onClick={onConnect}
         disabled={connecting}
-        style={{ ...chipBtn, background: connecting ? "transparent" : C.text, color: connecting ? C.sub : "#0B0D11", borderColor: connecting ? C.line : C.text, fontWeight: 700 }}
+        style={{ ...chipBtn, background: connecting ? "transparent" : C.invBg, color: connecting ? C.sub : C.invText, borderColor: connecting ? C.line : C.invBg, fontWeight: 700 }}
       >
         {connecting ? "連携中…" : isErr ? "再連携する" : "Googleカレンダーを連携"}
       </button>
@@ -2490,6 +2549,8 @@ export default function App() {
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
   // 区分の表示名を業種設定で差し替え（描画前に反映。子コンポーネントは labelOf() で参照）
   CAT_LABELS = (data && data.catLabels) || {};
+  // テーマを描画前に反映（C や inp/chipBtn/iconBtn が現在テーマの色で解決される）
+  THEME_NAME = data && data.theme === "light" ? "light" : "dark";
 
   // 通知ON：許可取得 → プッシュ購読 → 購読をFirestoreに保存（閉じていてもサーバーから届く）
   // 注意1(iOS): ホーム画面に追加したPWA内でのみプッシュ受信が可能。
@@ -2734,6 +2795,8 @@ export default function App() {
 
   // 製品計測（PostHog）の初期化。キー未設定なら何もしない（無料・無送信）
   useEffect(() => { initAnalytics(); track("app_opened"); }, []);
+  // 端末のオーバースクロール等で地が見えても背景が揃うよう、body色をテーマに追従させる
+  useEffect(() => { document.body.style.background = THEMES[THEME_NAME].bg; }, [data && data.theme]);
   // ログインしたら匿名uidで識別（PIIは送らない）。ファネル: app_opened → signed_in
   useEffect(() => {
     if (user && user.uid) { identifyUser(user.uid); track("signed_in"); }
@@ -2846,12 +2909,20 @@ export default function App() {
   const calConfig = data.calConfig || {}; // カレンダーID→ロール(work/family/off)
   const calCat = data.calCat || {};       // カレンダーID→既定の役割(施術/制作/集客/経営)。未設定はタイトルから自動判定。
   const axisOfCat = (cat) => (cat === "制作" || cat === "集客" ? "仕組み" : "労働");
+  const axisMap = data.axisMap || {}; // 予定名→労働/仕組み の手動上書き（メーターの精度を上げる）
   // 予定名→役割を記憶（同名の予定にも次回から自動適用）。"自動"を渡すと記憶を消して自動判定へ戻す。
   const setEventCat = (title, cat) => {
     const next = { ...catMap };
     if (cat === "自動") { delete next[title]; flashCatMsg(`「${title}」を自動判定に戻しました`); }
     else { next[title] = cat; flashCatMsg(`「${title}」を${labelOf(cat)}として記憶しました（同名の予定にも反映）`); }
     update({ catMap: next });
+  };
+  // 予定名→「労働/仕組み」を記憶。"自動"でcatからの自動判定に戻す。メーターの仕組み化%の精度に直結。
+  const setEventAxis = (title, axis) => {
+    const next = { ...axisMap };
+    if (axis === "自動") { delete next[title]; flashCatMsg(`「${title}」の労働/仕組みを自動に戻しました`); }
+    else { next[title] = axis; flashCatMsg(`「${title}」を「${axis}」として記憶しました（同名の予定にも反映）`); }
+    update({ axisMap: next });
   };
   const setCalRole = (calId, role) => update({ calConfig: { ...calConfig, [calId]: role } });
   // カレンダー単位の既定区分。"自動"で解除（タイトルから判定に戻す）。
@@ -2873,7 +2944,10 @@ export default function App() {
     else if (catMap[ev.title]) { cat = catMap[ev.title]; axis = axisOfCat(cat); catSource = "manual"; }
     else if (calCat[ev.calendarId]) { cat = calCat[ev.calendarId]; axis = axisOfCat(cat); catSource = "cal"; }
     else { const c = classifyEvent(ev.title); cat = c.cat; axis = c.axis; catSource = "auto"; }
-    return { ...ev, role, start, wd: start.getDay(), time: ev.allDay ? "終日" : `${pad2(start.getHours())}:${pad2(start.getMinutes())}`, hours, cat, axis, catSource };
+    // 労働/仕組みの手動上書き（家族以外）。axisSourceでUI表示を出し分け。
+    let axisSource = "auto";
+    if (role !== "family" && axisMap[ev.title]) { axis = axisMap[ev.title]; axisSource = "manual"; }
+    return { ...ev, role, start, wd: start.getDay(), time: ev.allDay ? "終日" : `${pad2(start.getHours())}:${pad2(start.getMinutes())}`, hours, cat, axis, catSource, axisSource };
   };
   const includedEntries = calEvents.filter((ev) => roleForCal(ev.calendarId) !== "off").map(buildEntry);
 
@@ -2974,6 +3048,7 @@ export default function App() {
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
           <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
+          <button onClick={() => update({ theme: data.theme === "light" ? "dark" : "light" })} title="背景の明るさを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>{data.theme === "light" ? "🌞明るい" : "🌙暗い"}</button>
           {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
         </div>
         <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
@@ -3058,7 +3133,7 @@ export default function App() {
               {catMsg && (
                 <div style={{ background: C.green + "1A", border: `1px solid ${C.green}`, color: C.text, borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 13 }}>✓ {catMsg}</div>
               )}
-              <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
+              <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} onSetAxis={setEventAxis} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
               <TimeMeter entries={scheduleEntries} {...calProps} />
               {(usingCal || manualEntries.length > 0) && <Upcoming events={upcoming} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />}
               <Acc title="設定・取り込み" defaultOpen={false}>
@@ -3117,7 +3192,7 @@ export default function App() {
               onEditItem={editTripItem}
               onRemoveItem={removeTripItem}
             />
-            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} birth={data.birth} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
+            <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} launches={data.launches} birth={data.birth} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
             <CheckList
               title="コンテンツ制作サイクル"
               accent={C.blue}
@@ -3215,7 +3290,7 @@ function Splash({ text }) {
 /* ──────────────────────────────────────────────────────────────
    共通スタイル片
    ────────────────────────────────────────────────────────────── */
-const inp = {
+const inp = dyn(() => ({
   width: "100%",
   boxSizing: "border-box",
   background: C.panel,
@@ -3226,8 +3301,8 @@ const inp = {
   fontSize: 13,
   marginBottom: 8,
   outline: "none",
-};
-const lbl = {
+}));
+const lbl = dyn(() => ({
   flex: 1,
   minWidth: 0,
   fontSize: 13,
@@ -3235,8 +3310,8 @@ const lbl = {
   display: "flex",
   flexDirection: "column",
   gap: 3,
-};
-const chipBtn = {
+}));
+const chipBtn = dyn(() => ({
   background: "transparent",
   border: `1px solid ${C.line}`,
   color: C.text,
@@ -3248,8 +3323,8 @@ const chipBtn = {
   minHeight: 40,
   display: "inline-flex",
   alignItems: "center",
-};
-const iconBtn = {
+}));
+const iconBtn = dyn(() => ({
   background: "transparent",
   border: "none",
   color: C.sub,
@@ -3260,4 +3335,4 @@ const iconBtn = {
   flex: "0 0 auto",
   display: "grid",
   placeItems: "center",
-};
+}));
