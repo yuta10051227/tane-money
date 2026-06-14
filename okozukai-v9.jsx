@@ -1077,7 +1077,7 @@ const SyncBadge = ({status}) => {
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
       <span style={{fontSize:10, color:col[status]||MUTED, fontWeight:700, background:`${col[status]||MUTED}15`, padding:"2px 7px", borderRadius:10}}>{map[status]||status}</span>
-      <span style={{fontSize:9, color:MUTED, fontWeight:700, padding:"1px 5px"}}>{code}</span>
+      <span style={{fontSize:11, color:MUTED, fontWeight:700, padding:"1px 5px"}}>{code}</span>
     </div>
   );
 };
@@ -2619,7 +2619,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:"rgba(255,255,255,0.9)",letterSpacing:0.5}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#fff",position:"relative"}}>
             ⚙
-            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:R,color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
@@ -2706,7 +2706,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{fontFamily:FB,fontWeight:800,fontSize:12,color:"rgba(74,158,255,0.7)",letterSpacing:2,textTransform:"uppercase"}}>Tane Money</div>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,color:"#e2e8f0",position:"relative"}}>
             ⚙
-            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
+            {((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&(<div style={{position:"absolute",top:-5,right:-5,minWidth:17,height:17,borderRadius:999,background:"#ef4444",color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</div>)}
           </button>
         </div>
         {/* 残高表示 */}
@@ -2736,7 +2736,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
               style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
               <div style={{fontSize:18,marginBottom:3}}>{e}</div>
-              <div style={{color:"rgba(255,255,255,0.35)",fontSize:9,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
+              <div style={{color:"rgba(255,255,255,0.35)",fontSize:11,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
               {v ? (
                 <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
               ) : (
@@ -2852,7 +2852,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               cursor:todayDone?"default":"pointer",fontSize:30,display:"flex",alignItems:"center",justifyContent:"center",
               animation:todayDone?"none":"gachaFab 1.6s ease-in-out infinite",fontFamily:F}}>
             {todayDone?"✓":ft.emoji}
-            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:9,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>ひく！</span>}
+            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:11,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>ひく！</span>}
           </button>
         );})()}
         <style>{`@keyframes gachaFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
@@ -3015,7 +3015,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                             ? <img src={`/assets/${item.id.replace("gi_","gacha_")}.png`} alt={item.name} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
-                          <div style={{fontSize:8,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
                           {cnt>1&&<div style={{fontSize:7,color:MUTED}}>×{cnt}</div>}
                         </div>);
                       })}
@@ -3032,7 +3032,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       <span style={{fontSize:11}}>{t.emoji}</span>
                       <span style={{fontSize:10,fontWeight:700,color:t.color}}>{t.label}</span>
                       <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
-                      <span style={{fontSize:9,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
                     </div>
                   ))}
                 </div>
@@ -3102,7 +3102,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const isDone=doneTodayIds.has(t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isDone?CARDS:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isDone?BORDER:isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isDone?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative",opacity:isDone?0.6:1}}>{isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:G,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>✓ 完了</div>}{isPending&&!isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:9,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const isDone=doneTodayIds.has(t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isDone?CARDS:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isDone?BORDER:isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isDone?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative",opacity:isDone?0.6:1}}>{isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>✓ 完了</div>}{isPending&&!isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
@@ -3350,10 +3350,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     <div style={{padding:"4px 4px",background:CARD,textAlign:"center"}}>
                       <div style={{fontSize:10,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
                       {!unlocked
-                        ? <div style={{fontSize:8,color:MUTED,fontWeight:700}}>🔒 あと{(t.need||0)-totalDoneMon}回</div>
+                        ? <div style={{fontSize:11,color:MUTED,fontWeight:700}}>🔒 あと{(t.need||0)-totalDoneMon}回</div>
                         : selected
-                        ? <div style={{fontSize:8,color:GP,fontWeight:800}}>えらび中</div>
-                        : <div style={{fontSize:8,color:MUTED}}>タップで変更</div>}
+                        ? <div style={{fontSize:11,color:GP,fontWeight:800}}>えらび中</div>
+                        : <div style={{fontSize:11,color:MUTED}}>タップで変更</div>}
                     </div>
                   </div>
                 );
@@ -3393,21 +3393,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
                         style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
                         onError={e=>{e.target.style.visibility="hidden"}}/>
-                      <div style={{fontSize:9,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      <div style={{fontSize:11,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                         {unlocked?h.name:"???"}
                       </div>
-                      <div style={{fontSize:8,color:GOLD,fontWeight:700}}>{"★".repeat(h.rarity)}</div>
+                      <div style={{fontSize:11,color:GOLD,fontWeight:700}}>{"★".repeat(h.rarity)}</div>
                       {!unlocked
-                        ? <div style={{fontSize:8,color:MUTED,fontWeight:700}}>🔒 あと{h.need-totalDoneMon}回</div>
+                        ? <div style={{fontSize:11,color:MUTED,fontWeight:700}}>🔒 あと{h.need-totalDoneMon}回</div>
                         : equipped
-                        ? <div style={{fontSize:8,color:GP,fontWeight:800}}>すがた中(タップで戻す)</div>
-                        : <div style={{fontSize:8,color:MUTED}}>タップですがた変更</div>}
+                        ? <div style={{fontSize:11,color:GP,fontWeight:800}}>すがた中(タップで戻す)</div>
+                        : <div style={{fontSize:11,color:MUTED}}>タップですがた変更</div>}
                     </div>
                   );
                 })}
               </div>
               {(()=>{const eq=HIDDEN_MONSTERS.find(h=>h.need<=totalDoneMon && (data.monsterSkin||{})[child.id]===h.id);return eq?(
-                <div style={{marginTop:8,fontSize:9,color:TEXTS,lineHeight:1.6,background:CARDS,borderRadius:10,padding:"8px 10px"}}>
+                <div style={{marginTop:8,fontSize:11,color:TEXTS,lineHeight:1.6,background:CARDS,borderRadius:10,padding:"8px 10px"}}>
                   <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{eq.name}</div>
                   <div>{eq.desc}</div>
                   <div style={{color:B,marginTop:2}}>{eq.edu}</div>
@@ -3501,7 +3501,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     {/* 分岐 */}
                     {cat.branches.map((br,bi)=>(
                       <div key={bi} style={{display:"flex",alignItems:"center",gap:4,marginTop:4,paddingLeft:8}}>
-                        <span style={{fontSize:9,fontWeight:800,color:br.color,flexShrink:0,width:46}}>└{br.force}</span>
+                        <span style={{fontSize:11,fontWeight:800,color:br.color,flexShrink:0,width:46}}>└{br.force}</span>
                         {br.stages.map((s,i)=>(
                           <React.Fragment key={s.id}>
                             {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:10}}>▶</span>}
@@ -4091,7 +4091,7 @@ function InvestLearnTab({child, data, update, onRanking}){
           <div style={{textAlign:"right"}}>
             <div style={{fontWeight:700,fontSize:14,color:TEXT}}>{s.price?.toLocaleString()}{s.currency==="JPY"?"円":"$"}</div>
             <div style={{fontSize:11,fontWeight:600,color:(s.lastChange||0)>=0?G:R}}>{(s.lastChange||0)>=0?"+":""}{(s.lastChange||0).toFixed(1)}%</div>
-            {s.realData===false&&<div style={{fontSize:9,color:R,fontWeight:700}}>サンプル値</div>}
+            {s.realData===false&&<div style={{fontSize:11,color:R,fontWeight:700}}>サンプル値</div>}
           </div>
         </div>
       ))}
@@ -4102,7 +4102,7 @@ function InvestLearnTab({child, data, update, onRanking}){
           <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{fx.name||fx.code}</div><div style={{fontSize:10,color:MUTED}}>1 {fx.code} = ¥{(fx.price||0).toFixed(fx.code==="KRW"?3:2)}</div></div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:11,fontWeight:600,color:(fx.changePct||0)>=0?G:R}}>{(fx.changePct||0)>=0?"+":""}{(fx.changePct||0).toFixed(2)}%</div>
-            {fx.realData?<div style={{fontSize:9,color:G,fontWeight:600}}>LIVE</div>:<div style={{fontSize:9,color:R,fontWeight:700}}>サンプル値</div>}
+            {fx.realData?<div style={{fontSize:11,color:G,fontWeight:600}}>LIVE</div>:<div style={{fontSize:11,color:R,fontWeight:700}}>サンプル値</div>}
           </div>
         </div>
       ))}
@@ -5162,7 +5162,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
           <button onClick={()=>setShowOnboardGuide(true)} style={{background:CARD,border:`2px solid ${GP}`,borderRadius:20,padding:"10px 7px",boxShadow:`0 4px 18px ${GP}30`,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",fontFamily:F,position:"relative",width:54}}>
             {onboardRemaining>0&&<div style={{position:"absolute",top:-7,right:-7,width:20,height:20,borderRadius:"50%",background:R,color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{onboardRemaining}</div>}
             <span style={{fontSize:22}}>📋</span>
-            <span style={{fontSize:8,fontWeight:800,color:GP,lineHeight:1.3,textAlign:"center"}}>初心者<br/>ガイド</span>
+            <span style={{fontSize:11,fontWeight:800,color:GP,lineHeight:1.3,textAlign:"center"}}>初心者<br/>ガイド</span>
           </button>
         </div>
       )}
@@ -5787,16 +5787,16 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
               {dispName}
-              <span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
-              {reincCount>0&&<span style={{fontSize:8,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
+              <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
+              {reincCount>0&&<span style={{fontSize:11,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
             </div>
-            <button onClick={()=>{setNickInput(dispName);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:9,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
+            <button onClick={()=>{setNickInput(dispName);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
           </div>
         )
       ) : (
         <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
           {dispName}
-          <span style={{fontSize:8,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
+          <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
         </div>
       )}
 
@@ -5807,13 +5807,13 @@ function SeedMonster({ child, data, size=90, update }) {
             <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
           </div>
           {!canEvolve && (
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>
               {!mon.growthOk ? `あと${evoRemaining}でしんか✨` : `⏳ ${fmtTimeRemain(mon.timeRemainMs)}でしんか`}
             </div>
           )}
         </>
       )}
-      {isFinal && <div style={{fontSize:9,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
+      {isFinal && <div style={{fontSize:11,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
       {/* 進化ボタン＋進化先ヒント (テスト中は分岐ステージでも必ず表示) */}
       {(canEvolve || (mon.testEvolve && !isFinal)) && !evolving && (()=>{
@@ -5824,7 +5824,7 @@ function SeedMonster({ child, data, size=90, update }) {
             <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
               🌟 しんかできるよ！
             </button>
-            {nextDef&&<div style={{fontSize:9,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}になりそう！</div>}
+            {nextDef&&<div style={{fontSize:11,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}になりそう！</div>}
           </>
         );
       })()}
@@ -5835,20 +5835,20 @@ function SeedMonster({ child, data, size=90, update }) {
             <button onClick={doGraduate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#34c77b,#187a4e)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(52,199,123,0.7)"}}>
               🎓 卒業して次の子をむかえる
             </button>
-            <div style={{fontSize:9,color:"rgba(180,255,210,0.85)",marginTop:2,lineHeight:1.4}}>育て切った！うちのこに加わって、新しい猫のタマゴが届くよ🐈</div>
+            <div style={{fontSize:11,color:"rgba(180,255,210,0.85)",marginTop:2,lineHeight:1.4}}>育て切った！うちのこに加わって、新しい猫のタマゴが届くよ🐈</div>
           </>
         ) : (
           <>
             <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
               🔄 転生する
             </button>
-            <div style={{fontSize:9,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
+            <div style={{fontSize:11,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
           </>
         )
       )}
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
       {isFinal && !canReincarnate && !evolving && (
-        <div style={{marginTop:6,fontSize:9,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
+        <div style={{marginTop:6,fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
           🔄 転生まで {fmtTimeRemain(mon.reincRemainMs)||"もう少し…"}
         </div>
       )}
@@ -5858,7 +5858,7 @@ function SeedMonster({ child, data, size=90, update }) {
       {/* タマゴからやり直す(別の進化を試せる) */}
       {evolved && !evolving && update && (
         <button onClick={()=>{ if(typeof window!=="undefined" && window.confirm("タマゴからやり直す？\nずかんはそのまま。ちがう進化を試せるよ！")) doRehatch(); }}
-          style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:9,cursor:"pointer",fontFamily:F}}>
+          style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
           🥚 タマゴからやり直す
         </button>
       )}
@@ -5904,7 +5904,7 @@ function MonsterZukan({ data, child }) {
         <img src={`/assets/monster_${id}_f0.png`} alt={found?def.name:"???"}
           style={{width:42,height:42,objectFit:"contain",display:"block",margin:"0 auto 2px",imageRendering:"pixelated",filter:found?"none":"brightness(0)"}}
           onError={e=>{e.target.style.visibility="hidden"}}/>
-        <div style={{fontSize:8,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+        <div style={{fontSize:11,fontWeight:800,color:found?TEXT:MUTED,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {found ? def.name : "???"}
         </div>
         <div style={{fontSize:7,color:GOLD,fontWeight:700}}>{"★".repeat(def.rarity)}</div>
@@ -5920,11 +5920,11 @@ function MonsterZukan({ data, child }) {
     const def = MONSTER_TREE[expandId];
     if (!(discovered.includes(expandId) || expandId==="egg")) return null;
     return (
-      <div style={{marginTop:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:9,color:TEXTS,lineHeight:1.6,textAlign:"left"}}>
+      <div style={{marginTop:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:11,color:TEXTS,lineHeight:1.6,textAlign:"left"}}>
         <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{def.name} <span style={{color:GOLD}}>{"★".repeat(def.rarity)}</span></div>
         <div style={{marginBottom:3}}>{def.desc}</div>
         {def.branchHint && <div style={{color:GP,fontWeight:700,marginBottom:3}}>🔀 {def.branchHint}</div>}
-        {def.edu && <div style={{color:B,fontSize:8}}>{def.edu}</div>}
+        {def.edu && <div style={{color:B,fontSize:11}}>{def.edu}</div>}
       </div>
     );
   };
@@ -5936,7 +5936,7 @@ function MonsterZukan({ data, child }) {
       </div>
 
       {/* ── 共通の道 ── */}
-      <div style={{fontSize:9,color:MUTED,fontWeight:800,marginBottom:4}}>はじまりの道（みんな共通）</div>
+      <div style={{fontSize:11,color:MUTED,fontWeight:800,marginBottom:4}}>はじまりの道（みんな共通）</div>
       <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
         <Card id="egg"/><Arrow/><Card id="m01"/><Arrow/><Card id="m02"/>
         <div style={{flex:1.2}}/>
@@ -5956,7 +5956,7 @@ function MonsterZukan({ data, child }) {
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
             <span style={{fontSize:12}}>{br.emoji}</span>
             <span style={{fontSize:11,fontWeight:900,color:TEXT}}>{br.label}</span>
-            <span style={{fontSize:8,color:GOLD,fontWeight:700}}>…★{MONSTER_TREE[br.ids[3]].rarity}まで</span>
+            <span style={{fontSize:11,color:GOLD,fontWeight:700}}>…★{MONSTER_TREE[br.ids[3]].rarity}まで</span>
           </div>
           <div style={{fontSize:8.5,color:TEXTS,fontWeight:700,marginBottom:6}}>条件: {br.cond} で進化</div>
           <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
@@ -6428,7 +6428,7 @@ function ForexSection({data, update, child}){
             {fx.history&&fx.history.length>1&&(
               <div style={{marginTop:8}}>
                 <StockChart history={fx.history} color={isUp?"#4ade80":"#f87171"} height={45} width={300}/>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#888",marginTop:2}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginTop:2}}>
                   <span>30日前: ¥{(fx.history[0]||0).toFixed(fx.code==="KRW"?3:2)}</span>
                   <span>現在: ¥{(fx.price||0).toFixed(fx.code==="KRW"?3:2)}</span>
                 </div>
@@ -6579,7 +6579,7 @@ function InvestTab({child,data,update}){
           <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"0 0 16px"}}/>
           {myHoldings.length>0?(
             <div style={{marginBottom:16}}>
-              <div style={{color:"rgba(255,255,255,0.3)",fontSize:9,fontWeight:700,letterSpacing:1,marginBottom:10}}>HOLDINGS</div>
+              <div style={{color:"rgba(255,255,255,0.3)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:10}}>HOLDINGS</div>
               {myHoldings.map(h=>{
                 const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;
                 const val=toPts(st,st.price)*h.qty;
@@ -6621,7 +6621,7 @@ function InvestTab({child,data,update}){
           }} style={{width:"100%",background:shareCopied?"rgba(74,222,128,0.15)":"#4a9eff",border:shareCopied?"1px solid #4ade80":"none",borderRadius:14,padding:"12px",color:shareCopied?"#4ade80":"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,marginTop:8,transition:"all .3s"}}>
             {shareCopied?"✓ コピーしました！":"📤 LINEで送る / シェア"}
           </button>
-          <div style={{textAlign:"center",color:"rgba(255,255,255,0.12)",fontSize:9,letterSpacing:0.5,marginTop:8}}>🌱 tane-money.vercel.app</div>
+          <div style={{textAlign:"center",color:"rgba(255,255,255,0.12)",fontSize:11,letterSpacing:0.5,marginTop:8}}>🌱 tane-money.vercel.app</div>
         </div>
       </div>
     )}
@@ -6708,7 +6708,7 @@ function InvestTab({child,data,update}){
                 <div style={{fontWeight:900,fontSize:14,color:isSel?"#fff":TEXT}}>{fmtPrice(s)}</div>
                 <div style={{fontSize:10,color:"#aaa"}}>{toPts(s,s.price).toLocaleString()}pt/株</div>
                 <div style={{fontSize:12,fontWeight:700,color:isUp?"#4ade80":"#f87171"}}>{isUp?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</div>
-                {s.realData&&<div style={{fontSize:9,color:"#4ade80",fontWeight:700}}>● LIVE</div>}
+                {s.realData&&<div style={{fontSize:11,color:"#4ade80",fontWeight:700}}>● LIVE</div>}
               </div>
             </div>
             {h&&<div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${isSel?"#333":BORDER}`,display:"flex",gap:12,fontSize:11}}>
@@ -6969,7 +6969,7 @@ function TipsSection({ageMode,child,data,update}){
       <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:TEXT}}>まめちしき</div><div style={{color:MUTED,fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
       <div style={{background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
         <div style={{fontWeight:900,fontSize:14,color:G}}>{totalRead}<span style={{fontSize:10,color:MUTED}}>/{ALL_TIPS.length}</span></div>
-        <div style={{fontSize:9,color:MUTED}}>読了</div>
+        <div style={{fontSize:11,color:MUTED}}>読了</div>
       </div>
     </div>
     <div style={{background:`${Y}15`,border:`1.5px solid ${Y}`,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
