@@ -2070,13 +2070,13 @@ function FamilyFortunePanel({ birth, members }) {
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
         {result.bestMover && (
-          <span style={{ fontSize: 12, background: C.green + "22", border: `1px solid ${C.green}`, color: C.green, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
-            {result.bestMover} が今日の牽引役
+          <span style={{ fontSize: 13, background: C.green + "22", border: `1px solid ${C.green}`, color: C.green, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
+            {result.bestMover} が今日の中心
           </span>
         )}
         {result.supporter && result.supporter !== result.bestMover && (
-          <span style={{ fontSize: 12, background: C.blue + "22", border: `1px solid ${C.blue}`, color: C.blue, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
-            {result.supporter} が今日の支え役
+          <span style={{ fontSize: 13, background: C.blue + "22", border: `1px solid ${C.blue}`, color: C.blue, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
+            {result.supporter} が今日の支え
           </span>
         )}
       </div>
