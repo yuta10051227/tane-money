@@ -86,9 +86,9 @@ function startOfDay(d) {
 }
 function iso(d) {
   const x = startOfDay(d);
-  // 不正な日付でも toISOString() でアプリ全体が落ちないようフォールバック
+  // 不正な日付でも落ちないようフォールバック。ローカル年月日で返す（UTC変換でJST深夜にズレるのを防ぐ）
   const safe = isNaN(x.getTime()) ? startOfDay(new Date()) : x;
-  return safe.toISOString().slice(0, 10);
+  return `${safe.getFullYear()}-${pad2(safe.getMonth() + 1)}-${pad2(safe.getDate())}`;
 }
 function addDays(base, n) {
   const d = new Date(base);
@@ -1749,7 +1749,7 @@ function SanmeiChart({ detail }) {
       >
         <span style={{ fontSize: 18 }}>{s.emoji}</span>
         <span style={{ fontSize: 13, fontWeight: 700 }}>{s.star}</span>
-        <span style={{ fontSize: 10, color: C.faint }}>{POS_SHORT[pos]}</span>
+        <span style={{ fontSize: 11, color: C.faint }}>{POS_SHORT[pos]}</span>
       </button>
     );
   };
@@ -1765,26 +1765,34 @@ function SanmeiChart({ detail }) {
       {/* 選択中の星の詳細 */}
       {sd && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 13px", marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: C.purple, fontWeight: 700, marginBottom: 2 }}>{sd.posLabel}（{sd.source}）</div>
+          <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginBottom: 2 }}>
+            {sd.posLabel}（{sd.source}）
+            {sd.pos === "center" && <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 6 }}>あなたの素の自分</span>}
+            {sd.pos === "north" && <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 6 }}>上司・年長者から見た印象</span>}
+            {sd.pos === "south" && <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 6 }}>仕事・目下から見た顔</span>}
+            {sd.pos === "east" && <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 6 }}>家族・パートナーから見た姿</span>}
+            {sd.pos === "west" && <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 6 }}>仲間内での魅力</span>}
+          </div>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{sd.emoji} {sd.star}・{sd.title}</div>
-          <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{sd.posMeaning}</div>
+          <div style={{ fontSize: 13, color: C.faint, marginTop: 2 }}>{sd.posMeaning}</div>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 6 }}>{sd.desc}</div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>💡 {sd.biz}</div>
         </div>
       )}
       {/* 十二大従星（人生の勢い） */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>人生のエネルギー（十二大従星）</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2 }}>人生のエネルギー（十二大従星）</div>
+      <div style={{ fontSize: 13, color: C.faint, marginBottom: 6 }}>人生の勢いを12段階で表す星</div>
       <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
         {(detail.energies || []).map((e) => (
           <div key={e.phase}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
               <span style={{ color: C.sub }}>{e.phase}期 ・ <b style={{ color: C.text }}>{e.name}</b></span>
               <span style={{ color: eColor(e.energy), fontWeight: 700 }}>エネルギー {e.energy}/12</span>
             </div>
             <div style={{ height: 8, background: C.panel2, borderRadius: 5, overflow: "hidden", border: `1px solid ${C.line}` }}>
               <div style={{ width: `${(e.energy / 12) * 100}%`, height: "100%", background: eColor(e.energy) }} />
             </div>
-            <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{e.meaning}</div>
+            <div style={{ fontSize: 13, color: C.faint, marginTop: 2 }}>{e.meaning}</div>
           </div>
         ))}
       </div>
@@ -1812,12 +1820,17 @@ function TenchusatsuDaiunAcc({ birth }) {
   const tc = useMemo(() => { try { return tenchusatsu(birth); } catch { return null; } }, [birth && birth.date, birth && birth.time]);
   const du = useMemo(() => { try { return daiun(birth); } catch { return null; } }, [birth && birth.date, birth && birth.time, birth && birth.gender]);
   if (!tc && !du) return null;
-  const cur = du && du.current;
+  // cur が null または preStart:true（立運前）のケースを防御的に扱う
+  const cur = du && du.current && !du.current.preStart ? du.current : null;
+  const preStart = du && du.current && du.current.preStart ? du.current : null;
   return (
     <Acc title="運勢の流れ（天中殺・大運）" color={C.blue} defaultOpen={false}>
       {tc && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 4 }}>{tc.name}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 2 }}>
+            {tc.name}
+            <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 8 }}>天中殺 = 運気が休む・充電の時期</span>
+          </div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 6 }}>{tc.desc}</div>
           {tc.years && tc.years.length > 0 && (
             <div style={{ fontSize: 13, color: C.text }}>
@@ -1826,41 +1839,60 @@ function TenchusatsuDaiunAcc({ birth }) {
           )}
         </div>
       )}
-      {du && cur && (
+      {du && (
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 6 }}>大運（10年の流れ）</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 2 }}>
+            大運（10年の流れ）
+            <span style={{ fontSize: 13, color: C.faint, fontWeight: 400, marginLeft: 8 }}>10年ごとの運勢の流れ</span>
+          </div>
           {du.assumed && (
-            <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>性別未設定のため順行で仮表示</div>
+            <div style={{ fontSize: 13, color: C.faint, marginBottom: 6 }}>性別未設定のため順行で仮表示</div>
           )}
-          <div style={{ background: C.panel, border: `1px solid ${C.blue}`, borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: C.blue, fontWeight: 700, marginBottom: 4 }}>現在の大運期</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{cur.ganzhi} ・ {cur.star}</div>
-            <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>{cur.ageFrom}歳〜{cur.ageTo}歳</div>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{cur.theme}</div>
-          </div>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>ロードマップ（5期）</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {du.roadmap.map((p, i) => (
-              <div
-                key={i}
-                style={{
-                  flex: "1 1 140px",
-                  minWidth: 120,
-                  background: p.current ? C.blue + "22" : C.panel2,
-                  border: `1px solid ${p.current ? C.blue : C.line}`,
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                }}
-              >
-                <div style={{ fontSize: 12, color: p.current ? C.blue : C.faint, fontWeight: p.current ? 700 : 400 }}>
-                  {p.ageFrom}〜{p.ageTo}歳
-                  {p.current && <span style={{ marginLeft: 4, fontSize: 11, fontWeight: 700 }}>← 現在</span>}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, margin: "2px 0" }}>{p.ganzhi} {p.star}</div>
-                <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5 }}>{p.theme && p.theme.slice(0, 22)}{p.theme && p.theme.length > 22 ? "…" : ""}</div>
+          {cur && (
+            <div style={{ background: C.panel, border: `1px solid ${C.blue}`, borderRadius: 10, padding: "10px 14px", marginBottom: 10, marginTop: 6 }}>
+              <div style={{ fontSize: 13, color: C.blue, fontWeight: 700, marginBottom: 4 }}>現在の大運期</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{cur.ganzhi} ・ {cur.star}</div>
+              <div style={{ fontSize: 13, color: C.sub, marginBottom: 4 }}>{cur.ageFrom}歳〜{cur.ageTo}歳</div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{cur.theme}</div>
+            </div>
+          )}
+          {preStart && (
+            <div style={{ background: C.panel2, border: `1px solid ${C.blue}`, borderRadius: 10, padding: "10px 14px", marginBottom: 10, marginTop: 6 }}>
+              <div style={{ fontSize: 13, color: C.blue, marginBottom: 2 }}>まもなく {preStart.ageFrom}歳から大運が始まります</div>
+              <div style={{ fontSize: 13, color: C.faint }}>{preStart.ganzhi} ・ {preStart.star}</div>
+            </div>
+          )}
+          {!cur && !preStart && (
+            <div style={{ fontSize: 13, color: C.faint, marginBottom: 10 }}>現在の大運期は算出中です</div>
+          )}
+          {du.roadmap && du.roadmap.length > 0 && (
+            <>
+              <div style={{ fontSize: 13, color: C.sub, marginBottom: 6 }}>ロードマップ（5期）</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {du.roadmap.map((p, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      flex: "1 1 140px",
+                      minWidth: 120,
+                      background: p.current ? C.blue + "22" : C.panel2,
+                      border: `1px solid ${p.current ? C.blue : C.line}`,
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: p.current ? C.blue : C.faint, fontWeight: p.current ? 700 : 400 }}>
+                      {p.ageFrom}〜{p.ageTo}歳
+                      {p.current && !p.preStart && <span style={{ marginLeft: 4, fontSize: 12, fontWeight: 700 }}>← 現在</span>}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, margin: "2px 0" }}>{p.ganzhi} {p.star}</div>
+                    {/* テキストを折り返して全文表示（truncateしない） */}
+                    <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, whiteSpace: "normal", wordBreak: "break-all" }}>{p.theme}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       )}
     </Acc>
@@ -1940,7 +1972,7 @@ function MemberManager({ members, onSaveMembers }) {
     } else {
       setDeleteConfirm(id);
       clearTimeout(dcTimer.current);
-      dcTimer.current = setTimeout(() => setDeleteConfirm(null), 1500);
+      dcTimer.current = setTimeout(() => setDeleteConfirm(null), 6000);
     }
   };
 
@@ -1974,9 +2006,10 @@ function MemberManager({ members, onSaveMembers }) {
                 <button onClick={() => { setEditId(m.id); setAdding(false); }} style={iconBtn} title="編集">✏️</button>
                 <button
                   onClick={() => handleDelete(m.id)}
-                  style={{ ...iconBtn, color: deleteConfirm === m.id ? C.red : C.sub, fontWeight: deleteConfirm === m.id ? 700 : 400, fontSize: 13 }}
+                  style={{ ...iconBtn, color: deleteConfirm === m.id ? C.red : C.sub, fontWeight: deleteConfirm === m.id ? 700 : 400, fontSize: deleteConfirm === m.id ? 16 : 13 }}
+                  title={deleteConfirm === m.id ? "もう一度押すと削除されます" : "削除"}
                 >
-                  {deleteConfirm === m.id ? "削除?" : "✕"}
+                  {deleteConfirm === m.id ? "もう一度押すと削除" : "✕"}
                 </button>
               </div>
             )}
@@ -2008,9 +2041,12 @@ function FamilyFortunePanel({ birth, members }) {
     return [...me, ...(members || []).map((m) => ({ name: m.name, birth: m.birth }))];
   }, [birth && birth.date, birth && birth.time, JSON.stringify(members)]);
 
-  if ((members || []).length === 0) {
-    return <Empty>メンバーを登録すると、今日のチーム運気が見られます</Empty>;
+  // birthが無くメンバーもゼロのときだけEmptyを出す（本人だけでも運気を表示する）
+  const hasBirthData = birth && birth.date;
+  if (!hasBirthData && (members || []).length === 0) {
+    return <Empty>出生情報またはメンバーを登録すると、今日のチーム運気が見られます</Empty>;
   }
+  if (allMembers.length === 0) return null;
 
   let result = null;
   try { result = familyFortune(allMembers); } catch { return <Empty>運気の計算に失敗しました</Empty>; }
@@ -2019,15 +2055,15 @@ function FamilyFortunePanel({ birth, members }) {
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>今日のチームスコア: <strong style={{ fontSize: 15, color: C.text }}>{stars5}</strong></div>
+      <div style={{ fontSize: 13, color: C.faint, marginBottom: 10 }}>今日のチームスコア: <strong style={{ fontSize: 15, color: C.text }}>{stars5}</strong></div>
       <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
         {result.members.map((mb, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
             <span style={{ fontSize: 14, color: C.accent, flex: "0 0 auto" }}>{stars(mb.score)}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{mb.name}</span>
-              <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>{mb.stance}</span>
-              {mb.focus && <div style={{ fontSize: 12, color: C.faint, marginTop: 2, lineHeight: 1.5 }}>{mb.focus}</div>}
+              <span style={{ fontSize: 13, color: C.sub, marginLeft: 8 }}>{mb.stance}</span>
+              {mb.focus && <div style={{ fontSize: 13, color: C.faint, marginTop: 2, lineHeight: 1.5 }}>{mb.focus}</div>}
             </div>
           </div>
         ))}
@@ -2092,7 +2128,15 @@ function AishouPanel({ birth, members }) {
             </button>
             {isExpanded && (
               <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${C.line}` }}>
-                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 10, marginTop: 10 }}>{result.summary}</div>
+                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 10, marginTop: 10 }}>{String(result.summary || "").replace(/\s*根拠[:：].*$/s, "")}</div>
+                {/* スコア根拠の断片（reasons配列）をタグ表示。点数の理由を掴めるように */}
+                {Array.isArray(result?.reasons) && result.reasons.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                    {result.reasons.map((r, i) => (
+                      <span key={i} style={{ fontSize: 13, color: C.faint, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 9px" }}>{r}</span>
+                    ))}
+                  </div>
+                )}
                 {!isChild && (
                   <>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, marginBottom: 4 }}>あなたから見て</div>
@@ -2165,8 +2209,9 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
             defaultOpen
             badge={<span style={{ fontSize: 12, color: C.purple, fontWeight: 700 }}>{detail.center.emoji}{detail.center.star}</span>}
           >
-            <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
-              生年月日から出した8つの星で「心の設計図」を読み解きます。各星をタップすると詳しい意味が出ます。中央＝本質、頭＝目上、腹＝社会、左手＝友人、右手＝身近な人から見たあなた。
+            <div style={{ fontSize: 13, color: C.faint, marginBottom: 4 }}>人体星図 = 生年月日から出す"心の設計図"　／　中心星・主星 = あなたの本質を表す星</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
+              生年月日から出した8つの星で心の設計図を読み解きます。各星をタップすると詳しい意味が出ます。中央＝本質、頭＝目上、腹＝社会、左手＝友人、右手＝身近な人から見たあなた。
             </div>
             <SanmeiChart detail={detail} />
           </Acc>
@@ -3488,8 +3533,13 @@ export default function App() {
   };
   const buildEntry = (ev) => {
     const role = roleForCal(ev.calendarId);
-    const start = new Date(ev.startISO);
-    const end = ev.endISO ? new Date(ev.endISO) : null;
+    // 終日予定は "YYYY-MM-DD" のみの文字列が来る。そのまま new Date() するとUTC00:00解釈になり
+    // JSTでは前日になるため、終日のときはローカル時刻の00:00として解釈する。
+    const startRaw = ev.startISO;
+    const start = ev.allDay && /^\d{4}-\d{2}-\d{2}$/.test(startRaw)
+      ? new Date(startRaw + "T00:00:00")
+      : new Date(startRaw);
+    const end = ev.endISO ? (ev.allDay && /^\d{4}-\d{2}-\d{2}$/.test(ev.endISO) ? new Date(ev.endISO + "T00:00:00") : new Date(ev.endISO)) : null;
     const hours = ev.allDay ? 0 : end ? Math.max(0.25, (end - start) / 3600000) : 1;
     // 役割の決定順：①予定名で記憶(manual) ②カレンダー単位の既定(cal) ③タイトルから自動(auto)
     let cat, axis, catSource;
