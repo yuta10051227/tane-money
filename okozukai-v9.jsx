@@ -1353,7 +1353,10 @@ function GachaAnim({ result, onClose }) {
             <span style={{color:"rgba(255,255,255,.8)",fontSize:14,fontWeight:700}}>pt</span>
           </div>
           {result.bonusPts>0&&<div style={{display:"inline-block",background:GOLDS,borderRadius:10,padding:"5px 14px",marginBottom:14,fontSize:12,fontWeight:800,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
-          <button onClick={(e)=>{stop(e);onClose();}} style={{display:"block",width:"100%",maxWidth:340,margin:"0 auto",background:result.color,border:"none",borderRadius:16,padding:"15px 36px",color:"#1a1024",fontWeight:900,fontSize:17,cursor:"pointer",fontFamily:F,boxShadow:`0 6px 24px ${result.color}66`}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
+          <div style={{display:"flex",gap:10,width:"100%",maxWidth:360,margin:"0 auto"}}>
+            {isSR && <button onClick={(e)=>{stop(e);shareCard({emoji:result.collItem?result.collItem.emoji:(isSuper?"👑":"🎁"), title:`${result.label}${result.collItem?(" "+result.collItem.name):""} が出た！`, subtitle:`ガチャで +${result.pts}pt`, color:result.color});}} style={{flex:1,background:"rgba(255,255,255,.14)",border:"1.5px solid rgba(255,255,255,.55)",borderRadius:16,padding:"15px 0",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>シェア 📤</button>}
+            <button onClick={(e)=>{stop(e);onClose();}} style={{flex:1.5,background:result.color,border:"none",borderRadius:16,padding:"15px 0",color:"#1a1024",fontWeight:900,fontSize:17,cursor:"pointer",fontFamily:F,boxShadow:`0 6px 24px ${result.color}66`}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
+          </div>
         </div>
       )}
 
@@ -3267,6 +3270,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <input value={gForm.emoji} onChange={e=>setGForm(f=>({...f,emoji:e.target.value}))} style={{...INP,width:58}}/>
                 <input value={gForm.label} onChange={e=>setGForm(f=>({...f,label:e.target.value}))} placeholder="なにを買いたい？" style={INP}/>
               </div>
+              <div style={{fontSize:11,color:MUTED,marginBottom:6,lineHeight:1.5}}>💡 ポイントは おてつだいで ためて、ごほうびと こうかんできるよ（例：ゲーム1本ぶん ≒ おうちの人ときめてね）</div>
               <input value={gForm.target} onChange={e=>setGForm(f=>({...f,target:e.target.value}))} type="number" placeholder="目標金額（pt）" style={{...INP,marginBottom:10}}/>
               <div style={{display:"flex",gap:8}}><Btn c={P} label="追加する" onClick={addGoal} disabled={!gForm.label||!gForm.target}/><Btn c={MUTED} label="キャンセル" onClick={()=>setGAdd(false)}/></div>
             </div>
@@ -6183,6 +6187,40 @@ function WeeklyReport({child,data,onClose}){
   );
 }
 
+// ── シェアカード生成（達成の瞬間をSNSへ。canvasで画像化→navigator.share）──
+async function shareCard({ emoji, title, subtitle, color }){
+  try{
+    const W=1080,H=1080, c=GP;
+    const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+    const x=cv.getContext("2d");
+    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#F7F5EF"); g.addColorStop(1,"#E3F3E8");
+    x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle=color||c; x.fillRect(0,0,W,18);
+    x.textAlign="center"; x.textBaseline="middle";
+    // バッジ帯
+    x.fillStyle=(color||c); x.font="600 46px sans-serif"; x.fillText("🌱 Tane Money", W/2, 120);
+    // 絵文字
+    x.font="320px sans-serif"; x.fillText(emoji||"🌟", W/2, 420);
+    // タイトル
+    x.fillStyle="#18231D"; x.font="bold 92px sans-serif";
+    (title||"").toString().slice(0,18).split("\n").forEach((ln,i)=>x.fillText(ln, W/2, 680+i*104));
+    // サブ
+    x.fillStyle=color||c; x.font="bold 64px sans-serif"; x.fillText((subtitle||"").toString().slice(0,24), W/2, 830);
+    // フッター
+    x.fillStyle="#929B95"; x.font="600 42px sans-serif"; x.fillText("おてつだいで お金を学ぶ · tane-money.vercel.app", W/2, 1000);
+    const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+    const file=new File([blob],"tane-money.png",{type:"image/png"});
+    const payload={ title:"Tane Money", text:`${title||""} ${subtitle||""}`.trim()+" #タネマネー", url:"https://tane-money.vercel.app" };
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ ...payload, files:[file] });
+    } else if(navigator.share){
+      await navigator.share(payload);
+    } else {
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="tane-money.png"; a.click();
+    }
+  }catch(e){ /* キャンセル/非対応は無視 */ }
+}
+
 // ── GoalCelebration ───────────────────────────────────
 function GoalCelebration({goal,onClose}){
   return(
@@ -6200,7 +6238,11 @@ function GoalCelebration({goal,onClose}){
           <div style={{color:Y,fontWeight:900,fontSize:20,marginBottom:8}}>目標達成おめでとう！</div>
           <div style={{fontWeight:900,fontSize:22,color:TEXT,marginBottom:8}}>{goal.label}</div>
           <div style={{color:MUTED,fontSize:14,marginBottom:24}}>{goal.target.toLocaleString()}pt 貯まったよ！</div>
-          <button onClick={onClose} style={{background:Y,border:"none",borderRadius:14,padding:"14px 40px",color:TEXT,fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F}}>やったー！🎉</button>
+          <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+            <button onClick={()=>shareCard({emoji:goal.emoji, title:`${goal.label} 達成！`, subtitle:`${goal.target.toLocaleString()}pt ためたよ`, color:Y})}
+              style={{background:"#fff",border:`2px solid ${Y}`,borderRadius:14,padding:"14px 22px",color:"#9a7000",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>シェア 📤</button>
+            <button onClick={onClose} style={{background:Y,border:"none",borderRadius:14,padding:"14px 32px",color:TEXT,fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F}}>やったー！🎉</button>
+          </div>
         </div>
       </div>
       <style>{`@keyframes confetti{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}`}</style>
