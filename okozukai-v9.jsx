@@ -5799,7 +5799,7 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
               {dispName}
-              <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
+              <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>{skinActive&&<span style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.88)",borderRadius:6,padding:"0 6px",marginLeft:5,fontWeight:900}}>👕すがた</span>}
               {reincCount>0&&<span style={{fontSize:11,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
             </div>
             <button onClick={()=>{setNickInput(dispName);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
@@ -5808,7 +5808,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ) : (
         <div style={{fontSize:11,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
           {dispName}
-          <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
+          <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>{skinActive&&<span style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.88)",borderRadius:6,padding:"0 6px",marginLeft:5,fontWeight:900}}>👕すがた</span>}
         </div>
       )}
 
