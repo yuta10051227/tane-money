@@ -428,6 +428,7 @@ function makeSeed() {
     newsCats: ["top", "business", "marketing", "solo"],
     birth: null,
     members: [],
+    hiddenTabs: { news: true }, // ニュースタブは既定で非表示（ホームの1行ブリーフィングから開ける）
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     sampleNotice: true, // サンプルデータ識別フラグ
@@ -1560,10 +1561,10 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
           )}
           {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
           {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab("money")} />}
-          {brief && !hideNews && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab("news")} />}
+          {brief && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab("news")} />}
         </>
       )}
-      {(!hideFortune || outstanding > 0 || (brief && !hideNews)) && (
+      {(!hideFortune || outstanding > 0 || brief) && (
         <button onClick={() => setMore((m) => !m)} style={{ width: "100%", textAlign: "center", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "9px 0 2px", cursor: "pointer", color: C.sub, font: "inherit", fontSize: 13 }}>
           {more ? "閉じる ▲" : "他の情報も見る ▼"}
         </button>
@@ -3543,7 +3544,8 @@ export default function App() {
   const briefFirst = (data.digest && data.digest.briefing ? data.digest.briefing.split("\n").filter((l) => l.trim())[0] : "");
 
   // トップのタブ（キー方式。ニュース/運気は設定で非表示にできる＝販売時はコアに集中できる）
-  const hiddenTabs = (data && data.hiddenTabs) || {};
+  // ニュースは既定で非表示（既存ユーザーにも適用。設定で明示的にON=news:false にすれば表示）
+  const hiddenTabs = { news: true, ...((data && data.hiddenTabs) || {}) };
   const ALL_TABS = [
     { key: "home", label: "ホーム" },
     { key: "work", label: "仕事" },
@@ -3553,7 +3555,8 @@ export default function App() {
     { key: "fortune", label: "運気" },
   ];
   const TABS = ALL_TABS.filter((t) => !hiddenTabs[t.key]);
-  const activeTab = TABS.some((t) => t.key === tab) ? tab : "home"; // 非表示タブ選択中はホームへ寄せる
+  // タブバーから隠れていても、ホームのカード（ニュース1行/運気）から開いた場合は表示できるようにする
+  const activeTab = ALL_TABS.some((t) => t.key === tab) ? tab : "home";
   const onTouchStart = (ev) => {
     if (ev.target.closest && ev.target.closest("[data-hscroll]")) { tabTouch.current = null; return; } // 内側の横スクロール上は無視
     const t = ev.touches[0];
