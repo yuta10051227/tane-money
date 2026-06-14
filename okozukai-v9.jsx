@@ -501,12 +501,12 @@ const MON_FRAMES6 = { egg:1, m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
 const BG_THEMES = [
   { id:"auto",   name:"じかんたい", emoji:"🕒", need:0,   grad:null, stars:false },
-  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false },
-  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false },
-  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true },
-  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true },
-  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true },
-  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true },
+  { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false, img:"/assets/bg_ocean.png" },
+  { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false, img:"/assets/bg_sunset.png" },
+  { id:"night",  name:"よぞら",     emoji:"🌙", need:45,  grad:"linear-gradient(180deg,#020410 0%,#0a1330 45%,#101a40 100%)", stars:true, img:"/assets/bg_night.png" },
+  { id:"galaxy", name:"うちゅう",   emoji:"🌌", need:75,  grad:"linear-gradient(180deg,#0a0618 0%,#1a0d33 45%,#0d0820 100%)", stars:true, img:"/assets/bg_galaxy.png" },
+  { id:"aurora", name:"オーロラ",   emoji:"✨", need:120, grad:"linear-gradient(180deg,#03101a 0%,#06281f 40%,#10103a 80%,#06281f 100%)", stars:true, img:"/assets/bg_aurora.png" },
+  { id:"sakura", name:"さくら",     emoji:"🌸", need:180, grad:"linear-gradient(180deg,#1a0a16 0%,#4a1a36 40%,#6a2a4a 75%,#2a1020 100%)", stars:true, img:"/assets/bg_sakura.png" },
 ];
 
 // モンスター系統の解放（累計タスクのクリアで新しい仲間が解放される）
@@ -1475,6 +1475,7 @@ function DailyTasks({ child, data, update }) {
   const _bgTheme = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
   const _bgUnlocked = (_bgTheme.need||0) <= totalDoneMon;
   const heroGrad = (_bgUnlocked && _bgTheme.grad) ? _bgTheme.grad : null;
+  const heroImg  = (_bgUnlocked && _bgTheme.img) ? _bgTheme.img : null;
   const heroStars = _bgUnlocked && _bgTheme.stars;
 
   const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
@@ -2457,6 +2458,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const _cBgTheme   = BG_THEMES.find(t=>t.id===_bgTid) || BG_THEMES[0];
   const _cBgUnlock  = (_cBgTheme.need||0) <= _cTotalDone;
   const heroGrad    = (_cBgUnlock && _cBgTheme.grad) ? _cBgTheme.grad : null;
+  const heroImg     = (_cBgUnlock && _cBgTheme.img) ? _cBgTheme.img : null;
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
@@ -2645,7 +2647,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           :h>=20&&h<22
           ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"
           :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
-        const bg = heroGrad || bgAuto;
+        const bg = heroImg ? `url(${heroImg}) center top/cover no-repeat, ${heroGrad||bgAuto}` : (heroGrad || bgAuto);
         const starOpacity=h>=7&&h<17?0.2:0.6;
         return(
       <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
@@ -2735,7 +2737,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const toPts2=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
         const portV2=myH2.reduce((s,h)=>{const st=stocks2.find(x=>x.id===h.stockId);return s+(st?toPts2(st,st.price)*h.qty:0);},0);
         return(
-      <div style={{background:heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)",position:"relative",overflow:"hidden"}}>
+      <div style={{background:heroImg?`url(${heroImg}) center top/cover no-repeat, ${heroGrad||"linear-gradient(160deg,#060d1a,#0f1a2e)"}`:(heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)"),position:"relative",overflow:"hidden"}}>
         {/* 背景グリッド */}
         <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",backgroundSize:"32px 32px",pointerEvents:"none"}}/>
         {/* 背景テーマの星(うちゅう/よぞら等) */}
@@ -3390,7 +3392,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <div key={t.id}
                     onClick={()=>{ if(unlocked) update(d=>({...d,bgTheme:{...(d.bgTheme||{}),[child.id]:t.id}})); }}
                     style={{borderRadius:12,overflow:"hidden",cursor:unlocked?"pointer":"default",border:selected?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,opacity:unlocked?1:0.5}}>
-                    <div style={{height:44,background:t.grad||"linear-gradient(180deg,#1a5c8a,#1f7038)"}}/>
+                    <div style={{height:44,background:t.img?`url(${t.img}) center/cover, ${t.grad||"#1a5c8a"}`:(t.grad||"linear-gradient(180deg,#1a5c8a,#1f7038)")}}/>
                     <div style={{padding:"4px 4px",background:CARD,textAlign:"center"}}>
                       <div style={{fontSize:11,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
                       {!unlocked
