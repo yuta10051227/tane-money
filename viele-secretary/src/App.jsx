@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor, sanmei } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -1708,6 +1708,81 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
   );
 }
 
+/* 算命学・人体星図（陽占）：五主星を十字に配置＋十二大従星のエネルギー＋日干タイプ＋陰占の干支 */
+const POS_SHORT = { center: "中央・本質", north: "頭・目上", south: "腹・社会", east: "右手・身近", west: "左手・友人" };
+function SanmeiChart({ detail }) {
+  const [sel, setSel] = useState("center");
+  if (!detail) return null;
+  const by = {};
+  (detail.stars || []).forEach((s) => { by[s.pos] = s; });
+  const sd = by[sel];
+  const cell = (pos) => {
+    const s = by[pos];
+    if (!s) return <span />;
+    const active = sel === pos;
+    return (
+      <button
+        onClick={() => setSel(pos)}
+        style={{ border: `1px solid ${active ? C.purple : C.line}`, background: active ? C.purple + "1F" : C.panel2, borderRadius: 10, padding: "8px 4px", textAlign: "center", cursor: "pointer", color: C.text, font: "inherit", display: "grid", gap: 1, placeItems: "center" }}
+      >
+        <span style={{ fontSize: 18 }}>{s.emoji}</span>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{s.star}</span>
+        <span style={{ fontSize: 10, color: C.faint }}>{POS_SHORT[pos]}</span>
+      </button>
+    );
+  };
+  const eColor = (e) => (e >= 9 ? C.green : e >= 5 ? C.accent : C.blue);
+  return (
+    <div>
+      {/* 十字（人体星図） */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
+        <span />{cell("north")}<span />
+        {cell("west")}{cell("center")}{cell("east")}
+        <span />{cell("south")}<span />
+      </div>
+      {/* 選択中の星の詳細 */}
+      {sd && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 13px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: C.purple, fontWeight: 700, marginBottom: 2 }}>{sd.posLabel}（{sd.source}）</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{sd.emoji} {sd.star}・{sd.title}</div>
+          <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{sd.posMeaning}</div>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 6 }}>{sd.desc}</div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>💡 {sd.biz}</div>
+        </div>
+      )}
+      {/* 十二大従星（人生の勢い） */}
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>人生のエネルギー（十二大従星）</div>
+      <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+        {(detail.energies || []).map((e) => (
+          <div key={e.phase}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+              <span style={{ color: C.sub }}>{e.phase}期 ・ <b style={{ color: C.text }}>{e.name}</b></span>
+              <span style={{ color: eColor(e.energy), fontWeight: 700 }}>エネルギー {e.energy}/12</span>
+            </div>
+            <div style={{ height: 8, background: C.panel2, borderRadius: 5, overflow: "hidden", border: `1px solid ${C.line}` }}>
+              <div style={{ width: `${(e.energy / 12) * 100}%`, height: "100%", background: eColor(e.energy) }} />
+            </div>
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{e.meaning}</div>
+          </div>
+        ))}
+      </div>
+      {/* 日干タイプ＋陰占の干支 */}
+      {detail.dayType && (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 8 }}>
+          <b style={{ color: C.purple }}>日干タイプ：{detail.dayType.label}</b>　{detail.dayType.desc}
+        </div>
+      )}
+      {detail.pillars && (
+        <div style={{ display: "flex", gap: 8, fontSize: 12, color: C.sub }}>
+          {[["年柱", detail.pillars.year], ["月柱", detail.pillars.month], ["日柱", detail.pillars.day]].map(([k, v]) => (
+            <span key={k} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "3px 10px" }}>{k} <b style={{ color: C.text }}>{v}</b></span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth }) {
   const f = fortune || {};
   const t = f.today || {};
@@ -1745,14 +1820,19 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       {birth && birth.date && !fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
 
       {birth && birth.date && (() => {
-        const sm = sanmei(birth);
-        return sm ? (
-          <div style={{ background: C.purple + "12", border: `1px solid ${C.purple}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
-            <div style={{ fontSize: 12, color: C.purple, fontWeight: 700, marginBottom: 4 }}>あなたの経営キャラ（算命学・中心星）</div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{sm.emoji} {sm.star}・{sm.title}</div>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 4 }}>{sm.desc}</div>
-            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>💡 {sm.biz}</div>
-          </div>
+        const detail = sanmeiDetail(birth);
+        return detail ? (
+          <Acc
+            title="算命学・人体星図（あなたの星）"
+            color={C.purple}
+            defaultOpen
+            badge={<span style={{ fontSize: 12, color: C.purple, fontWeight: 700 }}>{detail.center.emoji}{detail.center.star}</span>}
+          >
+            <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginBottom: 10 }}>
+              生年月日から出した8つの星で「心の設計図」を読み解きます。各星をタップすると詳しい意味が出ます。中央＝本質、頭＝目上、腹＝社会、左手＝友人、右手＝身近な人から見たあなた。
+            </div>
+            <SanmeiChart detail={detail} />
+          </Acc>
         ) : null;
       })()}
 
