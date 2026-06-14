@@ -2775,6 +2775,16 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <button onClick={()=>setShowTransfer(true)} style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
           </div>
+          {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
+            <div style={{marginTop:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,0.6)",marginBottom:5,fontWeight:700}}>
+                <span>🎯 {ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
+              </div>
+              <div style={{height:7,borderRadius:999,background:"rgba(255,255,255,0.16)",overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:`linear-gradient(90deg,${G},#4ade80)`,transition:"width .4s"}}/>
+              </div>
+            </div>
+          );})()}
           {(()=>{
             const rankable=[...data.children,...(data.parents||[])].filter(m=>m.visibility?.rankingParticipation!==false);
             if(rankable.length<2) return null;
@@ -2840,6 +2850,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
           <SeedMonster child={child} data={data} size={100} update={update}/>
         </div>
+        {/* 目標までの進捗バー(参考ゲームの進行感を健全に: 直近の未達成目標を1本だけ) */}
+        {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
+          <div style={{padding:"0 20px 16px",position:"relative",zIndex:2}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:5,fontWeight:700}}>
+              <span>🎯 {ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
+            </div>
+            <div style={{height:7,borderRadius:999,background:"rgba(255,255,255,0.13)",overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:`linear-gradient(90deg,${G},#4ade80)`,transition:"width .4s"}}/>
+            </div>
+          </div>
+        );})()}
         {/* 4ステータスグリッド */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
           {[
@@ -2865,13 +2886,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       })()}
       {/* タブナビゲーション */}
       <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
-        {MAIN_TABS.map(([v,l])=>(
+        {MAIN_TABS.map(([v,l])=>{
+          // 控えめな金色ドット: 「今日まだのおてつだい」と「今日まだのガチャ」だけ(最大2個)。やり終えたら消える。
+          const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && !todayDone && !gachaTest);
+          return (
           <button key={v} onClick={()=>setTab(v)}
-            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:11,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}}/>
+            style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <span style={{position:"relative",display:"inline-flex"}}>
+              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}}/>
+              {tabDot && <span style={{position:"absolute",top:-3,right:-6,width:9,height:9,borderRadius:"50%",background:GOLD,border:`1.5px solid ${isJunior?CARD:"#0f1a2e"}`}}/>}
+            </span>
             {l.replace(/^\S+\s+/,"")}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── ストリーク消滅リマインダー ── */}
@@ -2879,8 +2907,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{margin:"10px 16px 0",background:`linear-gradient(135deg,#fff8e1,#fffde7)`,border:`2px solid ${GOLD}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:24}}>🔥</span>
           <div style={{flex:1}}>
-            <div style={{fontWeight:800,fontSize:13,color:"#b45309"}}>連続{curStreak}日！今日もタスクをやろう</div>
-            <div style={{fontSize:11,color:MUTED,marginTop:1}}>タスクを完了しないと記録が途切れるよ</div>
+            <div style={{fontWeight:800,fontSize:13,color:"#b45309"}}>連続{curStreak}日！すごいね✨</div>
+            <div style={{fontSize:11,color:MUTED,marginTop:1}}>きょうも 1つ やって つづけよう！</div>
           </div>
         </div>
       )}
@@ -3127,7 +3155,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         const tc=tierColorMap[item.tierId]||BORDER;
                         return(<div key={item.id} style={{textAlign:"center",background:cnt>0?(darkBG?"rgba(255,255,255,0.08)":CARD):(darkBG?"rgba(255,255,255,0.02)":"rgba(0,0,0,0.04)"),borderRadius:11,padding:"8px 3px",border:`1.5px solid ${cnt>0?tc:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,transition:"all .2s"}}>
                           {cnt>0
-                            ? <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_").replace("gs_","gacha_gs_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>
+                            ? (item.id.startsWith("gs_")
+                                ? (()=>{const b=item.id.replace("gs_","gacha_gs_");return(
+                                    <div style={{position:"relative",width:42,height:42,margin:"0 auto",animation:"gsBob 1.6s ease-in-out infinite"}}>
+                                      <img src={`/assets/${b}_b.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.cssText="font-size:30px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;";e.target.replaceWith(sp);}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain"}}/>
+                                      <img src={`/assets/${b}_a.png`} alt="" onError={e=>{e.target.style.display="none";}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",animation:"gsBlink .9s steps(1,start) infinite"}}/>
+                                    </div>);})()
+                                : <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>)
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
                           }
                           <div style={{fontSize:11,fontWeight:700,color:cnt>0?(darkBG?"rgba(255,255,255,0.8)":TEXT):MUTED,marginTop:3,lineHeight:1.3}}>{cnt>0?item.name:"???"}</div>
@@ -3154,7 +3188,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               </div>
             </>);
           })()}
-          <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}`}</style>
+          <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}
+          @keyframes gsBlink{0%{opacity:1}49.9%{opacity:1}50%{opacity:0}99.9%{opacity:0}100%{opacity:1}}
+          @keyframes gsBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}`}</style>
         </div>
         {/* Junior: ガチャの後はショートカット＆きろくのみ（タスク本体はガチャの前へ移動済み） */}
         {isJunior && <>
