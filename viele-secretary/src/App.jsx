@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -427,6 +427,7 @@ function makeSeed() {
     digest: null,
     newsCats: ["top", "business", "marketing", "solo"],
     birth: null,
+    members: [],
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     sampleNotice: true, // サンプルデータ識別フラグ
@@ -1587,7 +1588,7 @@ const STANCE_UI = dyn(() => { const t = THEMES[THEME_NAME]; return {
   整える: { color: t.accent, mark: "整", tip: "淡々と整える日" },
   守り: { color: t.red, mark: "守", tip: "守りを固める・背伸びしない" },
 }; });
-function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
+function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
   const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
@@ -1606,8 +1607,9 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
     for (const t of trips || []) add(t.date, t.title);
     for (const d of deadlines || []) add(d.date, d.title);
     for (const L of launches || []) { add(L.deadlineReg, `${L.name} 先行締切`); add(L.deadlineCv, `${L.name} 本申込締切`); }
+    for (const e of events || []) add(e.date, e.title); // 同期(Googleカレンダー)・取り込み予定
     return m;
-  }, [trips, deadlines, launches]);
+  }, [trips, deadlines, launches, events]);
 
   if (!birth || !birth.date) return null; // 出生情報が無いときは出さない（FortunePanel側で入力導線を出す）
 
@@ -1790,7 +1792,321 @@ function SanmeiChart({ detail }) {
   );
 }
 
-function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth }) {
+/* ──────────────────────────────────────────────────────────────
+   A. 天中殺・大運 表示（FortunePanel内・人体星図Accの直下）
+   ────────────────────────────────────────────────────────────── */
+function TenchusatsuDaiunAcc({ birth }) {
+  const tc = useMemo(() => { try { return tenchusatsu(birth); } catch { return null; } }, [birth && birth.date, birth && birth.time]);
+  const du = useMemo(() => { try { return daiun(birth); } catch { return null; } }, [birth && birth.date, birth && birth.time, birth && birth.gender]);
+  if (!tc && !du) return null;
+  const cur = du && du.current;
+  return (
+    <Acc title="運勢の流れ（天中殺・大運）" color={C.blue} defaultOpen={false}>
+      {tc && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 4 }}>{tc.name}</div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 6 }}>{tc.desc}</div>
+          {tc.years && tc.years.length > 0 && (
+            <div style={{ fontSize: 13, color: C.text }}>
+              次の天中殺の年: <strong>{tc.years.join("・")}</strong>
+            </div>
+          )}
+        </div>
+      )}
+      {du && cur && (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.blue, marginBottom: 6 }}>大運（10年の流れ）</div>
+          {du.assumed && (
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 6 }}>性別未設定のため順行で仮表示</div>
+          )}
+          <div style={{ background: C.panel, border: `1px solid ${C.blue}`, borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: C.blue, fontWeight: 700, marginBottom: 4 }}>現在の大運期</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{cur.ganzhi} ・ {cur.star}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>{cur.ageFrom}歳〜{cur.ageTo}歳</div>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{cur.theme}</div>
+          </div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>ロードマップ（5期）</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {du.roadmap.map((p, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: "1 1 140px",
+                  minWidth: 120,
+                  background: p.current ? C.blue + "22" : C.panel2,
+                  border: `1px solid ${p.current ? C.blue : C.line}`,
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                }}
+              >
+                <div style={{ fontSize: 12, color: p.current ? C.blue : C.faint, fontWeight: p.current ? 700 : 400 }}>
+                  {p.ageFrom}〜{p.ageTo}歳
+                  {p.current && <span style={{ marginLeft: 4, fontSize: 11, fontWeight: 700 }}>← 現在</span>}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, margin: "2px 0" }}>{p.ganzhi} {p.star}</div>
+                <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.5 }}>{p.theme && p.theme.slice(0, 22)}{p.theme && p.theme.length > 22 ? "…" : ""}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Acc>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   B-1. メンバー管理フォーム・一覧
+   ────────────────────────────────────────────────────────────── */
+const RELATIONS = ["配偶者", "子ども", "親", "パートナー", "メンバー", "その他"];
+
+function MemberBirthForm({ initial, onSave, onCancel }) {
+  const def = initial || {};
+  const b = def.birth || {};
+  const [name, setName] = useState(def.name || "");
+  const [relation, setRelation] = useState(def.relation || "配偶者");
+  const [date, setDate] = useState(b.date || "");
+  const [time, setTime] = useState(b.time || "");
+  const [place, setPlace] = useState(b.place || "東京");
+  const [gender, setGender] = useState(b.gender || "");
+  const [err, setErr] = useState("");
+
+  const save = () => {
+    if (!name.trim()) { setErr("名前を入力してください"); return; }
+    if (!date) { setErr("生年月日を入力してください"); return; }
+    setErr("");
+    const p = PREFS.find((x) => x[0] === place) || PREFS.find((x) => x[0] === "東京");
+    onSave({
+      id: def.id || ("m" + Date.now()),
+      name: name.trim(),
+      relation,
+      birth: { date, time: time || "12:00", place, lat: p[1], lon: p[2], gender, utcOffset: 9 },
+    });
+  };
+
+  return (
+    <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
+      {err && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{err}</div>}
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="名前（必須）" style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>続柄</label>
+      <select value={relation} onChange={(e) => setRelation(e.target.value)} style={inp}>
+        {RELATIONS.map((r) => <option key={r}>{r}</option>)}
+      </select>
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>生年月日（必須）</label>
+      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生時刻（任意）</label>
+      <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inp} />
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生地</label>
+      <select value={place} onChange={(e) => setPlace(e.target.value)} style={inp}>
+        {PREFS.map((p) => <option key={p[0]}>{p[0]}</option>)}
+      </select>
+      <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>性別</label>
+      <select value={gender} onChange={(e) => setGender(e.target.value)} style={inp}>
+        <option value="">未設定</option>
+        <option value="male">男性</option>
+        <option value="female">女性</option>
+      </select>
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button onClick={save} style={{ ...chipBtn, background: C.green, color: "#0B0D11", borderColor: C.green, fontWeight: 700 }}>保存</button>
+        <button onClick={onCancel} style={chipBtn}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+function MemberManager({ members, onSaveMembers }) {
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const dcTimer = useRef(null);
+
+  const handleDelete = (id) => {
+    if (deleteConfirm === id) {
+      clearTimeout(dcTimer.current);
+      setDeleteConfirm(null);
+      onSaveMembers((members || []).filter((m) => m.id !== id));
+    } else {
+      setDeleteConfirm(id);
+      clearTimeout(dcTimer.current);
+      dcTimer.current = setTimeout(() => setDeleteConfirm(null), 1500);
+    }
+  };
+
+  const handleSave = (item) => {
+    const list = members || [];
+    const idx = list.findIndex((m) => m.id === item.id);
+    if (idx >= 0) {
+      onSaveMembers(list.map((m) => (m.id === item.id ? item : m)));
+    } else {
+      onSaveMembers([...list, item]);
+    }
+    setAdding(false);
+    setEditId(null);
+  };
+
+  return (
+    <div>
+      {(members || []).length === 0 && !adding && <Empty>メンバーがいません。下のボタンから追加してください。</Empty>}
+      <div style={{ display: "grid", gap: 2 }}>
+        {(members || []).map((m) => (
+          <div key={m.id}>
+            {editId === m.id ? (
+              <MemberBirthForm initial={m} onSave={handleSave} onCancel={() => setEditId(null)} />
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{m.name}</span>
+                  <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>{m.relation}</span>
+                  {m.birth && m.birth.date && <span style={{ fontSize: 12, color: C.faint, marginLeft: 8 }}>{m.birth.date}</span>}
+                </div>
+                <button onClick={() => { setEditId(m.id); setAdding(false); }} style={iconBtn} title="編集">✏️</button>
+                <button
+                  onClick={() => handleDelete(m.id)}
+                  style={{ ...iconBtn, color: deleteConfirm === m.id ? C.red : C.sub, fontWeight: deleteConfirm === m.id ? 700 : 400, fontSize: 13 }}
+                >
+                  {deleteConfirm === m.id ? "削除?" : "✕"}
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {adding ? (
+        <MemberBirthForm onSave={handleSave} onCancel={() => setAdding(false)} />
+      ) : (
+        <button
+          onClick={() => { setAdding(true); setEditId(null); }}
+          style={{ ...chipBtn, marginTop: 10, borderStyle: "dashed", width: "100%", justifyContent: "center" }}
+        >
+          + メンバーを追加
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   B-2. 今日のチーム運気
+   ────────────────────────────────────────────────────────────── */
+function FamilyFortunePanel({ birth, members }) {
+  const stars = (n) => "★★★★★".slice(0, Math.max(0, Math.min(5, Number(n) || 0))) + "☆☆☆☆☆".slice(0, 5 - Math.max(0, Math.min(5, Number(n) || 0)));
+  const allMembers = useMemo(() => {
+    const hasBirth = birth && birth.date;
+    const me = hasBirth ? [{ name: birth.name || "あなた", birth }] : [];
+    return [...me, ...(members || []).map((m) => ({ name: m.name, birth: m.birth }))];
+  }, [birth && birth.date, birth && birth.time, JSON.stringify(members)]);
+
+  if ((members || []).length === 0) {
+    return <Empty>メンバーを登録すると、今日のチーム運気が見られます</Empty>;
+  }
+
+  let result = null;
+  try { result = familyFortune(allMembers); } catch { return <Empty>運気の計算に失敗しました</Empty>; }
+  if (!result) return null;
+  const stars5 = stars(result.teamScore);
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.faint, marginBottom: 10 }}>今日のチームスコア: <strong style={{ fontSize: 15, color: C.text }}>{stars5}</strong></div>
+      <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+        {result.members.map((mb, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.line}` }}>
+            <span style={{ fontSize: 14, color: C.accent, flex: "0 0 auto" }}>{stars(mb.score)}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{mb.name}</span>
+              <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>{mb.stance}</span>
+              {mb.focus && <div style={{ fontSize: 12, color: C.faint, marginTop: 2, lineHeight: 1.5 }}>{mb.focus}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+        {result.bestMover && (
+          <span style={{ fontSize: 12, background: C.green + "22", border: `1px solid ${C.green}`, color: C.green, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
+            {result.bestMover} が今日の牽引役
+          </span>
+        )}
+        {result.supporter && result.supporter !== result.bestMover && (
+          <span style={{ fontSize: 12, background: C.blue + "22", border: `1px solid ${C.blue}`, color: C.blue, borderRadius: 8, padding: "3px 10px", fontWeight: 700 }}>
+            {result.supporter} が今日の支え役
+          </span>
+        )}
+      </div>
+      {result.advice && (
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.7, background: C.panel2, borderRadius: 8, padding: "10px 12px" }}>
+          チームへのひとこと：{result.advice}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   B-3. 相性チャート
+   ────────────────────────────────────────────────────────────── */
+function AishouPanel({ birth, members }) {
+  const [expandedId, setExpandedId] = useState(null);
+  if (!birth || !birth.date || (members || []).length === 0) {
+    return <Empty>本人の出生情報とメンバーを登録すると、相性チャートが表示されます</Empty>;
+  }
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {(members || []).map((m) => {
+        if (!m.birth || !m.birth.date) return null;
+        let result = null;
+        try { result = aishou(birth, m.birth); } catch { return null; }
+        if (!result) return null;
+        const pct = result.score;
+        const barColor = pct >= 75 ? C.green : pct >= 45 ? C.accent : C.blue;
+        const isExpanded = expandedId === m.id;
+        const isChild = m.relation === "子ども";
+        return (
+          <div key={m.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+            <button
+              onClick={() => setExpandedId(isExpanded ? null : m.id)}
+              style={{ width: "100%", background: "transparent", border: "none", color: C.text, padding: "12px 14px", cursor: "pointer", textAlign: "left", font: "inherit" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{m.name}</span>
+                <span style={{ fontSize: 12, color: C.sub }}>{m.relation}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: barColor }}>{result.score}点</span>
+                <span style={{ fontSize: 12, color: C.sub }}>{isExpanded ? "▲" : "▼"}</span>
+              </div>
+              <div style={{ height: 8, background: C.panel, borderRadius: 5, overflow: "hidden", marginBottom: 6 }}>
+                <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 5 }} />
+              </div>
+              <div style={{ fontSize: 13, color: C.text }}>{result.label}</div>
+            </button>
+            {isExpanded && (
+              <div style={{ padding: "0 14px 14px", borderTop: `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 10, marginTop: 10 }}>{result.summary}</div>
+                {!isChild && (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, marginBottom: 4 }}>あなたから見て</div>
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{result.aToB}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.blue, marginBottom: 4 }}>相手から見て</div>
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{result.bToA}</div>
+                  </>
+                )}
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 6 }}>うまくいくコツ</div>
+                <div style={{ display: "grid", gap: 4 }}>
+                  {(result.howto || []).slice(0, 3).map((h, i) => (
+                    <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>・{h}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   FortunePanel（本体）
+   ────────────────────────────────────────────────────────────── */
+function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers }) {
   const f = fortune || {};
   const t = f.today || {};
   const tm = f.tomorrow || {};
@@ -1805,6 +2121,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
     </div>
   ) : null;
   return (
+    <>
     <Panel
       title="運気（年・月・日）"
       accent={C.purple}
@@ -1842,6 +2159,8 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
           </Acc>
         ) : null;
       })()}
+
+      {birth && birth.date && <TenchusatsuDaiunAcc birth={birth} />}
 
       {birth && birth.date && (
         <>
@@ -1907,6 +2226,27 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
         ひとり秘書の鑑定AIによる占いです ・ 参考程度に
       </div>
     </Panel>
+
+    <Panel
+      title="家族・チームの相性と運気"
+      accent={FAMILY_COLOR}
+      help="家族・チームメンバーの生年月日から、今日の運気や相性を算命学で読み解きます。追加したメンバーのデータはクラウドに保存されます。"
+    >
+      <Acc title="メンバーの管理" defaultOpen={false}>
+        <MemberManager members={members} onSaveMembers={onSaveMembers} />
+      </Acc>
+      <Acc
+        title="今日のチーム運気"
+        defaultOpen
+        badge={<span style={{ fontSize: 12, color: FAMILY_COLOR, fontWeight: 700 }}>{(members || []).length > 0 ? (() => { try { const all = (birth && birth.date ? [{ name: birth.name || "あなた", birth }] : []).concat((members || []).map((m) => ({ name: m.name, birth: m.birth }))); const r = familyFortune(all); return "★★★★★".slice(0, r.teamScore) + "☆☆☆☆☆".slice(0, 5 - r.teamScore); } catch { return ""; } })() : ""}</span>}
+      >
+        <FamilyFortunePanel birth={birth} members={members} />
+      </Acc>
+      <Acc title="相性チャート" defaultOpen={false}>
+        <AishouPanel birth={birth} members={members} />
+      </Acc>
+    </Panel>
+    </>
   );
 }
 
@@ -3451,7 +3791,7 @@ export default function App() {
         )}
 
         {activeTab === "fortune" && (
-          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} onPlan={(d) => addDeadline({ title: "発信・告知", stage: "告知", date: d })} />
+          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} events={pool.map((e) => ({ date: `${e.start.getFullYear()}-${pad2(e.start.getMonth() + 1)}-${pad2(e.start.getDate())}`, title: e.title }))} onPlan={(d) => addDeadline({ title: "発信・告知", stage: "告知", date: d })} />
         )}
 
         {activeTab === "fortune" && (
@@ -3463,6 +3803,8 @@ export default function App() {
             onRefresh={() => refreshFortune()}
             birth={data.birth}
             onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
+            members={data.members || []}
+            onSaveMembers={(m) => update({ members: m })}
           />
         )}
 
