@@ -1194,7 +1194,7 @@ function GachaAnim({ result, onClose }) {
   const tier    = isSuper ? "super" : isSR ? "sr" : result.rate <= 25 ? "rare" : "normal";
   const TF      = ({normal:"n",rare:"r",sr:"sr",super:"super"})[tier]; // 最終レア度(額縁用)
   // レア度が上がるほど多段階でニョキニョキ育つ: 芽→つぼみ(青)→花(金)→大樹(虹)
-  const STAGES  = isSuper ? ["n","r","super"] : isSR ? ["n","r","sr"] : (result.rate<=25 ? ["n","r"] : ["n"]);
+  const STAGES  = result.simpleAnim ? [TF] : (isSuper ? ["n","r","super"] : isSR ? ["n","r","sr"] : (result.rate<=25 ? ["n","r"] : ["n"]));
   const AURA_OF = { n:"#eae2c8", r:"#4a9eff", sr:"#f5c842", super:"#f5c842" };
 
   const [phase, setPhase]       = useState("charge");   // charge→tap→grow→burst→show
@@ -1207,7 +1207,7 @@ function GachaAnim({ result, onClose }) {
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
   const HOLD = 950, HUSH = isSuper ? 1500 : 1000;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
-  const hasHush = isSR;                   // SR以上で「期待値の裏切り＋暗転→解放」
+  const hasHush = isSR && !result.simpleAnim;   // SR以上で暗転→解放（シンプル演出時はOFF）
   const reveal = () => {
     if(phase!=="tap") return;
     setPhase("grow"); setStage(0); buzz([60]);
@@ -2175,6 +2175,17 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{position:"absolute",top:3,left:fs.requireApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
+              {/* ガチャ演出をシンプルに（暗転・段階成長をOFF） */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>ガチャ演出をシンプルに</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると暗転やタメ演出を省いてすぐ結果に（まぶしさ/待ち時間が苦手な子に）</div>
+                </div>
+                <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),gachaSimple:!(d.familySettings?.gachaSimple)}}))}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:(fs.gachaSimple)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
+                  <div style={{position:"absolute",top:3,left:(fs.gachaSimple)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
               {/* 承認通知 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -2498,7 +2509,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
     const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
-    const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks};
+    const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks, simpleAnim:!!(data.familySettings?.gachaSimple)};
     setGachaRes(finalRes);
     if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
@@ -2923,7 +2934,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })()}
         {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
-          <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>TODAY'S TASKS</div>
+          <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
@@ -2933,7 +2944,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </>}
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
         <div style={{padding:"12px 16px 4px"}}>
-          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 DAILY GACHA</div>}
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
@@ -2952,15 +2963,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <div style={{flex:1}}>
                   <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
                   <div style={{fontWeight:800,fontSize:14,color:darkBG?((todayDone&&!gachaTest)?"rgba(255,255,255,0.35)":"#fff"):((todayDone&&!gachaTest)?MUTED:TEXT)}}>
-                    {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"CLAIMED":"✅ 今日は引き済み！"):"デイリーガチャ")}
+                    {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ")}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
-                    {gachaTest?"何回でもOK（記録は残りません・〜07:34）":(todayDone?(darkBG?"BACK TOMORROW":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
+                    {gachaTest?"何回でもOK（記録は残りません・〜07:34）":(todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
                   </div>
                   {!todayDone&&!gachaTest&&<div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
-                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑残り{rem}体 · COLLECT THEM ALL</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>COLLECTION COMPLETE ★</div>;})()}
+                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
@@ -5033,9 +5044,41 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
         <div style={{fontSize:13,fontWeight:700,color:TEXT}}>メンバーを選択</div>
       </div>
 
+      {/* 親の「今日ダッシュボード」：未承認・今日おてつだい・ガチャ残りを一目で */}
+      {data.children&&data.children.length>0 && (()=>{
+        const td=todayKey();
+        const pend=(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
+        const kids=data.children||[];
+        const didToday=kids.filter(c=>(data.logs||[]).some(l=>l.cid===c.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(td)));
+        const gachaLeft=kids.filter(c=>(data.gachaDate?.[c.id])!==td);
+        return (
+          <div style={{padding:"0 20px",marginBottom:18}}>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW}}>
+              <div style={{fontSize:11,fontWeight:800,color:MUTED,marginBottom:10,letterSpacing:.5}}>📋 きょうの ようす</div>
+              <div style={{display:"flex",alignItems:"stretch",gap:8}}>
+                <div onClick={()=>pend>0&&setShowSettings(true)} style={{flex:1,textAlign:"center",cursor:pend>0?"pointer":"default"}}>
+                  <div style={{fontSize:24,fontWeight:900,color:pend>0?R:TEXT,lineHeight:1.1}}>{pend}</div>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>みしょうにん{pend>0?" 👆":""}</div>
+                </div>
+                <div style={{width:1,background:BORDER}}/>
+                <div style={{flex:1,textAlign:"center"}}>
+                  <div style={{fontSize:24,fontWeight:900,color:G,lineHeight:1.1}}>{didToday.length}<span style={{fontSize:13,color:MUTED,fontWeight:700}}>/{kids.length}</span></div>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>きょう おてつだい</div>
+                </div>
+                <div style={{width:1,background:BORDER}}/>
+                <div style={{flex:1,textAlign:"center"}}>
+                  <div style={{fontSize:24,fontWeight:900,color:gachaLeft.length>0?GOLD:MUTED,lineHeight:1.1}}>{gachaLeft.length}</div>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>ガチャ まだ</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{padding:"0 20px"}}>
         {/* 子ども */}
-        <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Child</div>
+        <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>おこさま</div>
         {allMembers.filter(m=>m.isChild).map(member=>{
           const goal=topGoal(member.id);
           return (
@@ -5046,7 +5089,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                     <span style={{fontWeight:700,fontSize:15,color:TEXT}}>{member.name}</span>
-                    <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>Child</span>
+                    <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>こども</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||"中高生"}</span>
@@ -5073,7 +5116,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 
         {/* 親 */}
         {allMembers.filter(m=>!m.isChild).length>0&&(
-          <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>Parent</div>
+          <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>おうちのかた</div>
         )}
         {allMembers.filter(m=>!m.isChild).map(member=>{
           const childCount = data.children.length;
@@ -5085,7 +5128,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                 <span style={{fontWeight:700,fontSize:14,color:TEXT}}>{member.name}</span>
-                <span style={{fontSize:10,background:CARDS,color:TEXTS,padding:"2px 7px",borderRadius:999,fontWeight:600}}>Parent</span>
+                <span style={{fontSize:10,background:CARDS,color:TEXTS,padding:"2px 7px",borderRadius:999,fontWeight:600}}>おとな</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,color:MUTED}}>子ども {childCount}人</span>
@@ -5168,7 +5211,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
               🔐 おや管理（PIN認証）
             </button>
             <div style={{background:BG,borderRadius:14,padding:"12px 16px",marginBottom:10}}>
-              <p style={{color:MUTED,fontSize:11,fontWeight:600,margin:"0 0 3px",letterSpacing:.5}}>FAMILY CODE</p>
+              <p style={{color:MUTED,fontSize:11,fontWeight:600,margin:"0 0 3px",letterSpacing:.5}}>かぞくコード</p>
               <p style={{fontWeight:800,fontSize:15,color:TEXT,margin:0,letterSpacing:2.5}}>
                 {(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}
               </p>
