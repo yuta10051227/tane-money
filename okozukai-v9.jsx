@@ -2648,7 +2648,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           :h>=20&&h<22
           ?"linear-gradient(180deg,#050d1a 0%,#0a1a30 35%,#0d2a1a 65%,#164a28 100%)"
           :"linear-gradient(180deg,#020508 0%,#050d10 40%,#0a1a10 70%,#0f3020 100%)";
-        const bg = heroImg ? `url(${heroImg}) center top/cover no-repeat, ${heroGrad||bgAuto}` : (heroGrad || bgAuto);
+        const bg = heroImg ? `linear-gradient(180deg,rgba(6,10,18,.5) 0%,rgba(6,10,18,.12) 38%,rgba(6,10,18,.42) 100%), url(${heroImg}) center top/cover no-repeat` : (heroGrad || bgAuto);
         const starOpacity=h>=7&&h<17?0.2:0.6;
         return(
       <div style={{background:bg,position:"relative",overflow:"hidden",paddingBottom:0}}>
@@ -2738,7 +2738,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const toPts2=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
         const portV2=myH2.reduce((s,h)=>{const st=stocks2.find(x=>x.id===h.stockId);return s+(st?toPts2(st,st.price)*h.qty:0);},0);
         return(
-      <div style={{background:heroImg?`url(${heroImg}) center top/cover no-repeat, ${heroGrad||"linear-gradient(160deg,#060d1a,#0f1a2e)"}`:(heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)"),position:"relative",overflow:"hidden"}}>
+      <div style={{background:heroImg?`linear-gradient(180deg,rgba(6,10,18,.55) 0%,rgba(6,10,18,.12) 38%,rgba(6,10,18,.45) 100%), url(${heroImg}) center top/cover no-repeat`:(heroGrad||"linear-gradient(160deg,#060d1a 0%,#0f1a2e 50%,#091220 100%)"),position:"relative",overflow:"hidden"}}>
         {/* 背景グリッド */}
         <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(74,158,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(74,158,255,0.04) 1px,transparent 1px)",backgroundSize:"32px 32px",pointerEvents:"none"}}/>
         {/* 背景テーマの星(うちゅう/よぞら等) */}
