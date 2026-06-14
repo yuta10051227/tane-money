@@ -1713,6 +1713,33 @@ function TaskManagerSection({data, update}){
 }
 
 
+// prompt()の代替：モバイルでも崩れない自前の入力モーダル付きボタン（自己完結）
+function PromptModalButton({ btnStyle, btnLabel, title, desc, type, maxLen, initial, placeholder, onSubmit }) {
+  const [open, setOpen] = useState(false);
+  const [v, setV] = useState(initial||"");
+  return (
+    <>
+      <button onClick={()=>{ setV(initial||""); setOpen(true); }} style={btnStyle}>{btnLabel}</button>
+      {open && (
+        <div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,background:"#000a",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:F}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:CARD,borderRadius:20,padding:"24px 22px",width:"100%",maxWidth:340,boxShadow:"0 12px 48px #0005"}}>
+            <div style={{fontWeight:900,fontSize:17,color:TEXT,marginBottom:desc?6:14}}>{title}</div>
+            {desc&&<div style={{fontSize:13,color:MUTED,marginBottom:14,lineHeight:1.6}}>{desc}</div>}
+            <input autoFocus value={v}
+              onChange={e=>{const raw=e.target.value; setV(type==="number"?raw.replace(/[^0-9]/g,"").slice(0,maxLen||6):raw.slice(0,maxLen||40));}}
+              type="text" inputMode={type==="number"?"numeric":"text"} placeholder={placeholder||""}
+              style={{width:"100%",padding:"13px 14px",border:`2px solid ${BORDER}`,borderRadius:12,fontSize:18,fontWeight:700,fontFamily:F,background:BG,outline:"none",textAlign:"center",letterSpacing:type==="number"?6:1,boxSizing:"border-box",marginBottom:16}}/>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setOpen(false)} style={{flex:1,padding:"13px",background:"transparent",border:`1.5px solid ${BORDER}`,borderRadius:12,color:MUTED,fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+              <button onClick={()=>{ const val=v; setOpen(false); onSubmit(val); }} style={{flex:1.4,padding:"13px",background:GP,border:"none",borderRadius:12,color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>けってい</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function SettingsModal({data, update, onClose, currentMemberId}) {
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
@@ -2067,14 +2094,13 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
                       <div style={{color:MUTED,fontSize:11}}>PIN: {'*'.repeat(4)}</div>
                     </div>
-                    <button onClick={()=>{
-                      const np=prompt(`${m.name}の新しいPIN（4桁）`);
-                      if(!np||np.length!==4||isNaN(Number(np))){alert("4桁の数字を入力してください");return;}
-                      if(m.isParent||m.id==="parent") update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(np)};});
-                      else update(d=>({...d,children:d.children.map(c=>c.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(c):c),parents:(d.parents||[]).map(p=>p.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(p):p),pinChanged:{...(d.pinChanged||{}),[m.id]:true}}));
-                    }} style={{padding:"6px 12px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
-                      PIN変更
-                    </button>
+                    <PromptModalButton btnLabel="PIN変更" title={`${m.name}の あたらしい PIN`} desc="4けたの すうじを いれてね" type="number" maxLen={4} placeholder="0000"
+                      btnStyle={{padding:"6px 12px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
+                      onSubmit={(np)=>{
+                        if(!np||np.length!==4){alert("4桁の数字を入力してください");return;}
+                        if(m.isParent||m.id==="parent") update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(np)};});
+                        else update(d=>({...d,children:d.children.map(c=>c.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(c):c),parents:(d.parents||[]).map(p=>p.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(p):p),pinChanged:{...(d.pinChanged||{}),[m.id]:true}}));
+                      }}/>
                     {/* 親以外はPINなしトグル */}
                     {!m.isParent&&m.id!=="parent"&&(
                       <button onClick={()=>{
@@ -2100,18 +2126,17 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 4px"}}>ファミリーコード</p>
                 <p style={{fontWeight:900,fontSize:16,letterSpacing:3,margin:"0 0 8px"}}>{(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}</p>
                 <p style={{color:MUTED,fontSize:10,margin:"0 0 10px"}}>このコードを家族に共有してください</p>
-                <button onClick={()=>{
-                  const newCode=prompt("参加したいファミリーコードを入力（家族の端末の設定画面で確認できます）");
-                  if(!newCode)return;
-                  const code=newCode.trim().toUpperCase();
-                  if(!/^[A-Z0-9\-]{8,20}$/.test(code)){alert("コードの形式が正しくありません（8文字以上の英数字）");return;}
-                  if(!confirm(`「${code}」のファミリーに切り替えますか？\n今のファミリーのデータはクラウドに残ります。`))return;
-                  try{localStorage.setItem("tane_money_family_code",code);}catch(e){}
-                  _familyCode=code;
-                  window.location.reload();
-                }} style={{width:"100%",padding:"9px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:10,color:B,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}>
-                  🔗 ファミリーコードを変更
-                </button>
+                <PromptModalButton btnLabel="🔗 ファミリーコードを変更" title="ファミリーコードを変更" desc="参加したいコードを入力（家族の端末の設定で確認できます）" type="text" maxLen={20} placeholder="TANE-XXXX-XXXX"
+                  btnStyle={{width:"100%",padding:"9px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:10,color:B,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}
+                  onSubmit={(newCode)=>{
+                    if(!newCode)return;
+                    const code=newCode.trim().toUpperCase();
+                    if(!/^[A-Z0-9\-]{8,20}$/.test(code)){alert("コードの形式が正しくありません（8文字以上の英数字）");return;}
+                    if(!confirm(`「${code}」のファミリーに切り替えますか？\n今のファミリーのデータはクラウドに残ります。`))return;
+                    try{localStorage.setItem("tane_money_family_code",code);}catch(e){}
+                    _familyCode=code;
+                    window.location.reload();
+                  }}/>
                 <button onClick={()=>{
                   if(!confirm("この端末からログアウトしますか？\nファミリーコード入力画面に戻ります。"))return;
                   try{localStorage.removeItem("tane_money_family_code");}catch(e){}
@@ -3393,8 +3418,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>
                 飼い猫モチーフ。タマゴから育てて究極体まで行くと「卒業」して、ランダムで次の猫がやってくるよ🐈
               </div>
-              {/* テスト用: 1時間だけ即進化(時間/育てた度スキップ) */}
-              {(() => {
+              {/* テスト用: 1時間だけ即進化(本番では非表示・開発環境のみ) */}
+              {hasCloudStorage() && (() => {
                 const until = (data.testEvolveUntil||{})[child.id] || 0;
                 const active = until > Date.now();
                 const minLeft = Math.max(0, Math.ceil((until-Date.now())/60000));
@@ -3845,13 +3870,9 @@ function ParentDailyTab({data,update,sb}){
                 <ChildAvatar child={child} size={24}/>
                 <span style={{fontWeight:700,fontSize:12,flex:1}}>{child.name}</span>
                 <span style={{color:allD?G:MUTED,fontWeight:800,fontSize:11}}>{done}/{s.tasks.length} {allD?"🌟":""}</span>
-                <button onClick={()=>{
-                  const childBonus=(data.childDailyBonus||{})[child.id]??s.bonus;
-                  const amt=parseInt(prompt(`${child.name}にボーナスを付与（デフォルト:${childBonus}pt）`,String(childBonus))||String(childBonus));
-                  if(!isNaN(amt)&&amt>0) (()=>{const _e={id:uid(),cid:child.id,type:"grant",label:`🌟 ボーナスpt（${s.name}）`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
-                }} style={{padding:"3px 8px",background:`${Y}20`,border:`1px solid ${Y}`,borderRadius:7,color:"#9a7000",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:F}}>
-                  🎁 付与
-                </button>
+                <PromptModalButton btnLabel="🎁 付与" title={`${child.name}に ボーナスpt`} desc={`${s.name} のごほうび。何ポイント あげる？`} type="number" maxLen={4} initial={String((data.childDailyBonus||{})[child.id]??s.bonus)} placeholder="pt"
+                  btnStyle={{padding:"3px 8px",background:`${Y}20`,border:`1px solid ${Y}`,borderRadius:7,color:"#9a7000",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:F}}
+                  onSubmit={(val)=>{ const amt=parseInt(val); if(!isNaN(amt)&&amt>0){const _e={id:uid(),cid:child.id,type:"grant",label:`🌟 ボーナスpt（${s.name}）`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);} }}/>
               </div>);
             })}
           </div>
