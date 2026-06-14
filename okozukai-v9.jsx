@@ -1076,7 +1076,7 @@ const SyncBadge = ({status}) => {
   const code = (()=>{try{return localStorage.getItem("tane_money_family_code")||"NO_CODE";}catch(e){return "ERR";}})();
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-      <span style={{fontSize:10, color:col[status]||MUTED, fontWeight:700, background:`${col[status]||MUTED}15`, padding:"2px 7px", borderRadius:10}}>{map[status]||status}</span>
+      <span style={{fontSize:11, color:col[status]||MUTED, fontWeight:700, background:`${col[status]||MUTED}15`, padding:"2px 7px", borderRadius:10}}>{map[status]||status}</span>
       <span style={{fontSize:11, color:MUTED, fontWeight:700, padding:"1px 5px"}}>{code}</span>
     </div>
   );
@@ -1343,7 +1343,7 @@ function GachaAnim({ result, onClose }) {
           <div style={{position:"relative",width:130,height:130,margin:"0 auto 8px"}}>
             <img src={`/assets/gacha_frame_${TF}.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",filter:`drop-shadow(0 0 12px ${result.color}aa)`,animation:isSuper?"gPulse2 1.6s ease-in-out infinite":"none"}} onError={e=>{e.target.style.display="none";}}/>
             <span style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,filter:`drop-shadow(0 0 8px ${result.color})`}}>{result.collItem?result.collItem.emoji:(isSuper?"👑":"🎁")}</span>
-            {result.isNewItem&&<span style={{position:"absolute",top:2,right:2,background:R,color:"#fff",borderRadius:999,padding:"2px 9px",fontSize:10,fontWeight:900}}>NEW!</span>}
+            {result.isNewItem&&<span style={{position:"absolute",top:2,right:2,background:R,color:"#fff",borderRadius:999,padding:"2px 9px",fontSize:11,fontWeight:900}}>NEW!</span>}
           </div>
           {result.collItem && <div style={{fontWeight:900,fontSize:17,color:"#fff",marginBottom:2}}>{result.collItem.name}</div>}
           {result.collItem && <div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:8}}>{result.collItem.desc}</div>}
@@ -1842,7 +1842,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {SETTING_TABS.map(([v,l])=>(
             <button key={v} onClick={()=>setSettingsTab(v)}
               style={{padding:"8px 14px",border:"none",borderBottom:settingsTab===v?`3px solid ${Y}`:"3px solid transparent",background:"none",color:settingsTab===v?TEXT:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
-              {l}{v==="approval"&&((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:10,fontWeight:900}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</span>}
+              {l}{v==="approval"&&((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:11,fontWeight:900}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</span>}
             </button>
           ))}
         </div>
@@ -1945,7 +1945,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                               <span style={{fontSize:18}}>{t.emoji}</span>
                               <div style={{flex:1}}>
                                 <div style={{fontWeight:700,fontSize:12}}>{t.label}</div>
-                                <div style={{color:MUTED,fontSize:10}}>+{t.pts}pt</div>
+                                <div style={{color:MUTED,fontSize:11}}>+{t.pts}pt</div>
                               </div>
                               <button onClick={()=>update(d=>{
                                 const cur=(d.myTaskIds||{})[member.id]||[];
@@ -2128,7 +2128,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <div style={{background:BG,borderRadius:12,padding:"12px 14px",marginTop:8,border:`1.5px solid ${BORDER}`}}>
                 <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 4px"}}>ファミリーコード</p>
                 <p style={{fontWeight:900,fontSize:16,letterSpacing:3,margin:"0 0 8px"}}>{(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}</p>
-                <p style={{color:MUTED,fontSize:10,margin:"0 0 10px"}}>このコードを家族に共有してください</p>
+                <p style={{color:MUTED,fontSize:11,margin:"0 0 10px"}}>このコードを家族に共有してください</p>
                 <PromptModalButton btnLabel="🔗 ファミリーコードを変更" title="ファミリーコードを変更" desc="参加したいコードを入力（家族の端末の設定で確認できます）" type="text" maxLen={20} placeholder="TANE-XXXX-XXXX"
                   btnStyle={{width:"100%",padding:"9px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:10,color:B,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}
                   onSubmit={(newCode)=>{
@@ -2195,7 +2195,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{fontWeight:800,fontSize:14,color:TEXT}}>承認通知</div>
                   <div style={{color:MUTED,fontSize:11,marginTop:2}}>申請が届いたらブラウザ通知でお知らせ</div>
                   {"Notification" in window && Notification.permission==="denied" && (
-                    <div style={{color:R,fontSize:10,marginTop:4}}>通知がブロックされています。ブラウザ設定から許可してください</div>
+                    <div style={{color:R,fontSize:11,marginTop:4}}>通知がブロックされています。ブラウザ設定から許可してください</div>
                   )}
                 </div>
                 <button onClick={async()=>{
@@ -2216,7 +2216,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <span style={{fontSize:18}}>✅</span>
                   <div>
                     <div style={{fontWeight:700,fontSize:12,color:GP}}>通知の準備ができました！</div>
-                    <div style={{fontSize:10,color:MUTED,marginTop:1}}>子どもが申請するとスマホに通知が届きます</div>
+                    <div style={{fontSize:11,color:MUTED,marginTop:1}}>子どもが申請するとスマホに通知が届きます</div>
                   </div>
                 </div>
               )}
@@ -2635,8 +2635,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                <span style={{fontSize:10,color:"#fde68a",fontWeight:700}}>{label}</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>{m.growthOk?100:m.growthPct}%</span>
+                <span style={{fontSize:11,color:"#fde68a",fontWeight:700}}>{label}</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>{m.growthOk?100:m.growthPct}%</span>
               </div>
               <div style={{height:6,background:"rgba(255,255,255,0.15)",borderRadius:999,overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${m.growthOk?100:m.growthPct}%`,background:"linear-gradient(90deg,#fde68a,#f59e0b)",borderRadius:999,transition:"width .6s ease",boxShadow:"0 0 8px rgba(251,191,36,0.6)"}}/>
@@ -2669,11 +2669,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const medals=["🥇","🥈","🥉"];
             return(
               <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
                 <button onClick={()=>{setTab("more");setMoreOpen("ranking");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5,padding:0}}>
                   <span style={{fontSize:16}}>{medals[rIdx]||"🏅"}</span>
                   <span style={{fontSize:14,fontWeight:900,color:rIdx===0?"#fde68a":rIdx===1?"#e2e8f0":rIdx===2?"#fed7aa":"rgba(255,255,255,0.8)"}}>{rIdx+1}位</span>
-                  <span style={{fontSize:10,color:"rgba(255,255,255,0.4)"}}>›</span>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>›</span>
                 </button>
               </div>
             );
@@ -2740,7 +2740,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               {v ? (
                 <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
               ) : (
-                <div style={{color:"rgba(74,158,255,0.6)",fontSize:10,lineHeight:1.4}}>{hint} →</div>
+                <div style={{color:"rgba(74,158,255,0.6)",fontSize:11,lineHeight:1.4}}>{hint} →</div>
               )}
             </div>
           ))}
@@ -2752,7 +2752,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
         {MAIN_TABS.map(([v,l])=>(
           <button key={v} onClick={()=>setTab(v)}
-            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:10,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            style={{flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:11,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}}/>
             {l.replace(/^\S+\s+/,"")}
           </button>
@@ -2910,7 +2910,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <span style={{fontSize:20}}>🌱</span>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:900,fontSize:13,color:TEXT}}>スタートクエスト</div>
-                    <div style={{fontSize:10,color:MUTED}}>全部やると合計+{totalBonus}pt！</div>
+                    <div style={{fontSize:11,color:MUTED}}>全部やると合計+{totalBonus}pt！</div>
                   </div>
                   <div style={{fontSize:11,fontWeight:800,color:doneCnt===totalQ?GP:MUTED}}>{doneCnt}/{totalQ}</div>
                 </div>
@@ -2922,8 +2922,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     <span style={{fontSize:16,flexShrink:0}}>{q.done?"✅":q.emoji}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:700,fontSize:12,color:q.done?GP:TEXT}}>{q.label}</div>
-                      {!q.done&&<div style={{fontSize:10,color:MUTED,marginTop:1}}>{q.hint}</div>}
-                      {q.done&&<div style={{fontSize:10,color:GP,marginTop:1}}>達成！+50pt うけとれるよ</div>}
+                      {!q.done&&<div style={{fontSize:11,color:MUTED,marginTop:1}}>{q.hint}</div>}
+                      {q.done&&<div style={{fontSize:11,color:GP,marginTop:1}}>達成！+50pt うけとれるよ</div>}
                     </div>
                     {q.done
                       ?<button onClick={()=>claimQuest(q.id)} style={{background:G,border:"none",borderRadius:10,padding:"5px 12px",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,flexShrink:0}}>うけとる</button>
@@ -2937,7 +2937,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })()}
         {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
-          <div style={{color:"rgba(255,255,255,0.25)",fontSize:10,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
+          <div style={{color:"rgba(255,255,255,0.25)",fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
@@ -2947,7 +2947,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </>}
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
         <div style={{padding:"12px 16px 4px"}}>
-          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:10,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
@@ -2964,25 +2964,25 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   {mTheme.emoji}
                 </button>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:10,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
+                  <div style={{fontSize:11,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
                   <div style={{fontWeight:800,fontSize:14,color:darkBG?((todayDone&&!gachaTest)?"rgba(255,255,255,0.35)":"#fff"):((todayDone&&!gachaTest)?MUTED:TEXT)}}>
                     {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ")}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
                     {gachaTest?"何回でもOK（記録は残りません・〜07:34）":(todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
                   </div>
-                  {!todayDone&&!gachaTest&&<div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
+                  {!todayDone&&!gachaTest&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
-                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:10,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,fontSize:10,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</div>;})()}
+                  {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:11,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,fontSize:11,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                  <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
+                  <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
                   {tierCounts.filter(t=>t.count>0).map(t=>(
-                    <span key={t.id} style={{fontSize:10,background:darkBG?"rgba(255,255,255,0.06)":CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
+                    <span key={t.id} style={{fontSize:11,background:darkBG?"rgba(255,255,255,0.06)":CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
                   ))}
                 </div>
               )}
@@ -3025,13 +3025,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               })()}
               {/* 提供割合 */}
               <div style={{marginTop:8,background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:12,padding:"8px 12px",border:`1px solid ${darkBG?"rgba(255,255,255,0.08)":BORDER}`}}>
-                <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🎲 提供割合</div>
+                <div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🎲 提供割合</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {(data.gacha||[]).map(t=>(
                     <div key={t.id} style={{display:"flex",alignItems:"center",gap:4,background:darkBG?"rgba(255,255,255,0.06)":CARD,borderRadius:8,padding:"3px 8px",border:`1px solid ${t.color}40`}}>
                       <span style={{fontSize:11}}>{t.emoji}</span>
-                      <span style={{fontSize:10,fontWeight:700,color:t.color}}>{t.label}</span>
-                      <span style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
+                      <span style={{fontSize:11,fontWeight:700,color:t.color}}>{t.label}</span>
+                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
                       <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
                     </div>
                   ))}
@@ -3066,7 +3066,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     <span style={{fontSize:22}}>{emoji}</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{l.label}</div>
-                      <div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div>
+                      <div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div>
                     </div>
                     <Pt v={l.pts}/>
                   </div>
@@ -3224,7 +3224,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 return (
                   <div key={e.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                     <div style={{width:34,height:34,borderRadius:9,background:`${cat.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{cat.emoji}</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</div><div style={{color:MUTED,fontSize:10}}>{cat.label} · {fmtDate(e.date)}</div></div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</div><div style={{color:MUTED,fontSize:11}}>{cat.label} · {fmtDate(e.date)}</div></div>
                     <span style={{fontWeight:900,fontSize:14,color:R,flexShrink:0}}>-{e.amt.toLocaleString()}pt</span>
                     <button onClick={()=>delExpense(e.id)} style={{background:"none",border:"none",color:MUTED,fontSize:15,cursor:"pointer",flexShrink:0}}>✕</button>
                   </div>
@@ -3290,7 +3290,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:F,opacity:ok?1:.55}}>
                   {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:10,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
                 </button>
               );
             })}
@@ -3348,7 +3348,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     style={{borderRadius:12,overflow:"hidden",cursor:unlocked?"pointer":"default",border:selected?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,opacity:unlocked?1:0.5}}>
                     <div style={{height:44,background:t.grad||"linear-gradient(180deg,#1a5c8a,#1f7038)"}}/>
                     <div style={{padding:"4px 4px",background:CARD,textAlign:"center"}}>
-                      <div style={{fontSize:10,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
+                      <div style={{fontSize:11,fontWeight:700,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.emoji} {t.name}</div>
                       {!unlocked
                         ? <div style={{fontSize:11,color:MUTED,fontWeight:700}}>🔒 あと{(t.need||0)-totalDoneMon}回</div>
                         : selected
@@ -3381,7 +3381,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
           {moreOpen==="hidden" && (
             <div>
-              <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>たくさんクリアすると解放！タップで「すがた」を変えられるよ。</div>
+              <div style={{fontSize:11,color:MUTED,marginBottom:8,lineHeight:1.5}}>たくさんクリアすると解放！タップで「すがた」を変えられるよ。</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {HIDDEN_MONSTERS.map(h=>{
                   const unlocked=h.need<=totalDoneMon;
@@ -3430,7 +3430,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
           {moreOpen==="cats" && (
             <div>
-              <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>
+              <div style={{fontSize:11,color:MUTED,marginBottom:8,lineHeight:1.5}}>
                 飼い猫モチーフ。タマゴから育てて究極体まで行くと「卒業」して、ランダムで次の猫がやってくるよ🐈
               </div>
               {/* テスト用: 1時間だけ即進化(本番では非表示・開発環境のみ) */}
@@ -3441,11 +3441,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 return (
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,background:active?BS:CARD,border:`1.5px dashed ${active?B:BORDER}`,borderRadius:12,padding:"8px 10px"}}>
                     <span style={{fontSize:14}}>🧪</span>
-                    <div style={{flex:1,fontSize:10,color:TEXTS,fontWeight:700,lineHeight:1.3}}>
+                    <div style={{flex:1,fontSize:11,color:TEXTS,fontWeight:700,lineHeight:1.3}}>
                       {active ? `テスト進化ON：あと${minLeft}分（タップで即進化・即卒業）` : "テスト用：1時間だけ即進化できるようにする"}
                     </div>
                     <button onClick={()=>update(d=>({...d, testEvolveUntil:{...(d.testEvolveUntil||{}), [child.id]: active?0:(Date.now()+3600000)}}))}
-                      style={{fontSize:10,fontWeight:800,color:"#fff",background:active?MUTED:B,border:"none",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontFamily:F,flexShrink:0}}>
+                      style={{fontSize:11,fontWeight:800,color:"#fff",background:active?MUTED:B,border:"none",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontFamily:F,flexShrink:0}}>
                       {active?"OFFにする":"1時間ON"}
                     </button>
                   </div>
@@ -3485,15 +3485,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,gap:6}}>
                       <span style={{fontSize:12,fontWeight:900,color:GP}}>{cat.emoji} {cat.name}</span>
                       {(((data.monsterEvolved||{})[child.id]||"").startsWith(cat.id))
-                        ? <span style={{fontSize:10,fontWeight:800,color:GP,background:`${G}25`,borderRadius:8,padding:"3px 10px",flexShrink:0}}>🐾 育成中</span>
+                        ? <span style={{fontSize:11,fontWeight:800,color:GP,background:`${G}25`,borderRadius:8,padding:"3px 10px",flexShrink:0}}>🐾 育成中</span>
                         : <button onClick={()=>{ if(typeof window!=="undefined"&&window.confirm(`いまの子をおやすみさせて、${cat.name}をタマゴから育てる？`)) update(d=>({...d, monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:`${cat.id}_egg`}, monsterEvolvedAt:{...(d.monsterEvolvedAt||{}),[child.id]:null}, monsterStageAt:{...(d.monsterStageAt||{}),[child.id]:new Date().toISOString()}, monsterDiscovered:{...(d.monsterDiscovered||{}),[child.id]:[...new Set([...((d.monsterDiscovered||{})[child.id]||[]),`${cat.id}_egg`])]} })); }}
-                            style={{fontSize:10,fontWeight:800,color:"#fff",background:G,border:"none",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontFamily:F,flexShrink:0}}>🥚 このこを育てる</button>}
+                            style={{fontSize:11,fontWeight:800,color:"#fff",background:G,border:"none",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontFamily:F,flexShrink:0}}>🥚 このこを育てる</button>}
                     </div>
                     {/* 共通の道 */}
                     <div style={{display:"flex",alignItems:"center",gap:2,overflowX:"auto",paddingBottom:4}}>
                       {cat.stages.map((s,i)=>(
                         <React.Fragment key={s.id}>
-                          {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:10}}>▶</span>}
+                          {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:11}}>▶</span>}
                           <Cell sid={s.id} label={s.label}/>
                         </React.Fragment>
                       ))}
@@ -3504,7 +3504,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                         <span style={{fontSize:11,fontWeight:800,color:br.color,flexShrink:0,width:46}}>└{br.force}</span>
                         {br.stages.map((s,i)=>(
                           <React.Fragment key={s.id}>
-                            {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:10}}>▶</span>}
+                            {i>0&&<span style={{color:MUTED,fontWeight:900,fontSize:11}}>▶</span>}
                             <Cell sid={s.id} label={s.label}/>
                           </React.Fragment>
                         ))}
@@ -3549,7 +3549,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             return(
               <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:20}}>{emoji}</span>
-                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div></div>
+                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
                 <Pt v={l.pts}/>
                 {canDelete&&<button onClick={deleteLog} style={{background:"none",border:"none",fontSize:14,cursor:"pointer",color:MUTED,padding:"2px 4px",lineHeight:1}} title="取り消し">🗑</button>}
               </div>
@@ -3579,7 +3579,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <span style={{fontSize:14}}>🏆</span>
                 <span style={{fontSize:12,fontWeight:700,color:TEXT}}>今月の活動ランキング</span>
               </div>
-              <div style={{fontSize:10,color:MUTED,marginBottom:12}}>残高・投資損益は含みません。今月の活動ptで比較</div>
+              <div style={{fontSize:11,color:MUTED,marginBottom:12}}>残高・投資損益は含みません。今月の活動ptで比較</div>
               {rank.length===0&&<p style={{color:MUTED,textAlign:"center",padding:"16px 0"}}>参加メンバーがいません</p>}
               {rank.map((r,i)=>(
                 <div key={r.member.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<rank.length-1?`1px solid ${BORDER}`:"none"}}>
@@ -3587,11 +3587,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <ChildAvatar child={r.member} size={32}/>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{r.member.name}</div>
-                    <div style={{fontSize:10,color:MUTED}}>🔥 {r.streak}日連続</div>
+                    <div style={{fontSize:11,color:MUTED}}>🔥 {r.streak}日連続</div>
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontWeight:800,fontSize:14,color:G}}>+{r.pts}pt</div>
-                    <div style={{fontSize:10,color:MUTED}}>今月</div>
+                    <div style={{fontSize:11,color:MUTED}}>今月</div>
                   </div>
                 </div>
               ))}
@@ -3747,9 +3747,9 @@ function ParentDailyTab({data,update,sb}){
           <div style={{flex:1}}>
             <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{s.name}</div>
             <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-              <span style={{fontSize:10,fontWeight:700,color:statusColor[status]}}>{statusLabel[status]}</span>
-              <span style={{fontSize:10,color:MUTED}}>{s.tasks.length}タスク · ボーナス{s.bonus}pt</span>
-              {s.startDate&&<span style={{fontSize:10,color:MUTED}}>{s.startDate}〜{s.endDate||"無期限"}</span>}
+              <span style={{fontSize:11,fontWeight:700,color:statusColor[status]}}>{statusLabel[status]}</span>
+              <span style={{fontSize:11,color:MUTED}}>{s.tasks.length}タスク · ボーナス{s.bonus}pt</span>
+              {s.startDate&&<span style={{fontSize:11,color:MUTED}}>{s.startDate}〜{s.endDate||"無期限"}</span>}
             </div>
           </div>
           <div style={{display:"flex",gap:4,alignItems:"center"}}>
@@ -3815,8 +3815,8 @@ function ParentDailyTab({data,update,sb}){
                     {[["check","✅ チェック"],["count","🔢 回数"]].map(([x,l])=><button key={x} onClick={()=>setEditDt(v=>({...v,type:x}))} style={{flex:1,padding:"6px 0",border:`2px solid ${editDt.type===x?G:BORDER}`,borderRadius:8,background:editDt.type===x?`${G}15`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:editDt.type===x?G:MUTED}}>{l}</button>)}
                   </div>
                   <div style={{display:"flex",gap:6,marginBottom:6}}>
-                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:10,margin:"0 0 2px"}}>pt</p><input value={editDt.pts} onChange={e=>setEditDt(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
-                    {editDt.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:10,margin:"0 0 2px"}}>目標回数</p><input value={editDt.target} onChange={e=>setEditDt(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
+                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={editDt.pts} onChange={e=>setEditDt(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
+                    {editDt.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>目標回数</p><input value={editDt.target} onChange={e=>setEditDt(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
                   </div>
                   <div style={{display:"flex",gap:6}}><Btn c={G} label="保存" onClick={()=>saveTaskEdit(s.id)} sm/><Btn c={MUTED} label="キャンセル" onClick={()=>setEditDt(null)} sm/></div>
                 </div>
@@ -3824,7 +3824,7 @@ function ParentDailyTab({data,update,sb}){
                   <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13}}>{t.label}</div>
-                    <div style={{color:MUTED,fontSize:10}}>{t.type==="check"?"✅":"🔢"} +{t.pts}pt{t.type==="count"&&` · 目標${t.target||1}回`}</div>
+                    <div style={{color:MUTED,fontSize:11}}>{t.type==="check"?"✅":"🔢"} +{t.pts}pt{t.type==="count"&&` · 目標${t.target||1}回`}</div>
                   </div>
                   <div style={{display:"flex",gap:4}}>
                     <Btn c={B} label="✏" onClick={()=>setEditDt({...t,pts:String(t.pts),target:String(t.target||1)})} sm/>
@@ -3851,7 +3851,7 @@ function ParentDailyTab({data,update,sb}){
                     <button key={t.id} onClick={()=>addTaskToSet(s.id,{id:uid(),srcId:t.id,emoji:t.emoji,label:t.label,type:"check",pts:t.pts,target:1})}
                       style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left",fontFamily:F}}>
                       <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
-                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{t.label}</div><div style={{color:MUTED,fontSize:10}}>+{t.pts}pt</div></div>
+                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{t.label}</div><div style={{color:MUTED,fontSize:11}}>+{t.pts}pt</div></div>
                       <span style={{color:G,fontSize:16,fontWeight:900}}>+</span>
                     </button>
                   ))}
@@ -3861,8 +3861,8 @@ function ParentDailyTab({data,update,sb}){
                   <div style={{display:"flex",gap:6,marginBottom:6}}><input value={nd.emoji} onChange={e=>setNd(v=>({...v,emoji:e.target.value}))} style={{...INP,width:50}}/><input value={nd.label} onChange={e=>setNd(v=>({...v,label:e.target.value}))} placeholder="タスク名" style={INP}/></div>
                   <div style={{display:"flex",gap:6,marginBottom:6}}>{[["check","✅"],["count","🔢"]].map(([x,l])=><button key={x} onClick={()=>setNd(v=>({...v,type:x}))} style={{flex:1,padding:"5px 0",border:`2px solid ${nd.type===x?G:BORDER}`,borderRadius:8,background:nd.type===x?`${G}15`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:nd.type===x?G:MUTED}}>{l}</button>)}</div>
                   <div style={{display:"flex",gap:6,marginBottom:8}}>
-                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:10,margin:"0 0 2px"}}>pt</p><input value={nd.pts} onChange={e=>setNd(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
-                    {nd.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:10,margin:"0 0 2px"}}>目標回数</p><input value={nd.target} onChange={e=>setNd(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
+                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={nd.pts} onChange={e=>setNd(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
+                    {nd.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>目標回数</p><input value={nd.target} onChange={e=>setNd(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
                   </div>
                   <Btn c={G} label="追加する" onClick={()=>{
                     const pts=parseInt(nd.pts);if(!nd.label||isNaN(pts))return;
@@ -3886,7 +3886,7 @@ function ParentDailyTab({data,update,sb}){
                 <span style={{fontWeight:700,fontSize:12,flex:1}}>{child.name}</span>
                 <span style={{color:allD?G:MUTED,fontWeight:800,fontSize:11}}>{done}/{s.tasks.length} {allD?"🌟":""}</span>
                 <PromptModalButton btnLabel="🎁 付与" title={`${child.name}に ボーナスpt`} desc={`${s.name} のごほうび。何ポイント あげる？`} type="number" maxLen={4} initial={String((data.childDailyBonus||{})[child.id]??s.bonus)} placeholder="pt"
-                  btnStyle={{padding:"3px 8px",background:`${Y}20`,border:`1px solid ${Y}`,borderRadius:7,color:"#9a7000",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:F}}
+                  btnStyle={{padding:"3px 8px",background:`${Y}20`,border:`1px solid ${Y}`,borderRadius:7,color:"#9a7000",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
                   onSubmit={(val)=>{ const amt=parseInt(val); if(!isNaN(amt)&&amt>0){const _e={id:uid(),cid:child.id,type:"grant",label:`🌟 ボーナスpt（${s.name}）`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);} }}/>
               </div>);
             })}
@@ -4033,7 +4033,7 @@ function AiAdvisorTab({data}){
             <span style={{fontSize:20}}>🤖</span>
             <div>
               <div style={{fontWeight:900,fontSize:14,color:TEXT}}>AI分析レポート</div>
-              <div style={{color:MUTED,fontSize:10}}>{new Date().toLocaleDateString("ja-JP")} 生成</div>
+              <div style={{color:MUTED,fontSize:11}}>{new Date().toLocaleDateString("ja-JP")} 生成</div>
             </div>
           </div>
           <div>{renderResult(result)}</div>
@@ -4075,7 +4075,7 @@ function InvestLearnTab({child, data, update, onRanking}){
             <span style={{fontSize:14,fontWeight:700,color:op.pt>=0?G:R}}>{op.pt>=0?"+":""}{op.pt}pt</span>
           </div>
           <div style={{fontSize:11,color:MUTED}}>投資額：{op.cost}pt → 現在評価：{op.net}pt</div>
-          <div style={{fontSize:10,color:MUTED,marginTop:3}}>手数料：{sub==="stocks"?"売買10%":"売買2%"}</div>
+          <div style={{fontSize:11,color:MUTED,marginTop:3}}>手数料：{sub==="stocks"?"売買10%":"売買2%"}</div>
           {onRanking&&(
             <button onClick={onRanking} style={{marginTop:10,width:"100%",padding:"8px",background:GS,border:`1px solid ${G}30`,borderRadius:10,color:GP,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>
               🏆 運用ランキングを見る
@@ -4087,7 +4087,7 @@ function InvestLearnTab({child, data, update, onRanking}){
       {sub==="stocks"&&stocks.map((s,i)=>(
         <div key={i} style={{background:CARD,borderRadius:14,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(24,35,29,0.06)",border:`1px solid ${BORDER}`}}>
           <div style={{width:36,height:36,borderRadius:10,background:GS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{s.emoji}</div>
-          <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{s.name}</div><div style={{fontSize:10,color:MUTED}}>{s.ticker}</div></div>
+          <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{s.name}</div><div style={{fontSize:11,color:MUTED}}>{s.ticker}</div></div>
           <div style={{textAlign:"right"}}>
             <div style={{fontWeight:700,fontSize:14,color:TEXT}}>{s.price?.toLocaleString()}{s.currency==="JPY"?"円":"$"}</div>
             <div style={{fontSize:11,fontWeight:600,color:(s.lastChange||0)>=0?G:R}}>{(s.lastChange||0)>=0?"+":""}{(s.lastChange||0).toFixed(1)}%</div>
@@ -4099,7 +4099,7 @@ function InvestLearnTab({child, data, update, onRanking}){
       {sub==="forex"&&Object.values(forex).map((fx,i)=>(
         <div key={i} style={{background:CARD,borderRadius:14,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10,boxShadow:"0 4px 16px rgba(24,35,29,0.06)",border:`1px solid ${BORDER}`}}>
           <div style={{width:36,height:36,borderRadius:10,background:"#E5F0FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{fx.flag}</div>
-          <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{fx.name||fx.code}</div><div style={{fontSize:10,color:MUTED}}>1 {fx.code} = ¥{(fx.price||0).toFixed(fx.code==="KRW"?3:2)}</div></div>
+          <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:TEXT}}>{fx.name||fx.code}</div><div style={{fontSize:11,color:MUTED}}>1 {fx.code} = ¥{(fx.price||0).toFixed(fx.code==="KRW"?3:2)}</div></div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:11,fontWeight:600,color:(fx.changePct||0)>=0?G:R}}>{(fx.changePct||0)>=0?"+":""}{(fx.changePct||0).toFixed(2)}%</div>
             {fx.realData?<div style={{fontSize:11,color:G,fontWeight:600}}>LIVE</div>:<div style={{fontSize:11,color:R,fontWeight:700}}>サンプル値</div>}
@@ -4179,7 +4179,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
                 <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>{missionPts.toLocaleString()} / {target.toLocaleString()}pt</span>
                 <span style={{fontSize:13,fontWeight:800,color:"#86efac"}}>{pct}%</span>
               </div>
-              <div style={{marginTop:8,fontSize:10,color:"rgba(255,255,255,0.45)"}}>🎁 {fs.familyMission?.reward||"達成報酬"} · 活動・お手伝いのみ対象</div>
+              <div style={{marginTop:8,fontSize:11,color:"rgba(255,255,255,0.45)"}}>🎁 {fs.familyMission?.reward||"達成報酬"} · 活動・お手伝いのみ対象</div>
             </div>
           );
         })()}
@@ -4192,28 +4192,28 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
                 <span style={{fontSize:14}}>🏆</span>
                 <span style={{fontSize:11,fontWeight:700,color:TEXT}}>{METRICS.find(m=>m[0]===metric)?.[1]}ランキング</span>
               </div>
-              <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>
+              <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>
                 {metric==="approved_activity_points"?"今月の活動pt":metric==="streak"?"継続日数":"目標達成"}
               </span>
             </div>
-            <div style={{fontSize:10,color:MUTED,marginBottom:12}}>残高・投資損益は含みません</div>
+            <div style={{fontSize:11,color:MUTED,marginBottom:12}}>残高・投資損益は含みません</div>
             {actRank.map((r,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<actRank.length-1?`1px solid ${BORDER}`:"none"}}>
                 <div style={{width:26,height:26,borderRadius:8,background:i===0?GOLDS:i===1?CARDS:BG,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,flexShrink:0}}>{MEDAL[i]||i+1}</div>
                 <ChildAvatar child={r.member} size={32}/>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{r.member.name}</div>
-                  <div style={{fontSize:10,color:MUTED}}>🔥 {r.streak}日連続</div>
+                  <div style={{fontSize:11,color:MUTED}}>🔥 {r.streak}日連続</div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontWeight:800,fontSize:14,color:G}}>+{r.pts}pt</div>
-                  <div style={{fontSize:10,color:MUTED}}>今月</div>
+                  <div style={{fontSize:11,color:MUTED}}>今月</div>
                 </div>
               </div>
             ))}
             <div style={{marginTop:10,padding:"7px 12px",background:BG,borderRadius:10,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:10}}>🔒</span>
-              <span style={{fontSize:10,color:MUTED}}>残高・目標は本人と管理者のみ閲覧</span>
+              <span style={{fontSize:11}}>🔒</span>
+              <span style={{fontSize:11,color:MUTED}}>残高・目標は本人と管理者のみ閲覧</span>
             </div>
           </div>
         )}
@@ -4225,7 +4225,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
               <span style={{fontSize:14}}>📊</span>
               <span style={{fontSize:11,fontWeight:700,color:TEXT}}>運用ランキング</span>
             </div>
-            <div style={{background:"#E5F0FF",borderRadius:9,padding:"7px 10px",marginBottom:12,fontSize:10,color:"#3478D4"}}>
+            <div style={{background:"#E5F0FF",borderRadius:9,padding:"7px 10px",marginBottom:12,fontSize:11,color:"#3478D4"}}>
               これは実際のお金を使わないシミュレーションです。手数料を含めた損益率で比較しています。
             </div>
             {/* サブタブ */}
@@ -4247,8 +4247,8 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{r.member.name}</div>
                     {showDetail
-                      ?<div style={{fontSize:10,color:MUTED}}>元本{r.op.cost}pt</div>
-                      :<div style={{fontSize:10,color:MUTED,display:"flex",alignItems:"center",gap:3}}>🔒 損益のみ公開</div>
+                      ?<div style={{fontSize:11,color:MUTED}}>元本{r.op.cost}pt</div>
+                      :<div style={{fontSize:11,color:MUTED,display:"flex",alignItems:"center",gap:3}}>🔒 損益のみ公開</div>
                     }
                   </div>
                   <div style={{textAlign:"right"}}>
@@ -4474,7 +4474,7 @@ function ParentScreen({ data, update, onBack }) {
                   <ChildAvatar child={parentMember} size={32}/>
                   <div>
                     <div style={{color:"rgba(255,255,255,0.75)",fontSize:11,fontWeight:600}}>こんにちは、{parentMember.name}</div>
-                    <div style={{color:"rgba(255,255,255,0.45)",fontSize:10}}>現在のタネ</div>
+                    <div style={{color:"rgba(255,255,255,0.45)",fontSize:11}}>現在のタネ</div>
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:10}}>
@@ -4483,9 +4483,9 @@ function ParentScreen({ data, update, onBack }) {
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <span style={{fontSize:12,fontWeight:700,color:pDelta>=0?"#86efac":"#fca5a5"}}>{pDelta>=0?"+":""}{pDelta.toLocaleString()}pt</span>
-                  <span style={{fontSize:10,color:"rgba(255,255,255,0.45)"}}>今月</span>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>今月</span>
                   {pStreak>=3&&<div style={{display:"flex",alignItems:"center",gap:3,background:"rgba(255,255,255,0.12)",padding:"3px 8px",borderRadius:999}}>
-                    <span style={{fontSize:10,color:"#fff",fontWeight:600}}>🔥 {pStreak}日連続</span>
+                    <span style={{fontSize:11,color:"#fff",fontWeight:600}}>🔥 {pStreak}日連続</span>
                   </div>}
                 </div>
                 {topGoal&&(
@@ -4522,7 +4522,7 @@ function ParentScreen({ data, update, onBack }) {
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
                 <span style={{fontSize:34}}>{child.emoji}</span>
                 <div style={{flex:1}}>
-                  <div style={{fontWeight:800,fontSize:15}}>{child.name} <span style={{background:`${P}20`,color:P,fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:8}}>{AGE_MODES[child.ageMode||"middle"].label}</span></div>
+                  <div style={{fontWeight:800,fontSize:15}}>{child.name} <span style={{background:`${P}20`,color:P,fontSize:11,fontWeight:700,padding:"2px 6px",borderRadius:8}}>{AGE_MODES[child.ageMode||"middle"].label}</span></div>
                   <div style={{fontWeight:900,fontSize:24,color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</div>
                 </div>
               </div>
@@ -4632,7 +4632,7 @@ function ParentScreen({ data, update, onBack }) {
                   <div style={{display:"flex",gap:6,marginBottom:10}}>
                     {Object.entries(AGE_MODES).map(([k,v])=>(
                       <button key={k} onClick={()=>setEditChild(c=>({...c,ageMode:k}))}
-                        style={{flex:1,padding:"7px 4px",border:`2px solid ${editChild.ageMode===k?P:BORDER}`,borderRadius:10,background:editChild.ageMode===k?`${P}20`:"transparent",fontWeight:800,fontSize:10,cursor:"pointer",fontFamily:F,color:editChild.ageMode===k?P:MUTED}}>
+                        style={{flex:1,padding:"7px 4px",border:`2px solid ${editChild.ageMode===k?P:BORDER}`,borderRadius:10,background:editChild.ageMode===k?`${P}20`:"transparent",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,color:editChild.ageMode===k?P:MUTED}}>
                         {v.emoji}<br/>{v.label}
                       </button>
                     ))}
@@ -4684,7 +4684,7 @@ function ParentScreen({ data, update, onBack }) {
               <div style={{display:"flex",gap:6,marginBottom:12}}>
                 {Object.entries(AGE_MODES).map(([k,v])=>(
                   <button key={k} onClick={()=>setNcMode(k)}
-                    style={{flex:1,padding:"7px 4px",border:`2px solid ${ncMode===k?P:BORDER}`,borderRadius:10,background:ncMode===k?`${P}20`:"transparent",fontWeight:800,fontSize:10,cursor:"pointer",fontFamily:F,color:ncMode===k?P:MUTED}}>
+                    style={{flex:1,padding:"7px 4px",border:`2px solid ${ncMode===k?P:BORDER}`,borderRadius:10,background:ncMode===k?`${P}20`:"transparent",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,color:ncMode===k?P:MUTED}}>
                     {v.emoji}<br/>{v.label}
                   </button>
                 ))}
@@ -4747,7 +4747,7 @@ function ParentScreen({ data, update, onBack }) {
                           <div style={{color:MUTED,fontSize:11}}>デフォルト: {task.pts}pt{Object.keys(task.over||{}).length>0&&<span style={{color:P}}> · 個別設定あり</span>}</div>
                         </div>
                         <div style={{display:"flex",gap:5}}>
-                          <button onClick={()=>setOverModal({task:{...task,over:{...(task.over||{})}},kind})} style={{background:`${P}18`,border:`1px solid ${P}`,borderRadius:7,padding:"3px 7px",color:P,fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:F}}>個別</button>
+                          <button onClick={()=>setOverModal({task:{...task,over:{...(task.over||{})}},kind})} style={{background:`${P}18`,border:`1px solid ${P}`,borderRadius:7,padding:"3px 7px",color:P,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>個別</button>
                           {sb(B,"✏",()=>setEditTask({...task,pts:String(task.pts)}))}
                           {sb(R,"🗑",()=>delTask(kind,task.id))}
                         </div>
@@ -4907,7 +4907,7 @@ function ParentScreen({ data, update, onBack }) {
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                       {[["出現率(%)","rate"],["最小(pt)","min"],["最大(pt)","max"]].map(([lbl,key])=>(
                         <div key={key}>
-                          <p style={{color:MUTED,fontSize:10,margin:"0 0 3px"}}>{lbl}</p>
+                          <p style={{color:MUTED,fontSize:11,margin:"0 0 3px"}}>{lbl}</p>
                           <input value={g[key]} type="number" onChange={e=>{const c=[...gachaEdit];c[i]={...c[i],[key]:e.target.value};setGachaEdit(c);}} style={{...INP,padding:"6px 8px",fontSize:13}}/>
                         </div>
                       ))}
@@ -4970,7 +4970,7 @@ function ParentScreen({ data, update, onBack }) {
                   return (
                     <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 13px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
                       <span style={{fontSize:17}}>{emoji}</span>
-                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:10}}>{fmtDate(l.date)}</div></div>
+                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
                       <Pt v={l.pts}/>
                     </div>
                   );
@@ -5036,7 +5036,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
             <div style={{width:40,height:40,borderRadius:12,background:GP,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:`0 4px 12px ${GP}40`}}>🌱</div>
             <div>
               <div style={{fontFamily:FB,fontWeight:900,fontSize:19,color:GP,letterSpacing:.5}}>Tane Money</div>
-              <div style={{fontSize:10,color:MUTED,letterSpacing:.3}}>お金は、未来を育てるタネ。</div>
+              <div style={{fontSize:11,color:MUTED,letterSpacing:.3}}>お金は、未来を育てるタネ。</div>
             </div>
           </div>
           <button onClick={()=>setShowSettings(true)}
@@ -5075,6 +5075,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
                   <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>ガチャ まだ</div>
                 </div>
               </div>
+              {gachaLeft.length>0 && <div style={{fontSize:11,color:MUTED,marginTop:10,paddingTop:8,borderTop:`1px solid ${BORDER}`,lineHeight:1.5}}>🎰 まだの子：<b style={{color:"#9a7000"}}>{gachaLeft.map(c=>c.name).join("、")}</b></div>}
             </div>
           </div>
         );
@@ -5082,7 +5083,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 
       <div style={{padding:"0 20px"}}>
         {/* 子ども */}
-        <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>おこさま</div>
+        <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>おこさま</div>
         {allMembers.filter(m=>m.isChild).map(member=>{
           const goal=topGoal(member.id);
           return (
@@ -5093,12 +5094,12 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                     <span style={{fontWeight:700,fontSize:15,color:TEXT}}>{member.name}</span>
-                    <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>こども</span>
+                    <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>こども</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||"中高生"}</span>
-                    <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt</span>
-                    {(()=>{const td=todayDelta(member.id);return td>0&&<span style={{fontSize:10,background:GOLDS,color:GOLD,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今日 +{td}pt</span>;})()}
+                    <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt</span>
+                    {(()=>{const td=todayDelta(member.id);return td>0&&<span style={{fontSize:11,background:GOLDS,color:GOLD,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今日 +{td}pt</span>;})()}
                   </div>
                 </div>
                 <ChevronRightIcon/>
@@ -5120,7 +5121,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 
         {/* 親 */}
         {allMembers.filter(m=>!m.isChild).length>0&&(
-          <div style={{fontSize:10,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>おうちのかた</div>
+          <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>おうちのかた</div>
         )}
         {allMembers.filter(m=>!m.isChild).map(member=>{
           const childCount = data.children.length;
@@ -5132,11 +5133,11 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                 <span style={{fontWeight:700,fontSize:14,color:TEXT}}>{member.name}</span>
-                <span style={{fontSize:10,background:CARDS,color:TEXTS,padding:"2px 7px",borderRadius:999,fontWeight:600}}>おとな</span>
+                <span style={{fontSize:11,background:CARDS,color:TEXTS,padding:"2px 7px",borderRadius:999,fontWeight:600}}>おとな</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,color:MUTED}}>子ども {childCount}人</span>
-                <span style={{fontSize:10,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今月計 {monthTotal.toLocaleString()}pt</span>
+                <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今月計 {monthTotal.toLocaleString()}pt</span>
               </div>
             </div>
             <ChevronRightIcon/>
@@ -5785,7 +5786,7 @@ function SeedMonster({ child, data, size=90, update }) {
           </div>
         ) : (
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
               {dispName}
               <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
               {reincCount>0&&<span style={{fontSize:11,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
@@ -5794,7 +5795,7 @@ function SeedMonster({ child, data, size=90, update }) {
           </div>
         )
       ) : (
-        <div style={{fontSize:10,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
           {dispName}
           <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>
         </div>
@@ -5832,14 +5833,14 @@ function SeedMonster({ child, data, size=90, update }) {
       {canReincarnate && !evolving && (
         monDef.line==="cat" ? (
           <>
-            <button onClick={doGraduate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#34c77b,#187a4e)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(52,199,123,0.7)"}}>
+            <button onClick={doGraduate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#34c77b,#187a4e)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(52,199,123,0.7)"}}>
               🎓 卒業して次の子をむかえる
             </button>
             <div style={{fontSize:11,color:"rgba(180,255,210,0.85)",marginTop:2,lineHeight:1.4}}>育て切った！うちのこに加わって、新しい猫のタマゴが届くよ🐈</div>
           </>
         ) : (
           <>
-            <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:10,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
+            <button onClick={doReincarnate} style={{display:"block",margin:"6px auto 0",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:999,padding:"5px 14px",color:"#fff",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,boxShadow:"0 0 10px rgba(99,102,241,0.7)"}}>
               🔄 転生する
             </button>
             <div style={{fontSize:11,color:"rgba(200,180,255,0.8)",marginTop:2,lineHeight:1.4}}>卵に戻って7日間ポイント+5%！</div>
@@ -5912,7 +5913,7 @@ function MonsterZukan({ data, child }) {
     );
   };
   const Arrow = ({color}) => (
-    <div style={{display:"flex",alignItems:"center",fontSize:10,color:color||MUTED,fontWeight:900,flexShrink:0,padding:"0 1px"}}>▶</div>
+    <div style={{display:"flex",alignItems:"center",fontSize:11,color:color||MUTED,fontWeight:900,flexShrink:0,padding:"0 1px"}}>▶</div>
   );
   // タップしたモンスターの詳細(その行の下に全幅表示)
   const Detail = ({ids}) => {
@@ -5946,7 +5947,7 @@ function MonsterZukan({ data, child }) {
       {/* ── 分岐点 ── */}
       <div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 8px"}}>
         <div style={{flex:1,height:1.5,background:BORDER}}/>
-        <div style={{fontSize:10,fontWeight:900,color:GP}}>🔀 コロミントから 3つの道に分岐！</div>
+        <div style={{fontSize:11,fontWeight:900,color:GP}}>🔀 コロミントから 3つの道に分岐！</div>
         <div style={{flex:1,height:1.5,background:BORDER}}/>
       </div>
 
@@ -5958,7 +5959,7 @@ function MonsterZukan({ data, child }) {
             <span style={{fontSize:11,fontWeight:900,color:TEXT}}>{br.label}</span>
             <span style={{fontSize:11,color:GOLD,fontWeight:700}}>…★{MONSTER_TREE[br.ids[3]].rarity}まで</span>
           </div>
-          <div style={{fontSize:8.5,color:TEXTS,fontWeight:700,marginBottom:6}}>条件: {br.cond} で進化</div>
+          <div style={{fontSize:11,color:TEXTS,fontWeight:700,marginBottom:6}}>条件: {br.cond} で進化</div>
           <div style={{display:"flex",gap:2,alignItems:"stretch"}}>
             {br.ids.map((id,i)=>(
               <React.Fragment key={id}>
@@ -6028,7 +6029,7 @@ function PointTransferModal({ child, data, update, onClose }) {
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:30,lineHeight:1}}>{child.emoji}</div>
               <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{child.name}</div>
-              <div style={{fontSize:10,color:R,fontWeight:700}}>-{amt.toLocaleString()}pt</div>
+              <div style={{fontSize:11,color:R,fontWeight:700}}>-{amt.toLocaleString()}pt</div>
             </div>
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:26,color:GP}}>→</div>
@@ -6037,7 +6038,7 @@ function PointTransferModal({ child, data, update, onClose }) {
             <div style={{textAlign:"center"}}>
               <div style={{fontSize:30,lineHeight:1}}>{receiver?.emoji}</div>
               <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{receiver?.name}</div>
-              <div style={{fontSize:10,color:GP,fontWeight:700}}>+{amt.toLocaleString()}pt</div>
+              <div style={{fontSize:11,color:GP,fontWeight:700}}>+{amt.toLocaleString()}pt</div>
             </div>
           </div>
           <div style={{fontSize:11,color:MUTED}}>送信後の残高: <strong style={{color:GP}}>{(myBal-amt).toLocaleString()}pt</strong></div>
@@ -6171,7 +6172,7 @@ function WeeklyReport({child,data,onClose}){
           {[["🏆","お手伝い",`${taskCount}回`,null,"#34c77b"],["🎰","ガチャ",`${gachaCount}回`,null,"#f5c842"],["💰","獲得合計",null,earned,"#34c77b"],["📉","マイナス",null,-deducted,"#f0605a"]].map(([e,l,v,p,c],i)=>(
             <div key={i} style={{background:BG,borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
               <div style={{fontSize:20,marginBottom:4}}>{e}</div>
-              <div style={{color:MUTED,fontSize:10,fontWeight:700,marginBottom:2}}>{l}</div>
+              <div style={{color:MUTED,fontSize:11,fontWeight:700,marginBottom:2}}>{l}</div>
               {p!==null?<div style={{fontWeight:900,fontSize:14,color:c}}>{p>=0?"+":""}{p}pt</div>:<div style={{fontWeight:900,fontSize:14,color:c}}>{v}</div>}
             </div>
           ))}
@@ -6373,13 +6374,13 @@ function ForexSection({data, update, child}){
           <div style={{fontSize:11,color:"#555",marginBottom:4}}>保有なし — 下の通貨をタップして購入できます</div>
         )}
         <div style={{marginTop:6,color:"#aaa",fontSize:11}}>💰 残高: <span style={{color:"#fff",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
-        <div style={{fontSize:10,color:"#444",marginTop:4}}>※ 100円 = 1pt換算・手数料除く</div>
+        <div style={{fontSize:11,color:"#444",marginTop:4}}>※ 100円 = 1pt換算・手数料除く</div>
       </div>
 
       {/* レートヘッダー */}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:0,flex:1}}>💱 為替レート（対円）</p>
-        <span style={{fontSize:10,color:pairs[0]?.realData?"#4ade80":"#f87171",fontWeight:700}}>
+        <span style={{fontSize:11,color:pairs[0]?.realData?"#4ade80":"#f87171",fontWeight:700}}>
           {pairs[0]?.realData?"● LIVE":"● シミュ"}
         </span>
       </div>
@@ -6414,11 +6415,11 @@ function ForexSection({data, update, child}){
                   </div>
                   {held>0?(
                     <>
-                      <div style={{fontSize:10,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>
-                      <div style={{fontSize:10,color:"#4ade80",fontWeight:700}}>≈¥{Math.round(held*(fx.price||0)).toLocaleString()} / {Math.round(held*(fx.price||0)/100)}pt</div>
+                      <div style={{fontSize:11,color:"#f5c842",fontWeight:700}}>保有:{held}{fx.code}</div>
+                      <div style={{fontSize:11,color:"#4ade80",fontWeight:700}}>≈¥{Math.round(held*(fx.price||0)).toLocaleString()} / {Math.round(held*(fx.price||0)/100)}pt</div>
                     </>
                   ):(
-                    <div style={{fontSize:10,color:"#555",fontWeight:700}}>未保有</div>
+                    <div style={{fontSize:11,color:"#555",fontWeight:700}}>未保有</div>
                   )}
                 </div>
               </div>
@@ -6591,7 +6592,7 @@ function InvestTab({child,data,update}){
                     <span style={{fontSize:22}}>{st.emoji}</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:13}}>{st.name}</div>
-                      <div style={{color:"rgba(255,255,255,0.35)",fontSize:10}}>{fq}株 · {pct}%</div>
+                      <div style={{color:"rgba(255,255,255,0.35)",fontSize:11}}>{fq}株 · {pct}%</div>
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontWeight:700,fontSize:12}}>{val.toLocaleString()}pt</div>
@@ -6654,7 +6655,7 @@ function InvestTab({child,data,update}){
       <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:20,padding:18,marginBottom:14,color:"#fff"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
           <p style={{color:"#aaa",fontSize:12,fontWeight:700,margin:0}}>📊 ポートフォリオ</p>
-          <button onClick={()=>setShowShare(true)} style={{background:"rgba(74,158,255,0.15)",border:"1px solid rgba(74,158,255,0.3)",borderRadius:8,padding:"3px 10px",color:"#4a9eff",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸 シェア</button>
+          <button onClick={()=>setShowShare(true)} style={{background:"rgba(74,158,255,0.15)",border:"1px solid rgba(74,158,255,0.3)",borderRadius:8,padding:"3px 10px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸 シェア</button>
         </div>
         <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
@@ -6669,7 +6670,7 @@ function InvestTab({child,data,update}){
               {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=toPts(st,st.price)*h.qty/total*100;return<div key={h.stockId} style={{width:`${pct}%`,background:colors[st.ticker]||"#4a9eff",minWidth:3}}/>;  })}
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>
-              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:10}}><div style={{width:8,height:8,borderRadius:2,background:colors[st.ticker]||"#4a9eff"}}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
+              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><div style={{width:8,height:8,borderRadius:2,background:colors[st.ticker]||"#4a9eff"}}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
             </div>
           </>);
         })()}
@@ -6691,7 +6692,7 @@ function InvestTab({child,data,update}){
               <div style={{flex:1}}>
                 <div style={{fontWeight:800,fontSize:14,color:isSel?"#fff":TEXT}}>{s.name}</div>
                 <div style={{color:isSel?"#aaa":MUTED,fontSize:11}}>{s.sector}</div>
-                {s.lastComment&&<div style={{color:isSel?"#888":MUTED,fontSize:10,marginTop:1}}>💬 {s.lastComment}</div>}
+                {s.lastComment&&<div style={{color:isSel?"#888":MUTED,fontSize:11,marginTop:1}}>💬 {s.lastComment}</div>}
               </div>
               <div style={{textAlign:"right",minWidth:80}}>
                 {/* ミニスパークライン */}
@@ -6706,7 +6707,7 @@ function InvestTab({child,data,update}){
                   </svg>
                 )}
                 <div style={{fontWeight:900,fontSize:14,color:isSel?"#fff":TEXT}}>{fmtPrice(s)}</div>
-                <div style={{fontSize:10,color:"#aaa"}}>{toPts(s,s.price).toLocaleString()}pt/株</div>
+                <div style={{fontSize:11,color:"#aaa"}}>{toPts(s,s.price).toLocaleString()}pt/株</div>
                 <div style={{fontSize:12,fontWeight:700,color:isUp?"#4ade80":"#f87171"}}>{isUp?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</div>
                 {s.realData&&<div style={{fontSize:11,color:"#4ade80",fontWeight:700}}>● LIVE</div>}
               </div>
@@ -6729,13 +6730,13 @@ function InvestTab({child,data,update}){
                     <span style={{color:isUp?"#4ade80":"#f87171",fontSize:12,fontWeight:700}}>{fmtPrice(s)}</span>
                   </div>
                   <StockChart history={s.history} color={isUp?"#4ade80":"#f87171"} height={70} width={300}/>
-                  <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:10,color:"#666"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontSize:11,color:"#666"}}>
                     <span>30日前: {s.currency==="JPY"?`¥${s.history[0]?.toLocaleString()}`:`$${s.history[0]?.toFixed(2)}`}</span>
                     <span>高値: {s.currency==="JPY"?`¥${Math.max(...s.history).toLocaleString()}`:`$${Math.max(...s.history).toFixed(2)}`}</span>
                     <span>安値: {s.currency==="JPY"?`¥${Math.min(...s.history).toLocaleString()}`:`$${Math.min(...s.history).toFixed(2)}`}</span>
                   </div>
                 </div>
-              ):<span style={{color:"#555",fontSize:10}}>▼ チャートを見る</span>}
+              ):<span style={{color:"#555",fontSize:11}}>▼ チャートを見る</span>}
             </button>
           )}
 
@@ -6903,10 +6904,10 @@ function BadgesSection({child,data,update}){
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
       {filtered.map(b=>(
         <div key={b.id} style={{background:b.earned?CARD:BG,border:`2px solid ${b.earned?(b.type==="achieve"?Y:G):BORDER}`,borderRadius:16,padding:"14px 12px",textAlign:"center",opacity:b.earned?1:0.5,position:"relative"}}>
-          {b.earned&&<div style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",background:G,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:900}}>✓</div>}
+          {b.earned&&<div style={{position:"absolute",top:-6,right:-6,width:18,height:18,borderRadius:"50%",background:G,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",fontWeight:900}}>✓</div>}
           <img src={`/assets/badge_${b.id}.png`} alt={b.name} style={{width:52,height:52,objectFit:"contain",display:"block",margin:"0 auto 6px",borderRadius:8,filter:b.earned?"none":"grayscale(1) opacity(0.35)"}}/>
           <div style={{fontWeight:800,fontSize:12,color:b.earned?TEXT:MUTED,marginBottom:4,lineHeight:1.3}}>{b.name}</div>
-          <div style={{fontSize:10,color:MUTED,lineHeight:1.4}}>{b.desc}</div>
+          <div style={{fontSize:11,color:MUTED,lineHeight:1.4}}>{b.desc}</div>
         </div>
       ))}
     </div>
@@ -6968,7 +6969,7 @@ function TipsSection({ageMode,child,data,update}){
       <span style={{fontSize:20}}>💡</span>
       <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:TEXT}}>まめちしき</div><div style={{color:MUTED,fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
       <div style={{background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
-        <div style={{fontWeight:900,fontSize:14,color:G}}>{totalRead}<span style={{fontSize:10,color:MUTED}}>/{ALL_TIPS.length}</span></div>
+        <div style={{fontWeight:900,fontSize:14,color:G}}>{totalRead}<span style={{fontSize:11,color:MUTED}}>/{ALL_TIPS.length}</span></div>
         <div style={{fontSize:11,color:MUTED}}>読了</div>
       </div>
     </div>
@@ -6987,9 +6988,9 @@ function TipsSection({ageMode,child,data,update}){
           <div style={{flex:1}}>
             <div style={{fontWeight:800,fontSize:13,color:isOpen?B:TEXT}}>{tip.title}</div>
             <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
-              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:10}}>{tip.cat}</span>
-              {!isRead&&<span style={{background:`${Y}20`,color:"#9a7000",padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:10}}>+{TIP_PTS}pt</span>}
-              {isRead&&<span style={{color:G,fontSize:10,fontWeight:700}}>✓ 読んだ</span>}
+              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>{tip.cat}</span>
+              {!isRead&&<span style={{background:`${Y}20`,color:"#9a7000",padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>+{TIP_PTS}pt</span>}
+              {isRead&&<span style={{color:G,fontSize:11,fontWeight:700}}>✓ 読んだ</span>}
             </div>
           </div>
           <span style={{color:MUTED,fontSize:14,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
@@ -7347,7 +7348,7 @@ function SetupWizard({ data, update, onComplete }) {
           <div style={{display:"flex",gap:8,marginBottom:6}}>
             {[["junior","小学生","かんたん表示"],["teen","中学生・高校生","投資・家計簿つき"]].map(([v,l,desc])=>(
               <button key={v} onClick={()=>setChildMode(v)} style={{flex:1,padding:"11px 0",border:`2px solid ${childMode===v?GP:BORDER}`,borderRadius:12,background:childMode===v?`${GP}15`:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F,color:childMode===v?GP:MUTED,transition:"all .15s"}}>
-                {l}<br/><span style={{fontSize:10,fontWeight:600,color:MUTED}}>{desc}</span>
+                {l}<br/><span style={{fontSize:11,fontWeight:600,color:MUTED}}>{desc}</span>
               </button>
             ))}
           </div>
