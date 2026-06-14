@@ -460,21 +460,29 @@ function Panel({ title, accent, right, help, children }) {
   );
 }
 
-/* 用語の「?」ヘルプ（タップで説明をポップ） */
+/* 用語の「?」ヘルプ（タップで説明を中央オーバーレイ表示。画面端でも見切れない） */
 function Help({ text }) {
   const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-flex" }}>
+    <span style={{ display: "inline-flex" }}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="説明"
         style={{ width: 30, height: 30, borderRadius: "50%", border: `1px solid ${C.sub}`, background: C.panel2, color: C.text, fontSize: 17, fontWeight: 700, cursor: "pointer", lineHeight: 1, display: "grid", placeItems: "center", flex: "0 0 auto" }}
       >?</button>
       {open && (
-        <span
+        <div
           onClick={() => setOpen(false)}
-          style={{ position: "absolute", top: 36, left: 0, zIndex: 20, width: 260, maxWidth: "80vw", background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 13px", fontSize: 14, color: C.text, fontWeight: 400, lineHeight: 1.65, boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}
-        >{text}</span>
+          style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", padding: 24 }}
+        >
+          <div
+            onClick={(ev) => ev.stopPropagation()}
+            style={{ width: 360, maxWidth: "86vw", maxHeight: "70vh", overflowY: "auto", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: "18px 18px 14px", fontSize: 15, color: C.text, lineHeight: 1.75, boxShadow: "0 12px 40px rgba(0,0,0,0.4)" }}
+          >
+            <div style={{ whiteSpace: "pre-wrap" }}>{text}</div>
+            <button onClick={() => setOpen(false)} style={{ ...chipBtn, marginTop: 14, width: "100%", justifyContent: "center", background: C.invBg, color: C.invText, borderColor: C.invBg, fontWeight: 700 }}>閉じる</button>
+          </div>
+        </div>
       )}
     </span>
   );
