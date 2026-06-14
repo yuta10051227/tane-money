@@ -290,6 +290,9 @@ function startRealtimeSync(updateFn){
             // なでなで(お世話)・転生回数は多い方
             if(prev.monsterCare){merged.monsterCare={...(merged.monsterCare||{})};Object.keys(prev.monsterCare).forEach(cid=>{const pc=prev.monsterCare[cid]||{},rc=merged.monsterCare[cid]||{};if((pc.days||0)>=(rc.days||0))merged.monsterCare[cid]=pc;});}
             if(prev.reincarnationCount){merged.reincarnationCount={...(merged.reincarnationCount||{})};Object.keys(prev.reincarnationCount).forEach(cid=>{merged.reincarnationCount[cid]=Math.max(prev.reincarnationCount[cid]||0,merged.reincarnationCount[cid]||0);});}
+            // つけた名前(ニックネーム)・スキン装備も保護（巻き戻り防止）
+            if(prev.monsterNickname) merged.monsterNickname={...(merged.monsterNickname||{}),...prev.monsterNickname};
+            if(prev.monsterSkin) merged.monsterSkin={...(merged.monsterSkin||{}),...prev.monsterSkin};
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
             if(_processedApprovalIds.size>0){
               merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
