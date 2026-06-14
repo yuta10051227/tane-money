@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="c9fd950">
+<meta name="tane-version" content="c08bea0">
 </head>
 <body>
   <div id="root"></div>
@@ -183,7 +183,7 @@ const tier=isSuper?"super":isSR?"sr":result.rate<=25?"rare":"normal";const TF={n
 // レア度が上がるほど多段階でニョキニョキ育つ: 芽→つぼみ(青)→花(金)→大樹(虹)
 const STAGES=result.simpleAnim?[TF]:isSuper?["n","r","super"]:isSR?["n","r","sr"]:result.rate<=25?["n","r"]:["n"];const AURA_OF={n:"#eae2c8",r:"#4a9eff",sr:"#f5c842",super:"#f5c842"};const[phase,setPhase]=useState("charge");// charge→tap→grow→burst→show
 const[stage,setStage]=useState(0);// 成長段階(STAGESのindex)
-const timers=useRef([]);const at=(fn,ms)=>{const t=setTimeout(fn,ms);timers.current.push(t);};useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);useEffect(()=>{at(()=>setPhase(p=>p==="charge"?"tap":p),600);},[]);const buzz=pat=>{try{navigator.vibrate(pat);}catch(e){}};const HOLD=1200,HUSH=isSuper?1900:1350;// 段階ごとのタメ / 暗転の静寂(激レアほど長い)
+const timers=useRef([]);const at=(fn,ms)=>{const t=setTimeout(fn,ms);timers.current.push(t);};useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);useEffect(()=>{at(()=>setPhase(p=>p==="charge"?"tap":p),600);},[]);const buzz=pat=>{try{navigator.vibrate(pat);}catch(e){}};const HOLD=1450,HUSH=isSuper?2300:1650;// 段階ごとのタメ / 暗転の静寂(激レアほど長い)
 const hasHush=isSR&&!result.simpleAnim;// SR以上で暗転→解放（シンプル演出時はOFF）
 const reveal=()=>{if(phase!=="tap")return;setPhase("grow");setStage(0);buzz([60]);const last=STAGES.length-1;// 最終段の手前まで順に育てる＝わざと低レアっぽく見せる（裏切りの布石）
 for(let i=1;i<last;i++){const j=i;at(()=>{setStage(j);buzz([70]);},i*HOLD);}if(hasHush){const hushT=last*HOLD;// 最後の手前で暗転(静寂のタメ)

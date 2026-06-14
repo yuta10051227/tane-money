@@ -1250,7 +1250,7 @@ function GachaAnim({ result, onClose }) {
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
-  const HOLD = 1200, HUSH = isSuper ? 1900 : 1350;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
+  const HOLD = 1450, HUSH = isSuper ? 2300 : 1650;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
   const hasHush = isSR && !result.simpleAnim;   // SR以上で暗転→解放（シンプル演出時はOFF）
   const reveal = () => {
     if(phase!=="tap") return;
