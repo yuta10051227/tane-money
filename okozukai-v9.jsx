@@ -1246,11 +1246,11 @@ function GachaAnim({ result, onClose }) {
   const timers = useRef([]);
   const at = (fn, ms) => { const t = setTimeout(fn, ms); timers.current.push(t); };
   useEffect(()=>()=>timers.current.forEach(clearTimeout), []);
-  useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 450); }, []);
+  useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 600); }, []);
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
 
-  const HOLD = 950, HUSH = isSuper ? 1500 : 1000;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
+  const HOLD = 1200, HUSH = isSuper ? 1900 : 1350;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
   const hasHush = isSR && !result.simpleAnim;   // SR以上で暗転→解放（シンプル演出時はOFF）
   const reveal = () => {
     if(phase!=="tap") return;
@@ -1267,12 +1267,12 @@ function GachaAnim({ result, onClose }) {
       if(isSuper){ at(()=>buzz([90]), hushT+1100); at(()=>buzz([150]), hushT+1350); }
       const releaseT = hushT + HUSH;       // 限界までタメてから爆発的に解放
       at(()=>{ setStage(last); setPhase("burst"); buzz(isSuper?[0,90,40,40,560]:[0,340]); }, releaseT);
-      at(()=>setPhase("show"), releaseT + 820);
+      at(()=>setPhase("show"), releaseT + 950);
     } else {
       if(last>0) at(()=>setStage(last), last*HOLD);
-      const endT = last*HOLD + 760;
+      const endT = last*HOLD + 900;
       at(()=>setPhase("burst"), endT);
-      at(()=>setPhase("show"),  endT+440);
+      at(()=>setPhase("show"),  endT+520);
     }
   };
   const skip = () => { timers.current.forEach(clearTimeout); setStage(STAGES.length-1); setPhase("show"); };
@@ -1331,13 +1331,15 @@ function GachaAnim({ result, onClose }) {
       )}
 
       {grown && (
-        <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt={result.label}
-          style={{position:"absolute",left:"50%",bottom:"21%",transform:"translateX(-50%)",transformOrigin:"bottom center",
-            height:`${38+stage*7}vh`,width:"auto",maxWidth:"94vw",objectFit:"contain",
-            animation:(phase==="grow")?"gNyoki .6s cubic-bezier(.2,.9,.3,1.4) forwards":(phase==="burst"&&hasHush)?"gNyoki .55s cubic-bezier(.15,.9,.3,1.5) forwards":"none",
-            opacity:phase==="hush"?0.25:1,transition:"opacity .15s",
-            filter:`drop-shadow(0 0 20px ${rainbow?"#ffffff":AURA}cc)`}}
-          onError={e=>{e.target.style.display="none";}}/>
+        <div style={{position:"absolute",left:0,right:0,bottom:"21%",display:"flex",justifyContent:"center",alignItems:"flex-end",pointerEvents:"none"}}>
+          <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt={result.label}
+            style={{transformOrigin:"bottom center",
+              height:`${38+stage*7}vh`,width:"auto",maxWidth:"94vw",objectFit:"contain",
+              animation:(phase==="grow")?"gNyoki .7s cubic-bezier(.2,.9,.3,1.4) forwards":(phase==="burst"&&hasHush)?"gNyoki .6s cubic-bezier(.15,.9,.3,1.5) forwards":"none",
+              opacity:phase==="hush"?0.25:1,transition:"opacity .15s",
+              filter:`drop-shadow(0 0 20px ${rainbow?"#ffffff":AURA}cc)`}}
+            onError={e=>{e.target.style.display="none";}}/>
+        </div>
       )}
       {phase==="grow" && (
         <div key={"puff"+stage} style={{position:"absolute",left:"50%",bottom:`${30+stage*6}%`,transform:"translateX(-50%)",pointerEvents:"none",zIndex:4}}>
@@ -1417,7 +1419,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes gFlash{0%{opacity:0}12%{opacity:.7}100%{opacity:0}}
         @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
         @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
-        @keyframes gNyoki{0%{transform:translateX(-50%) scaleY(.12) scaleX(.6);opacity:.3}50%{transform:translateX(-50%) scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:translateX(-50%) scaleY(.94) scaleX(.99)}88%{transform:translateX(-50%) scaleY(1.04)}100%{transform:translateX(-50%) scale(1);opacity:1}}
+        @keyframes gNyoki{0%{transform:scaleY(.12) scaleX(.6);opacity:.3}50%{transform:scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:scaleY(.94) scaleX(.99)}88%{transform:scaleY(1.04)}100%{transform:scale(1);opacity:1}}
         @keyframes gPuff{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.9);opacity:0}}
         @keyframes gHush{from{opacity:0}to{opacity:1}}
         @keyframes gCharge{0%{transform:translate(-50%,-50%) scale(.25);opacity:.35}70%{opacity:.9}100%{transform:translate(-50%,-50%) scale(8);opacity:1}}
