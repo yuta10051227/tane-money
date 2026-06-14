@@ -464,12 +464,12 @@ function Help({ text }) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="説明"
-        style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${C.line}`, background: "transparent", color: C.sub, fontSize: 13, cursor: "pointer", lineHeight: 1, display: "grid", placeItems: "center", flex: "0 0 auto" }}
+        style={{ width: 30, height: 30, borderRadius: "50%", border: `1px solid ${C.sub}`, background: C.panel2, color: C.text, fontSize: 17, fontWeight: 700, cursor: "pointer", lineHeight: 1, display: "grid", placeItems: "center", flex: "0 0 auto" }}
       >?</button>
       {open && (
         <span
           onClick={() => setOpen(false)}
-          style={{ position: "absolute", top: 26, left: 0, zIndex: 20, width: 240, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: C.text, fontWeight: 400, lineHeight: 1.6, boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}
+          style={{ position: "absolute", top: 34, left: 0, zIndex: 20, width: 240, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, color: C.text, fontWeight: 400, lineHeight: 1.6, boxShadow: "0 8px 24px rgba(0,0,0,0.45)" }}
         >{text}</span>
       )}
     </span>
@@ -548,7 +548,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
   const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
 
   return (
-    <Panel title="予定の逆算チェーン" accent={C.green} help="本番日から逆算して、各準備の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。出張・旅行・打ち合わせ・入学式・誕生日など、前もって準備が要る予定に対応。Googleカレンダーに『出張・旅行・式典・誕生日』などを含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
+    <Panel title="予定の準備リスト（逆算）" accent={C.green} help="本番日から逆算して、各準備の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。出張・旅行・打ち合わせ・入学式・誕生日など、前もって準備が要る予定に対応。Googleカレンダーに『出張・旅行・式典・誕生日』などを含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
       {(!trips || trips.length === 0) && <Empty>逆算したい予定はまだありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
@@ -569,11 +569,11 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <strong style={{ fontSize: 14 }}>{trip.title}</strong>
-                    {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
-                    <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
+                    {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 12, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
+                    <span style={{ fontSize: 12, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
                   </div>
                   <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
-                    <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
+                    <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✏️</button>
                     <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
                   </div>
                 </div>
@@ -598,7 +598,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                       <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                         <input value={ie.label} onChange={(e) => setIe({ ...ie, label: e.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                         <input value={ie.daysBefore} onChange={(e) => setIe({ ...ie, daysBefore: e.target.value })} inputMode="numeric" title="本番の何日前" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                        <span style={{ fontSize: 11, color: C.sub }}>日前</span>
+                        <span style={{ fontSize: 12, color: C.sub }}>日前</span>
                         <button onClick={saveItem} style={chipBtn}>保存</button>
                         <button onClick={() => setEditItem(null)} style={iconBtn} title="取消">✕</button>
                       </div>
@@ -612,7 +612,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                           <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35, textDecoration: item.done ? "line-through" : "none", color: item.done ? C.faint : C.text }}>
                             {item.label}
                           </span>
-                          <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✎</button>
+                          <button onClick={() => startItem(trip.id, idx, item)} style={iconBtn} title="編集">✏️</button>
                           <button onClick={() => onRemoveItem(trip.id, idx)} style={iconBtn} title="削除">✕</button>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
@@ -620,7 +620,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                           <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                         </div>
                         {!item.done && stances[sig.deadlineISO] && stances[sig.deadlineISO].stance === "守り" && (
-                          <div style={{ fontSize: 11, color: C.red, marginTop: 2 }}>🧭 締切が守りの日。1日前倒すと楽です</div>
+                          <div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>🧭 締切が守りの日。1日前倒すと楽です</div>
                         )}
                       </div>
                     </div>
@@ -631,12 +631,12 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                   <input autoFocus value={ni.label} onChange={(e) => setNi({ ...ni, label: e.target.value })} placeholder="手配項目" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
                   <input value={ni.daysBefore} onChange={(e) => setNi({ ...ni, daysBefore: e.target.value })} inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 56 }} />
-                  <span style={{ fontSize: 11, color: C.sub }}>日前</span>
+                  <span style={{ fontSize: 12, color: C.sub }}>日前</span>
                   <button onClick={() => { if (!ni.label.trim()) return; onAddItem(trip.id, { label: ni.label.trim(), daysBefore: Number(ni.daysBefore) || 0 }); setNi({ label: "", daysBefore: 7 }); setAddItemFor(null); }} style={chipBtn}>追加</button>
                   <button onClick={() => setAddItemFor(null)} style={iconBtn} title="閉じる">✕</button>
                 </div>
               ) : (
-                <button onClick={() => setAddItemFor(trip.id)} style={{ ...chipBtn, marginTop: 8, fontSize: 11 }}>＋手配項目を追加</button>
+                <button onClick={() => setAddItemFor(trip.id)} style={{ ...chipBtn, marginTop: 8, fontSize: 12 }}>＋手配項目を追加</button>
               )}
             </div>
           );
@@ -710,9 +710,9 @@ function DraftPanel({ context }) {
       {drafts && ["line", "sns", "mail"].map((k) => drafts[k] && (
         <div key={k} style={{ marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{labels[k] || k}</span>
+            <span style={{ fontSize: 12, color: C.accent, fontWeight: 700 }}>{labels[k] || k}</span>
             <span style={{ flex: 1 }} />
-            <button onClick={() => copy(drafts[k])} style={{ ...chipBtn, fontSize: 11, padding: "3px 10px" }}>{copied === drafts[k].slice(0, 10) ? "コピー済✓" : "コピー"}</button>
+            <button onClick={() => copy(drafts[k])} style={{ ...chipBtn, fontSize: 12, padding: "3px 10px" }}>{copied === drafts[k].slice(0, 10) ? "コピー済✓" : "コピー"}</button>
           </div>
           <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", color: C.text, background: C.panel2, borderRadius: 8, padding: "8px 10px" }}>{drafts[k]}</div>
         </div>
@@ -819,11 +819,11 @@ function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onR
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, lineHeight: 1.35 }}>{d.linked ? "📣 " : ""}{d.title}</div>
                   <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}><span style={{ color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span> ・ {d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
-                  {(() => { const h = deadlineStanceHint(stances[d.date]); return h ? <div style={{ fontSize: 11, color: h.color, marginTop: 2 }}>🧭 {h.text}</div> : null; })()}
+                  {(() => { const h = deadlineStanceHint(stances[d.date]); return h ? <div style={{ fontSize: 12, color: h.color, marginTop: 2 }}>🧭 {h.text}</div> : null; })()}
                 </div>
                 <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
                   <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
-                  {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>}
+                  {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✏️</button>}
                   {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
                 </div>
               </div>
@@ -943,7 +943,7 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
       </div>
       {editable && (
         <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
-          <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✎</button>
+          <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✏️</button>
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </div>
       )}
@@ -1044,7 +1044,7 @@ function SwipeView({ slides, accent = C.blue, hint }) {
           ))}
         </div>
       )}
-      {hint && <div aria-hidden="true" style={{ fontSize: 11, color: C.sub, marginTop: 8, textAlign: "center" }}>{hint}</div>}
+      {hint && <div aria-hidden="true" style={{ fontSize: 12, color: C.sub, marginTop: 8, textAlign: "center" }}>{hint}</div>}
     </>
   );
 }
@@ -1080,7 +1080,7 @@ function Upcoming({ events, writableIds, onEditEvent, onDeleteEvent, editBusy })
     g.items.push(e);
   });
   return (
-    <Panel title="今後の予定（先2ヶ月）" accent={FAMILY_COLOR} help="出張・登壇・ライブ・イベント等の重要予定と、家族・プライベートの予定（別色）を先まで表示します。✎で時間変更・✕で削除（Googleカレンダーに反映）。">
+    <Panel title="今後の予定（先2ヶ月）" accent={FAMILY_COLOR} help="出張・登壇・ライブ・イベント等の重要予定と、家族・プライベートの予定（別色）を先まで表示します。✏️で時間変更・✕で削除（Googleカレンダーに反映）。">
       {list.length === 0 ? (
         <Empty>先2ヶ月に重要な予定はありません。</Empty>
       ) : (
@@ -1143,11 +1143,11 @@ function UpcomingRow({ e, writableIds, onEditEvent, onDeleteEvent, busy }) {
       <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35, color: e.role === "family" ? C.sub : C.text }}>{e.title}</span>
       {editable ? (
         <>
-          <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✎</button>
+          <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✏️</button>
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </>
       ) : (
-        <span style={{ fontSize: 11, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : labelOf(e.cat)}</span>
+        <span style={{ fontSize: 12, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : labelOf(e.cat)}</span>
       )}
     </div>
   );
@@ -1217,7 +1217,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: C.sub, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 12 }}>カテゴリを選んで「更新」で反映されます（取りすぎると見づらいので3〜5個が目安）。</div>
 
       {error && (
         <div style={{ fontSize: 12, color: C.red, background: C.panel2, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, wordBreak: "break-word" }}>
@@ -1244,7 +1244,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
                 <a key={i} href={it.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     <div style={{ fontSize: 14, lineHeight: 1.35, color: C.text }}>{it.title}</div>
-                    <div style={{ fontSize: 11, color: C.sub }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
+                    <div style={{ fontSize: 12, color: C.sub }}>{it.source}{it.date ? ` ・ ${fmtNews(it.date)}` : ""}</div>
                   </div>
                 </a>
               ))}
@@ -1261,7 +1261,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
 
       {/* 情報源の編集 */}
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
-        <button onClick={() => setOpen((o) => !o)} style={{ ...chipBtn, fontSize: 11 }}>{open ? "情報源を閉じる" : "情報源を編集"}</button>
+        <button onClick={() => setOpen((o) => !o)} style={{ ...chipBtn, fontSize: 12 }}>{open ? "情報源を閉じる" : "情報源を編集"}</button>
         {open && (
           <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
             {(feeds || []).map((f) => (
@@ -1275,7 +1275,7 @@ function DigestPanel({ digest, loading, error, onRefresh, feeds, onAddFeed, onRe
               <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="ニュース配信先(RSS)のURL" style={{ ...inp, marginBottom: 0, flex: "1 1 140px" }} />
               <button onClick={() => { if (!url.trim()) return; onAddFeed({ name: name.trim(), url: url.trim() }); setName(""); setUrl(""); }} style={chipBtn}>追加</button>
             </div>
-            <div style={{ fontSize: 11, color: C.sub }}>RSS＝ニュースの自動受信先のこと。例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
+            <div style={{ fontSize: 12, color: C.sub }}>RSS＝ニュースの自動受信先のこと。例：ブログ等のRSS、Googleニュース検索のRSS。記事は見出し＋出典リンクのみ表示します。</div>
           </div>
         )}
       </div>
@@ -1387,13 +1387,14 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
         {count > 0 && <button onClick={onClear} style={chipBtn}>取り込み{count}件を消去</button>}
       </div>
       {msg && <div style={{ fontSize: 12, color: C.sub, marginTop: 8, wordBreak: "break-word" }}>{msg}</div>}
-      <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>※「週」や「リスト」表示のスクショが精度◎。複数回取り込めます。</div>
     </Panel>
   );
 }
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
 function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews }) {
+  const [more, setMore] = useState(false); // 副次情報（運気/売上/ニュース）の折りたたみ
   // 占術コンディションは決定論(dayEnergy)で常に算出 → AIが無くても「今日のスタンス」が出る。
   // AIの鑑定文(fortune.today)は付加情報として併用する。
   const energy = useMemo(() => {
@@ -1487,14 +1488,25 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}><b style={{ color: mode.color }}>今日の一手</b>　{advice}</span>
         </button>
       )}
-      {!hideFortune && weekAttack.length > 0 && (
-        <Row icon="🟢" color={C.green} label={`今週の攻めの日 ${weekAttack.map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`).join("・")}（発信・営業を寄せて）`} onClick={() => onTab("fortune")} />
-      )}
-      {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
+      {/* 主要：今日の予定と要対応は常に表示（ここだけ見れば動ける） */}
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
       {(late + soon > 0) && <Row icon={late ? "🔴" : "🟠"} color={late ? C.red : C.orange} label={`要対応 ${late ? `遅れ${late}件 ` : ""}${soon ? `もうすぐ${soon}件` : ""}`} onClick={() => onTab("home")} />}
-      {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab("money")} />}
-      {brief && !hideNews && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab("news")} />}
+      {/* 副次：運気・攻めの日・未処理・ニュースは折りたたみ（情報過多の防止） */}
+      {more && (
+        <>
+          {!hideFortune && weekAttack.length > 0 && (
+            <Row icon="🟢" color={C.green} label={`今週の攻めの日 ${weekAttack.map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`).join("・")}（発信・営業を寄せて）`} onClick={() => onTab("fortune")} />
+          )}
+          {!hideFortune && <Row icon="🔮" label={`運気 ${sc ? "★".repeat(sc) : "—"}`} onClick={() => onTab("fortune")} />}
+          {outstanding > 0 && <Row icon="💰" label={`未処理 ¥${outstanding.toLocaleString("ja-JP")}`} onClick={() => onTab("money")} />}
+          {brief && !hideNews && <Row icon="📰" label={brief.replace(/^[・\-*\s]+/, "")} onClick={() => onTab("news")} />}
+        </>
+      )}
+      {(!hideFortune || outstanding > 0 || (brief && !hideNews)) && (
+        <button onClick={() => setMore((m) => !m)} style={{ width: "100%", textAlign: "center", background: "transparent", border: "none", borderTop: `1px solid ${C.line}`, padding: "9px 0 2px", cursor: "pointer", color: C.sub, font: "inherit", fontSize: 13 }}>
+          {more ? "閉じる ▲" : "運気・売上・ニュースをもっと見る ▼"}
+        </button>
+      )}
     </section>
   );
 }
@@ -1555,7 +1567,7 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
       {/* 曜日見出し */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
         {["日", "月", "火", "水", "木", "金", "土"].map((w, i) => (
-          <div key={w} style={{ textAlign: "center", fontSize: 11, color: i === 0 ? C.red : i === 6 ? C.blue : C.sub }}>{w}</div>
+          <div key={w} style={{ textAlign: "center", fontSize: 12, color: i === 0 ? C.red : i === 6 ? C.blue : C.sub }}>{w}</div>
         ))}
       </div>
       {/* 日セル */}
@@ -1606,10 +1618,10 @@ function BizCalendar({ birth, trips, deadlines, launches, onPlan }) {
         );
       })()}
       {/* 凡例 */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, fontSize: 11, color: C.sub }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10, fontSize: 12, color: C.sub }}>
         {Object.entries(STANCE_UI).map(([k, v]) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 16, height: 16, borderRadius: 4, background: v.color + "33", border: `1px solid ${v.color}`, color: v.color, fontSize: 11, fontWeight: 700, display: "grid", placeItems: "center" }}>{v.mark}</span>{k}
+            <span style={{ width: 16, height: 16, borderRadius: 4, background: v.color + "33", border: `1px solid ${v.color}`, color: v.color, fontSize: 12, fontWeight: 700, display: "grid", placeItems: "center" }}>{v.mark}</span>{k}
           </span>
         ))}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定あり</span>
@@ -1744,7 +1756,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 
       <BirthEditor birth={birth} onSave={onSaveBirth} />
 
-      <div style={{ fontSize: 11, color: C.sub, marginTop: 4 }}>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
         ひとり秘書の鑑定AIによる占いです ・ 参考程度に
       </div>
     </Panel>
@@ -1781,19 +1793,19 @@ function CalendarSettings({ calList, roleForCal, onSetRole, onDisconnect, catFor
                       <button
                         key={r.v}
                         onClick={() => onSetRole(c.id, r.v)}
-                        style={{ fontSize: 11, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
+                        style={{ fontSize: 12, padding: "4px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${role === r.v ? C.accent : C.line}`, background: role === r.v ? C.accent : "transparent", color: role === r.v ? "#0B0D11" : C.sub, fontWeight: role === r.v ? 700 : 400 }}
                       >{r.label}</button>
                     ))}
                   </div>
                 </div>
                 {role === "work" && onSetCat && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", paddingLeft: 2 }}>
-                    <span style={{ fontSize: 11, color: C.faint, flex: "0 0 auto" }}>区分</span>
+                    <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>区分</span>
                     {CATS_OPT.map((k) => (
                       <button
                         key={k}
                         onClick={() => onSetCat(c.id, k)}
-                        style={{ fontSize: 11, padding: "3px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${cat === k ? (catColor(k) || C.accent) : C.line}`, background: cat === k ? (catColor(k) || C.accent) : "transparent", color: cat === k ? "#0B0D11" : C.sub, fontWeight: cat === k ? 700 : 400 }}
+                        style={{ fontSize: 12, padding: "3px 8px", borderRadius: 8, cursor: "pointer", border: `1px solid ${cat === k ? (catColor(k) || C.accent) : C.line}`, background: cat === k ? (catColor(k) || C.accent) : "transparent", color: cat === k ? "#0B0D11" : C.sub, fontWeight: cat === k ? 700 : 400 }}
                       >{k === "自動" ? "自動" : labelOf(k)}</button>
                     ))}
                   </div>
@@ -1835,7 +1847,7 @@ function CatLabelSettings({ labels, onChange }) {
             <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT[k], flex: "0 0 auto" }} />
             <div style={{ flex: "0 0 88px", minWidth: 0 }}>
               <div style={{ fontSize: 12, color: C.sub }}>{k}</div>
-              <div style={{ fontSize: 10, color: C.faint }}>{axisHint(k)}</div>
+              <div style={{ fontSize: 12, color: C.faint }}>{axisHint(k)}</div>
             </div>
             <input value={labels[k] || ""} onChange={(e) => setOne(k, e.target.value)} placeholder={`例：${k}`} style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 0 }} />
           </div>
@@ -1880,7 +1892,7 @@ function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, re
                   {it.title}
                 </span>
                 {renderMeta && renderMeta(it)}
-                {onEdit && <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>}
+                {onEdit && <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>}
                 <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
               </>
             )}
@@ -1946,7 +1958,7 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
         <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{no}</span>
         <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{name}</span>
-        {sig && <span style={{ fontSize: 11, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot}{sig.label}</span>}
+        {sig && <span style={{ fontSize: 12, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot}{sig.label}</span>}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: done(pct) || color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{sub}</span>
         <span style={{ fontSize: 12, color: C.sub, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct)}%</span>
@@ -1961,7 +1973,7 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
     <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 15, fontWeight: 700, flex: 1, minWidth: 0 }}>{L.name}</span>
-        <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✎</button>
+        <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✏️</button>
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
       {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
@@ -2025,12 +2037,12 @@ function LaunchKpi({ launches, onAdd, onEdit, onRemove }) {
     <Panel
       title="新講座の販売 進捗（先行登録→申込→売上）"
       accent={C.accent}
-      help="「ローンチ」とは新しい講座・商品の期間限定の募集や販売のこと。それ『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✎からいつでも更新できます。"
+      help="「ローンチ」とは新しい講座・商品の期間限定の募集や販売のこと。それ『先行登録 → 本申込 → 売上』の進み具合を1枚で見ます。各段に目標と実績・達成率、締切まで何日かを信号(🟢=余裕 🟠=もうすぐ 🔴=締切すぎ)で表示。売上は『本申込の人数 × 客単価』で自動計算します。数字は✏️からいつでも更新できます。"
       right={<button onClick={() => { setMode(mode === "new" ? null : "new"); setF(blankNew); }} style={chipBtn}>＋ローンチ</button>}
     >
       {mode === "new" && (
         <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8, lineHeight: 1.6 }}>まず「名前」と「締切日」だけ入れればOK。人数や金額の数字は、あとから✎でいつでも更新できます。</div>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8, lineHeight: 1.6 }}>まず「名前」と「締切日」だけ入れればOK。人数や金額の数字は、あとから✏️でいつでも更新できます。</div>
           {formFields(f, setF)}
           <button
             style={{ ...chipBtn, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
@@ -2086,8 +2098,8 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
         <>
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
           {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
-          {it.kind && <span style={{ fontSize: 11, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
-          <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✎</button>
+          {it.kind && <span style={{ fontSize: 12, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
+          <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
           <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
         </>
       )}
@@ -2159,7 +2171,7 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
       title="今日の要対応"
       accent={accent}
       help="締切が過ぎた『遅れ』と、3日以内に迫った『もうすぐ』を自動でまとめます。取りこぼし防止用です。"
-      right={notifySupported && !notify ? <button onClick={onEnableNotify} style={chipBtn}>通知オン</button> : (notify ? <span style={{ fontSize: 11, color: C.green }}>通知オン</span> : null)}
+      right={notifySupported && !notify ? <button onClick={onEnableNotify} style={chipBtn}>通知オン</button> : (notify ? <span style={{ fontSize: 12, color: C.green }}>通知オン</span> : null)}
     >
       {none ? (
         <div style={{ fontSize: 14, color: C.green }}>✅ 直近の遅れ・締切間近はありません。</div>
@@ -2187,7 +2199,7 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
         <span>✅</span>
         <span style={{ flex: 1 }}>Googleカレンダー連携中（今週 {count}件・自動で最新化）</span>
         {onRefresh && (
-          <button onClick={onRefresh} disabled={refreshing} title="今すぐ最新の予定に更新" style={{ ...chipBtn, fontSize: 11, padding: "3px 8px", color: refreshing ? C.faint : C.green, borderColor: C.line }}>
+          <button onClick={onRefresh} disabled={refreshing} title="今すぐ最新の予定に更新" style={{ ...chipBtn, fontSize: 12, padding: "3px 8px", color: refreshing ? C.faint : C.green, borderColor: C.line }}>
             {refreshing ? "更新中…" : "🔄 更新"}
           </button>
         )}
@@ -2196,13 +2208,13 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
   }
   const isErr = status === "error";
   return (
-    <div style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${isErr ? C.red : C.line}`, borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+    <div style={{ fontSize: 13, color: C.text, background: C.panel2, border: `1px solid ${isErr ? C.red : C.orange}`, borderRadius: 8, padding: "9px 11px", marginBottom: 12 }}>
       <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 8 }}>
-        <span>{isErr ? "⚠️" : "⚙️"}</span>
-        <span style={{ color: isErr ? C.red : C.sub, wordBreak: "break-word" }}>
+        <span>{isErr ? "⚠️" : "👀"}</span>
+        <span style={{ color: isErr ? C.red : C.text, wordBreak: "break-word" }}>
           {isErr
             ? `カレンダー取得に失敗：${(error && error.message) || error}`
-            : "サンプル表示（準備中）— Googleカレンダーと一度連携すれば、以後は自動で維持され、毎回ログインし直す必要はありません。"}
+            : <><b style={{ color: C.orange }}>これは使い方のサンプルです（あなたの予定・実績ではありません）。</b>Googleカレンダーを連携すると、あなたの予定に置き換わります。一度連携すれば以後は自動で維持され、毎回ログインし直す必要はありません。</>}
         </span>
       </div>
       <button
@@ -2261,7 +2273,7 @@ function LoginGate({ onLogin, error }) {
           Googleではじめる
         </button>
         <p style={{ color: C.faint, fontSize: 12, lineHeight: 1.7, textAlign: "center", margin: "12px 0 0" }}>
-          お試し中の機能です（β版）。気に入らなければいつでもやめられます。<br />
+          お試し版です。気に入らなければいつでもやめられます。<br />
           ログインすると、あなた専用のデータ領域が作られます。<br />他の人のデータとは完全に分かれています。
         </p>
 
@@ -2300,7 +2312,7 @@ function WaitlistScreen({ user, onSignOut }) {
         </p>
         {user && user.email && (
           <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginBottom: 20 }}>
-            <div style={{ fontSize: 11, color: C.faint, marginBottom: 4 }}>ご案内の送り先</div>
+            <div style={{ fontSize: 12, color: C.faint, marginBottom: 4 }}>ご案内の送り先</div>
             <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-all" }}>{user.email}</div>
           </div>
         )}
@@ -2315,7 +2327,7 @@ function WaitlistScreen({ user, onSignOut }) {
         >
           別のアカウントでログインする
         </button>
-        <p style={{ color: C.faint, fontSize: 11, lineHeight: 1.7, margin: "16px 0 0" }}>
+        <p style={{ color: C.faint, fontSize: 12, lineHeight: 1.7, margin: "16px 0 0" }}>
           すでに招待済みの場合は、招待を受けたGoogleアカウントでログインし直してください。
         </p>
       </div>
@@ -2912,7 +2924,7 @@ export default function App() {
     refreshing: calStatus === "loading",
   };
 
-  // 書き込み可能なカレンダーID（予定一覧での✎編集・✕削除の可否判定に使う）
+  // 書き込み可能なカレンダーID（予定一覧での✏️編集・✕削除の可否判定に使う）
   const writableCalIds = new Set((calList || []).filter((c) => c.accessRole === "owner" || c.accessRole === "writer").map((c) => c.id));
 
   const alerts = computeAlerts(data);
@@ -2960,7 +2972,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <strong style={{ fontSize: 16, letterSpacing: 1 }}>ひとり秘書</strong>
           <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: C.sub }}>{dateLabel}</span>
+          <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
           <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
           {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
         </div>
@@ -3115,7 +3127,7 @@ export default function App() {
               onEdit={content.edit}
               onRemove={content.remove}
               placeholder="制作物を追加…"
-              renderMeta={(it) => it.phase && <span style={{ fontSize: 11, color: C.blue, fontWeight: 700 }}>{it.phase}</span>}
+              renderMeta={(it) => it.phase && <span style={{ fontSize: 12, color: C.blue, fontWeight: 700 }}>{it.phase}</span>}
             />
           </>
         )}
@@ -3181,7 +3193,7 @@ export default function App() {
           />
         )}
 
-        <footer style={{ textAlign: "center", color: C.faint, fontSize: 11, padding: "12px 0 32px" }}>
+        <footer style={{ textAlign: "center", color: C.faint, fontSize: 12, padding: "12px 0 32px" }}>
           ← 横スワイプ / 上のタブで切替 ・ {firebaseEnabled ? "全端末で同期" : "ローカル保存"}
         </footer>
       </main>
