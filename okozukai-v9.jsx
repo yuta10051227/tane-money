@@ -260,34 +260,34 @@ function startRealtimeSync(updateFn){
             if(prev.gachaDate){merged.gachaDate={...(merged.gachaDate||{})};const _td=todayKey();Object.keys(prev.gachaDate).forEach(cid=>{if(prev.gachaDate[cid]===_td)merged.gachaDate[cid]=_td;});}
             if(prev.streak) merged.streak=prev.streak;
             if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
-            // モンスター進化：多端末/遅延スナップショットで「巻き戻らない」よう、進んでいる方を優先
-            if(prev.monsterEvolved){
+            // モンスター進化/やり直し/転生：最終更新時刻(monsterStageAt)が新しい方を優先＝巻き戻り防止。
+            // 段階では判定しない(系統を壊さない)。卵に戻す操作も新しければ保持される。
+            {
               merged.monsterEvolved={...(merged.monsterEvolved||{})};
               merged.monsterEvolvedAt={...(merged.monsterEvolvedAt||{})};
               merged.monsterStageAt={...(merged.monsterStageAt||{})};
               merged.monsterIV={...(merged.monsterIV||{})};
-              const _stg=id=>(id&&MONSTER_TREE[id])?(MONSTER_TREE[id].stage||0):-1;
-              const _rc=(o,cid)=>((o||{})[cid]||0);
-              Object.keys(prev.monsterEvolved).forEach(cid=>{
-                // 転生回数が多い＝より最近の状態を優先。同数なら進化段階が高い方を優先
-                const prc=_rc(prev.reincarnationCount,cid), mrc=_rc(merged.reincarnationCount,cid);
-                const keepPrev = prc>mrc || (prc===mrc && _stg(prev.monsterEvolved[cid])>_stg(merged.monsterEvolved[cid]));
-                if(keepPrev){
-                  merged.monsterEvolved[cid]=prev.monsterEvolved[cid];
-                  if(prev.monsterEvolvedAt?.[cid]) merged.monsterEvolvedAt[cid]=prev.monsterEvolvedAt[cid];
-                  if(prev.monsterStageAt?.[cid]) merged.monsterStageAt[cid]=prev.monsterStageAt[cid];
-                  if(prev.monsterIV?.[cid]) merged.monsterIV[cid]=prev.monsterIV[cid];
+              const _t=(o,cid)=>{const v=(o||{})[cid];return v?new Date(v).getTime():0;};
+              const cids=new Set([...Object.keys(prev.monsterEvolved||{}),...Object.keys(merged.monsterEvolved||{}),...Object.keys(prev.monsterStageAt||{}),...Object.keys(merged.monsterStageAt||{})]);
+              cids.forEach(cid=>{
+                const pt=Math.max(_t(prev.monsterStageAt,cid),_t(prev.monsterEvolvedAt,cid));
+                const mt=Math.max(_t(merged.monsterStageAt,cid),_t(merged.monsterEvolvedAt,cid));
+                if(pt>=mt){ // ローカルが同じか新しい→ローカルを保持(リモートの古い状態で上書きしない)
+                  if((prev.monsterEvolved||{})[cid]!==undefined) merged.monsterEvolved[cid]=prev.monsterEvolved[cid];
+                  if((prev.monsterEvolvedAt||{})[cid]!==undefined) merged.monsterEvolvedAt[cid]=prev.monsterEvolvedAt[cid];
+                  if((prev.monsterStageAt||{})[cid]!==undefined) merged.monsterStageAt[cid]=prev.monsterStageAt[cid];
+                  if((prev.monsterIV||{})[cid]!==undefined) merged.monsterIV[cid]=prev.monsterIV[cid];
                 }
               });
             }
-            // 図鑑(発見済み)は和集合で絶対に減らさない
+            // 図鑑(発見済み)は和集合で減らさない
             if(prev.monsterDiscovered){
               merged.monsterDiscovered={...(merged.monsterDiscovered||{})};
               Object.keys(prev.monsterDiscovered).forEach(cid=>{
                 merged.monsterDiscovered[cid]=[...new Set([...(merged.monsterDiscovered[cid]||[]),...(prev.monsterDiscovered[cid]||[])])];
               });
             }
-            // なでなで(お世話)・転生回数は多い方を優先
+            // なでなで(お世話)・転生回数は多い方
             if(prev.monsterCare){merged.monsterCare={...(merged.monsterCare||{})};Object.keys(prev.monsterCare).forEach(cid=>{const pc=prev.monsterCare[cid]||{},rc=merged.monsterCare[cid]||{};if((pc.days||0)>=(rc.days||0))merged.monsterCare[cid]=pc;});}
             if(prev.reincarnationCount){merged.reincarnationCount={...(merged.reincarnationCount||{})};Object.keys(prev.reincarnationCount).forEach(cid=>{merged.reincarnationCount[cid]=Math.max(prev.reincarnationCount[cid]||0,merged.reincarnationCount[cid]||0);});}
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
