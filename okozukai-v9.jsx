@@ -1046,7 +1046,7 @@ const weekKey  = (d=new Date())=>{const jan1=new Date(d.getFullYear(),0,1);const
 const taskPts  = (task, cid) => task.over?.[cid] ?? task.pts;
 
 // 【一時テスト】この時刻まではガチャ回し放題（保存なし＝データを汚さない）。過ぎたら自動で通常の1日1回に戻る
-const GACHA_TEST_UNTIL = 1781445937113; // テスト回し放題 〜JST 23:05
+const GACHA_TEST_UNTIL = 1781454600000; // テスト回し放題 〜JST 01:30
 
 function rollGacha(gacha) {
   const total = gacha.reduce((s,g)=>s+g.rate,0);
@@ -3043,7 +3043,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ")}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
-                    {gachaTest?"何回でもOK（記録は残りません・〜23:05）":(todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
+                    {gachaTest?"何回でもOK（記録は残りません・〜01:30）":(todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
                   </div>
                   {!todayDone&&!gachaTest&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
