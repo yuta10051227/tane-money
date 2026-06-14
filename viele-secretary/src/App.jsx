@@ -527,10 +527,20 @@ function Check({ done, onClick }) {
 /* ──────────────────────────────────────────────────────────────
    逆算チェーン（出張・遠征）
    ────────────────────────────────────────────────────────────── */
+// 私的・お祝い系の型（仕事の「営業・追い込み」文言ではなく、温かい文言を出す）
+const CELEBRATION_TEMPLATES = new Set(["誕生日・記念日", "入学式・式典", "旅行", "日帰り"]);
+
 // 本番日のコンディション(占術)から、逆算チェーン全体への一言ガイドを作る（決定論・AI不使用）
-function tripStanceHint(rel, dleft) {
+// template に応じて、仕事系は「営業・追い込み」、私的・お祝い系は楽しむ前提の文言に出し分ける。
+function tripStanceHint(rel, dleft, template) {
   if (!rel) return null;
   const s = rel.stance;
+  if (CELEBRATION_TEMPLATES.has(template)) {
+    if (s === "攻め") return { color: C.green, text: "当日は運気も後押し。主役らしく、思いきり楽しめる日。" };
+    if (s === "守り") return { color: C.blue, text: "当日はゆったりが吉。準備は早めに済ませ、当日は楽しむことに集中して。" };
+    if (s === "労い") return { color: C.blue, text: "人に恵まれ、支えられる日。みんなで囲むのにぴったり。" };
+    return { color: C.accent, text: "穏やかに過ごせる日。段取り通り、落ち着いて楽しめます。" };
+  }
   if (s === "攻め") return { color: C.green, text: dleft < 0 ? "本番は攻めの日。仕上げ・追い込みが伸びる流れ。" : "本番は攻めの日。当日に営業・追い込みを置くと伸びやすい。" };
   if (s === "守り") return { color: C.red, text: "本番は守りの日。準備は前倒しで、当日は欲張らず守りの段取りに。" };
   if (s === "労い") return { color: C.blue, text: "本番は労いの日。人や場に支えられる。受け取る姿勢で臨もう。" };
@@ -596,7 +606,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                 {dleft < 0 ? `本番から${-dleft}日経過` : `本番まであと ${dleft}日`} ・ 本番 {fmt(trip.date)} ・ 手配 {doneCount}/{trip.items.length}
               </div>
               {(() => {
-                const hint = tripStanceHint(stances[trip.date], dleft);
+                const hint = tripStanceHint(stances[trip.date], dleft, trip.template);
                 return hint ? (
                   <div style={{ display: "flex", gap: 6, alignItems: "flex-start", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 9px", marginBottom: 10 }}>
                     <span style={{ flex: "0 0 auto", fontSize: 13 }}>🧭</span>
@@ -634,7 +644,9 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                           <span style={{ fontSize: 12, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
                         </div>
                         {!item.done && stances[sig.deadlineISO] && stances[sig.deadlineISO].stance === "守り" && (
-                          <div style={{ fontSize: 12, color: C.red, marginTop: 2 }}>🧭 締切が守りの日。1日前倒すと楽です</div>
+                          <div style={{ fontSize: 12, color: CELEBRATION_TEMPLATES.has(trip.template) ? C.sub : C.red, marginTop: 2 }}>
+                            🧭 {CELEBRATION_TEMPLATES.has(trip.template) ? "早めに準備しておくと当日ゆとりが持てます" : "締切が守りの日。1日前倒すと楽です"}
+                          </div>
                         )}
                       </div>
                     </div>
