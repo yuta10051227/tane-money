@@ -553,18 +553,20 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
                   </div>
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <strong style={{ fontSize: 14 }}>{trip.title}</strong>
-                  {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
-                  <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ fontSize: 12, color: C.sub }}>本番 {fmt(trip.date)}</span>
-                  <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
-                  <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 14 }}>{trip.title}</strong>
+                    {trip.auto && <span title="カレンダーの「出張」予定から自動作成" style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenSoft || C.panel2, border: `1px solid ${C.green}`, borderRadius: 8, padding: "1px 6px" }}>🤖自動</span>}
+                    <span style={{ fontSize: 11, color: C.sub, border: `1px solid ${C.line}`, borderRadius: 8, padding: "1px 6px" }}>{trip.template}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+                    <button onClick={() => startTrip(trip)} style={iconBtn} title="編集">✎</button>
+                    <button onClick={() => onRemove(trip.id)} style={iconBtn} title="削除">✕</button>
+                  </div>
                 </div>
               )}
               <div style={{ fontSize: 12, color: dleft < 0 ? C.red : C.accent, margin: "4px 0 8px" }}>
-                {dleft < 0 ? `本番から${-dleft}日経過` : `本番まであと ${dleft}日`} ・ 手配 {doneCount}/{trip.items.length}
+                {dleft < 0 ? `本番から${-dleft}日経過` : `本番まであと ${dleft}日`} ・ 本番 {fmt(trip.date)} ・ 手配 {doneCount}/{trip.items.length}
               </div>
               {(() => {
                 const hint = tripStanceHint(stances[trip.date], dleft);
@@ -797,19 +799,20 @@ function DeadlineBoard({ deadlines, linked, birth, onAdd, onAddBulk, onEdit, onR
           const sig = deadlineSignal(d.date);
           return (
             <div key={d.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel2, borderRadius: 12, padding: "12px 14px", borderLeft: d.linked ? `3px solid ${C.accent}` : undefined }}>
-                <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: C.panel2, borderRadius: 12, padding: "12px 14px", borderLeft: d.linked ? `3px solid ${C.accent}` : undefined }}>
+                <span style={{ width: 28, height: 28, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 13, color: C.sub, flex: "0 0 auto", marginTop: 1 }}>
                   {i + 1}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15 }}>{d.linked ? "📣 " : ""}{d.title}</div>
-                  <div style={{ fontSize: 12, color: C.sub }}>{d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
+                  <div style={{ fontSize: 15, lineHeight: 1.35 }}>{d.linked ? "📣 " : ""}{d.title}</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}><span style={{ color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span> ・ {d.stage} ・ {fmt(d.date)}{d.linked ? " ・ 売上タブのローンチ" : ""}</div>
                   {(() => { const h = deadlineStanceHint(stances[d.date]); return h ? <div style={{ fontSize: 11, color: h.color, marginTop: 2 }}>🧭 {h.text}</div> : null; })()}
                 </div>
-                <span style={{ fontSize: 13, color: sig.color, fontWeight: 600 }}>{sig.dot} {sig.label}</span>
-                <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
-                {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>}
-                {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
+                <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+                  <button onClick={() => setDraftId(draftId === d.id ? null : d.id)} style={iconBtn} title="告知文を作る">✍️</button>
+                  {!d.linked && <button onClick={() => startEdit(d)} style={iconBtn} title="編集">✎</button>}
+                  {!d.linked && <button onClick={() => onRemove(d.id)} style={iconBtn} title="削除">✕</button>}
+                </div>
               </div>
               {draftId === d.id && <DraftPanel context={`${d.stage ? d.stage + "：" : ""}「${d.title}」（${fmt(d.date)}）の告知`} />}
             </div>
@@ -911,18 +914,26 @@ function ScheduleRow({ e, source, onSetCat, writableIds, onEditEvent, onDeleteEv
     <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
       <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</span>
-      {canCat ? (
-        <button
-          onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
-          title={e.catSource === "manual" ? "記憶済み（タップで変更・一周すると自動に戻ります）" : e.catSource === "cal" ? "カレンダーの既定区分（タップでこの予定だけ変更）" : "自動判定（タップで記憶できます）"}
-          style={{ flex: "0 0 auto", fontSize: 12, fontWeight: e.catSource === "manual" ? 700 : 400, color: e.catSource === "manual" ? "#0B0D11" : catColor(e.cat), background: e.catSource === "manual" ? catColor(e.cat) : "transparent", border: `1px solid ${e.catSource === "manual" ? catColor(e.cat) : C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
-        >{e.cat}{e.catSource === "manual" ? " ✓" : " ⇄"}</button>
-      ) : (
-        <span style={{ fontSize: 12, color: catColor(e.cat), flex: "0 0 auto" }}>{e.cat}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</div>
+        <div style={{ marginTop: 4 }}>
+          {canCat ? (
+            <button
+              onClick={() => onSetCat(e.title, CAT_CYCLE[(CAT_CYCLE.indexOf(e.cat) + 1) % CAT_CYCLE.length])}
+              title={e.catSource === "manual" ? "記憶済み（タップで変更・一周すると自動に戻ります）" : e.catSource === "cal" ? "カレンダーの既定区分（タップでこの予定だけ変更）" : "自動判定（タップで記憶できます）"}
+              style={{ fontSize: 12, fontWeight: e.catSource === "manual" ? 700 : 400, color: e.catSource === "manual" ? "#0B0D11" : catColor(e.cat), background: e.catSource === "manual" ? catColor(e.cat) : "transparent", border: `1px solid ${e.catSource === "manual" ? catColor(e.cat) : C.line}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}
+            >{e.cat}{e.catSource === "manual" ? " ✓" : " ⇄"}</button>
+          ) : (
+            <span style={{ fontSize: 12, color: catColor(e.cat) }}>{e.cat}</span>
+          )}
+        </div>
+      </div>
+      {editable && (
+        <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+          <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✎</button>
+          <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
+        </div>
       )}
-      {editable && <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✎</button>}
-      {editable && <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>}
     </div>
   );
 }
