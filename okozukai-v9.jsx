@@ -1249,6 +1249,8 @@ function GachaAnim({ result, onClose }) {
   useEffect(()=>{ at(()=>setPhase(p=>p==="charge"?"tap":p), 600); }, []);
 
   const buzz = (pat)=>{ try{ navigator.vibrate(pat); }catch(e){} };
+  // 確定演出(予兆): SR以上は水やり直前にそっと振動でワクワクを煽る
+  useEffect(()=>{ if(isSR) at(()=>buzz(isSuper?[0,60,80,60,80,140]:[0,50,90,50]), 680); }, []);
 
   const HOLD = 1450, HUSH = isSuper ? 2300 : 1650;  // 段階ごとのタメ / 暗転の静寂(激レアほど長い)
   const hasHush = isSR && !result.simpleAnim;   // SR以上で暗転→解放（シンプル演出時はOFF）
@@ -1319,6 +1321,27 @@ function GachaAnim({ result, onClose }) {
           filter:"blur(10px)",opacity:.85,animation: rainbow?"gRing 2.4s linear infinite":"gPulse 1s ease-in-out infinite",pointerEvents:"none"}}/>
       )}
 
+      {/* ── 確定演出(予兆): 水やりの瞬間にSR以上で発生 ── */}
+      {(phase==="charge"||phase==="tap") && isSuper && (
+        <div style={{position:"absolute",top:0,left:0,right:0,height:"52%",pointerEvents:"none",zIndex:2,overflow:"hidden"}}>
+          {[0,1,2,3].map(i=>{const c=["#3bd16f","#3b9eff","#9b5bff","#ff5ea8"][i];return(
+            <div key={"aur"+i} style={{position:"absolute",top:0,left:`${-25+i*22}%`,width:"78%",height:"100%",
+              background:`linear-gradient(180deg,${c}00 0%,${c}88 42%,${c}00 100%)`,
+              filter:"blur(20px)",mixBlendMode:"screen",
+              animation:`gAurora ${3.6+i*0.7}s ease-in-out ${(i*0.4).toFixed(1)}s infinite alternate`}}/>);})}
+        </div>
+      )}
+      {(phase==="charge"||phase==="tap") && isSR && (
+        <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:3,overflow:"hidden"}}>
+          {[0,1,2,3].map(i=>(
+            <div key={"shoot"+i} style={{position:"absolute",top:`${5+i*9}%`,left:"-12%",width:130,height:3,
+              borderRadius:3,background:isSuper?"linear-gradient(90deg,transparent,#bfe6ff,#fff)":"linear-gradient(90deg,transparent,#ffe9a8,#fff)",
+              boxShadow:isSuper?"0 0 10px #bfe6ff":"0 0 10px #ffd86b",
+              animation:`gShoot ${1.5}s ease-in ${(i*0.55).toFixed(2)}s infinite`}}/>
+          ))}
+        </div>
+      )}
+
       {(phase==="charge"||phase==="tap") && (
         <div style={{position:"absolute",left:"50%",bottom:"22%",transform:"translateX(-50%)",textAlign:"center",cursor:phase==="tap"?"pointer":"default"}}
              onClick={phase==="tap"?reveal:undefined}>
@@ -1371,7 +1394,7 @@ function GachaAnim({ result, onClose }) {
           {(phase==="charge"||phase==="tap") && result.todayTasks>0 && <div style={{fontSize:13,color:"#bff0c8",fontWeight:800,marginBottom:8,textShadow:"0 2px 8px #000"}}>きょう {result.todayTasks}こ おてつだいしたから タネが げんき！🌱</div>}
           <div style={{fontSize:phase==="grow"&&isSuper?24:19,fontWeight:900,color:rainbow?"#fff":phase==="grow"?AURA:"#fff",textShadow:rainbow?"0 0 16px #fff,0 2px 8px #000":"0 2px 8px #000",animation:"fadePulse .8s ease-in-out infinite"}}>
             {phase==="charge" ? "タネを植えるよ…"
-             : phase==="tap" ? "タップして水をあげよう！💧"
+             : phase==="tap" ? (isSuper ? "そらが にじいろに…！？ 水をあげて！🌈" : isSR ? "ながれ星…！？ いそいで水を！💧✨" : "タップして水をあげよう！💧")
              : rainbow ? "にじいろの大樹だ‼"
              : curTier==="sr" ? "金の花が さいた…⁉"
              : curTier==="r" ? "ニョキッ！まだ育つ…！？"
@@ -1426,6 +1449,8 @@ function GachaAnim({ result, onClose }) {
         @keyframes gHushBeat{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.22);opacity:1}}
         @keyframes gSeedBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.05)}}
         @keyframes gPour{0%,100%{transform:rotate(8deg)}50%{transform:rotate(26deg)}}
+        @keyframes gShoot{0%{transform:translate(0,0) rotate(20deg);opacity:0}8%{opacity:1}55%{opacity:1}100%{transform:translate(125vw,46vh) rotate(20deg);opacity:0}}
+        @keyframes gAurora{0%{transform:translateX(-10%) scaleY(.88);opacity:.45}100%{transform:translateX(10%) scaleY(1.12);opacity:.92}}
         @keyframes gWdrop{0%{transform:translateY(0) scale(.7);opacity:0}25%{opacity:1}100%{transform:translateY(78px) scale(1);opacity:0}}
         @keyframes gPetal{0%{transform:translate(-50%,-50%) rotate(0deg) scale(.4);opacity:0}18%{opacity:1}100%{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty) + 50px)) rotate(var(--rot)) scale(1);opacity:0}}
         @keyframes gPulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
