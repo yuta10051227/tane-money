@@ -421,32 +421,36 @@ const JUN_TENCHU = [
 ];
 
 export function tenchusatsu(birth) {
-  const c = computeChart(birth);
-  const dayStem = String(c.dayPillar).slice(0, 1);
-  const dayBranch = String(c.dayPillar).slice(-1);
-  const dayIdx = ganzhiIndex(dayStem, dayBranch);
-  const junIdx = Math.floor(dayIdx / 10); // 0..5
-  const info = JUN_TENCHU[junIdx];
+  try {
+    if (!birth || !birth.date) return null;
+    const c = computeChart(birth);
+    const dayStem = String(c.dayPillar).slice(0, 1);
+    const dayBranch = String(c.dayPillar).slice(-1);
+    const dayIdx = ganzhiIndex(dayStem, dayBranch);
+    const junIdx = Math.floor(dayIdx / 10); // 0..5
+    const info = JUN_TENCHU[junIdx];
+    if (!info) return null;
 
-  // branches に当たる十二支の西暦年（今年=2026 以降で近い2つ）を算出。
-  // 年の干支は computeChart の年柱ロジックと同じ基準: index = (year-1984) % 60。
-  const thisYear = new Date().getFullYear();
-  const years = [];
-  let y = thisYear;
-  while (years.length < 2 && y < thisYear + 24) {
-    const yi = (((y - 1984) % 60) + 60) % 60;
-    const yb = Z[yi % 12];
-    if (info.branches.includes(yb)) years.push(y);
-    y++;
-  }
+    // branches に当たる十二支の西暦年（今年=2026 以降で近い2つ）を算出。
+    // 年の干支は computeChart の年柱ロジックと同じ基準: index = (year-1984) % 60。
+    const thisYear = new Date().getFullYear();
+    const years = [];
+    let y = thisYear;
+    while (years.length < 2 && y < thisYear + 24) {
+      const yi = (((y - 1984) % 60) + 60) % 60;
+      const yb = Z[yi % 12];
+      if (info.branches.includes(yb)) years.push(y);
+      y++;
+    }
 
-  return {
-    name: info.name,
-    jun: info.jun,
-    branches: info.branches.slice(),
-    years,
-    desc: "運気の休息・充電期。新規拡大より整理・内省が吉。",
-  };
+    return {
+      name: info.name,
+      jun: info.jun,
+      branches: info.branches.slice(),
+      years,
+      desc: "運気の休息・充電期。新規拡大より整理・内省が吉。",
+    };
+  } catch { return null; }
 }
 
 /* ── 2) 大運（10年ロードマップ）─────────────────────────────────
@@ -468,8 +472,11 @@ const DAIUN_THEME = {
 };
 
 export function daiun(birth) {
+  try {
+  if (!birth || !birth.date) return null;
   const c = computeChart(birth);
   const me = c.dayMaster;
+  if (!me) return null;
   const yearStem = String(c.yearPillar).slice(0, 1);
   const monthIdx = ganzhiIndex(String(c.monthPillar).slice(0, 1), String(c.monthPillar).slice(-1));
 
@@ -515,31 +522,47 @@ export function daiun(birth) {
     return { k, ageFrom, ageTo, ganzhi, god, star, unsei, theme: DAIUN_THEME[star] };
   };
 
-  // 現在どの期にいるか（k>=0 で ageFrom<=age<ageTo を満たす最初）。startAge前は第1期扱い。
-  let curK = 0;
-  for (let k = 0; k < 12; k++) {
-    const p = period(k);
-    if (age < p.ageTo) { curK = k; break; }
-    curK = k;
-  }
-  const cur = period(curK);
+  // 立運前（未来生まれ/乳児など age<startAge）かどうか。
+  // この場合は「現在どの大運期にも入っていない（立運前）」とし、第1期を"現在"と誤表示しない。
+  const preStart = age < startAge;
 
-  // ロードマップ: 現在含む前後計5期（現在の2期前〜2期後, ただし k>=0 に丸め）。
-  let from = Math.max(0, curK - 2);
+  // 現在どの期にいるか（k>=0 で ageFrom<=age<ageTo を満たす最初）。立運前は curK=-1（該当なし）。
+  let curK = -1;
+  if (!preStart) {
+    curK = 0;
+    for (let k = 0; k < 12; k++) {
+      const p = period(k);
+      if (age < p.ageTo) { curK = k; break; }
+      curK = k;
+    }
+  }
+  const cur = preStart ? null : period(curK);
+
+  // ロードマップ: 立運前は第0〜4期を表示（current無し）。それ以外は現在含む前後計5期。
+  let from = preStart ? 0 : Math.max(0, curK - 2);
   if (from + 4 > 11) from = Math.max(0, 11 - 4);
   const roadmap = [];
   for (let k = from; k <= from + 4; k++) {
     const p = period(k);
-    roadmap.push({ ageFrom: p.ageFrom, ageTo: p.ageTo, ganzhi: p.ganzhi, star: p.star, theme: p.theme, current: k === curK });
+    roadmap.push({ ageFrom: p.ageFrom, ageTo: p.ageTo, ganzhi: p.ganzhi, star: p.star, theme: p.theme, current: !preStart && k === curK });
   }
+
+  // current: 立運前は preStart フラグを立て、age と startAge のみ返す（期データは null）。
+  // ★UI担当向け: daiun().current は preStart=true の場合 ganzhi/star/theme 等が無い（age と startAge と preStart のみ）。
+  //   その場合 roadmap には current:true が一つも無い（どの期も「現在」にしない）。
+  const current = preStart
+    ? { preStart: true, age, startAge, ageFrom: null, ageTo: null, ganzhi: null, god: null, star: null, unsei: null, theme: null }
+    : { preStart: false, age, ageFrom: cur.ageFrom, ageTo: cur.ageTo, ganzhi: cur.ganzhi, god: cur.god, star: cur.star, unsei: cur.unsei, theme: cur.theme };
 
   return {
     assumed,
     direction: forward ? "順行" : "逆行",
     startAge,
-    current: { age, ageFrom: cur.ageFrom, ageTo: cur.ageTo, ganzhi: cur.ganzhi, god: cur.god, star: cur.star, unsei: cur.unsei, theme: cur.theme },
+    preStart,            // ★追加: 立運前（まだ大運が始まっていない）なら true
+    current,
     roadmap,
   };
+  } catch { return null; }
 }
 
 /* ── 3) 2人の相性 ──────────────────────────────────────────────
@@ -565,79 +588,139 @@ const STAR_GROUP = {
 };
 
 export function aishou(birthA, birthB) {
-  const ca = computeChart(birthA), cb = computeChart(birthB);
-  const sa = sanmeiDetail(birthA), sb = sanmeiDetail(birthB);
-  const meA = ca.dayMaster, meB = cb.dayMaster;
-  const elemA = FIVE[meA], elemB = FIVE[meB];
-  const branchA = String(ca.dayPillar).slice(-1), branchB = String(cb.dayPillar).slice(-1);
-  const starA = sa?.center?.star || "貫索星", starB = sb?.center?.star || "貫索星";
+  try {
+    // 防御: A/Bどちらかの birth.date が不正なら null（UIが落ちないことを優先）
+    if (!birthA || !birthA.date || !birthB || !birthB.date) return null;
+    const ca = computeChart(birthA), cb = computeChart(birthB);
+    const meA = ca.dayMaster, meB = cb.dayMaster;
+    if (!meA || !meB) return null;
+    const sa = sanmeiDetail(birthA), sb = sanmeiDetail(birthB);
+    const elemA = FIVE[meA], elemB = FIVE[meB];
+    const branchA = String(ca.dayPillar).slice(-1), branchB = String(cb.dayPillar).slice(-1);
+    const starA = sa?.center?.star || "貫索星", starB = sb?.center?.star || "貫索星";
 
-  let score = 50;
-  const notes = [];
+    // 加減算式（基準50点）。加点だけでなく冲=大減点・剋=減点を入れ、30台〜100に分布させる。
+    let score = 50;
+    const notes = [];
+    const reasons = []; // スコアの根拠の断片（UI表示用）
 
-  // (1) 日干関係（重み最大）
-  let kanRel;
-  if (GANGOU[meA] === meB) { score += 22; kanRel = "干合"; notes.push("日干が干合。惹かれ合い結びつく最良の縁。"); }
-  else if (elemA === elemB) { score += 10; kanRel = "比和"; notes.push("日干が同じ五行。価値観が近く息が合う。"); }
-  else if (GEN[elemA] === elemB) { score += 14; kanRel = "Aが生む"; notes.push("AがBを生かす関係。AはBを育て支える。"); }
-  else if (GEN[elemB] === elemA) { score += 14; kanRel = "Bが生む"; notes.push("BがAを生かす関係。BはAを育て支える。"); }
-  else if (CTRL[elemA] === elemB) { score += 4; kanRel = "Aが剋す"; notes.push("AがBを律する関係。Aが主導しBを引き締める。"); }
-  else if (CTRL[elemB] === elemA) { score += 4; kanRel = "Bが剋す"; notes.push("BがAを律する関係。Bが主導しAを引き締める。"); }
-  else { kanRel = "中立"; }
+    // (1) 日干関係（重み最大）
+    let kanRel;
+    if (GANGOU[meA] === meB) {
+      score += 26; kanRel = "干合";
+      notes.push("日干が干合。惹かれ合い結びつく最良の縁。");
+      reasons.push("日干が干合(+)");
+    } else if (GEN[elemA] === elemB) {
+      score += 16; kanRel = "Aが生む";
+      notes.push("AがBを生かす関係。AはBを育て支える。");
+      reasons.push("日干が相生(+)");
+    } else if (GEN[elemB] === elemA) {
+      score += 16; kanRel = "Bが生む";
+      notes.push("BがAを生かす関係。BはAを育て支える。");
+      reasons.push("日干が相生(+)");
+    } else if (elemA === elemB) {
+      score += 10; kanRel = "比和";
+      notes.push("日干が同じ五行。価値観が近く息が合う。");
+      reasons.push("日干が比和(+)");
+    } else if (CTRL[elemA] === elemB) {
+      score -= 10; kanRel = "Aが剋す";
+      notes.push("AがBを律する関係。摩擦も出るが、Aが主導すれば噛み合う。");
+      reasons.push("日干が相剋(-)");
+    } else if (CTRL[elemB] === elemA) {
+      score -= 10; kanRel = "Bが剋す";
+      notes.push("BがAを律する関係。摩擦も出るが、Bが主導すれば噛み合う。");
+      reasons.push("日干が相剋(-)");
+    } else { kanRel = "中立"; }
 
-  // (2) 中心星グループの相性
-  const ga = STAR_GROUP[starA], gb = STAR_GROUP[starB];
-  if (ga === gb) { score += 8; notes.push(`中心星が同系統(${ga})。動き方の感覚が揃う。`); }
-  else { score += 4; notes.push(`中心星が異系統(${ga}×${gb})。役割を分けると強い。`); }
+    // (2) 中心星グループの相性
+    const ga = STAR_GROUP[starA], gb = STAR_GROUP[starB];
+    if (ga === gb) {
+      score += 6; notes.push(`中心星が同系統(${ga})。動き方の感覚が揃う。`);
+      reasons.push("中心星が同系統(+)");
+    } else {
+      score -= 2; notes.push(`中心星が異系統(${ga}×${gb})。役割を分けると強い。`);
+      reasons.push("中心星が異系統(±)");
+    }
 
-  // (3) 日支の関係
-  let zhiRel;
-  if (SHIGOU[branchA] === branchB) { score += 12; zhiRel = "支合"; notes.push("日支が支合。距離が縮まり安定する組み合わせ。"); }
-  else if (isSangou(branchA, branchB)) { score += 12; zhiRel = "三合"; notes.push("日支が三合。同じ目的に向かい協力しやすい。"); }
-  else if (CHONG[branchA] === branchB) { score += 6; zhiRel = "冲"; notes.push("日支が冲。刺激し合い化学反応を生むが衝突も。"); }
-  else if (branchA === branchB) { score += 6; zhiRel = "同支"; notes.push("日支が同じ。似た者同士で居心地がよい。"); }
-  else { zhiRel = "中立"; score += 2; }
+    // (3) 日支の関係（冲=大減点 / 相剋=減点 / 支合・三合・同支=加点）
+    let zhiRel;
+    if (SHIGOU[branchA] === branchB) {
+      score += 16; zhiRel = "支合";
+      notes.push("日支が支合。距離が縮まり安定する組み合わせ。");
+      reasons.push("日支が支合(+)");
+    } else if (isSangou(branchA, branchB)) {
+      score += 16; zhiRel = "三合";
+      notes.push("日支が三合。同じ目的に向かい協力しやすい。");
+      reasons.push("日支が三合(+)");
+    } else if (branchA === branchB) {
+      score += 8; zhiRel = "同支";
+      notes.push("日支が同じ。似た者同士で居心地がよい。");
+      reasons.push("日支が同支(+)");
+    } else if (CHONG[branchA] === branchB) {
+      score -= 18; zhiRel = "冲";
+      notes.push("日支が冲。強く刺激し合う一方で、衝突や温度差も生まれやすい。");
+      reasons.push("日支が冲(--)");
+    } else {
+      // 日支の五行が相剋なら減点
+      const be = FIVE[HIDDEN[branchA]] || "", bbe = FIVE[HIDDEN[branchB]] || "";
+      if (be && bbe && (CTRL[be] === bbe || CTRL[bbe] === be)) {
+        score -= 8; zhiRel = "相剋";
+        notes.push("日支が相剋。ペースや価値観のズレが出やすい。");
+        reasons.push("日支が相剋(-)");
+      } else {
+        zhiRel = "中立";
+        reasons.push("日支は中立(±)");
+      }
+    }
 
-  score = Math.max(0, Math.min(100, Math.round(score)));
+    score = Math.max(0, Math.min(100, Math.round(score)));
 
-  let label;
-  if (score >= 80) label = "名コンビ";
-  else if (score >= 65) label = "補い合う";
-  else if (score >= 50) label = "刺激し合う";
-  else label = "距離が要る";
+    // ラベル（前向き語のまま。"悪い/NG"は使わない）。30台〜100の分布に合わせて閾値調整。
+    let label;
+    if (score >= 78) label = "深い共鳴";
+    else if (score >= 62) label = "息が合う";
+    else if (score >= 48) label = "補い合う";
+    else if (score >= 38) label = "刺激し合う";
+    else label = "違いが大きい";
 
-  // 役割分担 howto（星グループから）
-  const roleOf = (g) => g === "守備" ? "土台・継続・管理" : g === "伝達" ? "発信・企画・伝える" : "突破・開拓・実行";
-  const howto = [];
-  if (ga === gb) howto.push(`二人とも${roleOf(ga)}が得意。逆方向(${ga === "守備" ? "開拓/発信" : ga === "伝達" ? "土台/実行" : "管理/守り"})を外部や仕組みで補うと盤石。`);
-  else howto.push(`Aは${roleOf(ga)}、Bは${roleOf(gb)}を担うと噛み合う。`);
-  if (kanRel === "干合") howto.push("公私が混ざりやすい縁。役割と境界を言語化しておくと長続きする。");
-  if (zhiRel === "冲") howto.push("意見はぶつかって当然と捉え、結論より『論点を出し切る』議論を。");
-  if (kanRel.includes("剋")) howto.push("律する側が言い過ぎないこと。指摘は『提案+理由』のセットで。");
-  if (howto.length < 2) howto.push("定期的に方向性をすり合わせる場を持つと、強みが噛み合い続ける。");
+    // 役割分担 howto（星グループから）。どのスコアでも必ず1件以上。
+    const roleOf = (g) => g === "守備" ? "土台・継続・管理" : g === "伝達" ? "発信・企画・伝える" : "突破・開拓・実行";
+    const howto = [];
+    if (ga === gb) howto.push(`二人とも${roleOf(ga)}が得意。逆方向(${ga === "守備" ? "開拓/発信" : ga === "伝達" ? "土台/実行" : "管理/守り"})を外部や仕組みで補うと盤石。`);
+    else howto.push(`Aは${roleOf(ga)}、Bは${roleOf(gb)}を担うと噛み合う。`);
+    if (kanRel === "干合") howto.push("公私が混ざりやすい縁。役割と境界を言語化しておくと長続きする。");
+    if (zhiRel === "冲") howto.push("ぶつかるのは相性が悪いからではなく刺激が強いから。結論を急がず『論点を出し切る』議論にすると活きる。");
+    if (zhiRel === "相剋") howto.push("ペースが違う前提で、締切や役割を先に決めておくとすれ違いが減る。");
+    if (kanRel.includes("剋")) howto.push("律する側が言い過ぎないこと。指摘は『提案+理由』のセットで伝えると関係が安定する。");
+    // 低スコアほど "こう組めば活きる" 対処を厚めに
+    if (score < 48) howto.push("似せようとせず、得意な持ち場をはっきり分けると、違いがそのまま戦力になる。");
+    if (howto.length < 2) howto.push("定期的に方向性をすり合わせる場を持つと、強みが噛み合い続ける。");
 
-  const summary = `${label}の関係。日干は${kanRel}、日支は${zhiRel}、中心星は${starA}×${starB}。${kanRel === "干合" || zhiRel === "支合" || zhiRel === "三合" ? "自然に手を取り合える相性。" : "違いを役割に変えると伸びる相性。"}`;
+    const positive = (kanRel === "干合" || GEN[elemA] === elemB || GEN[elemB] === elemA || zhiRel === "支合" || zhiRel === "三合");
+    const summary = `${label}の関係（${score}点）。日干は${kanRel}、日支は${zhiRel}、中心星は${starA}×${starB}。${positive ? "自然に手を取り合える相性。" : "違いを役割に変えると伸びる相性。"} 根拠: ${reasons.join("・")}`;
 
-  const dirText = (from, to, fe, te) => {
-    if (GEN[fe] === te) return `${from}は${to}を育て支える(生)。`;
-    if (CTRL[fe] === te) return `${from}は${to}を引き締め律する(剋)。`;
-    if (fe === te) return `${from}は${to}と同調し共鳴する(比和)。`;
-    return `${from}は${to}に刺激と気づきを与える。`;
-  };
+    const dirText = (from, to, fe, te) => {
+      if (GEN[fe] === te) return `${from}は${to}を育て支える(生)。`;
+      if (CTRL[fe] === te) return `${from}は${to}を引き締め律する(剋)。`;
+      if (fe === te) return `${from}は${to}と同調し共鳴する(比和)。`;
+      return `${from}は${to}に刺激と気づきを与える。`;
+    };
 
-  return {
-    score,
-    label,
-    summary,
-    howto,
-    aToB: dirText("A", "B", elemA, elemB),
-    bToA: dirText("B", "A", elemB, elemA),
-    detail: {
-      dayStemA: meA, dayStemB: meB, kanRel, zhiRel,
-      centerStarA: starA, centerStarB: starB,
-      elemA, elemB, branchA, branchB, notes,
-    },
-  };
+    return {
+      score,
+      label,
+      summary,
+      reasons,         // ★追加: スコア根拠の断片配列（UI表示用。例 ["日干が干合(+)","日支が冲(--)"]）
+      howto,
+      aToB: dirText("A", "B", elemA, elemB),
+      bToA: dirText("B", "A", elemB, elemA),
+      detail: {
+        dayStemA: meA, dayStemB: meB, kanRel, zhiRel,
+        centerStarA: starA, centerStarB: starB,
+        elemA, elemB, branchA, branchB, notes, reasons,
+      },
+    };
+  } catch { return null; }
 }
 
 /* ── 4) 家族・チーム全体の今日の運気 ───────────────────────────
@@ -672,14 +755,36 @@ export function familyFortune(members, dateISO) {
   // 最も勢い=最高スコア（同点なら攻めスタンス優先）、支え役=最低スコア。
   const stancePri = { 攻め: 0, 整える: 1, 労い: 2, 守り: 3 };
   const sorted = [...valid].sort((a, b) => b.score - a.score || stancePri[a.stance] - stancePri[b.stance]);
-  const bestMover = sorted.length ? sorted[0].name : null;
-  const supporter = sorted.length ? sorted[sorted.length - 1].name : null;
+
+  // ── 旗振り/支え役を言及してよいか判定 ──
+  // 矛盾を避けるため、次のいずれかなら言及しない（bestMover/supporter は null）:
+  //   (a) teamScore < 3（全体に守りの日 → 「旗振り」と矛盾する）
+  //   (b) 全員が同じスタンス（役割を分ける前提が成立しない）
+  //   (c) スコア最大と最小の差が僅差（< 2）で序列が意味を持たない
+  //   (d) 有効メンバーが2人未満
+  const scores = valid.map((m) => m.score);
+  const spread = scores.length ? Math.max(...scores) - Math.min(...scores) : 0;
+  const allSameStance = valid.length > 0 && valid.every((m) => m.stance === valid[0].stance);
+  const top = sorted.length ? sorted[0] : null;
+  const bottom = sorted.length ? sorted[sorted.length - 1] : null;
+  const mentionRoles =
+    valid.length >= 2 &&
+    teamScore >= 3 &&
+    !allSameStance &&
+    spread >= 2 &&
+    !!top && !!bottom && top.name !== bottom.name;
+
+  // ★UI担当向け: bestMover/supporter は上記条件を満たさない場合 null になる
+  //   （全員守り/同スタンス/僅差/人数不足）。null のときは UI で旗振り・支え役を出さない想定。
+  const bestMover = mentionRoles ? top.name : null;
+  const supporter = mentionRoles ? bottom.name : null;
 
   let advice;
   if (teamScore >= 4) advice = "全体に追い風の日。勢いのある人が前に出て、皆で一気に攻めの一手を進めよう。";
   else if (teamScore >= 3) advice = "波が分かれる日。攻める人と支える人で役割を分担し、無理なく前進を。";
   else advice = "全体に守りの日。新規拡大は控え、整理・休息・関係づくりに時間を使うと吉。";
-  if (bestMover && supporter && bestMover !== supporter) {
+  // advice 本文と矛盾しないときだけ旗振り・支え役を追記。
+  if (mentionRoles && bestMover && supporter && bestMover !== supporter) {
     advice += `今日は${bestMover}さんが旗振り、${supporter}さんは支えに回るとバランスが取れる。`;
   }
 
