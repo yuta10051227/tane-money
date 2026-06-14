@@ -5822,9 +5822,9 @@ function SeedMonster({ child, data, size=90, update }) {
         editNick ? (
           <div style={{marginTop:4}}>
             <input value={nickInput} onChange={e=>setNickInput(e.target.value)}
-              onBlur={()=>{if(nickInput.trim())update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()}}));setEditNick(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"){if(nickInput.trim())update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()}}));setEditNick(false);}if(e.key==="Escape")setEditNick(false);}}
-              autoFocus maxLength={8}
+              onBlur={()=>{update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()||null}}));setEditNick(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"){update(d=>({...d,monsterNickname:{...(d.monsterNickname||{}),[child.id]:nickInput.trim()||null}}));setEditNick(false);}if(e.key==="Escape")setEditNick(false);}}
+              autoFocus maxLength={8} placeholder={skinActive?skinDef.name:monDef.name}
               style={{fontSize:12,border:"1.5px solid rgba(255,255,255,0.5)",borderRadius:8,padding:"3px 8px",textAlign:"center",width:80,fontFamily:"inherit",color:"#fff",background:"rgba(255,255,255,0.15)",outline:"none"}}
             />
           </div>
@@ -5835,7 +5835,7 @@ function SeedMonster({ child, data, size=90, update }) {
               <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>{skinActive&&<span onClick={(e)=>{e.stopPropagation();update&&update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:null}}));}} title="タップで すがたを外す" style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"0 7px",marginLeft:5,fontWeight:900,cursor:"pointer"}}>👕すがた ✕</span>}
               {reincCount>0&&<span style={{fontSize:11,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
             </div>
-            <button onClick={()=>{setNickInput(dispName);setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
+            <button onClick={()=>{setNickInput(nickname||"");setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
           </div>
         )
       ) : (
