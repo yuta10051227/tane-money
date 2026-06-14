@@ -1332,8 +1332,8 @@ function GachaAnim({ result, onClose }) {
 
       {grown && (
         <div style={{position:"absolute",left:0,right:0,bottom:"21%",display:"flex",justifyContent:"center",alignItems:"flex-end",pointerEvents:"none"}}>
-          <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt={result.label}
-            style={{transformOrigin:"bottom center",
+          <img key={stage} src={`/assets/gacha_grow_${curTier}.png`} alt=""
+            style={{transformOrigin:"50% 100%",
               height:`${38+stage*7}vh`,width:"auto",maxWidth:"94vw",objectFit:"contain",
               animation:(phase==="grow")?"gNyoki .7s cubic-bezier(.2,.9,.3,1.4) forwards":(phase==="burst"&&hasHush)?"gNyoki .6s cubic-bezier(.15,.9,.3,1.5) forwards":"none",
               opacity:phase==="hush"?0.25:1,transition:"opacity .15s",
@@ -1419,7 +1419,7 @@ function GachaAnim({ result, onClose }) {
         @keyframes gFlash{0%{opacity:0}12%{opacity:.7}100%{opacity:0}}
         @keyframes gBurst{from{transform:translate(-50%,-50%) scale(1);opacity:1}to{transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.3);opacity:0}}
         @keyframes gGrow{0%{transform:translateX(-50%) scaleY(.04) scaleX(.5);opacity:.5}55%{transform:translateX(-50%) scaleY(1.07) scaleX(1.03);opacity:1}78%{transform:translateX(-50%) scaleY(.97) scaleX(.99)}100%{transform:translateX(-50%) scale(1);opacity:1}}
-        @keyframes gNyoki{0%{transform:scaleY(.12) scaleX(.6);opacity:.3}50%{transform:scaleY(1.14) scaleX(1.05);opacity:1}72%{transform:scaleY(.94) scaleX(.99)}88%{transform:scaleY(1.04)}100%{transform:scale(1);opacity:1}}
+        @keyframes gNyoki{0%{transform:scaleY(.12);opacity:.3}50%{transform:scaleY(1.12);opacity:1}72%{transform:scaleY(.96)}88%{transform:scaleY(1.03)}100%{transform:scaleY(1);opacity:1}}
         @keyframes gPuff{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.9);opacity:0}}
         @keyframes gHush{from{opacity:0}to{opacity:1}}
         @keyframes gCharge{0%{transform:translate(-50%,-50%) scale(.25);opacity:.35}70%{opacity:.9}100%{transform:translate(-50%,-50%) scale(8);opacity:1}}
