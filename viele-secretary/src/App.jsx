@@ -2121,10 +2121,13 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
         <button onClick={() => onEdit(L)} style={iconBtn} title="編集">✏️</button>
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
-      {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
-      {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv)}
-      {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null)}
-      <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
+      <div onClick={() => onEdit(L)} title="タップで数字を入力・更新" style={{ cursor: "pointer" }}>
+        {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
+        {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv)}
+        {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null)}
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
+      </div>
+      <button onClick={() => onEdit(L)} style={{ ...chipBtn, width: "100%", justifyContent: "center", marginTop: 10, background: C.accent, color: "#0B0D11", borderColor: C.accent, fontWeight: 700 }}>✏️ 数字を入力・更新</button>
     </div>
   );
 }
