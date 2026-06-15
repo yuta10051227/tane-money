@@ -2163,6 +2163,44 @@ function AishouPanel({ birth, members }) {
 /* ──────────────────────────────────────────────────────────────
    FortunePanel（本体）
    ────────────────────────────────────────────────────────────── */
+/* 算命学・運氣の流れ：今日を主役に。今月/今年は初期は畳んでおき、見たい人だけ開く（過密回避） */
+function SanmeiFlow({ birth }) {
+  const [showMore, setShowMore] = useState(false);
+  const un = useMemo(() => sanmeiUn(birth, iso(new Date())), [birth && birth.date, birth && birth.time]);
+  if (!un) return null;
+  const stColor = un.day.stance === "攻め" ? C.green : un.day.stance === "守り" ? C.red : un.day.stance === "労い" ? C.blue : C.accent;
+  const Period = ({ label, u, color }) => (
+    <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8 }}>
+      <div style={{ fontSize: 13, color, fontWeight: 700, marginBottom: 1 }}>{label}　{u.emoji} {u.star}（{u.ganzhi}）</div>
+      <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{u.move}</div>
+    </div>
+  );
+  return (
+    <Acc
+      title="算命学・運氣の流れ（今日の動き）"
+      color={C.purple}
+      defaultOpen
+      badge={<span style={{ fontSize: 13, color: stColor, fontWeight: 700 }}>今日{un.day.emoji}{un.day.star}</span>}
+    >
+      <div style={{ fontSize: 13, color: C.faint, marginBottom: 8 }}>あなたの日干に、今動いている星（十大主星）を重ねて“流れ・動き方”を出します。人体星図と同じ星の言葉です。</div>
+      <div style={{ background: stColor + "14", border: `1px solid ${stColor}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: stColor, marginBottom: 2 }}>今日 ・ {un.day.emoji} {un.day.star}（{un.day.title}） ・ {un.day.stance}</div>
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{un.day.move}</div>
+      </div>
+      {showMore ? (
+        <>
+          <Period label="今月" u={un.month} color={C.blue} />
+          <Period label="今年" u={un.year} color={C.purple} />
+        </>
+      ) : (
+        <button onClick={() => setShowMore(true)} style={{ width: "100%", background: "transparent", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 0", cursor: "pointer", color: C.sub, font: "inherit", fontSize: 13 }}>
+          今月・今年の流れも見る　{un.month.emoji}{un.month.star}／{un.year.emoji}{un.year.star} ▼
+        </button>
+      )}
+    </Acc>
+  );
+}
+
 function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers }) {
   const f = fortune || {};
   const t = f.today || {};
@@ -2219,33 +2257,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 
       {birth && birth.date && <TenchusatsuDaiunAcc birth={birth} />}
 
-      {birth && birth.date && (() => {
-        const un = sanmeiUn(birth, iso(new Date()));
-        if (!un) return null;
-        const stColor = un.day.stance === "攻め" ? C.green : un.day.stance === "守り" ? C.red : un.day.stance === "労い" ? C.blue : C.accent;
-        const Period = ({ label, u, color }) => (
-          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 8 }}>
-            <div style={{ fontSize: 13, color: color, fontWeight: 700, marginBottom: 1 }}>{label}　{u.emoji} {u.star}（{u.ganzhi}）</div>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{u.move}</div>
-          </div>
-        );
-        return (
-          <Acc
-            title="算命学・運氣の流れ（今日／今月／今年）"
-            color={C.purple}
-            defaultOpen
-            badge={<span style={{ fontSize: 13, color: stColor, fontWeight: 700 }}>今日{un.day.emoji}{un.day.star}</span>}
-          >
-            <div style={{ fontSize: 13, color: C.faint, marginBottom: 8 }}>あなたの日干に、今動いている星（十大主星）を重ねて“流れ・動き方”を出します。人体星図と同じ星の言葉です。</div>
-            <div style={{ background: stColor + "14", border: `1px solid ${stColor}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: stColor, marginBottom: 2 }}>今日 ・ {un.day.emoji} {un.day.star}（{un.day.title}） ・ {un.day.stance}</div>
-              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{un.day.move}</div>
-            </div>
-            <Period label="今月" u={un.month} color={C.blue} />
-            <Period label="今年" u={un.year} color={C.purple} />
-          </Acc>
-        );
-      })()}
+      {birth && birth.date && <SanmeiFlow birth={birth} />}
 
       {birth && birth.date && (
         <>
