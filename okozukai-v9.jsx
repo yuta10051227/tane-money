@@ -905,7 +905,7 @@ function migrate(d) {
   if(!d.activeSetId) d.activeSetId=d.dailyTaskSets[0]?.id||"set_default";
   // 同時アクティブ配列を保証(旧データはactiveSetIdから生成)。存在するセットのみ・最大2件
   if(!Array.isArray(d.activeSetIds)||d.activeSetIds.length===0) d.activeSetIds=[d.activeSetId].filter(Boolean);
-  d.activeSetIds=d.activeSetIds.filter(id=>d.dailyTaskSets.some(s=>s.id===id)).slice(0,2);
+  d.activeSetIds=d.activeSetIds.filter(id=>d.dailyTaskSets.some(s=>s.id===id)).slice(0,4);
   if(d.activeSetIds.length===0&&d.dailyTaskSets[0]) d.activeSetIds=[d.dailyTaskSets[0].id];
   if(!d.dailyProgress) d.dailyProgress={};
   if(!d.rewards||d.rewards.length===0) d.rewards=INIT.rewards;
@@ -1520,7 +1520,7 @@ function DailyTasks({ child, data, update }) {
         const fb = sets.find(inWindow) || sets.find(s => s.active!==false) || sets[0];
         chosen = fb ? [fb] : [];
       }
-      return chosen.slice(0, 2);
+      return chosen.slice(0, 4);
     } catch(e) { return []; }
   })();
   const activeSet = activeSets[0] || null;   // 後方互換(ヘッダ表示等)
@@ -3826,12 +3826,12 @@ function ParentDailyTab({data,update,sb}){
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes}:s)
   }));
 
-  // 最大2セットを同時アクティブにトグル(3つ目を選ぶと一番古い選択が外れる)
+  // 最大4セットを同時アクティブにトグル(5つ目を選ぶと一番古い選択が外れる)
   const toggleActive = id => update(d=>{
     const cur = Array.isArray(d.activeSetIds) ? d.activeSetIds.filter(x=>(d.dailyTaskSets||[]).some(s=>s.id===x)) : (d.activeSetId?[d.activeSetId]:[]);
     let next;
     if (cur.includes(id)) next = cur.filter(x=>x!==id);     // 解除
-    else next = [...cur, id].slice(-2);                      // 追加(最大2・古いものから押し出し)
+    else next = [...cur, id].slice(-4);                      // 追加(最大4・古いものから押し出し)
     if (next.length===0) next = [id];                        // 最低1つは残す
     return {...d, activeSetIds: next, activeSetId: next[0],
       dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true}:s)};
