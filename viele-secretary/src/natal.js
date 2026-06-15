@@ -802,3 +802,45 @@ export function familyFortune(members, dateISO) {
   };
 }
 
+
+/* ──────────────────────────────────────────────────────────────
+   算命学・運氣の流れ（日運／月運／年運）：その時点の干支と本人の日干から
+   「今動いている十大主星」を出す。人体星図と同じ星言語で“流れ・動き”を表す。
+   AI不使用・完全決定論。
+   ────────────────────────────────────────────────────────────── */
+// 各主星の「動き方」エッセンス（期間を問わず使える中立表現。UI側で今日/今月/今年を前置）
+const STAR_MOVE = {
+  貫索星: "自分の軸を貫く流れ。定番・看板を地道に太く。人に合わせすぎないのが吉。",
+  石門星: "人と組むと伸びる流れ。輪を広げ、協力・ネットワークを動かす。",
+  鳳閣星: "楽しんで表現する流れ。発信・会話・遊び心が良い運を呼ぶ。",
+  調舒星: "感性が冴える流れ。こだわりの制作・繊細な表現に集中すると◎。",
+  禄存星: "尽くすと返る流れ。気配り・サービス・人への投資が運を開く。",
+  司禄星: "コツコツ積む流れ。記録・整理・蓄えが地力になる。",
+  車騎星: "動いて勝つ流れ。即行動・営業・前進。スピードが武器。",
+  牽牛星: "誇りと信用の流れ。きちんと装い、責任ある立ち回りで評価が上がる。",
+  龍高星: "挑戦と学びの流れ。新しい世界・未知へ。型を破る一手が吉。",
+  玉堂星: "学び直す流れ。情報収集・知識の整理・じっくり思考が活きる。",
+};
+
+// 本人の日干 × その日の年柱/月柱/日柱 から、今動く主星を返す。出生情報が無ければ null。
+export function sanmeiUn(birth, dateISO) {
+  try {
+    if (!birth || !birth.date) return null;
+    const me = computeChart(birth).dayMaster;
+    const iso = dateISO || new Date().toISOString().slice(0, 10);
+    const tc = computeChart({ date: iso, time: "12:00" }); // その日の年・月・日柱
+    const mk = (pillar) => {
+      const stem = String(pillar).slice(0, 1);
+      const god = tenGod(me, stem);
+      const star = TEN_GOD_TO_STAR[god] || "貫索星";
+      const d = STAR_DESC[star] || {};
+      return { ganzhi: pillar, stem, god, star, emoji: d.emoji, title: d.title, move: STAR_MOVE[star] };
+    };
+    const rel = relationFor(FIVE[me], iso); // 五行ベースのスタンス/スコア（既存の波と整合）
+    return {
+      day: { ...mk(tc.dayPillar), stance: rel.stance, score: rel.score },
+      month: mk(tc.monthPillar),
+      year: mk(tc.yearPillar),
+    };
+  } catch { return null; }
+}
