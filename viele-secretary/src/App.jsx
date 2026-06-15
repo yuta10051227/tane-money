@@ -2206,7 +2206,6 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
           <Acc
             title="算命学・人体星図（あなたの星）"
             color={C.purple}
-            defaultOpen
             badge={<span style={{ fontSize: 12, color: C.purple, fontWeight: 700 }}>{detail.center.emoji}{detail.center.star}</span>}
           >
             <div style={{ fontSize: 13, color: C.faint, marginBottom: 4 }}>人体星図 = 生年月日から出す"心の設計図"　／　中心星・主星 = あなたの本質を表す星</div>
@@ -2250,8 +2249,9 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 
       {birth && birth.date && (
         <>
+          <div style={{ fontSize: 11, color: C.faint, letterSpacing: 1, textAlign: "center", borderTop: `1px solid ${C.line}`, padding: "10px 0 4px", marginTop: 6 }}>── AI詳細鑑定（仕事運・金運など）──</div>
           {t.theme && (
-            <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>} defaultOpen>
+            <Acc title="今日" badge={<span style={{ color: C.accent, fontSize: 14 }}>{stars(t.score)}</span>}>
               <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{t.theme}</div>
               <Line label="仕事運" value={t.work} color={C.green} />
               <Line label="金運" value={t.money} color={C.accent} />
