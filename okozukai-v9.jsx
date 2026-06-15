@@ -7118,14 +7118,14 @@ function TipsSection({ageMode,child,data,update}){
   return(<div style={{padding:"12px 16px"}}>
     <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:20}}>💡</span>
-      <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:TEXT}}>まめちしき</div><div style={{color:MUTED,fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
-      <div style={{background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
-        <div style={{fontWeight:900,fontSize:14,color:G}}>{totalRead}<span style={{fontSize:11,color:MUTED}}>/{ALL_TIPS.length}</span></div>
-        <div style={{fontSize:11,color:MUTED}}>読了</div>
+      <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:"#fff"}}>まめちしき</div><div style={{color:"rgba(255,255,255,0.55)",fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
+      <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
+        <div style={{fontWeight:900,fontSize:14,color:GP}}>{totalRead}<span style={{fontSize:11,color:TEXTS}}>/{ALL_TIPS.length}</span></div>
+        <div style={{fontSize:11,color:TEXTS}}>読了</div>
       </div>
     </div>
-    <div style={{background:`${Y}15`,border:`1.5px solid ${Y}`,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <span style={{fontSize:12,color:TEXT,fontWeight:700}}>📚 読んで獲得したpt</span>
+    <div style={{background:GOLDS,border:`1.5px solid ${Y}`,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{fontSize:12,color:"#7a5a00",fontWeight:700}}>📚 読んで獲得したpt</span>
       <span style={{fontWeight:900,fontSize:15,color:Y}}>+{(totalRead*TIP_PTS).toLocaleString()}pt</span>
     </div>
     <div style={{marginBottom:14}}><SortBar options={cats.filter(c=>ageCats?ageCats.includes(c)||c==="すべて":true).map(c=>[c,c])} value={cat} onChange={setCat}/></div>
@@ -7133,7 +7133,7 @@ function TipsSection({ageMode,child,data,update}){
       const isOpen=openId===tip.id;
       const isRead=readIds.includes(tip.id);
       return(<button key={tip.id} onClick={()=>handleOpen(tip.id)}
-        style={{width:"100%",background:isOpen?`${B}10`:isRead?`${G}08`:CARD,border:`1.5px solid ${isOpen?B:isRead?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:8,textAlign:"left",cursor:"pointer",fontFamily:F,transition:"all .2s"}}>
+        style={{width:"100%",background:isOpen?BS:isRead?GS:CARD,border:`1.5px solid ${isOpen?B:isRead?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:8,textAlign:"left",cursor:"pointer",fontFamily:F,transition:"all .2s"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:22,flexShrink:0}}>{tip.emoji}</span>
           <div style={{flex:1}}>
