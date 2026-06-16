@@ -572,6 +572,13 @@ const CAT_LINES = [
 ];
 
 const HIDDEN_MONSTERS = [
+  // ── どうぶつの仲間(2コマアニメ・すがたに装備可)。spriteフィールド=gacha_gs_*_a/b.png ──
+  { id:"gs_risu", name:"コインリス", rarity:3, need:30, sprite:"risu",
+    desc:"コツコツ貯金が大すきなリス。木の実みたいにコインをためる。",
+    edu:"リスが木の実をためるように、お金も少しずつコツコツ貯めると、いつのまにか大きく育つ。" },
+  { id:"gs_pig",  name:"ブタコ",     rarity:3, need:50, sprite:"pig",
+    desc:"おなかにコインをためる、貯金箱のブタ。",
+    edu:"貯金箱は『いま使わないお金』をためておく入れもの。少しずつでも、気づけば大きな額になる。" },
   // ── 新収録「黄金の系譜」(お金×成長×自然×伝説×歴史) ＋ 既存隠し ──
   { id:"mameko", name:"マメコ",        rarity:4, need:40,
     desc:"一枚の金貨から生まれた妖精。みんなの貯金が大すき。",
@@ -1226,15 +1233,6 @@ const GACHA_ITEMS = [
   {id:"gm_eur", tierId:"gc2",setId:"s01",emoji:"💶",name:"ユーロ", desc:"ヨーロッパのお金",   edu:"ヨーロッパの たくさんの くにが おなじ ユーロを つかう"},
   {id:"gm_koban",tierId:"gc3",setId:"s01",emoji:"🟡",name:"小判",  desc:"江戸のきんか",       edu:"小判は 江戸じだいの きんか。おさむらいが つかった お金"},
   {id:"gm_oban", tierId:"gc4",setId:"s01",emoji:"🟡",name:"大判",  desc:"でっかいきんか",     edu:"大判は とても 大きな きんか。むかしの さいこうきゅうの お金"},
-  // ── 第2弾「ひみつの仲間 図鑑」(setId:s02) どうぶつの仲間がお金を おしえてくれる ──
-  {id:"gs_risu",  tierId:"gc1",setId:"s02",emoji:"🐿",name:"コインリス",   desc:"コツコツやさん",     edu:"リスが 木の実を ためるように コインを コツコツ ためよう"},
-  {id:"gs_pig",   tierId:"gc1",setId:"s02",emoji:"🐷",name:"ブタコ",       desc:"ちょきんばこの精",   edu:"おなかに コインを ためる ちょきんばこ。すこしずつが だいじ"},
-  {id:"gs_cat",   tierId:"gc1",setId:"s02",emoji:"🐱",name:"まねきネコ",   desc:"えんぎのネコ",       edu:"ふくを よぶ ネコ。でも うんに たよりすぎないのが かしこい"},
-  {id:"gs_hari",  tierId:"gc1",setId:"s02",emoji:"🦔",name:"ハリーくん",   desc:"だいじにやさん",     edu:"ハリに たからを さして だいじに する ハリネズミ"},
-  {id:"gs_fox",   tierId:"gc2",setId:"s02",emoji:"🦊",name:"きんギツネ",   desc:"かしこいキツネ",     edu:"よく かんがえて かしこく つかう。むだづかいを しない"},
-  {id:"gs_owl",   tierId:"gc2",setId:"s02",emoji:"🦉",name:"フクロウ博士", desc:"もの知りフクロウ",   edu:"けいかくを たてて つかうと お金が もっと いきる"},
-  {id:"gs_dragon",tierId:"gc3",setId:"s02",emoji:"🐲",name:"たからリュウ", desc:"たからのまもり",     edu:"たからを まもる りゅう。たいせつに する こころが ほんとうの たから"},
-  {id:"gs_lion",  tierId:"gc4",setId:"s02",emoji:"🦁",name:"こがね獅子",   desc:"でんせつのまもりがみ",edu:"金の しし。ねばり強く つづける ものに たからが やってくる"},
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -3541,9 +3539,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     <div key={h.id}
                       onClick={()=>{ if(unlocked) update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:equipped?null:h.id}})); }}
                       style={{borderRadius:12,padding:"8px 4px",textAlign:"center",background:equipped?GS:CARD,border:equipped?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.85}}>
-                      <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
-                        style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
-                        onError={e=>{e.target.style.visibility="hidden"}}/>
+                      {h.sprite
+                        ? <div style={{position:"relative",width:50,height:50,margin:"0 auto 3px",filter:unlocked?"none":"brightness(0)"}}>
+                            <img src={`/assets/gacha_gs_${h.sprite}_b.png`} alt={unlocked?h.name:"???"} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.visibility="hidden"}}/>
+                            <img src={`/assets/gacha_gs_${h.sprite}_a.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"gsBlink .9s steps(1,start) infinite"}} onError={e=>{e.target.style.display="none"}}/>
+                          </div>
+                        : <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
+                            style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
+                            onError={e=>{e.target.style.visibility="hidden"}}/>}
                       <div style={{fontSize:11,fontWeight:800,color:unlocked?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                         {unlocked?h.name:"???"}
                       </div>
@@ -3557,6 +3560,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   );
                 })}
               </div>
+              <style>{`@keyframes gsBlink{0%{opacity:1}49.9%{opacity:1}50%{opacity:0}99.9%{opacity:0}100%{opacity:1}}`}</style>
               {(()=>{const eq=HIDDEN_MONSTERS.find(h=>h.need<=totalDoneMon && (data.monsterSkin||{})[child.id]===h.id);return eq?(
                 <div style={{marginTop:8,fontSize:11,color:TEXTS,lineHeight:1.6,background:CARDS,borderRadius:10,padding:"8px 10px"}}>
                   <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{eq.name}</div>
@@ -5716,7 +5720,11 @@ function SeedMonster({ child, data, size=90, update }) {
   const fIdx           = hatching ? (3 + Math.floor(frame/2) % 3)
                        : multiFront ? Math.floor(frame / 3) % frontFrames
                        : Math.floor(frame / 5) % 2;
-  const imgSrc         = (multiFront || hatching)
+  // どうぶつ仲間スキン(gacha_gs_*)は2コマ(a/b)でぴょこぴょこ
+  const gsSkin         = skinActive && skinDef && skinDef.sprite ? skinDef.sprite : null;
+  const imgSrc         = gsSkin
+    ? `/assets/gacha_gs_${gsSkin}_${(Math.floor(frame/6)%2)?"b":"a"}.png`
+    : (multiFront || hatching)
     ? `/assets/monster_${dispId}_f${fIdx}.png`
     : `/assets/monster_${dispId}_side_f${fIdx}.png`;
 
