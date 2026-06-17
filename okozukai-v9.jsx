@@ -1256,6 +1256,13 @@ const GACHA_ITEMS = [
 // ═══════════════════════════════════════════════════════
 // GACHA ANIMATION
 // ═══════════════════════════════════════════════════════
+// ドット絵アイコン共通部品(画像が無ければ絵文字fbにフォールバック)
+function Ico({name,size=20,fb,style}){
+  return <img src={`/assets/icon_${name}.png`} alt="" draggable="false"
+    onError={fb?e=>{const s=document.createElement("span");s.textContent=fb;s.style.fontSize=Math.round(size*0.92)+"px";s.style.lineHeight="1";e.target.replaceWith(s);}:e=>{e.target.style.display="none";}}
+    style={{width:size,height:size,objectFit:"contain",imageRendering:"pixelated",verticalAlign:"middle",display:"inline-block",...style}}/>;
+}
+
 function GachaAnim({ result, onClose }) {
   const theme = result.theme || getMonthTheme();
   const isSuper = result.rate <= 3;             // 激レア(虹)
@@ -2789,12 +2796,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,200,0,0.2)",color:"#fde68a",padding:"2px 7px",borderRadius:999,fontWeight:700}}>🔥 {curStreak}日</span>}
               </div>
             </div>
-            <button onClick={()=>setShowTransfer(true)} style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
+            <button onClick={()=>setShowTransfer(true)} style={{background:"rgba(255,255,255,0.18)",border:"1.5px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"8px 14px",color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
           </div>
           {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
             <div style={{marginTop:10}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,0.6)",marginBottom:5,fontWeight:700}}>
-                <span>🎯 {ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
+                <span><Ico name="target" fb="🎯" size={13} style={{marginRight:3}}/>{ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
               </div>
               <div style={{height:7,borderRadius:999,background:"rgba(255,255,255,0.16)",overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:`linear-gradient(90deg,${G},#4ade80)`,transition:"width .4s"}}/>
@@ -2861,7 +2868,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>今月</span>
               <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
-              <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>💸 おくる</button>
+              <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
           </div>
           <SeedMonster child={child} data={data} size={100} update={update}/>
@@ -2870,7 +2877,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
           <div style={{padding:"0 20px 16px",position:"relative",zIndex:2}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,0.55)",marginBottom:5,fontWeight:700}}>
-              <span>🎯 {ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
+              <span><Ico name="target" fb="🎯" size={13} style={{marginRight:3}}/>{ag.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt`:"たっせい！🎉"}</span>
             </div>
             <div style={{height:7,borderRadius:999,background:"rgba(255,255,255,0.13)",overflow:"hidden"}}>
               <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:`linear-gradient(90deg,${G},#4ade80)`,transition:"width .4s"}}/>
@@ -2880,14 +2887,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 4ステータスグリッド */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
           {[
-            ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう"],
-            ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう"],
-            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう"],
-            ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう"],
-          ].map(([e,l,v,c,tabTarget,hint])=>(
+            ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう","flame"],
+            ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう","clipboard"],
+            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう","chartup"],
+            ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう","medal"],
+          ].map(([e,l,v,c,tabTarget,hint,ic])=>(
             <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
               style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
-              <div style={{fontSize:18,marginBottom:3}}>{e}</div>
+              <div style={{marginBottom:3}}><Ico name={ic} fb={e} size={24}/></div>
               <div style={{color:"rgba(255,255,255,0.35)",fontSize:11,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
               {v ? (
                 <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
