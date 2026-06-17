@@ -1550,12 +1550,22 @@ function DailyTasks({ child, data, update }) {
     } catch(e) { return []; }
   })();
   const activeSet = activeSets[0] || null;   // 後方互換(ヘッダ表示等)
-  // 2セットのタスクを結合。完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
-  const tasks = activeSets.length
-    ? activeSets.flatMap(s => (Array.isArray(s.tasks)?s.tasks:[]).map(t =>
-        ({...t, _k:`${s.id}::${t.id}`, _setId:s.id, _setName:s.name, _setEmoji:s.emoji})))
+  // 平日/休日タブ: 1セットずつ表示。今日に合うセットを自動選択(手動でも切替可)
+  const _isWeekend = [0,6].includes(new Date().getDay());
+  const _pickToday = () => {
+    const wk  = activeSets.find(s=>(s.name||"").includes("平日"));
+    const hol = activeSets.find(s=>/休|週末|土日/.test(s.name||""));
+    return ((_isWeekend ? (hol||wk) : (wk||hol)) || activeSets[0] || {}).id || null;
+  };
+  const [selSetId, setSelSetId] = useState(null);
+  const selId   = (selSetId && activeSets.some(s=>s.id===selSetId)) ? selSetId : _pickToday();
+  const viewSet = activeSets.find(s=>s.id===selId) || activeSets[0] || null;
+  // 完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
+  const tasks = viewSet
+    ? (Array.isArray(viewSet.tasks)?viewSet.tasks:[]).map(t =>
+        ({...t, _k:`${viewSet.id}::${t.id}`, _setId:viewSet.id, _setName:viewSet.name, _setEmoji:viewSet.emoji}))
     : (data.dailyTasks || []).map(t => ({...t, _k:t.id, _setId:"", _setName:"", _setEmoji:""}));
-  const bonusTotal = activeSets.reduce((sum,s)=>sum+(s.bonus??0), 0) || (activeSets.length?0:(data.dailyBonus??50));
+  const bonusTotal = viewSet ? (viewSet.bonus??0) : (data.dailyBonus??50);
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
   const [justDone, setJustDone] = useState({});
@@ -1590,7 +1600,7 @@ function DailyTasks({ child, data, update }) {
   const bonusKey  = s => `__bonus__::${s.id}`;
   const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
     tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
-  const allBonusGiven = activeSets.length>0 && activeSets.every(s => !s.bonus || prog[bonusKey(s)]);
+  const allBonusGiven = viewSet ? (!viewSet.bonus || !!prog[bonusKey(viewSet)]) : true;
   // 開閉: 既定は「未完なら開く・全部できたら畳む」。タップで手動上書き。
   const open = openOverride !== null ? openOverride : !allDone;
   const toggleOpen = () => setOpenOverride(!open);
@@ -1657,15 +1667,25 @@ function DailyTasks({ child, data, update }) {
 
       {/* Progress bar（タップで下のタスク一覧を開閉するヘッダー） */}
       <div onClick={toggleOpen} role="button" style={{background:CARD,border:`2px solid ${allDone?"#34c77b":BORDER}`,borderRadius:18,padding:16,marginBottom:14,cursor:"pointer",userSelect:"none"}}>
-        {/* アクティブセット名（最大2つ） */}
-        {activeSets.length>0&&<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-          {activeSets.map(s=>(
-            <span key={s.id} style={{display:"inline-flex",alignItems:"center",gap:4,background:`${P}12`,borderRadius:10,padding:"2px 8px"}}>
-              <span style={{fontSize:14}}>{s.emoji}</span>
-              <span style={{fontWeight:800,fontSize:11,color:P}}>{s.name}</span>
+        {/* 平日/休日タブ(2セット以上で切替・タップで選択。今日に合うセットを自動選択) */}
+        {activeSets.length>1 ? (
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+            {activeSets.map(s=>{const sel=s.id===selId;const sdone=setDoneIn(s,prog);return(
+              <button key={s.id} onClick={(e)=>{e.stopPropagation();setSelSetId(s.id);}}
+                style={{display:"inline-flex",alignItems:"center",gap:4,background:sel?GP:`${P}10`,border:`1.5px solid ${sel?GP:"transparent"}`,borderRadius:999,padding:"5px 13px",cursor:"pointer",fontFamily:F}}>
+                <span style={{fontSize:14}}>{s.emoji}</span>
+                <span style={{fontWeight:800,fontSize:12,color:sel?"#fff":P}}>{s.name}</span>
+                {sdone&&<span style={{fontSize:11,fontWeight:900,color:sel?"#fff":G}}>✓</span>}
+              </button>);})}
+          </div>
+        ) : activeSets.length===1 ? (
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+            <span style={{display:"inline-flex",alignItems:"center",gap:4,background:`${P}12`,borderRadius:10,padding:"2px 8px"}}>
+              <span style={{fontSize:14}}>{activeSets[0].emoji}</span>
+              <span style={{fontWeight:800,fontSize:11,color:P}}>{activeSets[0].name}</span>
             </span>
-          ))}
-        </div>}
+          </div>
+        ) : null}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <p style={{fontWeight:900,fontSize:14,margin:0,color:allDone?G:TEXT}}>
             {allDone ? "🌟 今日は全部できた！" : "📋 今日のやること"}
@@ -1694,7 +1714,7 @@ function DailyTasks({ child, data, update }) {
       {tasks.map((t,i) => {
         const done = isDone(t);
         const count = isCheck(t) ? null : (prog[t._k]||0);
-        const showHeader = activeSets.length>1 && (i===0 || tasks[i-1]._setId!==t._setId);
+        const showHeader = false; // 平日/休日はタブで切替表示するため、一覧内の見出しは不要
         return (
           <React.Fragment key={t._k}>
           {showHeader&&(
