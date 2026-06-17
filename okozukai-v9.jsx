@@ -1163,7 +1163,7 @@ function PinPad({ title, emoji, hint, check, onOk, onBack, extra }) {
   return (
     <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:F,padding:24,position:"relative"}}>
       <button onClick={onBack} style={{position:"absolute",top:20,left:20,background:"none",border:"none",fontSize:28,cursor:"pointer",color:MUTED}}>‹</button>
-      <div style={{fontSize:52,marginBottom:6}}>{emoji}</div>
+      <div style={{marginBottom:6}}><Emo e={emoji} size={52}/></div>
       <h2 style={{color:TEXT,fontSize:20,fontWeight:800,margin:"0 0 4px"}}>{title}</h2>
       {hint && <p style={{color:MUTED,fontSize:11,margin:"0 0 20px",textAlign:"center",maxWidth:260}}>{hint}</p>}
       <div style={{display:"flex",gap:14,marginBottom:28,animation:shake?"shk .5s":undefined}}>
@@ -1263,6 +1263,12 @@ function Ico({name,size=20,fb,style}){
   return <img src={`/assets/icon_${name}.png`} alt="" draggable="false"
     onError={fb?e=>{const s=document.createElement("span");s.textContent=fb;s.style.fontSize=Math.round(size*0.92)+"px";s.style.lineHeight="1";e.target.replaceWith(s);}:e=>{e.target.style.display="none";}}
     style={{width:size,height:size,objectFit:"contain",imageRendering:"pixelated",verticalAlign:"middle",display:"inline-block",...style}}/>;
+}
+
+// 絵文字 or ドット絵アイコン(値が "ico:name" ならアイコン画像)を出し分ける共通レンダラ
+function Emo({e,size=20,style}){
+  if(typeof e==="string" && e.startsWith("ico:")) return <Ico name={e.slice(4)} size={size} fb="🙂" style={style}/>;
+  return <span style={{fontSize:size,lineHeight:1,...style}}>{e}</span>;
 }
 
 function GachaAnim({ result, onClose }) {
@@ -2232,7 +2238,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   const interest=data.interestEnabled&&b>0?Math.floor(b*(data.interestRate||0.05)):0;
                   return(
                     <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                      <span style={{fontSize:18}}>{m.emoji}</span>
+                      <Emo e={m.emoji} size={18}/>
                       <div style={{flex:1,fontWeight:700,fontSize:12,color:TEXT}}>{m.name}</div>
                       <div style={{fontSize:12,color:MUTED}}>{b.toLocaleString()}pt</div>
                       <div style={{fontSize:12,fontWeight:700,color:interest>0?G:MUTED}}>
@@ -2252,7 +2258,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 if(!m) return null;
                 return(
                   <div key={m.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                    <span style={{fontSize:24}}>{m.emoji}</span>
+                    <Emo e={m.emoji} size={24}/>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
                       <div style={{color:MUTED,fontSize:11}}>PIN: {'*'.repeat(4)}</div>
@@ -2808,7 +2814,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
-              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2}}>{child.emoji} {child.name}</div>
+              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
               <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
                 <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
                 <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
@@ -2883,7 +2889,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 残高表示 */}
         <div style={{padding:"20px 20px 18px",position:"relative",zIndex:2,display:"flex",alignItems:"center",gap:12}}>
           <div style={{flex:1}}>
-            <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}>{child.emoji} {child.name}</div>
+            <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
             <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
@@ -4643,7 +4649,7 @@ function ParentScreen({ data, update, onBack }) {
       <div style={{minHeight:"100vh",background:BG,fontFamily:F}}>
         <div style={{background:TEXT,padding:"14px 18px",display:"flex",alignItems:"center",gap:12}}>
           <button onClick={()=>setKChild(null)} style={{background:"none",border:"none",color:MUTED,fontSize:26,cursor:"pointer"}}>‹</button>
-          <span style={{fontSize:22}}>{child.emoji}</span>
+          <Emo e={child.emoji} size={22}/>
           <span style={{color:Y,fontSize:17,fontWeight:900}}>{child.name}の家計簿</span>
         </div>
         <ChildScreen child={child} data={data} update={update} onBack={()=>setKChild(null)}/>
@@ -4724,7 +4730,7 @@ function ParentScreen({ data, update, onBack }) {
           {data.children.map(child=>(
             <div key={child.id} style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:20,padding:16,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                <span style={{fontSize:34}}>{child.emoji}</span>
+                <Emo e={child.emoji} size={34}/>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:15}}>{child.name} <span style={{background:`${P}20`,color:P,fontSize:11,fontWeight:700,padding:"2px 6px",borderRadius:8}}>{AGE_MODES[child.ageMode||"middle"].label}</span></div>
                   <div style={{fontWeight:900,fontSize:24,color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</div>
@@ -4753,7 +4759,7 @@ function ParentScreen({ data, update, onBack }) {
               const streak=data.streak?.[child.id]?.cur||0;
               return (
                 <div key={child.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
-                  <span style={{fontSize:24}}>{child.emoji}</span>
+                  <Emo e={child.emoji} size={24}/>
                   <span style={{fontWeight:700,fontSize:14,flex:1}}>{child.name}</span>
                   <div style={{textAlign:"right",fontSize:12}}>
                     <div style={{color:G,fontWeight:700}}>お手伝い +{earned}pt</div>
@@ -4811,13 +4817,23 @@ function ParentScreen({ data, update, onBack }) {
                       </label>
                     </div>
                     <div style={{flex:1}}>
-                      <p style={{color:MUTED,fontSize:11,margin:"0 0 4px"}}>絵文字（写真がない場合）</p>
+                      <p style={{color:MUTED,fontSize:11,margin:"0 0 4px"}}>絵文字 / アバター（写真がない場合）</p>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <input value={editChild.emoji} onChange={e=>setEditChild(c=>({...c,emoji:e.target.value}))} style={{...INP,width:60}}/>
+                        <input value={(editChild.emoji||"").startsWith("ico:")?"":editChild.emoji} placeholder="絵文字" onChange={e=>setEditChild(c=>({...c,emoji:e.target.value}))} style={{...INP,width:60}}/>
                         {editChild.avatar&&<button onClick={()=>setEditChild(c=>({...c,avatar:undefined}))}
                           style={{padding:"5px 9px",border:`1px solid ${R}`,borderRadius:8,background:"transparent",color:R,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>
                           写真を削除
                         </button>}
+                      </div>
+                      <p style={{color:MUTED,fontSize:11,margin:"8px 0 4px"}}>ドット絵アバターから選ぶ</p>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {["dad","mom","boy","girl","toddler","baby","grandpa","grandma"].map(av=>{
+                          const sel=editChild.emoji===`ico:${av}`;
+                          return <button key={av} onClick={()=>setEditChild(c=>({...c,emoji:`ico:${av}`}))}
+                            style={{width:42,height:42,borderRadius:10,border:`2px solid ${sel?GP:BORDER}`,background:sel?GS:CARD,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",padding:0}}>
+                            <Ico name={av} size={32}/>
+                          </button>;
+                        })}
                       </div>
                     </div>
                   </div>
@@ -4912,7 +4928,7 @@ function ParentScreen({ data, update, onBack }) {
                 <p style={{color:MUTED,fontSize:12,margin:"0 0 16px"}}>こどもごとに金額を個別設定（空欄=デフォルト {overModal.task.pts}円）</p>
                 {data.children.map(child=>(
                   <div key={child.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-                    <span style={{fontSize:20}}>{child.emoji}</span>
+                    <Emo e={child.emoji} size={20}/>
                     <span style={{fontWeight:700,fontSize:14,flex:1}}>{child.name}</span>
                     <input type="number" placeholder={`${overModal.task.pts}`}
                       value={overModal.task.over?.[child.id]??""} onChange={e=>setOver(overModal.task.id,overModal.kind,child.id,e.target.value)}
@@ -5030,7 +5046,7 @@ function ParentScreen({ data, update, onBack }) {
           {data.children.map(child=>(
             <button key={child.id} onClick={()=>setKChild(child.id)}
               style={{width:"100%",background:CARD,border:`2px solid ${BORDER}`,borderRadius:18,padding:"13px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:14,cursor:"pointer",textAlign:"left",fontFamily:F}}>
-              <span style={{fontSize:32}}>{child.emoji}</span>
+              <Emo e={child.emoji} size={32}/>
               <div style={{flex:1}}>
                 <div style={{fontWeight:800,fontSize:15}}>{child.name}</div>
                 <div style={{color:MUTED,fontSize:12}}>今月支出: {(data.expenses||[]).filter(e=>e.cid===child.id&&(e.date||"").startsWith(monthKey())).reduce((s,e)=>s+e.amt,0).toLocaleString()}pt</div>
@@ -5130,7 +5146,7 @@ function ParentScreen({ data, update, onBack }) {
             const done=data.gachaDate?.[child.id]===todayKey();
             return (
               <div key={child.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
-                <span style={{fontSize:26}}>{child.emoji}</span>
+                <Emo e={child.emoji} size={26}/>
                 <span style={{flex:1,fontWeight:700,fontSize:14}}>{child.name}</span>
                 <span style={{fontWeight:800,fontSize:12,color:done?G:MUTED}}>{done?"✅ 引き済み":"⏳ まだ"}</span>
               </div>
@@ -5168,7 +5184,7 @@ function ParentScreen({ data, update, onBack }) {
             const logs=data.logs.filter(l=>l.cid===child.id).slice(0,20);
             return (
               <div key={child.id} style={{marginBottom:24}}>
-                <p style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}>{child.emoji} {child.name}　<span style={{color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</span></p>
+                <p style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}><Emo e={child.emoji} size={13} style={{marginRight:3}}/>{child.name}　<span style={{color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</span></p>
                 {logs.map(l=>{
                   const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
                   return (
@@ -6235,7 +6251,7 @@ function PointTransferModal({ child, data, update, onClose }) {
         <div style={{background:GS,border:`2px solid ${G}`,borderRadius:18,padding:"20px 16px",marginBottom:20,textAlign:"center"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:14}}>
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:30,lineHeight:1}}>{child.emoji}</div>
+              <div style={{lineHeight:1}}><Emo e={child.emoji} size={30}/></div>
               <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{child.name}</div>
               <div style={{fontSize:11,color:R,fontWeight:700}}>-{amt.toLocaleString()}pt</div>
             </div>
@@ -6291,7 +6307,7 @@ function PointTransferModal({ child, data, update, onClose }) {
                   cursor:"pointer",textAlign:"left",fontFamily:F,
                 }}>
                 <div style={{width:38,height:38,borderRadius:11,background:sel?GP:CARD,border:`1.5px solid ${sel?GP:BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                  {m.emoji}
+                  <Emo e={m.emoji} size={20}/>
                 </div>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:700,fontSize:14,color:TEXT}}>{m.name}</div>
@@ -6775,7 +6791,7 @@ function InvestTab({child,data,update}){
             <button onClick={()=>setShowShare(false)} style={{background:"rgba(255,255,255,0.08)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",color:"rgba(255,255,255,0.6)",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>✕</button>
           </div>
           <div style={{marginBottom:16}}>
-            <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,marginBottom:6}}>{child.emoji} {child.name} の投資ポートフォリオ</div>
+            <div style={{color:"rgba(255,255,255,0.4)",fontSize:11,marginBottom:6}}><Emo e={child.emoji} size={13} style={{marginRight:3}}/>{child.name} の投資ポートフォリオ</div>
             <div style={{display:"flex",alignItems:"flex-end",gap:6,marginBottom:4}}>
               <span style={{fontSize:34,fontWeight:900,lineHeight:1}}>{portfolioVal.toLocaleString()}</span>
               <span style={{fontSize:13,color:"#4a9eff",fontWeight:700,marginBottom:4}}>pt</span>
@@ -6824,7 +6840,7 @@ function InvestTab({child,data,update}){
           );})()}
           <button onClick={async()=>{
             const gainStr=portfolioGain>=0?`+${portfolioGain.toLocaleString()}`:portfolioGain.toLocaleString();
-            const txt=`${child.emoji} ${child.name}のポートフォリオ\n💰 ${portfolioVal.toLocaleString()}pt（損益: ${gainStr}pt）\n${myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);return st?`${st.emoji}${st.name}`:""}).filter(Boolean).join("・")}\n🌱 tane-money.vercel.app`;
+            const txt=`${(child.emoji||"").startsWith("ico:")?"🧒":child.emoji} ${child.name}のポートフォリオ\n💰 ${portfolioVal.toLocaleString()}pt（損益: ${gainStr}pt）\n${myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);return st?`${st.emoji}${st.name}`:""}).filter(Boolean).join("・")}\n🌱 tane-money.vercel.app`;
             if(navigator.share){try{await navigator.share({title:"TANE MONEY ポートフォリオ",text:txt});}catch(e){}}
             else{navigator.clipboard?.writeText(txt);setShareCopied(true);setTimeout(()=>setShareCopied(false),2500);}
           }} style={{width:"100%",background:shareCopied?"rgba(74,222,128,0.15)":"#4a9eff",border:shareCopied?"1px solid #4ade80":"none",borderRadius:14,padding:"12px",color:shareCopied?"#4ade80":"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,marginTop:8,transition:"all .3s"}}>
@@ -7232,7 +7248,7 @@ function TaskCustomizer({child,data,update,onClose}){
     <div style={{background:CARD,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:440,maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 -8px 40px #0004"}}>
       <div style={{padding:"18px 20px 12px",borderBottom:`1px solid ${BORDER}`}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-          <h3 style={{fontWeight:900,fontSize:17,margin:0,color:TEXT}}>{child.emoji} マイタスクリスト</h3>
+          <h3 style={{fontWeight:900,fontSize:17,margin:0,color:TEXT}}><Emo e={child.emoji} size={17} style={{marginRight:4}}/>マイタスクリスト</h3>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
         </div>
         <p style={{color:MUTED,fontSize:12,margin:"0 0 12px",lineHeight:1.6}}>自分が管理したいタスクをチェックしよう。</p>
