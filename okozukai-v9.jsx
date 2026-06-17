@@ -996,6 +996,8 @@ function migrate(d) {
 // HELPERS
 // ═══════════════════════════════════════════════════════
 const todayKey = () => { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
+// 期間(startDate/endDate)はtype="date"のゼロ埋め"YYYY-MM-DD"。比較はこちらで揃える(todayKeyはゼロ埋め無しなので文字列比較が壊れる)
+const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
 // ── 運用損益計算ヘルパー ──────────────────────────────
 // 手数料込みの実質損益率を計算
@@ -1531,8 +1533,9 @@ function DailyTasks({ child, data, update }) {
   const today  = todayKey();
   // アクティブセットを取得（最大2セットを同時に。期間チェック・null安全）
   const sets = data.dailyTaskSets || [];
+  const _todayISO = todayISO();
   const inWindow = s => !!s && s.active!==false &&
-    (!s.startDate || today >= s.startDate) && (!s.endDate || today <= s.endDate);
+    (!s.startDate || _todayISO >= s.startDate) && (!s.endDate || _todayISO <= s.endDate);
   const activeSets = (() => {
     try {
       if (sets.length === 0) return [];
@@ -3817,9 +3820,10 @@ function ParentDailyTab({data,update,sb}){
 
   // アクティブセットの自動判定（期間外なら非アクティブ）
   const getSetStatus = s => {
+    const t = todayISO();
     if(!s.active) return "off";
-    if(s.startDate && today < s.startDate) return "pending";
-    if(s.endDate   && today > s.endDate)   return "expired";
+    if(s.startDate && t < s.startDate) return "pending";
+    if(s.endDate   && t > s.endDate)   return "expired";
     return "active";
   };
   const statusLabel = {active:"● 配信中",pending:"⏳ 開始前",expired:"終了",off:"停止中"};
