@@ -1983,7 +1983,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
         {/* ヘッダー */}
         <div style={{padding:"20px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
           <div>
-            <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 2px"}}>⚙ 全体管理</h3>
+            <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 2px"}}><Ico name="gear" fb="⚙" size={17} style={{marginRight:5}}/>全体管理</h3>
             <p style={{color:MUTED,fontSize:11,margin:0}}>家族全員のポイント・タスクを管理</p>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:24,cursor:"pointer",color:MUTED}}>✕</button>
@@ -3183,7 +3183,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 return(<div style={{marginTop:10}}>
                   <button onClick={()=>setShowZukan(v=>!v)} style={{width:"100%",background:darkBG?"rgba(255,255,255,0.05)":CARDS,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:showZukan?"14px 14px 0 0":14,padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:15}}>📖</span>
+                      <Ico name="book" fb="📖" size={16}/>
                       <span style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.8)":TEXT}}>図鑑</span>
                       <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{zukanCount}/{GACHA_ITEMS.length}コンプリート</span>
                     </div>
@@ -3437,7 +3437,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="money" && monTab==="goals" && (
         <div style={{padding:"12px 16px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <p style={{color:MUTED,fontSize:13,fontWeight:800,margin:0}}>🎯 {young?"もくひょう":"貯金目標"}</p>
+            <p style={{color:MUTED,fontSize:13,fontWeight:800,margin:0}}><Ico name="target" fb="🎯" size={14} style={{marginRight:4}}/>{young?"もくひょう":"貯金目標"}</p>
             <Btn c={P} label="＋ 追加" onClick={()=>setGAdd(s=>!s)}/>
           </div>
           {myGoals.map(g=>{
@@ -3493,7 +3493,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             })}
           </div>
           <div style={{marginTop:14,background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:"11px 14px"}}>
-            <p style={{margin:0,fontSize:13,fontWeight:700}}>💰 いまの残高: <span style={{fontSize:16,color:G}}>{myBal.toLocaleString()}pt</span></p>
+            <p style={{margin:0,fontSize:13,fontWeight:700}}><Ico name="coin" fb="💰" size={15} style={{marginRight:4}}/>いまの残高: <span style={{fontSize:16,color:G}}>{myBal.toLocaleString()}pt</span></p>
           </div>
         </div>
       )}
@@ -3504,7 +3504,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div onClick={()=>setMoreOpen(o=>o==="zukan"?null:"zukan")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:18}}>📖</span>
+              <Ico name="book" fb="📖" size={18}/>
               <span style={{fontSize:13,fontWeight:700,color:TEXT}}>モンスター図鑑</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3566,7 +3566,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div onClick={()=>setMoreOpen(o=>o==="hidden"?null:"hidden")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:18}}>✨</span>
+              <Ico name="sparkle" fb="✨" size={18}/>
               <span style={{fontSize:13,fontWeight:700,color:TEXT}}>ひみつのなかま</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -3779,7 +3779,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{padding:16}}>
             <div style={{background:CARD,borderRadius:16,padding:"16px",border:`1px solid ${BORDER}`,boxShadow:"0 4px 16px rgba(24,35,29,0.06)"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                <span style={{fontSize:14}}>🏆</span>
+                <Ico name="trophy" fb="🏆" size={16}/>
                 <span style={{fontSize:12,fontWeight:700,color:TEXT}}>今月の活動ランキング</span>
               </div>
               <div style={{fontSize:11,color:MUTED,marginBottom:12}}>残高・投資損益は含みません。今月の活動ptで比較</div>
@@ -4393,7 +4393,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
           <div style={{background:CARD,borderRadius:18,padding:"16px",boxShadow:"0 4px 16px rgba(24,35,29,0.06)",border:`1px solid ${BORDER}`}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <span style={{fontSize:14}}>🏆</span>
+                <Ico name="trophy" fb="🏆" size={16}/>
                 <span style={{fontSize:11,fontWeight:700,color:TEXT}}>{METRICS.find(m=>m[0]===metric)?.[1]}ランキング</span>
               </div>
               <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>
@@ -4658,7 +4658,7 @@ function ParentScreen({ data, update, onBack }) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <button onClick={onBack} style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:TEXTS,boxShadow:"0 2px 8px rgba(24,35,29,0.05)"}}>‹</button>
           <div style={{fontFamily:FB,fontWeight:800,fontSize:14,color:GP,letterSpacing:.5}}>Tane Money</div>
-          <button onClick={()=>setTab("children")} style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:"0 2px 8px rgba(24,35,29,0.05)"}}>⚙</button>
+          <button onClick={()=>setTab("children")} style={{width:36,height:36,borderRadius:10,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:15,boxShadow:"0 2px 8px rgba(24,35,29,0.05)"}}><Ico name="gear" fb="⚙" size={18}/></button>
         </div>
         {/* 親自身の残高カード */}
         {(()=>{
@@ -7182,7 +7182,7 @@ function TipsSection({ageMode,child,data,update}){
       </div>
     </div>
     <div style={{background:GOLDS,border:`1.5px solid ${Y}`,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <span style={{fontSize:12,color:"#7a5a00",fontWeight:700}}>📚 読んで獲得したpt</span>
+      <span style={{fontSize:12,color:"#7a5a00",fontWeight:700}}><Ico name="books" fb="📚" size={14} style={{marginRight:4}}/>読んで獲得したpt</span>
       <span style={{fontWeight:900,fontSize:15,color:Y}}>+{(totalRead*TIP_PTS).toLocaleString()}pt</span>
     </div>
     <div style={{marginBottom:14}}><SortBar options={cats.filter(c=>ageCats?ageCats.includes(c)||c==="すべて":true).map(c=>[c,c])} value={cat} onChange={setCat}/></div>
@@ -7570,7 +7570,7 @@ function SetupWizard({ data, update, onComplete }) {
       {/* Step 3: 親参加 */}
       {step===3&&(
         <div style={{flex:1}}>
-          <div style={{fontSize:48,marginBottom:14}}>🏆</div>
+          <div style={{marginBottom:14}}><Ico name="trophy" fb="🏆" size={48}/></div>
           <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>親も参加しますか？</h2>
           <p style={{color:MUTED,fontSize:13,margin:"0 0 6px",lineHeight:1.6}}>
             子どもと一緒にポイントを貯めてランキングで競えます
@@ -7657,7 +7657,7 @@ function SetupWizard({ data, update, onComplete }) {
       {/* Step 5: 最初の目標 */}
       {step===5&&(
         <div style={{flex:1}}>
-          <div style={{fontSize:48,marginBottom:14}}>🎯</div>
+          <div style={{marginBottom:14}}><Ico name="target" fb="🎯" size={48}/></div>
           <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 6px"}}>はじめての目標を決めよう</h2>
           <p style={{color:MUTED,fontSize:13,margin:"0 0 16px",lineHeight:1.6}}>何のために貯める？<br/>スキップしてあとで設定もOK！</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:14}}>
