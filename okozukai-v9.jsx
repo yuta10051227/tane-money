@@ -2608,8 +2608,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayDone= data.gachaDate?.[child.id] === todayKey();
   const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
-  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayKey())).map(l=>l.rid));
-  const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayKey()));
+  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayISO())).map(l=>l.rid));
+  const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayISO()));
 
   // Apply interest on open
   useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
@@ -2675,7 +2675,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const theme = getMonthTheme();
     const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
     const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
-    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayKey())).length;
+    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
     const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
@@ -5787,7 +5787,13 @@ function SeedMonster({ child, data, size=90, update }) {
                        : Math.floor(frame / 5) % 2;
   // どうぶつ仲間スキン(gacha_gs_*)は2コマ(a/b)でぴょこぴょこ
   const gsSkin         = skinActive && skinDef && skinDef.sprite ? skinDef.sprite : null;
-  const imgSrc         = gsSkin
+  // ── サボり退化(一時的): 今日タップもタスクも無いと"サボりモン"に一時変身。タップ/タスクで即もとに戻る・進化や育てた度は失わない ──
+  const _caredTap  = ((data.monsterCare||{})[child.id]||{}).last === todayKey();
+  const _caredTask = myLogs.some(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO()));
+  const neglected  = !evolving && !hatching && monsterId!=="egg" && !_caredTap && !_caredTask;
+  const imgSrc         = neglected
+    ? `/assets/monster_neglect_${(Math.floor(frame/6)%2)?"b":"a"}.png`
+    : gsSkin
     ? `/assets/gacha_gs_${gsSkin}_${(Math.floor(frame/6)%2)?"b":"a"}.png`
     : (multiFront || hatching)
     ? `/assets/monster_${dispId}_f${fIdx}.png`
@@ -5978,6 +5984,14 @@ function SeedMonster({ child, data, size=90, update }) {
         </div>
       )}
 
+      {/* サボり中のふきだし(構ってよ〜) */}
+      {neglected && !speech && (
+        <div style={{position:"absolute",bottom:"100%",left:"50%",transform:"translateX(-50%)",marginBottom:6,background:"#fff",border:"2px solid #b08130",borderRadius:14,padding:"6px 12px",fontSize:12,fontWeight:800,color:"#7a5a00",whiteSpace:"nowrap",boxShadow:"0 4px 18px rgba(24,35,29,0.18)",zIndex:10,animation:"smPop .25s cubic-bezier(.34,1.56,.64,1)",pointerEvents:"none"}}>
+          くさ〜い…おせわして！
+          <div style={{position:"absolute",top:"100%",left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"7px solid transparent",borderRight:"7px solid transparent",borderTop:"8px solid #b08130"}}/>
+        </div>
+      )}
+
       {/* モンスター画像（デジモン風に横移動） */}
       <div style={{transform:`translateX(${walkX}px) scaleX(${multiFront?1:face})`,transition:"transform 1.8s ease-in-out",willChange:"transform"}}>
         <div style={{animation:evolving?"none":"monFloat 2.5s ease-in-out infinite"}} onClick={handleTap}>
@@ -5992,6 +6006,8 @@ function SeedMonster({ child, data, size=90, update }) {
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
+            {neglected && <span style={{position:"absolute",top:-4,right:-4,fontSize:Math.round(size*0.22),animation:"neglFly 1.4s ease-in-out infinite",pointerEvents:"none"}}>🪰</span>}
+            {neglected && <span style={{position:"absolute",top:-12,left:4,fontSize:Math.round(size*0.2),opacity:.75,animation:"neglStink 1.9s ease-in-out infinite",pointerEvents:"none"}}>💨</span>}
           </div>
         </div>
         <div style={{width:50,height:8,borderRadius:"50%",background:"rgba(0,0,0,0.15)",margin:"-4px auto 0",animation:"monShadow 2.5s ease-in-out infinite"}}/>
@@ -6094,6 +6110,8 @@ function SeedMonster({ child, data, size=90, update }) {
         @keyframes monFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
         @keyframes monBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
         @keyframes monShadow{0%,100%{transform:scaleX(1);opacity:.15}50%{transform:scaleX(.55);opacity:.07}}
+        @keyframes neglFly{0%,100%{transform:translate(0,0) rotate(-8deg)}50%{transform:translate(-6px,-5px) rotate(8deg)}}
+        @keyframes neglStink{0%{transform:translateY(2px) scale(.85);opacity:0}40%{opacity:.8}100%{transform:translateY(-14px) scale(1.1);opacity:0}}
         @keyframes evoPulse{0%,100%{box-shadow:0 0 14px rgba(251,191,36,0.8);transform:scale(1)}50%{box-shadow:0 0 26px rgba(251,191,36,1);transform:scale(1.07)}}
         @keyframes evoFlash{0%,100%{opacity:1}50%{opacity:0.3}}
       `}</style>
