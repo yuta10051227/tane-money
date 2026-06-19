@@ -2632,7 +2632,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const needApproval = fs.requireApproval && pts > 0;
     const alreadyPending = (data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);
     if(alreadyPending) return;
-    if(doneTodayIds.has(task.id)) return;
     setPressed(p=>({...p,[task.id]:true}));
     setTimeout(()=>setPressed(p=>{const n={...p};delete n[task.id];return n;}),500);
     if(needApproval) {
@@ -3305,7 +3304,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const isDone=doneTodayIds.has(t.id);return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isDone?CARDS:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isDone?BORDER:isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isDone?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative",opacity:isDone?0.6:1}}>{isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>✓ 完了</div>}{isPending&&!isDone&&<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&(l.date||"").startsWith(todayISO())).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
