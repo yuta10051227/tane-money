@@ -1533,6 +1533,142 @@ function GachaAnim({ result, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════
+// BATTLE MODE (野生CPUと対戦・育てた度で強くなる・勝利でガチャチケット)
+// ═══════════════════════════════════════════════════════
+const WILD_MONSTERS = [
+  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f"},
+  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff"},
+  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e"},
+  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0"},
+  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59"},
+  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f"},
+];
+function HPBar({label,hp,max,color}){
+  const pct=Math.max(0,Math.round(hp/max*100));
+  return (<div>
+    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:800,marginBottom:3}}><span>{label}</span><span>{Math.max(0,hp)}/{max}</span></div>
+    <div style={{height:12,borderRadius:999,background:"rgba(255,255,255,.15)",overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:pct>50?color:pct>20?"#f5c842":"#e0564f",borderRadius:999,transition:"width .4s"}}/></div>
+  </div>);
+}
+function BattleModal({child,data,update,onClose}){
+  const mon = getMonState(data,child);
+  const iv  = (data.monsterIV||{})[child.id] || {hp:5,atk:5,def:5};
+  const careDays = mon.careDays||0;
+  const pStage = mon.stage||0;
+  const pMaxHP = 60 + pStage*25 + (iv.hp||5)*4 + careDays*3;
+  const pATK   = 12 + pStage*5 + (iv.atk||5)*2 + Math.floor((mon.gauge||0)/4);
+  const pDEF   = 6  + pStage*3 + (iv.def||5)*2;
+  const pImg   = `/assets/monster_${mon.curId}_f0.png`;
+  const pName  = (data.monsterNickname||{})[child.id] || mon.def?.label || "あいぼう";
+  const [oppIdx,setOppIdx]=useState(0);
+  const opp = WILD_MONSTERS[oppIdx];
+  const oMaxHP = 50 + opp.lv*28;
+  const oATK   = 9 + opp.lv*5;
+  const oDEF   = 4 + opp.lv*3;
+  const [phase,setPhase]=useState("select");
+  const [pHP,setPHP]=useState(pMaxHP);
+  const [oHP,setOHP]=useState(oMaxHP);
+  const [turn,setTurn]=useState("player");
+  const [log,setLog]=useState("");
+  const [fx,setFx]=useState(null);
+  const [result,setResult]=useState(null);
+  const [reward,setReward]=useState(null);
+  const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
+  const start=(i)=>{ const o=WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setTurn("player"); setResult(null); setReward(null); setLog(`${o.name}が あらわれた！`); setPhase("fight"); };
+  const finish=(r)=>{
+    setResult(r); setPhase("result");
+    if(r==="win"){
+      const today=todayKey();
+      const lastWin=(data.battleWinDate||{})[child.id];
+      if(lastWin!==today){
+        setReward("ticket");
+        update(d=>({...d,
+          battleTickets:{...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1},
+          battleWinDate:{...(d.battleWinDate||{}),[child.id]:today}}));
+      } else setReward("none");
+    }
+  };
+  const oppAttack=()=>{
+    const d=dmgCalc(oATK,pDEF);
+    setFx({who:"player",dmg:d}); setTimeout(()=>setFx(null),500);
+    setPHP(ph=>{const np=Math.max(0,ph-d); if(np<=0) setTimeout(()=>finish("lose"),650); return np;});
+    setLog(`${opp.name}の こうげき！ ${d} ダメージ！`);
+    setTurn("player");
+  };
+  const playerAttack=()=>{
+    if(phase!=="fight"||turn!=="player"||result) return;
+    const d=dmgCalc(pATK,oDEF);
+    setFx({who:"opp",dmg:d}); setTimeout(()=>setFx(null),500);
+    const no=Math.max(0,oHP-d); setOHP(no); setLog(`${pName}の こうげき！ ${d} ダメージ！`);
+    if(no<=0){ setTimeout(()=>finish("win"),650); return; }
+    setTurn("opp"); setTimeout(oppAttack,950);
+  };
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"linear-gradient(180deg,#1a1530,#0a0815)",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{padding:"calc(12px + env(safe-area-inset-top)) 16px 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <span style={{color:"#fff",fontWeight:900,fontSize:16}}>⚔ バトル</span>
+        <button onClick={onClose} style={{background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,color:"#fff",padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
+      </div>
+      {phase==="select" && (
+        <div style={{flex:1,overflowY:"auto",padding:"4px 18px 30px"}}>
+          <div style={{textAlign:"center",color:"#fff",marginBottom:14}}>
+            <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
+            <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
+            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>HP {pMaxHP} · ⚔{pATK} · 🛡{pDEF}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:3}}>お手伝い・なでなで・進化で つよくなる！</div>
+          </div>
+          <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {WILD_MONSTERS.map((w,i)=>{
+              const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
+              const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
+              return <button key={i} onClick={()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
+                <div style={{fontSize:38}}>{w.emoji}</div>
+                <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
+                <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥つよい":""}</div>
+              </button>;
+            })}
+          </div>
+        </div>
+      )}
+      {(phase==="fight"||phase==="result") && (
+        <div style={{flex:1,display:"flex",flexDirection:"column",position:"relative"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            <div style={{width:"72%",maxWidth:250,marginBottom:8}}><HPBar label={opp.name} hp={oHP} max={oMaxHP} color={opp.color}/></div>
+            <div style={{fontSize:72,animation:fx?.who==="opp"?"btShake .4s":"none"}}>{opp.emoji}</div>
+            {fx?.who==="opp"&&<div style={{position:"absolute",top:"34%",fontSize:32,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{fx.dmg}</div>}
+          </div>
+          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            {fx?.who==="player"&&<div style={{position:"absolute",top:"6%",fontSize:32,fontWeight:900,color:"#ff6a6a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{fx.dmg}</div>}
+            <img src={pImg} style={{width:110,height:110,objectFit:"contain",imageRendering:"pixelated",animation:fx?.who==="player"?"btShake .4s":"none"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
+            <div style={{width:"72%",maxWidth:250,marginTop:8}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
+          </div>
+          <div style={{padding:"10px 18px calc(18px + env(safe-area-inset-bottom))",background:"rgba(0,0,0,.3)"}}>
+            <div style={{color:"#fff",fontSize:13,fontWeight:700,textAlign:"center",minHeight:20,marginBottom:10}}>{log}</div>
+            {phase==="fight" && !result && (
+              <button onClick={playerAttack} disabled={turn!=="player"} style={{width:"100%",background:turn==="player"?"#ff7a59":"rgba(255,255,255,.15)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:900,fontSize:17,cursor:turn==="player"?"pointer":"default",fontFamily:F}}>{turn==="player"?"こうげき！⚔":"あいての ターン…"}</button>
+            )}
+            {result && (
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:22,fontWeight:900,color:result==="win"?"#ffd24a":"#fff",marginBottom:6}}>{result==="win"?"🎉 かった！":"つよかった…！"}</div>
+                {result==="win"&&reward==="ticket"&&<div style={{color:"#bff0c8",fontSize:13,fontWeight:800,marginBottom:10}}>🎟 ガチャチケットを 1まい もらった！</div>}
+                {result==="win"&&reward==="none"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>きょうのチケットは もうもらったよ（また あした）</div>}
+                {result==="lose"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>もっと お世話して つよくなろう！</div>}
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={()=>setPhase("select")} style={{flex:1,background:"rgba(255,255,255,.15)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,cursor:"pointer",fontFamily:F}}>もういちど</button>
+                  <button onClick={onClose} style={{flex:1,background:"#34C77B",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,cursor:"pointer",fontFamily:F}}>おわる</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes btShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}@keyframes btDmg{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:1;transform:scale(1.25)}100%{transform:translateY(-34px);opacity:0}}`}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 // DAILY TASKS
 // ═══════════════════════════════════════════════════════
 function DailyTasks({ child, data, update }) {
@@ -2597,6 +2733,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showZukan, setShowZukan] = useState(false);
+  const [showBattle, setShowBattle] = useState(false);
 
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
@@ -2662,8 +2799,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     }
   };
 
+  const hasTicket = (data.battleTickets?.[child.id]||0) > 0;
   const doGacha = () => {
-    if (todayDone && !gachaTest) return;
+    const useTicket = todayDone && !gachaTest && hasTicket;
+    if (todayDone && !gachaTest && !hasTicket) return;
     let res = rollGacha(data.gacha);
     // 連続日数で「がんばりが報われる」確定演出（7日でSR以上・30日で激レア確定）
     const _gf = (id)=> (data.gacha||[]).find(g=>g.id===id);
@@ -2688,8 +2827,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     update(d => ({
       ...d,
       logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
-      gachaDate: {...(d.gachaDate||{}), [child.id]: today},
-      streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }},
+      // チケット使用時は当日記録(gachaDate/streak)を変えず、チケットを1枚消費
+      ...(useTicket
+        ? { battleTickets: {...(d.battleTickets||{}), [child.id]: Math.max(0,(d.battleTickets?.[child.id]||0)-1)} }
+        : { gachaDate: {...(d.gachaDate||{}), [child.id]: today},
+            streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }} }),
       gachaCollection: collItem ? {...(d.gachaCollection||{}), [child.id]: {...(d.gachaCollection?.[child.id]||{}), [collItem.id]:((d.gachaCollection?.[child.id]?.[collItem.id]||0)+1)}} : (d.gachaCollection||{}),
     }));
   };
@@ -3012,6 +3154,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Gacha anim */}
       {gachaRes && <GachaAnim result={gachaRes} onClose={()=>setGachaRes(null)}/>}
+      {showBattle && <BattleModal child={child} data={data} update={update} onClose={()=>setShowBattle(false)}/>}
 
       {/* Reward confirm */}
       {rewardPop && (
@@ -3038,7 +3181,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && <>
         {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
         {(()=>{ const ft=getMonthTheme(); return (
-          <button onClick={()=>{ if(!todayDone||gachaTest) doGacha(); }} disabled={todayDone&&!gachaTest} aria-label="デイリーガチャ"
+          <button onClick={()=>{ if(!todayDone||gachaTest||hasTicket) doGacha(); }} disabled={todayDone&&!gachaTest&&!hasTicket} aria-label="デイリーガチャ"
             style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
               border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
               background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
@@ -3149,7 +3292,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
-                <button onClick={doGacha} disabled={todayDone&&!gachaTest}
+                <button onClick={doGacha} disabled={todayDone&&!gachaTest&&!hasTicket}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
                     fontSize:28,cursor:todayDone?"default":"pointer",
@@ -3172,6 +3315,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
+              {hasTicket&&<div style={{marginTop:6,fontSize:11,color:"#bff0c8",fontWeight:800}}>🎟 ガチャチケット {data.battleTickets[child.id]}まい！ガチャを もう1回ひけるよ</div>}
+              <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                   <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
