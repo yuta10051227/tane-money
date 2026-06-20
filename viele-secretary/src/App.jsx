@@ -652,7 +652,7 @@ function tripStanceHint(rel, dleft, template) {
   return { color: C.accent, text: "本番は整える日。淡々と予定通りに進めるのが吉。" };
 }
 
-function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem }) {
+function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddItem, onEditItem, onRemoveItem, usage }) {
   // 各予定の本番日＋各手配の締切日の「気」をまとめて計算（命式計算は1回だけ・出生情報がある時のみ）
   const stances = useMemo(() => {
     if (!(birth && birth.date)) return {};
@@ -677,7 +677,7 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
   const saveItem = () => { if (ie.label.trim()) onEditItem(editItem.tripId, editItem.idx, { label: ie.label.trim(), daysBefore: Number(ie.daysBefore) || 0 }); setEditItem(null); };
 
   return (
-    <Panel title="予定の準備リスト（逆算）" accent={C.green} help="本番日から逆算して、各準備の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。出張・旅行・打ち合わせ・入学式・誕生日など、前もって準備が要る予定に対応。Googleカレンダーに『出張・旅行・式典・誕生日』などを含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} />}>
+    <Panel title="予定の準備リスト（逆算）" accent={C.green} help="本番日から逆算して、各準備の締切と信号（🟢=済 🟠=もうすぐ 🔴=遅れ）を自動表示します。出張・旅行・打ち合わせ・入学式・誕生日など、前もって準備が要る予定に対応。Googleカレンダーに『出張・旅行・式典・誕生日』などを含む予定があれば、3ヶ月先まで自動で逆算チェーン（🤖自動）を作ります。「型から追加」で手動追加も可能。" right={<AddTrip onAdd={onAdd} usage={usage} />}>
       {(!trips || trips.length === 0) && <Empty>逆算したい予定はまだありません。右上の「＋型から追加」で作成。</Empty>}
       <div style={{ display: "grid", gap: 14 }}>
         {(trips || []).map((trip) => {
@@ -777,17 +777,21 @@ function TripChain({ trips, birth, onToggle, onAdd, onRemove, onEditTrip, onAddI
   );
 }
 
-function AddTrip({ onAdd }) {
+function AddTrip({ onAdd, usage }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [template, setTemplate] = useState("遠方登壇");
   const [date, setDate] = useState(iso(addDays(new Date(), 14)));
+  // usage=split のとき私的・お祝い系テンプレ(CELEBRATION_TEMPLATES)を除外して仕事テンプレのみ表示
+  const templateKeys = usage === "split"
+    ? Object.keys(TEMPLATES).filter((t) => !CELEBRATION_TEMPLATES.has(t))
+    : Object.keys(TEMPLATES);
   if (!open) return <button onClick={() => setOpen(true)} style={chipBtn}>＋型から追加</button>;
   return (
     <div style={{ position: "absolute", right: 18, marginTop: 36, zIndex: 5, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, width: 240 }}>
-      <input placeholder="タイトル（例：大阪登壇／家族旅行）" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
+      <input placeholder="タイトル（例：大阪登壇／会食）" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
       <select value={template} onChange={(e) => setTemplate(e.target.value)} style={inp}>
-        {Object.keys(TEMPLATES).map((t) => <option key={t}>{t}</option>)}
+        {templateKeys.map((t) => <option key={t}>{t}</option>)}
       </select>
       <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -1586,12 +1590,14 @@ function OnboardingWizard({ onSave, onSkip }) {
     <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 16, padding: "20px 18px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: C.accent, fontWeight: 700, letterSpacing: 0.5 }}>ひとり秘書 セットアップ</div>
+          <div style={{ fontSize: 13, color: C.accent, fontWeight: 700, letterSpacing: 0.5 }}>
+            {occupation === "president" ? "社長の段取り秘書 セットアップ" : "ひとり秘書 セットアップ"}
+          </div>
           <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2 }}>
             {step === 0 && "生年月日を教えてください"}
             {step === 1 && "あなたのお仕事は？"}
-            {step === 2 && "チームの規模は？"}
-            {step === 3 && "何を管理したいですか？"}
+            {step === 2 && (occupation === "president" ? "組織の規模は？" : "チームの規模は？")}
+            {step === 3 && (occupation === "president" ? "何を管理・段取りしたいですか？" : "何を管理したいですか？")}
             {step === 4 && "運気の濃さを選んでください"}
           </div>
         </div>
@@ -1685,7 +1691,7 @@ function IndustryPrompt({ onSelect, onDismiss }) {
 }
 
 /* 生年月日クイック入力バナー（出生情報未登録時のみ表示。日付だけ入れると即・今日の運気が出る導線） */
-function BirthQuickInput({ onSave, onDismiss }) {
+function BirthQuickInput({ onSave, onDismiss, occupation }) {
   const [date, setDate] = useState("");
   const [done, setDone] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1713,8 +1719,12 @@ function BirthQuickInput({ onSave, onDismiss }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <span style={{ fontSize: 20, flex: "0 0 auto" }}>🔮</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple }}>生年月日を入れると「今日の動き」が出ます</div>
-          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.5, marginTop: 2 }}>日付だけでOK。入れた瞬間に今日のコンディションが反映されます。</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple }}>
+            {occupation === "president" ? "生年月日を入れると「意思決定の日のコンディション」が出ます" : "生年月日を入れると「今日の動き」が出ます"}
+          </div>
+          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.5, marginTop: 2 }}>
+            {occupation === "president" ? "日付だけでOK。攻め・守り・労いの日を経営カレンダーで確認できます。" : "日付だけでOK。入れた瞬間に今日のコンディションが反映されます。"}
+          </div>
         </div>
         {onDismiss && (
           <button onClick={onDismiss} style={iconBtn} title="閉じる">✕</button>
@@ -1732,7 +1742,9 @@ function BirthQuickInput({ onSave, onDismiss }) {
       )}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, flex: "1 1 160px" }} />
-        <button onClick={save} disabled={!date} style={{ ...chipBtn, background: date ? C.purple : "transparent", color: date ? "#fff" : C.sub, borderColor: date ? C.purple : C.line, fontWeight: 700, flex: "0 0 auto" }}>今日の運気を見る</button>
+        <button onClick={save} disabled={!date} style={{ ...chipBtn, background: date ? C.purple : "transparent", color: date ? "#fff" : C.sub, borderColor: date ? C.purple : C.line, fontWeight: 700, flex: "0 0 auto" }}>
+          {occupation === "president" ? "経営カレンダーを見る" : "今日の運気を見る"}
+        </button>
       </div>
       {saved && (
         <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginTop: 8 }}>
@@ -1907,7 +1919,11 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
   );
   return (
     <section style={{ background: C.panel, border: `1px solid ${C.accent}`, borderRadius: 16, padding: "16px 18px", marginBottom: 16 }}>
-      <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>☀️ {greet}・今朝のまとめ</div>
+      <div style={{ fontSize: 13, color: C.accent, fontWeight: 700 }}>
+        {(profile && profile.occupation === "president")
+          ? `☀️ ${greet}・今日の段取りと意思決定まとめ`
+          : `☀️ ${greet}・今朝のまとめ`}
+      </div>
       {/* 今日の残り件数 KPI */}
       <button onClick={() => onTab("work")} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.text, font: "inherit", padding: "10px 0 4px" }}>
         {rem === 0 ? (
@@ -2342,7 +2358,9 @@ function TenchusatsuDaiunAcc({ birth }) {
 /* ──────────────────────────────────────────────────────────────
    B-1. メンバー管理フォーム・一覧
    ────────────────────────────────────────────────────────────── */
-const RELATIONS = ["配偶者", "子ども", "親", "パートナー", "メンバー", "その他"];
+const RELATIONS = ["配偶者", "子ども", "親", "パートナー", "メンバー", "取引先", "会食相手", "幹部・社員", "後継者", "ビジネスパートナー", "その他"];
+// 仕事系の続柄（社長用）
+const WORK_RELATIONS = new Set(["取引先", "会食相手", "幹部・社員", "後継者", "ビジネスパートナー", "メンバー"]);
 
 function MemberBirthForm({ initial, onSave, onCancel }) {
   const def = initial || {};
@@ -2532,10 +2550,16 @@ function FamilyFortunePanel({ birth, members }) {
 /* ──────────────────────────────────────────────────────────────
    B-3. 相性チャート
    ────────────────────────────────────────────────────────────── */
-function AishouPanel({ birth, members }) {
+function AishouPanel({ birth, members, occupation }) {
   const [expandedId, setExpandedId] = useState(null);
   if (!birth || !birth.date || (members || []).length === 0) {
-    return <Empty>本人の出生情報とメンバーを登録すると、相性チャートが表示されます</Empty>;
+    return (
+      <Empty>
+        {occupation === "president"
+          ? "本人の出生情報と相手（取引先・会食相手・幹部）を登録すると、相性チャートが表示されます"
+          : "本人の出生情報とメンバーを登録すると、相性チャートが表示されます"}
+      </Empty>
+    );
   }
   return (
     <div style={{ display: "grid", gap: 10 }}>
@@ -2548,6 +2572,8 @@ function AishouPanel({ birth, members }) {
         const barColor = pct >= 75 ? C.green : pct >= 45 ? C.accent : C.blue;
         const isExpanded = expandedId === m.id;
         const isChild = m.relation === "子ども";
+        // 仕事系続柄かどうか（社長モードで追加された取引先・幹部等）
+        const isWorkRelation = WORK_RELATIONS.has(m.relation);
         return (
           <div key={m.id} style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
             <button
@@ -2579,13 +2605,19 @@ function AishouPanel({ birth, members }) {
                 )}
                 {!isChild && (
                   <>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, marginBottom: 4 }}>あなたから見て</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, marginBottom: 4 }}>
+                      {isWorkRelation ? "あなたから見た印象・関係" : "あなたから見て"}
+                    </div>
                     <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{result.aToB}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.blue, marginBottom: 4 }}>相手から見て</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.blue, marginBottom: 4 }}>
+                      {isWorkRelation ? "相手から見た印象・関係" : "相手から見て"}
+                    </div>
                     <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 10 }}>{result.bToA}</div>
                   </>
                 )}
-                <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 6 }}>うまくいくコツ</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 6 }}>
+                  {isWorkRelation ? "組む・会う時のコツ" : "うまくいくコツ"}
+                </div>
                 <div style={{ display: "grid", gap: 4 }}>
                   {(result.howto || []).slice(0, 3).map((h, i) => (
                     <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>・{h}</div>
@@ -2814,7 +2846,7 @@ function SanmeiFlow({ birth, uranaiLevel }) {
   );
 }
 
-function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers, uranaiLevel, usage }) {
+function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers, uranaiLevel, usage, occupation }) {
   const f = fortune || {};
   const t = f.today || {};
   const tm = f.tomorrow || {};
@@ -2941,29 +2973,49 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       </div>
     </Panel>
 
-    {/* usage=work/split のとき家族相性セクションは控えめ（title変更・AishouPanel非表示）。work_private なら通常表示 */}
-    <Panel
-      title="家族・チームの相性と運気"
-      accent={FAMILY_COLOR}
-      help="家族・チームメンバーの生年月日から、今日の運気や相性を算命学で読み解きます。追加したメンバーのデータはクラウドに保存されます。"
-    >
-      <Acc title="メンバーの管理" defaultOpen={false}>
-        <MemberManager members={members} onSaveMembers={onSaveMembers} />
-      </Acc>
-      <Acc
-        title={usage === "work" || usage === "split" ? "今日のチーム運気" : "今日のチーム・家族の運気"}
-        defaultOpen={usage !== "work"}
-        badge={<span style={{ fontSize: 12, color: FAMILY_COLOR, fontWeight: 700 }}>{(members || []).length > 0 ? (() => { try { const all = (birth && birth.date ? [{ name: birth.name || "あなた", birth }] : []).concat((members || []).map((m) => ({ name: m.name, birth: m.birth }))); const r = familyFortune(all); return "★★★★★".slice(0, r.teamScore) + "☆☆☆☆☆".slice(0, 5 - r.teamScore); } catch { return ""; } })() : ""}</span>}
-      >
-        <FamilyFortunePanel birth={birth} members={members} />
-      </Acc>
-      {/* usage=work/split のとき相性チャート(家族)は非表示。work_private なら表示 */}
-      {usage !== "work" && usage !== "split" && (
-        <Acc title="相性チャート" defaultOpen={false}>
-          <AishouPanel birth={birth} members={members} />
-        </Acc>
-      )}
-    </Panel>
+    {/* usage=work/split のとき家族相性セクションは控えめ（title変更・AishouPanel非表示）。
+        ただし occupation=president のときは仕事相性として AishouPanel を表示する。
+        work_private なら通常の家族相性として表示。 */}
+    {(() => {
+      const isPresident = occupation === "president";
+      // 社長 or work_private はパネルタイトルを仕事文脈に
+      const panelTitle = isPresident
+        ? "人との相性と運気（会食・取引先・幹部）"
+        : (usage === "work" || usage === "split")
+          ? "チームの相性と運気"
+          : "家族・チームの相性と運気";
+      const panelHelp = isPresident
+        ? "取引先・幹部・会食相手の生年月日から、今日の運気や相性を算命学で読み解きます。商談・組む前の参考に。データはクラウドに保存されます。"
+        : "家族・チームメンバーの生年月日から、今日の運気や相性を算命学で読み解きます。追加したメンバーのデータはクラウドに保存されます。";
+      // 相性チャートを表示するか（社長ならwork/splitでも表示。それ以外はwork_privateのみ）
+      const showAishou = isPresident || (usage !== "work" && usage !== "split");
+      const aishouTitle = isPresident
+        ? "相性チャート（会食相手・取引先・幹部）"
+        : "相性チャート";
+      return (
+        <Panel
+          title={panelTitle}
+          accent={FAMILY_COLOR}
+          help={panelHelp}
+        >
+          <Acc title="メンバーの管理" defaultOpen={false}>
+            <MemberManager members={members} onSaveMembers={onSaveMembers} />
+          </Acc>
+          <Acc
+            title={isPresident ? "今日のチーム・幹部の運気" : (usage === "work" || usage === "split") ? "今日のチーム運気" : "今日のチーム・家族の運気"}
+            defaultOpen={isPresident || usage !== "work"}
+            badge={<span style={{ fontSize: 12, color: FAMILY_COLOR, fontWeight: 700 }}>{(members || []).length > 0 ? (() => { try { const all = (birth && birth.date ? [{ name: birth.name || "あなた", birth }] : []).concat((members || []).map((m) => ({ name: m.name, birth: m.birth }))); const r = familyFortune(all); return "★★★★★".slice(0, r.teamScore) + "☆☆☆☆☆".slice(0, 5 - r.teamScore); } catch { return ""; } })() : ""}</span>}
+          >
+            <FamilyFortunePanel birth={birth} members={members} />
+          </Acc>
+          {showAishou && (
+            <Acc title={aishouTitle} defaultOpen={false}>
+              <AishouPanel birth={birth} members={members} occupation={occupation} />
+            </Acc>
+          )}
+        </Panel>
+      );
+    })()}
     </>
   );
 }
@@ -4425,10 +4477,11 @@ export default function App() {
               )}
               {/* はじめの3ステップ（セットアップが終わるまで案内。「どこから始めるか」の地図） */}
               {(data.sampleNotice || !data.birth) && !data.onboardDismissed && (() => {
+                const isPresidentOnboard = profile && profile.occupation === "president";
                 const steps = [
                   { n: 1, label: "自分のデータにする", hint: "上の「サンプルを全部消す」or「これは自分のデータ」を押す", done: !data.sampleNotice },
-                  { n: 2, label: "生年月日を登録する", hint: "「今日の一手」と経営カレンダーが動き出します", done: !!data.birth, action: () => setTab("fortune"), btn: "運気タブへ" },
-                  { n: 3, label: "Googleカレンダーを連携（任意）", hint: "予定が自動で取り込まれ、逆算の手配も自動生成", done: usingCal, action: connectCalendar, btn: "連携する" },
+                  { n: 2, label: "生年月日を登録する", hint: isPresidentOnboard ? "「意思決定の一手」と経営カレンダーが動き出します" : "「今日の一手」と経営カレンダーが動き出します", done: !!data.birth, action: () => setTab("fortune"), btn: "運気タブへ" },
+                  { n: 3, label: "Googleカレンダーを連携（任意）", hint: isPresidentOnboard ? "会議・会食・商談の予定が自動で取り込まれ、逆算の段取りも自動生成" : "予定が自動で取り込まれ、逆算の手配も自動生成", done: usingCal, action: connectCalendar, btn: "連携する" },
                 ];
                 return (
                   <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
@@ -4452,8 +4505,10 @@ export default function App() {
                   </div>
                 );
               })()}
-              {/* 業種プロンプト：catLabels 未設定・sampleNotice 終了後・industryPromptDismissed でなければ表示 */}
-              {!data.sampleNotice && !data.industryPromptDismissed && !Object.keys(data.catLabels || {}).length && (
+              {/* 業種プロンプト：catLabels 未設定・sampleNotice 終了後・industryPromptDismissed でなければ表示。
+                  ただしウィザード完了済み(profile.done)またはスキップ済み(onboardingSkipped)のときは非表示
+                  （ウィザードで職種を設定しているため二重になる） */}
+              {!data.sampleNotice && !data.industryPromptDismissed && !Object.keys(data.catLabels || {}).length && !showOnboarding && !(data.profile && data.profile.done) && (
                 <IndustryPrompt
                   onSelect={(preset) => {
                     update({ catLabels: preset.labels, industryPromptDismissed: true });
@@ -4467,6 +4522,7 @@ export default function App() {
                 <BirthQuickInput
                   onSave={(b) => { update({ birth: b }); setTab("fortune"); }}
                   onDismiss={null}
+                  occupation={profile && profile.occupation}
                 />
               )}
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
@@ -4566,6 +4622,7 @@ export default function App() {
               onAddItem={addTripItem}
               onEditItem={editTripItem}
               onRemoveItem={removeTripItem}
+              usage={(data.profile && data.profile.usage) || null}
             />
             <DeadlineBoard deadlines={data.deadlines} linked={launchLinked} launches={data.launches} birth={data.birth} onAdd={addDeadline} onAddBulk={addDeadlinesBulk} onEdit={editDeadline} onRemove={removeDeadline} />
             <CheckList
@@ -4651,6 +4708,7 @@ export default function App() {
                 onSaveMembers={(m) => update({ members: m })}
                 uranaiLevel={fortuneUranai}
                 usage={fortuneUsage}
+                occupation={fortuneProfile && fortuneProfile.occupation}
               />
             </>
           );
