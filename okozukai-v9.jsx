@@ -296,6 +296,9 @@ function startRealtimeSync(updateFn){
             // バトル/育成の進行(EXP・チケットは多い方、HP/ボス解放はローカル優先)
             if(prev.monsterExp){merged.monsterExp={...(merged.monsterExp||{})};Object.keys(prev.monsterExp).forEach(cid=>{merged.monsterExp[cid]=Math.max(prev.monsterExp[cid]||0,merged.monsterExp[cid]||0);});}
             if(prev.battleTickets){merged.battleTickets={...(merged.battleTickets||{})};Object.keys(prev.battleTickets).forEach(cid=>{merged.battleTickets[cid]=Math.max(prev.battleTickets[cid]||0,merged.battleTickets[cid]||0);});}
+            if(prev.battleFragments){merged.battleFragments={...(merged.battleFragments||{})};Object.keys(prev.battleFragments).forEach(cid=>{merged.battleFragments[cid]=Math.max(prev.battleFragments[cid]||0,merged.battleFragments[cid]||0);});}
+            if(prev.battleFragDate) merged.battleFragDate={...(merged.battleFragDate||{}),...prev.battleFragDate};
+            if(prev.battleFragOpps) merged.battleFragOpps={...(merged.battleFragOpps||{}),...prev.battleFragOpps};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1611,6 +1614,8 @@ function BattleModal({child,data,update,onClose}){
   const pMaxHP = stats.hp, pATK = stats.atk, pDEF = stats.def, pImg = stats.img, pName = stats.name, pMove = stats.move;
   const curHP  = curMonHP(data,child);
   const lowHP  = curHP < Math.max(20, Math.round(pMaxHP*0.2));
+  const fragNow = (data.battleFragments||{})[child.id]||0;
+  const ticketNow = (data.battleTickets||{})[child.id]||0;
   const [oppIdx,setOppIdx]=useState(0);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
@@ -1643,15 +1648,27 @@ function BattleModal({child,data,update,onClose}){
     setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
     const today=todayKey();
     const hpSave=Math.max(0,Math.round(finalHP));
-    const giveTicket=(r==="win") && (data.battleWinDate||{})[child.id]!==today;
     const unlockBoss=(r==="win") && opp.lv>=7 && !opp.boss;
-    const expGain=(r==="win") ? (opp.boss?60:25) : 6;
-    if(r==="win") setReward(giveTicket?"ticket":"none");
+    const expGain=(r==="win") ? (opp.boss?60:25) : 6;  // EXPは常にもらえる
+    // チケットのかけら: 勝利でかけら+1(同じモンスターは1日1かけらまで)。5枚で🎟チケット1枚に
+    const oppKey=opp.boss?"boss":String(oppIdx);
+    const fragDateOk=(data.battleFragDate||{})[child.id]===today;
+    const wonOpps=fragDateOk?((data.battleFragOpps||{})[child.id]||[]):[];
+    const canFrag=(r==="win") && !wonOpps.includes(oppKey);
+    const curFrag=(data.battleFragments||{})[child.id]||0;
+    const converted=canFrag && (curFrag+1>=5);
+    const newFrag=canFrag ? (converted?(curFrag+1-5):(curFrag+1)) : curFrag;
+    if(r==="win") setReward(canFrag?(converted?"ticket":"fragment"):"none");
     update(d=>{ const nd={...d};
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
       nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
-      if(giveTicket){ nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1}; nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today}; }
+      if(canFrag){
+        nd.battleFragments={...(d.battleFragments||{}),[child.id]:newFrag};
+        if(converted) nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1};
+        nd.battleFragDate={...(d.battleFragDate||{}),[child.id]:today};
+        nd.battleFragOpps={...(d.battleFragOpps||{}),[child.id]:[...wonOpps,oppKey]};
+      }
       if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
       return nd; });
   };
@@ -1742,7 +1759,9 @@ function BattleModal({child,data,update,onClose}){
               {confetti.map((c,i)=><span key={i} style={{position:"absolute",left:`${c.x}%`,top:"-6%",fontSize:c.s,animation:`btConf ${c.d}s linear ${c.dl}s infinite`}}>{c.e}</span>)}
               <img src={pImg} style={{width:124,height:124,objectFit:"contain",imageRendering:"pixelated",zIndex:2,animation:"btWinJump 1s ease-in-out infinite",filter:"drop-shadow(0 0 16px #ffd24a)"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
               <div style={{fontSize:56,fontWeight:900,color:"#fff",letterSpacing:2,textShadow:"0 0 26px #ffd24a,0 0 8px #fff",zIndex:2,marginTop:4,animation:"btWinText .6s cubic-bezier(.2,.9,.3,1.4)"}}>WIN！</div>
-              {reward==="ticket"&&<div style={{marginTop:8,fontSize:17,fontWeight:900,color:"#fff5cc",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🎟 ガチャチケット GET！</div>}
+              {reward==="ticket"&&<div style={{marginTop:8,fontSize:16,fontWeight:900,color:"#fff5cc",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🧩×5 → 🎟 ガチャチケット 完成！</div>}
+              {reward==="fragment"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#cfe6ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🧩 チケットのかけら GET！（{fragNow}/5）</div>}
+              {reward==="none"&&<div style={{marginTop:8,fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",zIndex:2,textShadow:"0 2px 8px #000"}}>このモンスターの かけらは きょうGET済み（EXPはGET！）</div>}
             </div>
           )}
           {result==="lose"&&(
@@ -1762,7 +1781,7 @@ function BattleModal({child,data,update,onClose}){
           </>}
           {result && (
             <div style={{textAlign:"center"}}>
-              {result==="win"&&reward==="none"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>きょうのチケットは もうもらったよ（また あした）</div>}
+              <div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>🧩 かけら {fragNow}/5 ・ 🎟 チケット {ticketNow}まい</div>
               <div style={{display:"flex",gap:10}}>
                 <button onClick={()=>{setPhase("select");setResult(null);}} style={{flex:1,background:"rgba(255,255,255,.15)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,cursor:"pointer",fontFamily:F}}>もういちど</button>
                 <button onClick={onClose} style={{flex:1,background:"#34C77B",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,cursor:"pointer",fontFamily:F}}>おわる</button>
@@ -1792,6 +1811,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n10", e:"🧩", t:"バトル報酬が「チケットのかけら」に", b:"バトルに勝つと「ガチャチケットのかけら」がもらえるよ。5枚あつめると🎟ガチャチケット1枚に！同じモンスターからは1日1かけらまで（でもEXPは毎回もらえる）。いろんな相手と戦って集めよう！"},
   {id:"n09", e:"🆙", t:"モンスターに レベル登場！", b:"お手伝い・なでなで・バトル勝利で EXP が貯まって レベルアップ！レベルが上がると HP・こうげき・ぼうぎょ が強くなるよ。個体値(才能)が高い子ほど ぐんぐん伸びる！"},
   {id:"n08", e:"⚔", t:"モンスターバトル＆ボス登場！", b:"育てたモンスターで野生モンスターとバトル！「⚔モンスターバトル」ボタンから。3ターン勝負で、勝つと🎟ガチャチケットがもらえてガチャをもう1回引けるよ。ヌシ・ドラゴに勝つと秘密のボスも出現！"},
   {id:"n07", e:"❤", t:"バトルはHPを持ち越し", b:"バトルで減ったHPは、お手伝い・なでなで で回復するよ。つかれてると戦えないので、お世話してあげよう（あさになると元気に！）。"},
@@ -3495,7 +3515,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
-              {hasTicket&&<div style={{marginTop:6,fontSize:11,color:"#bff0c8",fontWeight:800}}>🎟 ガチャチケット {data.battleTickets[child.id]}まい！ガチャを もう1回ひけるよ</div>}
+              <div style={{marginTop:6,display:"flex",gap:10,flexWrap:"wrap",fontSize:11,fontWeight:800}}>
+                {hasTicket&&<span style={{color:"#bff0c8"}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
+                <span style={{color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>🧩 チケットのかけら {(data.battleFragments?.[child.id]||0)}/5</span>
+              </div>
               <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
