@@ -1450,10 +1450,36 @@ function Acc({ title, color, badge, defaultOpen, children }) {
   );
 }
 
+/* 業種プロンプト（catLabels 未設定の初回のみ表示。1タップで区分名を切替） */
+function IndustryPrompt({ onSelect, onDismiss }) {
+  return (
+    <div style={{ background: C.panel, border: `2px solid ${C.blue}`, borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 20, flex: "0 0 auto" }}>💼</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.blue }}>あなたの業種は？</div>
+          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.5, marginTop: 2 }}>選ぶと「施術/制作/集客/経営」の区分名がぴったりの言葉に変わります（後で変更できます）。</div>
+        </div>
+        <button onClick={onDismiss} style={iconBtn} title="閉じる">✕</button>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {CAT_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onSelect(p)}
+            style={{ ...chipBtn, background: C.blue, color: "#fff", borderColor: C.blue, fontWeight: 700 }}
+          >{p.name}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* 生年月日クイック入力バナー（出生情報未登録時のみ表示。日付だけ入れると即・今日の運気が出る導線） */
 function BirthQuickInput({ onSave, onDismiss }) {
   const [date, setDate] = useState("");
   const [done, setDone] = useState(false);
+  const [saved, setSaved] = useState(false);
   const todayKoyomiQ = (() => {
     try { return typeof koyomi === 'function' ? koyomi(iso(new Date())) : null; }
     catch { return null; }
@@ -1462,6 +1488,14 @@ function BirthQuickInput({ onSave, onDismiss }) {
     if (!date) return;
     const p = [35.69, 139.69]; // 東京デフォルト
     onSave({ date, time: "12:00", place: "東京", lat: p[0], lon: p[1], utcOffset: 9, gender: "" });
+    setSaved(true);
+    // 保存後に SanmeiFlow（今日の動き）へ自動スクロール（タブ切り替えのレンダリング待ち）
+    setTimeout(() => {
+      try {
+        const el = document.getElementById("sanmei-flow");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch { /* スクロール失敗は無視 */ }
+    }, 800);
     setDone(true);
   };
   if (done) return null;
@@ -1491,7 +1525,12 @@ function BirthQuickInput({ onSave, onDismiss }) {
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, flex: "1 1 160px" }} />
         <button onClick={save} disabled={!date} style={{ ...chipBtn, background: date ? C.purple : "transparent", color: date ? "#fff" : C.sub, borderColor: date ? C.purple : C.line, fontWeight: 700, flex: "0 0 auto" }}>今日の運気を見る</button>
       </div>
-      <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>出生地・時刻は「運気タブ &gt; 出生情報の編集」で後から詳しく入れられます。</div>
+      {saved && (
+        <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginTop: 8 }}>
+          下に「今日の動き」が出ました
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>保存すると、このページの下に「今日の動き（算命学）」が表示されます。出生地・時刻は「運気タブ &gt; 出生情報の編集」で後から詳しく入れられます。</div>
     </div>
   );
 }
@@ -2322,6 +2361,138 @@ function AishouPanel({ birth, members }) {
 }
 
 /* ──────────────────────────────────────────────────────────────
+   運気カード画像生成（canvas → ダウンロード / Share API）
+   ────────────────────────────────────────────────────────────── */
+function generateFortuneImage({ dateLabel, star, stance, stanceColor, move, koyomiLabel }) {
+  try {
+    const W = 1080, H = 1350;
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+
+    // 背景グラデーション
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#0F1115");
+    bg.addColorStop(1, "#1E1040");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // 装飾ライン
+    ctx.strokeStyle = stanceColor + "44";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(80, 160); ctx.lineTo(W - 80, 160);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(80, H - 160); ctx.lineTo(W - 80, H - 160);
+    ctx.stroke();
+
+    // ブランド名
+    ctx.fillStyle = "#C9A227";
+    ctx.font = "bold 36px 'Helvetica Neue', Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("ひとり秘書", W / 2, 100);
+
+    // 日付
+    ctx.fillStyle = "#C5CBD3";
+    ctx.font = "32px 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillText(dateLabel, W / 2, 210);
+
+    // スタンスバッジ
+    const badgeW = 280, badgeH = 72;
+    const bx = (W - badgeW) / 2, by = 260;
+    ctx.fillStyle = stanceColor + "33";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(bx, by, badgeW, badgeH, 36);
+    } else {
+      ctx.rect(bx, by, badgeW, badgeH);
+    }
+    ctx.fill();
+    ctx.strokeStyle = stanceColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(bx, by, badgeW, badgeH, 36);
+    } else {
+      ctx.rect(bx, by, badgeW, badgeH);
+    }
+    ctx.stroke();
+    ctx.fillStyle = stanceColor;
+    ctx.font = "bold 42px 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillText("今日は" + stance, W / 2, by + 48);
+
+    // 主星
+    ctx.fillStyle = "#E8EAED";
+    ctx.font = "bold 64px 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillText(star, W / 2, 430);
+
+    // 開運日ラベル
+    if (koyomiLabel) {
+      ctx.fillStyle = "#C9A227";
+      ctx.font = "bold 34px 'Helvetica Neue', Arial, sans-serif";
+      ctx.fillText(koyomiLabel, W / 2, 510);
+    }
+
+    // 今日の動き（折り返し）
+    ctx.fillStyle = "#C5CBD3";
+    ctx.font = "30px 'Helvetica Neue', Arial, sans-serif";
+    const maxW = W - 160;
+    const words = move || "";
+    const lines = [];
+    let cur = "";
+    for (let i = 0; i < words.length; i++) {
+      const next = cur + words[i];
+      if (ctx.measureText(next).width > maxW && cur.length > 0) {
+        lines.push(cur);
+        cur = words[i];
+      } else {
+        cur = next;
+      }
+    }
+    if (cur.length > 0) lines.push(cur);
+    const lineH = 46;
+    const startY = koyomiLabel ? 590 : 540;
+    lines.slice(0, 6).forEach((l, i) => {
+      ctx.fillText(l, W / 2, startY + i * lineH);
+    });
+
+    // フッター
+    ctx.fillStyle = "#66707C";
+    ctx.font = "26px 'Helvetica Neue', Arial, sans-serif";
+    ctx.fillText("ひとり秘書 | 今日のコンディション", W / 2, H - 100);
+
+    const dataUrl = canvas.toDataURL("image/png");
+
+    // Share API（モバイル） or ダウンロード（デスクトップ）
+    if (navigator.canShare && typeof navigator.share === "function") {
+      canvas.toBlob((blob) => {
+        if (!blob) { fallbackDownload(dataUrl); return; }
+        const file = new File([blob], "fortune-card.png", { type: "image/png" });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: "今日のコンディション" }).catch(() => fallbackDownload(dataUrl));
+        } else {
+          fallbackDownload(dataUrl);
+        }
+      }, "image/png");
+    } else {
+      fallbackDownload(dataUrl);
+    }
+  } catch (e) {
+    console.error("[VIELE] fortune image error", e);
+  }
+}
+
+function fallbackDownload(dataUrl) {
+  try {
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = "fortune-card.png";
+    a.click();
+  } catch { /* ignore */ }
+}
+
+/* ──────────────────────────────────────────────────────────────
    FortunePanel（本体）
    ────────────────────────────────────────────────────────────── */
 /* 算命学・運氣の流れ：今日を主役に。今月/今年は初期は畳んでおき、見たい人だけ開く（過密回避） */
@@ -2342,6 +2513,7 @@ function SanmeiFlow({ birth }) {
     </div>
   );
   return (
+    <div id="sanmei-flow">
     <Acc
       title="算命学・運氣の流れ（今日の動き）"
       color={C.purple}
@@ -2366,6 +2538,27 @@ function SanmeiFlow({ birth }) {
         <div style={{ fontSize: 14, fontWeight: 700, color: stColor, marginBottom: 2 }}>今日 ・ {un.day.emoji} {un.day.star}（{un.day.title}） ・ {un.day.stance}</div>
         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{un.day.move}</div>
       </div>
+      {/* 画像で保存/シェアボタン */}
+      <button
+        onClick={() => {
+          const now2 = new Date();
+          const dl = `${now2.getFullYear()}/${now2.getMonth() + 1}/${now2.getDate()}(${WD[now2.getDay()]})`;
+          const kl = todayKoyomi && todayKoyomi.labels && todayKoyomi.labels.length > 0
+            ? todayKoyomi.labels.map((l) => l.emoji + l.name).join(" ")
+            : "";
+          generateFortuneImage({
+            dateLabel: dl,
+            star: `${un.day.emoji} ${un.day.star}`,
+            stance: un.day.stance,
+            stanceColor: stColor,
+            move: un.day.move,
+            koyomiLabel: kl,
+          });
+        }}
+        style={{ ...chipBtn, marginBottom: 10, background: C.purple, color: "#fff", borderColor: C.purple, fontWeight: 700 }}
+      >
+        画像で保存 / ストーリーズ用カードを作る
+      </button>
       {showMore ? (
         <>
           <Period label="今月" u={un.month} color={C.blue} />
@@ -2377,6 +2570,7 @@ function SanmeiFlow({ birth }) {
         </button>
       )}
     </Acc>
+    </div>
   );
 }
 
@@ -2704,35 +2898,39 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
         {sorted.length === 0 && <Empty>タスクはありません。</Empty>}
         {sorted.map((it) => {
           const sig = dueSig(it.due);
+          const isTaskSample = String(it.title || "").startsWith("（例）");
           return (
-            <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
-              {editId === it.id ? (
-                <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
-                  <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                    <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
-                    <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
-                    <button onClick={saveEdit} style={chipBtn}>保存</button>
-                    <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+            <div key={it.id}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+                {editId === it.id ? (
+                  <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+                    <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+                      <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+                      <button onClick={saveEdit} style={chipBtn}>保存</button>
+                      <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
-                  <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: priColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
-                    {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
-                    {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
+                ) : (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
+                    <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: priColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
+                      {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
+                      {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
+                    </div>
                   </div>
-                </div>
-              )}
-              {editId !== it.id && (
-                <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
-                  <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
-                  <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
-                </div>
-              )}
+                )}
+                {editId !== it.id && (
+                  <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+                    <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
+                    <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+                  </div>
+                )}
+              </div>
+              {isTaskSample && <div style={{ fontSize: 12, color: C.faint, paddingLeft: 50, marginTop: 2 }}>削除して自分のタスクを追加してください</div>}
             </div>
           );
         })}
@@ -2787,9 +2985,26 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
   const sigCv = cvDL ? deadlineSignal(cvDL) : null;                          // 本申込締切（＝売上の締切）
   const done = (p) => (p >= 100 ? C.green : null);
 
-  const stage = (no, name, color, sub, pct, width, sig) => (
+  // CVR差分バッジ：目標CVR(goal/parent) vs 実績CVR(actual/parent) の差分を pt で表示
+  // goal/actual 両方が数値として有効な場合のみ表示
+  const CvrDiff = ({ goalNum, goalDen, actualNum, actualDen, label }) => {
+    if (!goalDen || !goalNum) return null;
+    const goalCvr = Math.round((goalNum / goalDen) * 100);
+    if (!actualDen) return null;
+    const actualCvr = Math.round((actualNum / actualDen) * 100);
+    const diff = actualCvr - goalCvr;
+    const color = diff >= 0 ? C.green : C.red;
+    const sign = diff >= 0 ? "+" : "";
+    return (
+      <span style={{ fontSize: 12, color, fontWeight: 700, background: color + "18", borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>
+        {label} 目標{goalCvr}% / 実績{actualCvr}% {sign}{diff}pt
+      </span>
+    );
+  };
+
+  const stage = (no, name, color, sub, pct, width, sig, cvrDiffNode) => (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12, color: C.faint, flex: "0 0 auto" }}>{no}</span>
         <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{name}</span>
         {sig && <span style={{ fontSize: 12, color: sig.color, fontWeight: 600, whiteSpace: "nowrap" }}>{sig.dot}{sig.label}</span>}
@@ -2797,6 +3012,7 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
         <span style={{ fontSize: 13, color: done(pct) || color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{sub}</span>
         <span style={{ fontSize: 12, color: C.sub, width: 42, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(pct)}%</span>
       </div>
+      {cvrDiffNode && <div style={{ marginBottom: 4 }}>{cvrDiffNode}</div>}
       <div style={{ display: "flex", justifyContent: "center" }}>
         <FunnelBar pct={pct} color={done(pct) || color} width={width} />
       </div>
@@ -2819,9 +3035,13 @@ function LaunchFunnel({ L, onEdit, onRemove }) {
         <button onClick={() => onRemove(L.id)} style={iconBtn} title="削除">✕</button>
       </div>
       <div onClick={() => onEdit(L)} title="タップで数字を入力・更新" style={{ cursor: "pointer" }}>
-        {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg)}
-        {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv)}
-        {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null)}
+        {stage("①", "先行登録", C.blue, `${reg} / ${goalReg}人`, regPct, "100%", sigReg,
+          <CvrDiff goalNum={goalReg} goalDen={goalReg} actualNum={reg} actualDen={goalReg} label="登録率" />
+        )}
+        {stage("②", "本申込", C.purple, `${cv}人 · 申込率 ${cvRate}%`, cvPct, "82%", sigCv,
+          <CvrDiff goalNum={goalCv} goalDen={goalReg} actualNum={cv} actualDen={reg || goalReg} label="転換CVR" />
+        )}
+        {stage("③", "売上", C.accent, `${manYen(rev)} / ${manYen(goalRev)}`, revPct, "64%", null, null)}
         <div style={{ fontSize: 12, color: C.sub, marginTop: 6, textAlign: "right" }}>客単価 {yen(price)} × 本申込{cv}人で自動計算</div>
       </div>
       <button onClick={() => onEdit(L)} style={{ ...chipBtn, width: "100%", justifyContent: "center", marginTop: 10, background: C.accent, color: "#0B0D11", borderColor: C.accent, fontWeight: 700 }}>✏️ 数字を入力・更新</button>
@@ -2940,28 +3160,32 @@ function MoneyList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const diffCur = incCur - expCur;
   const incPct = incPrev > 0 ? Math.round(((incCur - incPrev) / incPrev) * 100) : null;
 
+  const isSample = (it) => String(it.title || "").startsWith("（例）");
   const renderRow = (it) => (
-    <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <Check done={it.done} onClick={() => onToggle(it.id)} />
-      {editId === it.id ? (
-        <>
-          <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="項目" style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 80 }} />
-          <input value={e.amount} onChange={(ev) => setE({ ...e, amount: ev.target.value })} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
-          <select value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 70 }}>
-            {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
-          </select>
-          <button onClick={saveEdit} style={chipBtn}>保存</button>
-          <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
-        </>
-      ) : (
-        <>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
-          {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
-          {it.kind && <span style={{ fontSize: 12, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
-          <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
-          <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
-        </>
-      )}
+    <div key={it.id}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Check done={it.done} onClick={() => onToggle(it.id)} />
+        {editId === it.id ? (
+          <>
+            <input value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} placeholder="項目" style={{ ...inp, marginBottom: 0, flex: 1, minWidth: 80 }} />
+            <input value={e.amount} onChange={(ev) => setE({ ...e, amount: ev.target.value })} placeholder="金額" inputMode="numeric" style={{ ...inp, marginBottom: 0, width: 84 }} />
+            <select value={e.kind} onChange={(ev) => setE({ ...e, kind: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 70 }}>
+              {MONEY_KINDS.map((k) => <option key={k}>{k}</option>)}
+            </select>
+            <button onClick={saveEdit} style={chipBtn}>保存</button>
+            <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+          </>
+        ) : (
+          <>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</span>
+            {it.amount > 0 && <span style={{ fontSize: 13, color: it.done ? C.faint : C.text, fontVariantNumeric: "tabular-nums" }}>{yen(it.amount)}</span>}
+            {it.kind && <span style={{ fontSize: 12, color: kindColor(it.kind), fontWeight: 700 }}>{it.kind}</span>}
+            <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
+            <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+          </>
+        )}
+      </div>
+      {isSample(it) && <div style={{ fontSize: 12, color: C.faint, paddingLeft: 50, marginTop: 2 }}>削除して自分の項目を追加してください</div>}
     </div>
   );
 
@@ -3083,7 +3307,7 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
         <span style={{ color: isErr ? C.red : C.text, wordBreak: "break-word" }}>
           {isErr
             ? `カレンダー取得に失敗：${(error && error.message) || error}`
-            : <><b style={{ color: C.orange }}>これは使い方のサンプルです（あなたの予定・実績ではありません）。</b>Googleカレンダーを連携すると、あなたの予定に置き換わります。一度連携すれば以後は自動で維持され、毎回ログインし直す必要はありません。</>}
+            : <><b style={{ color: C.orange }}>これは使い方のサンプルです（あなたの予定・実績ではありません）。</b>Googleカレンダーを連携すると、あなたの予定に置き換わります。一度連携すれば以後は自動で維持され、毎回ログインし直す必要はありません。<br /><span style={{ color: C.faint }}>連携は任意です。後からいつでもOK。連携しなくてもほかの機能はすべて使えます。</span></>}
         </span>
       </div>
       <button
@@ -3944,6 +4168,15 @@ export default function App() {
                   </div>
                 );
               })()}
+              {/* 業種プロンプト：catLabels 未設定・sampleNotice 終了後・industryPromptDismissed でなければ表示 */}
+              {!data.sampleNotice && !data.industryPromptDismissed && !Object.keys(data.catLabels || {}).length && (
+                <IndustryPrompt
+                  onSelect={(preset) => {
+                    update({ catLabels: preset.labels, industryPromptDismissed: true });
+                  }}
+                  onDismiss={() => update({ industryPromptDismissed: true })}
+                />
+              )}
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
               {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
               {(!data.birth || !data.birth.date) && !data.sampleNotice && (
