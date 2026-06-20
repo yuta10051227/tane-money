@@ -1536,13 +1536,15 @@ function GachaAnim({ result, onClose }) {
 // BATTLE MODE (野生CPUと対戦・育てた度で強くなる・勝利でガチャチケット)
 // ═══════════════════════════════════════════════════════
 const WILD_MONSTERS = [
-  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f", move:{n:"ねばねばショット", e:"🫧", c:"#7bd88f"}},
-  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff", move:{n:"ソニックウェーブ", e:"🌀", c:"#9b8cff"}},
-  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e", move:{n:"トゲミサイル", e:"📌", c:"#f0a35e"}},
-  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0", move:{n:"ホネつぶて", e:"🦴", c:"#cfd6e0"}},
-  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59", move:{n:"ひのたま", e:"🔥", c:"#ff7a59"}},
-  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"}},
+  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f", img:"wild_slime",  move:{n:"ねばねばショット", e:"🫧", c:"#7bd88f"}},
+  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff", img:"wild_bat",    move:{n:"ソニックウェーブ", e:"🌀", c:"#9b8cff"}},
+  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e", img:"wild_spike",  move:{n:"トゲミサイル", e:"📌", c:"#f0a35e"}},
+  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0", img:"wild_bone",   move:{n:"ホネつぶて", e:"🦴", c:"#cfd6e0"}},
+  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59", img:"wild_fire",   move:{n:"ひのたま", e:"🔥", c:"#ff7a59"}},
+  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", img:"wild_dragon", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"}},
 ];
+// 秘密のボス: ヌシ・ドラゴを倒すと出現
+const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
 // 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
 const PLAYER_MOVES = [
   {n:"エナジーボール", e:"🔆", c:"#34C77B"},
@@ -1573,7 +1575,8 @@ function BattleModal({child,data,update,onClose}){
   const pName  = (data.monsterNickname||{})[child.id] || mon.def?.label || "あいぼう";
   const pMove  = pickMove(mon.curId);
   const [oppIdx,setOppIdx]=useState(0);
-  const opp = WILD_MONSTERS[oppIdx];
+  const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
+  const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
   const oMaxHP = 50 + opp.lv*28;
   const oATK   = 9 + opp.lv*5;
   const oDEF   = 4 + opp.lv*3;
@@ -1595,13 +1598,17 @@ function BattleModal({child,data,update,onClose}){
   useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
-  const start=(i)=>{ const o=WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
+  const start=(i)=>{ const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
   const finish=(r)=>{
     setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
     if(r==="win"){
-      const today=todayKey(); const lastWin=(data.battleWinDate||{})[child.id];
-      if(lastWin!==today){ setReward("ticket"); update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1},battleWinDate:{...(d.battleWinDate||{}),[child.id]:today}})); }
-      else setReward("none");
+      const today=todayKey(); const giveTicket=(data.battleWinDate||{})[child.id]!==today;
+      const unlockBoss=(opp.lv>=7 && !opp.boss);
+      setReward(giveTicket?"ticket":"none");
+      update(d=>{ const nd={...d};
+        if(giveTicket){ nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1}; nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today}; }
+        if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
+        return nd; });
     }
   };
   const finishByHP=(o,p)=> finish((p/pMaxHP) >= (o/oMaxHP) ? "win" : "lose");
@@ -1642,11 +1649,24 @@ function BattleModal({child,data,update,onClose}){
               const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
               const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
               return <button key={i} onClick={()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
-                <div style={{fontSize:38}}>{w.emoji}</div>
+                <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
                 <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥つよい":""}</div>
               </button>;
             })}
+            {bossUnlocked ? (
+              <button onClick={()=>start(WILD_MONSTERS.length)} style={{background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:"pointer",fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
+                <img src={`/assets/${BOSS_MONSTER.img}.png`} style={{width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=BOSS_MONSTER.emoji;s.style.fontSize="40px";e.target.replaceWith(s);}}/>
+                <div style={{color:"#fff",fontWeight:900,fontSize:13,marginTop:4}}>{BOSS_MONSTER.name}</div>
+                <div style={{fontSize:11,color:BOSS_MONSTER.color,fontWeight:900,marginTop:2}}>Lv.{BOSS_MONSTER.lv} 👑ボス</div>
+              </button>
+            ) : (
+              <div style={{background:"rgba(255,255,255,.04)",border:"1.5px dashed rgba(255,255,255,.2)",borderRadius:16,padding:"14px 8px",textAlign:"center",opacity:.8}}>
+                <div style={{fontSize:38,filter:"brightness(0) opacity(.55)"}}>👑</div>
+                <div style={{color:"rgba(255,255,255,.5)",fontWeight:800,fontSize:13,marginTop:4}}>？？？</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.4)",fontWeight:700,marginTop:2}}>🔒 ヌシをたおすと…</div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1656,7 +1676,7 @@ function BattleModal({child,data,update,onClose}){
           <div style={{position:"absolute",bottom:14,right:14,width:"45%"}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
           <div style={{position:"absolute",top:44,left:0,right:0,textAlign:"center",color:"#7fe0ff",fontWeight:900,fontSize:13,letterSpacing:3,textShadow:"0 0 6px #2aa0ff"}}>ROUND {Math.min(round,MAXR)} / {MAXR}</div>
           <div style={{position:"absolute",right:"12%",top:"22%",textAlign:"center"}}>
-            <div style={{fontSize:64,filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":"none",animation:hit?.who==="opp"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}}>{opp.emoji}</div>
+            <img src={`/assets/${opp.img}.png`} style={{width:opp.boss?104:80,height:opp.boss?104:80,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":(opp.boss?`drop-shadow(0 0 14px ${opp.color})`:"none"),animation:hit?.who==="opp"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}} onError={e=>{const s=document.createElement("span");s.textContent=opp.emoji;s.style.fontSize="64px";e.target.replaceWith(s);}}/>
             {hit?.who==="opp"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
           <div style={{position:"absolute",left:"8%",bottom:"26%",textAlign:"center"}}>
