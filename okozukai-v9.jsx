@@ -293,6 +293,13 @@ function startRealtimeSync(updateFn){
             // つけた名前(ニックネーム)・スキン装備も保護（巻き戻り防止）
             if(prev.monsterNickname) merged.monsterNickname={...(merged.monsterNickname||{}),...prev.monsterNickname};
             if(prev.monsterSkin) merged.monsterSkin={...(merged.monsterSkin||{}),...prev.monsterSkin};
+            // バトル/育成の進行(EXP・チケットは多い方、HP/ボス解放はローカル優先)
+            if(prev.monsterExp){merged.monsterExp={...(merged.monsterExp||{})};Object.keys(prev.monsterExp).forEach(cid=>{merged.monsterExp[cid]=Math.max(prev.monsterExp[cid]||0,merged.monsterExp[cid]||0);});}
+            if(prev.battleTickets){merged.battleTickets={...(merged.battleTickets||{})};Object.keys(prev.battleTickets).forEach(cid=>{merged.battleTickets[cid]=Math.max(prev.battleTickets[cid]||0,merged.battleTickets[cid]||0);});}
+            if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
+            if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
+            if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
+            if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
             if(_processedApprovalIds.size>0){
               merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
@@ -1556,13 +1563,17 @@ const PLAYER_MOVES = [
   {n:"いなずまスパーク", e:"⚡", c:"#ffe14a"},
 ];
 const pickMove = (id)=> PLAYER_MOVES[[...String(id||"")].reduce((a,c)=>a+c.charCodeAt(0),0) % PLAYER_MOVES.length];
-// バトルのステータス(育てた度で決まる)を一元化
+// レベル(EXP→Lv)。お手伝い・バトルでEXPが貯まる。Lvが上がるとステ上昇(IVは伸び率=才能)
+function monLevel(exp){ let lv=1,need=60,e=exp||0; while(e>=need&&lv<50){e-=need;lv++;need=Math.round(need*1.16);} return {lv,into:Math.round(e),need}; }
+// バトルのステータス(進化段階 × レベル(努力) × IV(才能))を一元化
 function battleStats(data, child){
   const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5};
+  const L=monLevel((data.monsterExp||{})[child.id]||0); const lv=L.lv;
   return {
-    hp: 60+(m.stage||0)*25+(iv.hp||5)*4+(m.careDays||0)*3,
-    atk:12+(m.stage||0)*5+(iv.atk||5)*2+Math.floor((m.gauge||0)/4),
-    def:6 +(m.stage||0)*3+(iv.def||5)*2,
+    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2,
+    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6),
+    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14)),
+    lv, exp:L, iv,
     curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう",
     move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
   };
@@ -1581,6 +1592,12 @@ function healMon(d, cid, ratio){
   const cur=(sameDay && (d.monsterHP||{})[cid]!==undefined)?(d.monsterHP||{})[cid]:max;
   if(cur>=max) return d;
   return {...d, monsterHP:{...(d.monsterHP||{}),[cid]:Math.min(max,Math.round(cur+max*ratio))}, monsterHPDate:{...(d.monsterHPDate||{}),[cid]:todayKey()}};
+}
+// お世話/勝利で HP回復 ＋ EXP付与(ratio=0なら回復なし)
+function careMon(d, cid, ratio, exp){
+  let nd = ratio?healMon(d,cid,ratio):d;
+  if(exp){ nd={...nd, monsterExp:{...(nd.monsterExp||{}),[cid]:((nd.monsterExp||{})[cid]||0)+exp}}; }
+  return nd;
 }
 function HPBar({label,hp,max,color}){
   const pct=Math.max(0,Math.round(hp/max*100));
@@ -1628,10 +1645,12 @@ function BattleModal({child,data,update,onClose}){
     const hpSave=Math.max(0,Math.round(finalHP));
     const giveTicket=(r==="win") && (data.battleWinDate||{})[child.id]!==today;
     const unlockBoss=(r==="win") && opp.lv>=7 && !opp.boss;
+    const expGain=(r==="win") ? (opp.boss?60:25) : 6;
     if(r==="win") setReward(giveTicket?"ticket":"none");
     update(d=>{ const nd={...d};
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
+      nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
       if(giveTicket){ nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1}; nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today}; }
       if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
       return nd; });
@@ -1665,8 +1684,9 @@ function BattleModal({child,data,update,onClose}){
           <div style={{textAlign:"center",color:"#fff",marginBottom:14}}>
             <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
-            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>⚔{pATK} · 🛡{pDEF}</div>
-            <div style={{width:180,maxWidth:"80%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
+            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>Lv.{stats.lv} · ⚔{pATK} · 🛡{pDEF}</div>
+            <div style={{width:190,maxWidth:"82%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
+            <div style={{width:190,maxWidth:"82%",margin:"5px auto 0"}}><HPBar label="EXP" hp={stats.exp.into} max={stats.exp.need} color="#ffd24a"/></div>
             <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:5}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
           </div>
           {lowHP && <div style={{background:"rgba(224,86,79,.15)",border:"1.5px solid #e0564f",borderRadius:12,padding:"10px 12px",marginBottom:10,textAlign:"center"}}>
@@ -1772,6 +1792,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n09", e:"🆙", t:"モンスターに レベル登場！", b:"お手伝い・なでなで・バトル勝利で EXP が貯まって レベルアップ！レベルが上がると HP・こうげき・ぼうぎょ が強くなるよ。個体値(才能)が高い子ほど ぐんぐん伸びる！"},
   {id:"n08", e:"⚔", t:"モンスターバトル＆ボス登場！", b:"育てたモンスターで野生モンスターとバトル！「⚔モンスターバトル」ボタンから。3ターン勝負で、勝つと🎟ガチャチケットがもらえてガチャをもう1回引けるよ。ヌシ・ドラゴに勝つと秘密のボスも出現！"},
   {id:"n07", e:"❤", t:"バトルはHPを持ち越し", b:"バトルで減ったHPは、お手伝い・なでなで で回復するよ。つかれてると戦えないので、お世話してあげよう（あさになると元気に！）。"},
   {id:"n06", e:"💩", t:"サボりモンに気をつけて", b:"1日タップもタスクもしないと、モンスターが一時的に「サボりモン」に変身…！タップかタスク1つで すぐ元に戻るよ（進化は消えません）。"},
@@ -1917,7 +1938,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => healMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2));
+    update(d => careMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, 6));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -1929,7 +1950,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => healMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12));
+    update(d => careMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, 4));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -2927,7 +2948,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     } else {
       showFlash(pts, task.emoji);
       addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
-      if(pts>0) update(d=>healMon(d,child.id,0.25));  // お手伝いでHP回復
+      if(pts>0) update(d=>careMon(d,child.id,0.25,8));  // お手伝いでHP回復＋EXP
     }
   };
 
@@ -6155,7 +6176,7 @@ function SeedMonster({ child, data, size=90, update }) {
           const c = (d.monsterCare||{})[child.id] || {};
           if (c.last === today) return d;
           // なでなで(1日1回)でHPも回復
-          return healMon({...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}}, child.id, 0.3);
+          return careMon({...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}}, child.id, 0.3, 5);
         });
       }
     }
@@ -6264,6 +6285,7 @@ function SeedMonster({ child, data, size=90, update }) {
   const nickname  = (data.monsterNickname||{})[child.id];
   const dispName  = nickname || (skinActive ? skinDef.name : monDef.name);
   const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
+  const monLv = monLevel((data.monsterExp||{})[child.id]||0).lv;
 
   return (
     <div style={{position:"relative",flexShrink:0,textAlign:"center"}}>
@@ -6332,7 +6354,7 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:3,marginTop:2}}>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.9)",fontWeight:800}}>
               {dispName}
-              <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>{skinActive&&<span onClick={(e)=>{e.stopPropagation();update&&update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:null}}));}} title="タップで すがたを外す" style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"0 7px",marginLeft:5,fontWeight:900,cursor:"pointer"}}>👕すがた ✕</span>}
+              <span style={{fontSize:11,fontWeight:800,color:"#3aa0d8",marginLeft:4,background:"rgba(122,224,255,0.18)",borderRadius:6,padding:"0 5px"}}>Lv.{monLv}</span><span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:4}}>{rarityStr}</span>{skinActive&&<span onClick={(e)=>{e.stopPropagation();update&&update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:null}}));}} title="タップで すがたを外す" style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"0 7px",marginLeft:5,fontWeight:900,cursor:"pointer"}}>👕すがた ✕</span>}
               {reincCount>0&&<span style={{fontSize:11,color:"rgba(160,200,255,0.9)",marginLeft:3}}>転{reincCount}</span>}
             </div>
             <button onClick={()=>{setNickInput(nickname||"");setEditNick(true);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"rgba(255,255,255,0.45)",padding:0,lineHeight:1}}>✏</button>
@@ -6341,7 +6363,7 @@ function SeedMonster({ child, data, size=90, update }) {
       ) : (
         <div style={{fontSize:11,color:"rgba(255,255,255,0.88)",fontWeight:800,marginTop:2,letterSpacing:0.3}}>
           {dispName}
-          <span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:3}}>{rarityStr}</span>{skinActive&&<span onClick={(e)=>{e.stopPropagation();update&&update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:null}}));}} title="タップで すがたを外す" style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"0 7px",marginLeft:5,fontWeight:900,cursor:"pointer"}}>👕すがた ✕</span>}
+          <span style={{fontSize:11,fontWeight:800,color:"#3aa0d8",marginLeft:4,background:"rgba(122,224,255,0.18)",borderRadius:6,padding:"0 5px"}}>Lv.{monLv}</span><span style={{fontSize:11,color:"rgba(255,220,100,0.8)",marginLeft:4}}>{rarityStr}</span>{skinActive&&<span onClick={(e)=>{e.stopPropagation();update&&update(d=>({...d,monsterSkin:{...(d.monsterSkin||{}),[child.id]:null}}));}} title="タップで すがたを外す" style={{fontSize:11,color:"#1a1024",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"0 7px",marginLeft:5,fontWeight:900,cursor:"pointer"}}>👕すがた ✕</span>}
         </div>
       )}
 
