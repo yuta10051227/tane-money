@@ -1082,3 +1082,103 @@ export function sanmeiUn(birth, dateISO) {
     };
   } catch { return null; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   決断の良い日取り（bestDays）── AI不使用・完全決定論 ──
+   本人の命式の「攻めの日(stance=攻め)」と、暦の「開運日(koyomi)」を掛け合わせ、
+   これから先の“良い決断日”を上位N件返す。
+   ◆ スコア = 本人スタンス点（relationFor の score: 攻め=4〜5で高い）
+            + 開運日点（koyomi.score。天赦日=+2 と重め、一粒万倍/寅/巳/己巳=+1）
+            + ボーナス（攻めの日 かつ 開運日なら +2、天赦日なら更に +1）。
+   ◆ 「攻めの日 かつ 開運日」が最優先で上位に来るよう加点設計。
+   ◆ 良い日(スコア基準を満たす日)が無ければ空配列を返す。
+   ◆ birth 不正・空は try/catch で空配列（落ちない）。
+   ════════════════════════════════════════════════════════════════ */
+const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"];
+const isoOf = (d) => {
+  // ローカル日付ベースで YYYY-MM-DD（タイムゾーンずれを避ける）
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+export function bestDays(birth, fromISO, opts) {
+  try {
+    if (!birth || !birth.date) return [];
+    const { horizonDays = 90, count = 3 } = opts || {};
+    // 命式の整合性を一度だけ確認（不正なら例外→catchで空配列）。本人の日干(五行)。
+    const me = FIVE[computeChart(birth).dayMaster];
+    if (!me) return [];
+
+    const start = fromISO
+      ? new Date(String(fromISO).slice(0, 10) + "T00:00:00")
+      : new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+    if (Number.isNaN(start.getTime())) return [];
+
+    const cand = [];
+    for (let i = 0; i < horizonDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const iso = isoOf(d);
+
+      const rel = relationFor(me, iso);        // 本人のその日のスタンス/スコア
+      const k = koyomi(iso);                    // その日の開運日
+      const good = (k.labels || []).filter((l) => l.good).map(({ name, emoji }) => ({ name, emoji }));
+      const isAttack = rel.stance === "攻め";
+      const isKoyomi = good.length > 0;
+      const isTensha = (k.labels || []).some((l) => l.key === "tensha");
+
+      // 候補に入れる条件: 攻めの日 か 開運日 のどちらか（両方が最上位）。
+      if (!isAttack && !isKoyomi) continue;
+
+      // スコア合算
+      let score = rel.score + k.score;
+      if (isAttack && isKoyomi) score += 2;    // 攻め × 開運の相乗ボーナス
+      if (isTensha) score += 1;                // 天赦日は最強なので上乗せ
+
+      // reason 文言（攻め×開運を最優先に表現）
+      const koyomiNames = good.map((g) => g.name);
+      let reason;
+      if (isTensha && isAttack) {
+        reason = `天赦日（最強）× 攻め`;
+      } else if (isTensha) {
+        reason = `天赦日（最強の開運日）`;
+      } else if (isAttack && isKoyomi) {
+        reason = `攻めの日 × ${koyomiNames.join("・")}`;
+      } else if (isAttack) {
+        reason = `攻めの日（${rel.relation}）`;
+      } else {
+        reason = `開運日 ${koyomiNames.join("・")}`;
+      }
+
+      // その日の十大主星（sanmeiUn の day.star）
+      let dayStar = null;
+      try { dayStar = sanmeiUn(birth, iso)?.day?.star || null; } catch { dayStar = null; }
+
+      cand.push({
+        date: iso,
+        weekday: WEEKDAY_JA[d.getDay()],
+        stance: rel.stance,
+        dayStar,
+        koyomi: good,            // [{name, emoji}]
+        score,
+        reason,
+        _attack: isAttack,       // 並べ替え用（返却時に除去）
+        _koyomi: isKoyomi,
+        _tensha: isTensha,
+      });
+    }
+
+    // 並べ替え: 攻め×開運 > 天赦 > スコア降順 > 日付昇順（早い日を優先）
+    cand.sort((a, b) => {
+      const ak = (a._attack && a._koyomi) ? 1 : 0;
+      const bk = (b._attack && b._koyomi) ? 1 : 0;
+      if (ak !== bk) return bk - ak;
+      if (a._tensha !== b._tensha) return (b._tensha ? 1 : 0) - (a._tensha ? 1 : 0);
+      if (b.score !== a.score) return b.score - a.score;
+      return a.date < b.date ? -1 : 1;
+    });
+
+    return cand.slice(0, Math.max(0, count)).map(({ _attack, _koyomi, _tensha, ...rest }) => rest);
+  } catch {
+    return [];
+  }
+}
