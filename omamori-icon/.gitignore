@@ -1,1 +1,5 @@
 node_modules/
+export/
+*.zip
+*.tar.gz
+gpt-source.png
