@@ -1769,6 +1769,47 @@ function BattleModal({child,data,update,onClose}){
 }
 
 // ═══════════════════════════════════════════════════════
+// お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
+// ═══════════════════════════════════════════════════════
+const NEWS = [
+  {id:"n08", e:"⚔", t:"モンスターバトル＆ボス登場！", b:"育てたモンスターで野生モンスターとバトル！「⚔モンスターバトル」ボタンから。3ターン勝負で、勝つと🎟ガチャチケットがもらえてガチャをもう1回引けるよ。ヌシ・ドラゴに勝つと秘密のボスも出現！"},
+  {id:"n07", e:"❤", t:"バトルはHPを持ち越し", b:"バトルで減ったHPは、お手伝い・なでなで で回復するよ。つかれてると戦えないので、お世話してあげよう（あさになると元気に！）。"},
+  {id:"n06", e:"💩", t:"サボりモンに気をつけて", b:"1日タップもタスクもしないと、モンスターが一時的に「サボりモン」に変身…！タップかタスク1つで すぐ元に戻るよ（進化は消えません）。"},
+  {id:"n05", e:"🐾", t:"ひみつのなかま 8体追加", b:"記録タブの「ひみつのなかま」に、コインリス・ブタコ・まねきネコ など8体を追加。たくさんクリアすると解放され、タップで“すがた”を変えられるよ。"},
+  {id:"n04", e:"🎨", t:"アプリのアイコンがドット絵に", b:"ホームの統計や見出しのアイコンを、オリジナルのドット絵に変更中。メンバー編集から“ドット絵アバター”も選べます。"},
+  {id:"n03", e:"📅", t:"おてつだいが 平日/休日タブに", b:"毎日のおてつだいを、平日／休日のタブで切り替えられるようになりました。今日に合うタブが自動で開きます。"},
+  {id:"n02", e:"🎰", t:"ガチャに確定演出＆新シリーズ", b:"SR以上で水やりの瞬間に流れ星・オーロラなどの予兆演出が出るように。図鑑に「世界のお金」シリーズも追加！"},
+  {id:"n01", e:"🖼", t:"背景きせかえ追加", b:"累計クリアで、海・夕焼け・夜空・宇宙・オーロラ・桜・森 などの背景が解放されます。"},
+];
+function NewsModal({onClose}){
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(8,6,18,.6)",backdropFilter:"blur(2px)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"82vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 30px rgba(0,0,0,.3)"}}>
+        <div style={{padding:"16px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${BORDER}`}}>
+          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>📢 おしらせ</span>
+          <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
+        </div>
+        <div style={{overflowY:"auto",padding:"12px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+          {NEWS.map((n,i)=>(
+            <div key={n.id} style={{background:CARD,border:`1.5px solid ${i===0?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:10,display:"flex",gap:11}}>
+              <div style={{fontSize:26,flexShrink:0}}>{n.e}</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontWeight:900,fontSize:14,color:TEXT}}>{n.t}</span>
+                  {i===0&&<span style={{fontSize:10,fontWeight:900,color:"#fff",background:R,borderRadius:999,padding:"1px 6px"}}>NEW</span>}
+                </div>
+                <div style={{fontSize:12.5,color:TEXTS,lineHeight:1.6,marginTop:4}}>{n.b}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{textAlign:"center",color:MUTED,fontSize:11,marginTop:6}}>🌱 Tane Money は どんどん あたらしくなるよ</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 // DAILY TASKS
 // ═══════════════════════════════════════════════════════
 function DailyTasks({ child, data, update }) {
@@ -2834,6 +2875,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showZukan, setShowZukan] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
+  const [showNews, setShowNews] = useState(false);
+  const [newsSeen, setNewsSeen] = useState(()=>{try{return localStorage.getItem("tane_news_seen")||"";}catch(e){return "";}});
+  const hasNews = NEWS.length>0 && newsSeen!==NEWS[0].id;
+  const openNews = ()=>{ setShowNews(true); try{localStorage.setItem("tane_news_seen",NEWS[0].id);}catch(e){} setNewsSeen(NEWS[0].id); };
 
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
@@ -3196,6 +3241,18 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })}
       </div>
 
+      {/* 📢 おしらせ(新機能の告知) */}
+      {effectiveTab==="daily" && (
+        <div style={{padding:"10px 16px 0"}}>
+          <button onClick={openNews} style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${hasNews?GOLD:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,borderRadius:14,padding:"9px 14px",cursor:"pointer",fontFamily:F}}>
+            <span style={{fontSize:16}}>📢</span>
+            <span style={{flex:1,textAlign:"left",fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>おしらせ{hasNews?"・新機能があるよ！":""}</span>
+            {hasNews && <span style={{fontSize:10,fontWeight:900,color:"#fff",background:R,borderRadius:999,padding:"2px 8px"}}>NEW</span>}
+            <span style={{fontSize:13,color:MUTED}}>›</span>
+          </button>
+        </div>
+      )}
+
       {/* ── ストリーク消滅リマインダー ── */}
       {curStreak>=3 && !todayTaskDone && effectiveTab==="daily" && (
         <div style={{margin:"10px 16px 0",background:`linear-gradient(135deg,#fff8e1,#fffde7)`,border:`2px solid ${GOLD}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
@@ -3256,6 +3313,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* Gacha anim */}
       {gachaRes && <GachaAnim result={gachaRes} onClose={()=>setGachaRes(null)}/>}
       {showBattle && <BattleModal child={child} data={data} update={update} onClose={()=>setShowBattle(false)}/>}
+      {showNews && <NewsModal onClose={()=>setShowNews(false)}/>}
 
       {/* Reward confirm */}
       {rewardPop && (
