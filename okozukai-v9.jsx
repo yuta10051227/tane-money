@@ -1589,6 +1589,7 @@ function BattleModal({child,data,update,onClose}){
   const [log,setLog]=useState("");
   const [result,setResult]=useState(null);
   const [reward,setReward]=useState(null);
+  const [confetti]=useState(()=>[...Array(30)].map(()=>({x:Math.round(Math.random()*100),s:14+Math.round(Math.random()*18),d:(1.6+Math.random()*1.6).toFixed(2),dl:(Math.random()*0.9).toFixed(2),e:"⭐✨🎉🎊💫🎟🌟"[Math.floor(Math.random()*7)]})));
   const timers=useRef([]);
   const t=(fn,ms)=>{const id=setTimeout(fn,ms);timers.current.push(id);};
   useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);
@@ -1596,7 +1597,7 @@ function BattleModal({child,data,update,onClose}){
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
   const start=(i)=>{ const o=WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
   const finish=(r)=>{
-    setResult(r); setLog(r==="win"?"WIN！":"LOSE…");
+    setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
     if(r==="win"){
       const today=todayKey(); const lastWin=(data.battleWinDate||{})[child.id];
       if(lastWin!==today){ setReward("ticket"); update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1},battleWinDate:{...(d.battleWinDate||{}),[child.id]:today}})); }
@@ -1665,6 +1666,22 @@ function BattleModal({child,data,update,onClose}){
           {proj==="p"&&<div style={{position:"absolute",left:"24%",bottom:"42%",fontSize:30,filter:`drop-shadow(0 0 10px ${pMove.c})`,animation:"btProjP .45s linear forwards",zIndex:4}}>{pMove.e}</div>}
           {proj==="o"&&<div style={{position:"absolute",right:"24%",top:"32%",fontSize:30,filter:`drop-shadow(0 0 10px ${opp.move.c})`,animation:"btProjO .45s linear forwards",zIndex:4}}>{opp.move.e}</div>}
           {vs&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:6}}><div style={{fontSize:64,fontWeight:900,color:"#fff",textShadow:"0 0 22px #ff3b6b,0 0 8px #fff",animation:"btVs 1.1s ease-out"}}>VS</div></div>}
+          {result==="win"&&(
+            <div style={{position:"absolute",inset:0,zIndex:9,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",background:"radial-gradient(circle at 50% 44%,rgba(255,210,74,.4),rgba(7,6,17,.86))"}}>
+              <div style={{position:"absolute",width:"170%",height:"170%",background:"conic-gradient(from 0deg,rgba(255,210,74,.18),transparent 24deg,rgba(255,210,74,.18) 48deg,transparent 72deg,rgba(255,210,74,.18) 96deg,transparent 120deg,rgba(255,210,74,.18) 144deg,transparent 168deg,rgba(255,210,74,.18) 192deg,transparent 216deg,rgba(255,210,74,.18) 240deg,transparent 264deg,rgba(255,210,74,.18) 288deg,transparent 312deg,rgba(255,210,74,.18) 336deg,transparent 360deg)",animation:"btRays 9s linear infinite"}}/>
+              {confetti.map((c,i)=><span key={i} style={{position:"absolute",left:`${c.x}%`,top:"-6%",fontSize:c.s,animation:`btConf ${c.d}s linear ${c.dl}s infinite`}}>{c.e}</span>)}
+              <img src={pImg} style={{width:124,height:124,objectFit:"contain",imageRendering:"pixelated",zIndex:2,animation:"btWinJump 1s ease-in-out infinite",filter:"drop-shadow(0 0 16px #ffd24a)"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
+              <div style={{fontSize:56,fontWeight:900,color:"#fff",letterSpacing:2,textShadow:"0 0 26px #ffd24a,0 0 8px #fff",zIndex:2,marginTop:4,animation:"btWinText .6s cubic-bezier(.2,.9,.3,1.4)"}}>WIN！</div>
+              {reward==="ticket"&&<div style={{marginTop:8,fontSize:17,fontWeight:900,color:"#fff5cc",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🎟 ガチャチケット GET！</div>}
+            </div>
+          )}
+          {result==="lose"&&(
+            <div style={{position:"absolute",inset:0,zIndex:9,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(5,5,12,.84)"}}>
+              <img src={pImg} style={{width:98,height:98,objectFit:"contain",imageRendering:"pixelated",filter:"grayscale(.85) brightness(.6)",transform:"rotate(-7deg)",animation:"btShake .5s"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
+              <div style={{fontSize:46,fontWeight:900,color:"#9aa3b2",letterSpacing:2,textShadow:"0 2px 8px #000",marginTop:10,animation:"btLoseText .6s ease-out"}}>LOSE…</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginTop:8}}>もっと お世話して つよくなろう！</div>
+            </div>
+          )}
         </div>
       )}
       {phase!=="select" && (
@@ -1675,10 +1692,7 @@ function BattleModal({child,data,update,onClose}){
           </>}
           {result && (
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:24,fontWeight:900,color:result==="win"?"#ffd24a":"#fff",marginBottom:6,textShadow:result==="win"?"0 0 12px #ffd24a":"none"}}>{result==="win"?"🎉 WIN！":"LOSE…"}</div>
-              {result==="win"&&reward==="ticket"&&<div style={{color:"#bff0c8",fontSize:13,fontWeight:800,marginBottom:10}}>🎟 ガチャチケットを 1まい もらった！</div>}
               {result==="win"&&reward==="none"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>きょうのチケットは もうもらったよ（また あした）</div>}
-              {result==="lose"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>もっと お世話して つよくなろう！</div>}
               <div style={{display:"flex",gap:10}}>
                 <button onClick={()=>{setPhase("select");setResult(null);}} style={{flex:1,background:"rgba(255,255,255,.15)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,cursor:"pointer",fontFamily:F}}>もういちど</button>
                 <button onClick={onClose} style={{flex:1,background:"#34C77B",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,cursor:"pointer",fontFamily:F}}>おわる</button>
@@ -1694,6 +1708,11 @@ function BattleModal({child,data,update,onClose}){
         @keyframes btProjP{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(56vw,-26vh) scale(1.15);opacity:1}}
         @keyframes btProjO{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(-56vw,24vh) scale(1.15);opacity:1}}
         @keyframes btVs{0%{transform:scale(2.6);opacity:0}25%{transform:scale(1);opacity:1}75%{opacity:1}100%{transform:scale(1.15);opacity:0}}
+        @keyframes btRays{to{transform:rotate(360deg)}}
+        @keyframes btConf{0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(112vh) rotate(560deg);opacity:0}}
+        @keyframes btWinText{0%{transform:scale(2.4);opacity:0}45%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:1}}
+        @keyframes btWinJump{0%,100%{transform:translateY(0)}30%{transform:translateY(-22px)}55%{transform:translateY(-4px)}70%{transform:translateY(-12px)}}
+        @keyframes btLoseText{0%{transform:scale(1.5);opacity:0}50%{opacity:1}100%{opacity:1}}
       `}</style>
     </div>
   );
