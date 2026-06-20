@@ -25,12 +25,51 @@ const DAY_ANCHOR = jdn(1990, 10, 5) - 39;
 // Lahiri アヤナムシャ近似（J2000=約23.86°, 約0.0139°/年ドリフト）
 function lahiri(year) { return 23.86 + (year - 2000) * 0.013889; }
 
+/* ── 節入り（節月の境界）時刻の算出 ─────────────────────────────
+   四柱推命の節月境界は「太陽黄経が 315°(立春) を起点に 30°刻み」=315,345,15,45...
+   = 315 + 30k (mod 360)。astronomy-engine の SearchSunLongitude で、
+   太陽がその黄経に達する瞬間（UTC）を二分探索的に求める（ライブラリ内部実装）。
+   computeChart の bucket 判定（Math.floor(norm(sunLon-315)/30)）と完全整合させるため、
+   ターゲット黄経も同じ式 315 + bucket*30 を使う。 */
+// 指定UTC時刻における「太陽黄経」(of date, tropical)。computeChart の elon(Sun) と同一定義。
+function sunLonAt(utcDate) { return norm(A.SunPosition(A.MakeTime(utcDate)).elon); }
+
+// utcDate が属する節月の「直前の節入り」と「直後の節入り」のUTC時刻を返す。
+// 返り値: { prev: Date, next: Date, bucket } 。bucket=0(寅月,立春)..11(丑月,小寒)。
+function setsuBoundaries(utcDate) {
+  const sunLon = sunLonAt(utcDate);
+  const bucket = Math.floor(norm(sunLon - 315) / 30); // computeChart と同一
+  const startLon = norm(315 + bucket * 30);           // 現在の節の開始黄経
+  const nextLon = norm(startLon + 30);                // 次の節の開始黄経
+  // 直前の節入り: 出生の45日前から前方探索（黄経は1日約0.9856°進むので30日強で1節）
+  const back = A.MakeTime(new Date(utcDate.getTime() - 45 * 86400000));
+  const prevEv = A.SearchSunLongitude(startLon, back, 60);
+  // 直後の節入り: 出生時刻から前方探索
+  const nextEv = A.SearchSunLongitude(nextLon, A.MakeTime(utcDate), 60);
+  return {
+    prev: prevEv ? prevEv.date : null,
+    next: nextEv ? nextEv.date : null,
+    bucket,
+  };
+}
+
+// 出生時刻 utcDate の「節入りからの経過日数」（蔵干深浅用）。直前の節入りが取れなければ null。
+function daysSinceSetsu(utcDate) {
+  const b = setsuBoundaries(utcDate);
+  if (!b.prev) return null;
+  return (utcDate.getTime() - b.prev.getTime()) / 86400000;
+}
+
 export function computeChart(birth) {
   const { date, time = "12:00", utcOffset = 9, lat = 35.68, lon = 139.69 } = birth || {};
   const [Y, M, D] = String(date).split("-").map(Number);
   const [hh, mm] = String(time).split(":").map(Number);
   const utc = new Date(Date.UTC(Y, M - 1, D, hh - utcOffset, mm || 0));
   const t = A.MakeTime(utc);
+
+  // 蔵干深浅用: 節入りからの経過日数（太陽黄経で求めた実節入り基準）。
+  let setsuDays = null;
+  try { setsuDays = daysSinceSetsu(utc); } catch { setsuDays = null; }
 
   // 天体黄経（of date, tropical）
   const elon = (body) =>
@@ -91,6 +130,7 @@ export function computeChart(birth) {
   return {
     text: lines.join("\n"),
     yearPillar, monthPillar, dayPillar, hourPillar, dayMaster: G[dayStem],
+    setsuDays, // 節入りからの経過日数（蔵干深浅用。求まらなければ null）
     western: Object.fromEntries(Object.entries(P).map(([k, v]) => [k, signOf(v)])),
     asc: signOf(asc),
     nakshatra: NAK[nakIdx],
@@ -203,6 +243,57 @@ function tenGod(meStem, otherStem) {
   if (GEN[ot] === me) return sameYin ? "偏印" : "印綬";   // 彼 生 我
   return "比肩";
 }
+/* ──────────────────────────────────────────────────────────────
+   蔵干（蔵干深浅）テーブル ── 高尾系/四柱推命の標準表（余気→中気→本気）。
+   各十二支は「節入りからの経過日数」で蔵干が 余気→(中気)→本気 と切り替わる。
+   下表は高尾系・四柱推命で広く流布する標準対応（『四柱推命 蔵干深浅表』）。
+   各エントリは [蔵干, その蔵干が支配する“節入りからの日数しきい値(上限,含まず)”]。
+   日数 d (節入りからの経過日数, 0始まり) が小さい順に：
+     d < 余気しきい → 余気の干
+     d < 中気しきい → 中気の干（中気が無い支は余気→本気の2段）
+     それ以外       → 本気の干
+   ── 標準表（節入りからの日数しきい値） ──────────────────────────────
+     子: 余気 壬(10日)            / 本気 癸
+     丑: 余気 癸(9日)  中気 辛(12日) / 本気 己
+     寅: 余気 戊(7日)  中気 丙(14日) / 本気 甲
+     卯: 余気 甲(10日)            / 本気 乙
+     辰: 余気 乙(9日)  中気 癸(12日) / 本気 戊
+     巳: 余気 戊(5日)  中気 庚(14日) / 本気 丙
+     午: 余気 丙(10日) 中気 己(20日) / 本気 丁
+     未: 余気 丁(9日)  中気 乙(12日) / 本気 己
+     申: 余気 己(7日)  中気 壬(14日) / 本気 庚   ※余気を戊とする流派もあるが高尾系は己/壬/庚
+     酉: 余気 庚(10日)            / 本気 辛
+     戌: 余気 辛(9日)  中気 丁(12日) / 本気 戊
+     亥: 余気 戊(7日)            / 本気 壬   ※亥は中気(甲)を立てる流派もあるが高尾系は戊→壬の2段
+   ── 出典：高尾義政系算命学／四柱推命で広く用いられる蔵干深浅の公知標準表。
+   ──────────────────────────────────────────────────────────────── */
+const HIDDEN_DEEP = {
+  子: [["壬", 10], ["癸", Infinity]],
+  丑: [["癸", 9], ["辛", 12], ["己", Infinity]],
+  寅: [["戊", 7], ["丙", 14], ["甲", Infinity]],
+  卯: [["甲", 10], ["乙", Infinity]],
+  辰: [["乙", 9], ["癸", 12], ["戊", Infinity]],
+  巳: [["戊", 5], ["庚", 14], ["丙", Infinity]],
+  午: [["丙", 10], ["己", 20], ["丁", Infinity]],
+  未: [["丁", 9], ["乙", 12], ["己", Infinity]],
+  申: [["己", 7], ["壬", 14], ["庚", Infinity]],
+  酉: [["庚", 10], ["辛", Infinity]],
+  戌: [["辛", 9], ["丁", 12], ["戊", Infinity]],
+  亥: [["戊", 7], ["壬", Infinity]],
+};
+
+// 節入りからの経過日数 days で、支 branch の蔵干（本気/中気/余気）を返す。
+// days が未知(null/undefined/NaN)の場合は本気を返す（後方互換: 従来 HIDDEN は本気のみだった）。
+function hiddenStemForBranch(branch, days) {
+  const table = HIDDEN_DEEP[branch];
+  if (!table) return HIDDEN[branch];
+  if (days == null || Number.isNaN(days)) return table[table.length - 1][0]; // 本気
+  for (const [stem, limit] of table) {
+    if (days < limit) return stem;
+  }
+  return table[table.length - 1][0];
+}
+
 const STAR_DESC = {
   貫索星: { emoji: "🌳", title: "独立独歩タイプ", desc: "マイペースに一つを貫く人。ブレない軸が最大の強み。", biz: "流行を追うより『自分のやり方をコツコツ続ける』ことで信頼と実績が積み上がります。", attack: "続けてきた定番をもう一歩前へ。" },
   石門星: { emoji: "🤝", title: "輪を広げるタイプ", desc: "人を巻き込み輪を作る社交家。仲間づくりが得意。", biz: "一人で抱えるより、コラボ・コミュニティ・チームで動くと一気に伸びます。", attack: "仲間・コラボに声をかけて巻き込みを。" },
@@ -222,7 +313,8 @@ export function sanmei(birth) {
     const c = computeChart(birth);
     const me = c.dayMaster;
     const monthBranch = String(c.monthPillar).slice(-1);
-    const hidden = HIDDEN[monthBranch] || me;
+    // 月支元命＝蔵干深浅（節入りからの経過日数で 余気/中気/本気 を切替）。
+    const hidden = hiddenStemForBranch(monthBranch, c.setsuDays) || me;
     const god = tenGod(me, hidden);
     const star = TEN_GOD_TO_STAR[god] || "貫索星";
     return { star, god, ...STAR_DESC[star] };
@@ -345,9 +437,12 @@ export function sanmeiDetail(birth) {
     const dayBranch = String(c.dayPillar).slice(-1);
 
     // ── 五主星（十大主星） ──
-    const center = buildStar("center", me, HIDDEN[monthBranch] || me); // 月支蔵干
-    const north = buildStar("north", me, HIDDEN[yearBranch] || me);    // 年支蔵干
-    const south = buildStar("south", me, HIDDEN[dayBranch] || me);     // 日支蔵干
+    // 中央(中心星=月支元命)は蔵干深浅（節入りからの経過日数で余気/中気/本気）を適用。
+    // 年支/日支は人体星図の標準どおり本気(元命)を用いる（出生の経過日数は月支基準のため
+    // 年支/日支に流用すると不正確になる。深浅は中心星=月支に限定するのが高尾系標準）。
+    const center = buildStar("center", me, hiddenStemForBranch(monthBranch, c.setsuDays) || me); // 月支蔵干(深浅)
+    const north = buildStar("north", me, hiddenStemForBranch(yearBranch, null) || me);  // 年支蔵干(本気)
+    const south = buildStar("south", me, hiddenStemForBranch(dayBranch, null) || me);   // 日支蔵干(本気)
     const east = buildStar("east", me, monthStem);                     // 月干
     const west = buildStar("west", me, yearStem);                      // 年干
     const stars = [center, north, south, east, west];
@@ -488,19 +583,22 @@ export function daiun(birth) {
   else if (gender === "female") forward = !yangYear; // 陰女=順 / 陽女=逆
   else { forward = true; assumed = true; }           // 未設定は順行仮定
 
-  // 立運（開始年齢）の近似: 出生時の太陽黄経から次の節（30°境界, 起点315°）までの度数。
-  // 順行なら次の節まで、逆行なら前の節までの度数を使う（簡易）。1°≒1日, 3日=1歳。
+  // 立運（開始年齢）＝標準式: 出生から「次（順行）／前（逆行）の節入り」までの実日数 ÷ 3 = 歳。
+  // 節入り時刻は astronomy-engine の太陽黄経探索(SearchSunLongitude)で実時刻を求める。
+  // 順行(陽男陰女): 出生→直後の節入り までの日数 / 3。
+  // 逆行(陰男陽女): 直前の節入り→出生 までの日数 / 3。
   let startAge = 0;
   try {
     const [Y, M, D] = String(birth.date).split("-").map(Number);
     const [hh = 12, mm = 0] = String(birth.time || "12:00").split(":").map(Number);
     const utcOffset = birth.utcOffset ?? 9;
     const utc = new Date(Date.UTC(Y, M - 1, D, hh - utcOffset, mm));
-    const sunLon = norm(A.SunPosition(A.MakeTime(utc)).elon);
-    const fromSetsu = norm(sunLon - 315); // 立春315°起点での節内位置 0..360
-    const within = fromSetsu % 30;        // 直近の節からの経過度数
-    const deg = forward ? (30 - within) : within; // 次/前の節までの度数
-    startAge = Math.max(0, Math.round((deg / 3) * 10) / 10); // 度=日, /3=年
+    const b = setsuBoundaries(utc);
+    let days;
+    if (forward) days = b.next ? (b.next.getTime() - utc.getTime()) / 86400000 : null;
+    else days = b.prev ? (utc.getTime() - b.prev.getTime()) / 86400000 : null;
+    if (days != null && days >= 0) startAge = Math.round((days / 3) * 10) / 10; // 3日=1歳
+    else startAge = 0;
   } catch { startAge = 0; }
 
   // 現在年齢
