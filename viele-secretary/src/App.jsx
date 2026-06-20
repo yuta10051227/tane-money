@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -268,6 +268,50 @@ const TEMPLATES = {
     { label: "メッセージカード・飾り付けを準備", daysBefore: 2 },
     { label: "当日の段取りを確認", daysBefore: 1 },
   ],
+  "オンライン講座・説明会": [
+    { label: "告知文・申込ページを準備", daysBefore: 21 },
+    { label: "募集ページ公開・SNS告知", daysBefore: 18 },
+    { label: "参加者へリマインド①", daysBefore: 7 },
+    { label: "Zoom/配信URLを参加者へ送付", daysBefore: 3 },
+    { label: "スライド・資料の最終確認", daysBefore: 2 },
+    { label: "参加者へ前日リマインド", daysBefore: 1 },
+  ],
+  "サロン・施術イベント": [
+    { label: "予約枠を開放・告知", daysBefore: 14 },
+    { label: "SNS/LINEで集客告知", daysBefore: 10 },
+    { label: "材料・備品の在庫確認・発注", daysBefore: 7 },
+    { label: "参加者リスト・当日の流れを確認", daysBefore: 3 },
+    { label: "施術スペース・機材の準備", daysBefore: 1 },
+  ],
+  "出張施術": [
+    { label: "訪問先との日程・場所を確定", daysBefore: 14 },
+    { label: "材料・備品・道具のリストアップ", daysBefore: 7 },
+    { label: "交通・駐車場の確認", daysBefore: 3 },
+    { label: "持ち物パッキング・前日確認", daysBefore: 1 },
+  ],
+  "ハンドメイド出店": [
+    { label: "材料の発注", daysBefore: 30 },
+    { label: "制作開始", daysBefore: 21 },
+    { label: "作品の検品・価格付け", daysBefore: 10 },
+    { label: "梱包・ラッピング準備", daysBefore: 5 },
+    { label: "Instagram/SNS告知", daysBefore: 3 },
+    { label: "搬入物・当日設営の準備確認", daysBefore: 1 },
+  ],
+  "ハンドメイド新作リリース": [
+    { label: "材料の発注", daysBefore: 30 },
+    { label: "試作・制作", daysBefore: 21 },
+    { label: "撮影・写真の準備", daysBefore: 10 },
+    { label: "商品説明文・価格の設定", daysBefore: 5 },
+    { label: "Instagram/SNS告知投稿", daysBefore: 3 },
+    { label: "販売ページの最終確認", daysBefore: 1 },
+  ],
+  "撮影・収録": [
+    { label: "香盤・台本・構成を確定", daysBefore: 14 },
+    { label: "機材・小道具のリストアップ", daysBefore: 7 },
+    { label: "ロケハン・撮影場所の確認", daysBefore: 5 },
+    { label: "衣装・メイクの準備", daysBefore: 3 },
+    { label: "機材充電・SDカード確認", daysBefore: 1 },
+  ],
 };
 
 /* 二段ローンチ等の「逆算テンプレ」。基準日(offset 0)からの相対日数で締切群を自動生成 */
@@ -334,6 +378,12 @@ const AUTO_RULES = [
   { kw: /誕生日|誕生会|バースデー|記念日|アニバーサリー|birthday/i, tpl: "誕生日・記念日" },
   { kw: /旅行|家族旅行|帰省| travel|trip/i, tpl: "旅行" },
   { kw: /日帰り/, tpl: "日帰り" },
+  { kw: /撮影|収録|ロケ|撮り/, tpl: "撮影・収録" },
+  { kw: /出店|マルシェ|クラフト|ハンドメイド|ハンドメード|手作り/, tpl: "ハンドメイド出店" },
+  { kw: /新作リリース|新作公開|作品リリース/, tpl: "ハンドメイド新作リリース" },
+  { kw: /出張施術|訪問施術|出張セッション|訪問セッション/, tpl: "出張施術" },
+  { kw: /施術|サロン|トリートメント/, tpl: "サロン・施術イベント" },
+  { kw: /オンライン講座|説明会|オンラインセミナー|体験会|講座|レッスン/, tpl: "オンライン講座・説明会" },
   { kw: /出張|登壇|遠征|遠方|セミナー|講演|イベント/, tpl: "遠方登壇" },
 ];
 
@@ -1400,6 +1450,52 @@ function Acc({ title, color, badge, defaultOpen, children }) {
   );
 }
 
+/* 生年月日クイック入力バナー（出生情報未登録時のみ表示。日付だけ入れると即・今日の運気が出る導線） */
+function BirthQuickInput({ onSave, onDismiss }) {
+  const [date, setDate] = useState("");
+  const [done, setDone] = useState(false);
+  const todayKoyomiQ = (() => {
+    try { return typeof koyomi === 'function' ? koyomi(iso(new Date())) : null; }
+    catch { return null; }
+  })();
+  const save = () => {
+    if (!date) return;
+    const p = [35.69, 139.69]; // 東京デフォルト
+    onSave({ date, time: "12:00", place: "東京", lat: p[0], lon: p[1], utcOffset: 9, gender: "" });
+    setDone(true);
+  };
+  if (done) return null;
+  return (
+    <div style={{ background: C.panel, border: `2px solid ${C.purple}`, borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 20, flex: "0 0 auto" }}>🔮</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple }}>生年月日を入れると「今日の動き」が出ます</div>
+          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.5, marginTop: 2 }}>日付だけでOK。入れた瞬間に今日のコンディションが反映されます。</div>
+        </div>
+        {onDismiss && (
+          <button onClick={onDismiss} style={iconBtn} title="閉じる">✕</button>
+        )}
+      </div>
+      {todayKoyomiQ && todayKoyomiQ.labels && todayKoyomiQ.labels.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {todayKoyomiQ.labels.map((l) => (
+            <span key={l.key} style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: C.accent, borderRadius: 999, padding: "2px 10px" }}>
+              {l.emoji}今日は{l.name}
+            </span>
+          ))}
+          <span style={{ fontSize: 12, color: C.sub }}>生年月日を入れてあなたの運気と合わせて確認を</span>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, flex: "1 1 160px" }} />
+        <button onClick={save} disabled={!date} style={{ ...chipBtn, background: date ? C.purple : "transparent", color: date ? "#fff" : C.sub, borderColor: date ? C.purple : C.line, fontWeight: 700, flex: "0 0 auto" }}>今日の運気を見る</button>
+      </div>
+      <div style={{ fontSize: 12, color: C.faint, marginTop: 6 }}>出生地・時刻は「運気タブ &gt; 出生情報の編集」で後から詳しく入れられます。</div>
+    </div>
+  );
+}
+
 // 出生情報エディタ（1回入力すれば保存され毎回反映）
 function BirthEditor({ birth, onSave }) {
   const b = birth || {};
@@ -1483,6 +1579,11 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
     try { return birth && birth.date ? dayEnergy(birth, iso(new Date())) : null; }
     catch { return null; }
   }, [birth && birth.date, birth && birth.time]);
+  // 今日の開運日（koyomiが未定義でも落ちない）
+  const todayKoyomiHome = useMemo(() => {
+    try { return typeof koyomi === 'function' ? koyomi(iso(new Date())) : null; }
+    catch { return null; }
+  }, []);
   const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
   // 今週（今日から7日）の攻めの日 → 発信・営業を寄せる狙い目として提示
   const weekAttack = useMemo(() => {
@@ -1559,9 +1660,24 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
       </button>
       {t.theme && <div style={{ fontSize: 15, fontWeight: 700, margin: "6px 0 4px" }}>{t.theme}</div>}
       {mode && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
           <span style={{ flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#0B0D11", background: mode.color, borderRadius: 999, padding: "2px 10px" }}>今日は{mode.label}</span>
+          {todayKoyomiHome && todayKoyomiHome.labels && todayKoyomiHome.labels.length > 0 && todayKoyomiHome.labels.map((l) => (
+            <span key={l.key} style={{ flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#0B0D11", background: todayKoyomiHome.best ? C.green : C.accent, borderRadius: 999, padding: "2px 10px" }}>
+              {l.emoji}今日は{l.name}
+            </span>
+          ))}
           {mode.tip && <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.sub, lineHeight: 1.4 }}>{mode.tip}</span>}
+        </div>
+      )}
+      {/* 出生情報未登録時：開運日だけは出す（birth不要） */}
+      {!birth && todayKoyomiHome && todayKoyomiHome.labels && todayKoyomiHome.labels.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+          {todayKoyomiHome.labels.map((l) => (
+            <span key={l.key} style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: C.accent, borderRadius: 999, padding: "2px 10px" }}>
+              {l.emoji}今日は{l.name}
+            </span>
+          ))}
         </div>
       )}
       {advice && (
@@ -1614,6 +1730,11 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
   const todayD = base.getDate();
   const dateList = useMemo(() => Array.from({ length: dim }, (_, i) => `${yy}-${pad2(mm + 1)}-${pad2(i + 1)}`), [yy, mm, dim]);
   const stances = useMemo(() => (birth && birth.date ? stancesFor(birth, dateList) : {}), [birth && birth.date, birth && birth.time, dateList.join(",")]);
+  // 開運日（一粒万倍日・天赦日・己巳の日・巳の日・寅の日）をkoyomiMonthで取得
+  const koyomiData = useMemo(() => {
+    try { return typeof koyomiMonth === 'function' ? koyomiMonth(yy, mm + 1) : {}; }
+    catch { return {}; }
+  }, [yy, mm]);
   const marks = useMemo(() => {
     const m = {};
     const add = (d, label) => { if (!d) return; const k = String(d).slice(0, 10); (m[k] = m[k] || []).push(label); };
@@ -1662,15 +1783,21 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
           const isToday = isCurrent && d === todayD;
           const hasMark = !!marks[k];
           const isSel = sel === k;
+          const koyomiLabels = koyomiData[k] || [];
+          const hasKoyomi = koyomiLabels.length > 0;
+          // 攻め×開運日＝ダブルで良い日
+          const isDouble = ui && st.stance === "攻め" && hasKoyomi;
+          const koyomiTip = koyomiLabels.map((l) => l.emoji + l.name).join("・");
           return (
             <button key={k} onClick={() => setSel(isSel ? null : k)}
-              title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
-              style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: ui ? ui.color + (isSel ? "44" : "22") : C.panel2, border: isSel ? `2px solid ${C.purple}` : isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, font: "inherit" }}>
+              title={`${mm + 1}/${d}${ui ? ` ・ ${st.stance}（${ui.tip}）` : ""}${hasKoyomi ? ` ・ ${koyomiTip}` : ""}${hasMark ? ` ・ ${marks[k].join(" / ")}` : ""}`}
+              style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, background: isDouble ? C.green + "44" : ui ? ui.color + (isSel ? "44" : "22") : C.panel2, border: isSel ? `2px solid ${C.purple}` : isDouble ? `2px solid ${C.green}` : isToday ? `2px solid ${C.accent}` : `1px solid ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", padding: 0, font: "inherit" }}>
               <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.05 }}>
                 <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: ui ? ui.color : C.sub }}>{d}</span>
-                {ui && <span style={{ fontSize: 12, fontWeight: 700, color: ui.color }}>{ui.mark}</span>}
+                {ui && <span style={{ fontSize: 12, fontWeight: 700, color: isDouble ? C.green : ui.color }}>{ui.mark}</span>}
+                {hasKoyomi && <span style={{ fontSize: 10, lineHeight: 1 }}>{koyomiLabels[0].emoji}</span>}
               </span>
-              {hasMark && <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: C.purple }} />}
+              {hasMark && <span style={{ position: "absolute", bottom: 3, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: C.purple }} />}
             </button>
           );
         })}
@@ -1690,6 +1817,21 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
             </div>
             {st && <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 6 }}>{st.focus}</div>}
             {st && st.stance === "攻め" && sm && sm.attack && <div style={{ fontSize: 12, color: C.green, lineHeight: 1.6, marginTop: 4 }}>{sm.emoji}あなたは{sm.star}。{sm.attack}</div>}
+            {(() => {
+              const kl = koyomiData[sel] || [];
+              if (!kl.length) return null;
+              const isDoubleDay = st && st.stance === "攻め";
+              return (
+                <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {kl.map((l) => (
+                    <span key={l.key} style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: isDoubleDay ? C.green : C.accent, borderRadius: 999, padding: "1px 9px" }}>
+                      {l.emoji}{l.name}
+                    </span>
+                  ))}
+                  {isDoubleDay && <span style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>攻め×開運日 ダブルで良い日！</span>}
+                </div>
+              );
+            })()}
             {marks[sel] && (
               <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>📌 この日の予定：{marks[sel].join(" / ")}</div>
             )}
@@ -1707,7 +1849,26 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
           </span>
         ))}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定あり</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>✨開運日（タップで詳細）</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 12, color: C.green }}>■</span>攻め×開運日</span>
       </div>
+      {/* 今月の開運日一覧 */}
+      {(() => {
+        const koyomiDays = Object.entries(koyomiData).sort(([a], [b]) => a.localeCompare(b));
+        if (!koyomiDays.length) return null;
+        return (
+          <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 6 }}>✨ 今月の開運日</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {koyomiDays.map(([dateKey, labels]) => (
+                <span key={dateKey} style={{ fontSize: 12, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "2px 8px" }}>
+                  {Number(dateKey.slice(5, 7))}/{Number(dateKey.slice(8, 10))} {labels.map((l) => l.emoji + l.name).join("・")}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {/* 狙い目（攻めの日） */}
       {attackDays.length > 0 && (
         <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 12 }}>
@@ -2167,6 +2328,11 @@ function AishouPanel({ birth, members }) {
 function SanmeiFlow({ birth }) {
   const [showMore, setShowMore] = useState(false);
   const un = useMemo(() => sanmeiUn(birth, iso(new Date())), [birth && birth.date, birth && birth.time]);
+  // 今日の開運日（optional: koyomiが未定義でも落ちない）
+  const todayKoyomi = useMemo(() => {
+    try { return typeof koyomi === "function" ? koyomi(iso(new Date())) : null; }
+    catch { return null; }
+  }, []);
   if (!un) return null;
   const stColor = un.day.stance === "攻め" ? C.green : un.day.stance === "守り" ? C.red : un.day.stance === "労い" ? C.blue : C.accent;
   const Period = ({ label, u, color }) => (
@@ -2182,7 +2348,20 @@ function SanmeiFlow({ birth }) {
       defaultOpen
       badge={<span style={{ fontSize: 13, color: stColor, fontWeight: 700 }}>今日{un.day.emoji}{un.day.star}</span>}
     >
-      <div style={{ fontSize: 13, color: C.faint, marginBottom: 8 }}>あなたの日干に、今動いている星（十大主星）を重ねて“流れ・動き方”を出します。人体星図と同じ星の言葉です。</div>
+      <div style={{ fontSize: 13, color: C.faint, marginBottom: 8 }}>あなたの日干に、今動いている星（十大主星）を重ねて"流れ・動き方"を出します。人体星図と同じ星の言葉です。</div>
+      {/* 開運日バッジ */}
+      {todayKoyomi && todayKoyomi.labels && todayKoyomi.labels.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+          {todayKoyomi.labels.map((l) => (
+            <span key={l.key} style={{ fontSize: 13, fontWeight: 700, color: "#0B0D11", background: todayKoyomi.best ? C.green : C.accent, borderRadius: 999, padding: "2px 10px" }}>
+              {l.emoji} 今日は{l.name}
+            </span>
+          ))}
+          {un.day.stance === "攻め" && todayKoyomi.labels.length > 0 && (
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.green }}>攻め×開運日 最高のタイミング！</span>
+          )}
+        </div>
+      )}
       <div style={{ background: stColor + "14", border: `1px solid ${stColor}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: stColor, marginBottom: 2 }}>今日 ・ {un.day.emoji} {un.day.star}（{un.day.title}） ・ {un.day.stance}</div>
         <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{un.day.move}</div>
@@ -2225,14 +2404,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
     >
       {aiOff && <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>※ AI機能は現在オフです</div>}
       {(!birth || !birth.date) && (
-        <div style={{ background: C.panel2, border: `1px solid ${C.purple}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.purple, marginBottom: 6 }}>
-            まず、あなたの出生情報を入力してください
-          </div>
-          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
-            占いはあなたの命式から計算します。下の「出生情報を入力」を開いて生年月日を登録すると、あなた専用の運気が出ます。
-          </div>
-        </div>
+        <BirthQuickInput onSave={onSaveBirth} />
       )}
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
@@ -3465,7 +3637,7 @@ export default function App() {
 
   if (firebaseEnabled && user === undefined) return <Splash text="読み込み中…" />;
   if (firebaseEnabled && user === null) return <LoginGate onLogin={login} error={authError} />;
-  // 許可リスト外でログインした人は“行き止まり”にせず、事前登録（waitlist）へ案内する
+  // 許可リスト外でログインした人は"行き止まり"にせず、事前登録（waitlist）へ案内する
   if (error && error.code === "permission-denied") return <WaitlistScreen user={user} onSignOut={logout} />;
   if (error) return <ErrorScreen error={error} onSignOut={logout} />;
   if (loading || !data) return <Splash text="読み込み中…" />;
@@ -3773,6 +3945,13 @@ export default function App() {
                 );
               })()}
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
+              {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
+              {(!data.birth || !data.birth.date) && !data.sampleNotice && (
+                <BirthQuickInput
+                  onSave={(b) => { update({ birth: b }); setTab("fortune"); }}
+                  onDismiss={null}
+                />
+              )}
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               {catMsg && (
