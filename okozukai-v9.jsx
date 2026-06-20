@@ -1556,6 +1556,32 @@ const PLAYER_MOVES = [
   {n:"いなずまスパーク", e:"⚡", c:"#ffe14a"},
 ];
 const pickMove = (id)=> PLAYER_MOVES[[...String(id||"")].reduce((a,c)=>a+c.charCodeAt(0),0) % PLAYER_MOVES.length];
+// バトルのステータス(育てた度で決まる)を一元化
+function battleStats(data, child){
+  const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5};
+  return {
+    hp: 60+(m.stage||0)*25+(iv.hp||5)*4+(m.careDays||0)*3,
+    atk:12+(m.stage||0)*5+(iv.atk||5)*2+Math.floor((m.gauge||0)/4),
+    def:6 +(m.stage||0)*3+(iv.def||5)*2,
+    curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう",
+    move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
+  };
+}
+// 現在HP(日替わりで全回復・バトルで減ったら持ち越し)
+function curMonHP(data, child){
+  const max=battleStats(data,child).hp;
+  const stored=(data.monsterHP||{})[child.id];
+  const sameDay=(data.monsterHPDate||{})[child.id]===todayKey();
+  return (sameDay && stored!==undefined) ? Math.max(0,Math.min(max,stored)) : max;
+}
+// お世話で回復(ratio=最大HPの割合ぶん回復)。満タンなら何もしない
+function healMon(d, cid, ratio){
+  const max=battleStats(d,{id:cid}).hp;
+  const sameDay=(d.monsterHPDate||{})[cid]===todayKey();
+  const cur=(sameDay && (d.monsterHP||{})[cid]!==undefined)?(d.monsterHP||{})[cid]:max;
+  if(cur>=max) return d;
+  return {...d, monsterHP:{...(d.monsterHP||{}),[cid]:Math.min(max,Math.round(cur+max*ratio))}, monsterHPDate:{...(d.monsterHPDate||{}),[cid]:todayKey()}};
+}
 function HPBar({label,hp,max,color}){
   const pct=Math.max(0,Math.round(hp/max*100));
   return (<div>
@@ -1564,16 +1590,10 @@ function HPBar({label,hp,max,color}){
   </div>);
 }
 function BattleModal({child,data,update,onClose}){
-  const mon = getMonState(data,child);
-  const iv  = (data.monsterIV||{})[child.id] || {hp:5,atk:5,def:5};
-  const careDays = mon.careDays||0;
-  const pStage = mon.stage||0;
-  const pMaxHP = 60 + pStage*25 + (iv.hp||5)*4 + careDays*3;
-  const pATK   = 12 + pStage*5 + (iv.atk||5)*2 + Math.floor((mon.gauge||0)/4);
-  const pDEF   = 6  + pStage*3 + (iv.def||5)*2;
-  const pImg   = `/assets/monster_${mon.curId}_f0.png`;
-  const pName  = (data.monsterNickname||{})[child.id] || mon.def?.label || "あいぼう";
-  const pMove  = pickMove(mon.curId);
+  const stats  = battleStats(data,child);
+  const pMaxHP = stats.hp, pATK = stats.atk, pDEF = stats.def, pImg = stats.img, pName = stats.name, pMove = stats.move;
+  const curHP  = curMonHP(data,child);
+  const lowHP  = curHP < Math.max(20, Math.round(pMaxHP*0.2));
   const [oppIdx,setOppIdx]=useState(0);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
@@ -1582,7 +1602,7 @@ function BattleModal({child,data,update,onClose}){
   const oDEF   = 4 + opp.lv*3;
   const MAXR=3;
   const [phase,setPhase]=useState("select");
-  const [pHP,setPHP]=useState(pMaxHP);
+  const [pHP,setPHP]=useState(curHP);
   const [oHP,setOHP]=useState(oMaxHP);
   const [round,setRound]=useState(1);
   const [busy,setBusy]=useState(true);
@@ -1601,20 +1621,22 @@ function BattleModal({child,data,update,onClose}){
   const oppSrc = opp.boss ? `/assets/${opp.img}.png` : `/assets/${opp.img}_${afrm%3}.png`;
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
-  const start=(i)=>{ const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
-  const finish=(r)=>{
+  const start=(i)=>{ if(lowHP) return; const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
+  const finish=(r,finalHP)=>{
     setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
-    if(r==="win"){
-      const today=todayKey(); const giveTicket=(data.battleWinDate||{})[child.id]!==today;
-      const unlockBoss=(opp.lv>=7 && !opp.boss);
-      setReward(giveTicket?"ticket":"none");
-      update(d=>{ const nd={...d};
-        if(giveTicket){ nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1}; nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today}; }
-        if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
-        return nd; });
-    }
+    const today=todayKey();
+    const hpSave=Math.max(0,Math.round(finalHP));
+    const giveTicket=(r==="win") && (data.battleWinDate||{})[child.id]!==today;
+    const unlockBoss=(r==="win") && opp.lv>=7 && !opp.boss;
+    if(r==="win") setReward(giveTicket?"ticket":"none");
+    update(d=>{ const nd={...d};
+      nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
+      nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
+      if(giveTicket){ nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1}; nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today}; }
+      if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
+      return nd; });
   };
-  const finishByHP=(o,p)=> finish((p/pMaxHP) >= (o/oMaxHP) ? "win" : "lose");
+  const finishByHP=(o,p)=> finish((p/pMaxHP) >= (o/oMaxHP) ? "win" : "lose", p);
   // 1ターン=自分の攻撃→相手の攻撃。3ターンで決着(KOが無ければHP割合で判定)
   const doRound=()=>{
     if(busy||result||phase!=="fight") return;
@@ -1623,10 +1645,10 @@ function BattleModal({child,data,update,onClose}){
     const de=dmgCalc(oATK,pDEF); const newP=Math.max(0,pHP-de);
     setLog(`${pName}の ${pMove.n}！`); setProj("p");
     t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450);
-      if(newO<=0){ t(()=>finish("win"),720); return; }
+      if(newO<=0){ t(()=>finish("win",pHP),720); return; }
       t(()=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
         t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450);
-          if(newP<=0){ t(()=>finish("lose"),720); return; }
+          if(newP<=0){ t(()=>finish("lose",0),720); return; }
           t(()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } },520);
         },470);
       },560);
@@ -1643,22 +1665,27 @@ function BattleModal({child,data,update,onClose}){
           <div style={{textAlign:"center",color:"#fff",marginBottom:14}}>
             <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
-            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>HP {pMaxHP} · ⚔{pATK} · 🛡{pDEF}</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:3}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
+            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>⚔{pATK} · 🛡{pDEF}</div>
+            <div style={{width:180,maxWidth:"80%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:5}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
           </div>
+          {lowHP && <div style={{background:"rgba(224,86,79,.15)",border:"1.5px solid #e0564f",borderRadius:12,padding:"10px 12px",marginBottom:10,textAlign:"center"}}>
+            <div style={{color:"#ffb3ae",fontWeight:800,fontSize:13}}>つかれて たたかえない…💤</div>
+            <div style={{color:"rgba(255,255,255,.6)",fontSize:11,marginTop:2}}>お手伝い・なでなで で かいふくしよう！（あさになると 元気に）</div>
+          </div>}
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {WILD_MONSTERS.map((w,i)=>{
               const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
               const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
-              return <button key={i} onClick={()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:"pointer",fontFamily:F,textAlign:"center"}}>
+              return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
                 <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
                 <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥つよい":""}</div>
               </button>;
             })}
             {bossUnlocked ? (
-              <button onClick={()=>start(WILD_MONSTERS.length)} style={{background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:"pointer",fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
+              <button onClick={lowHP?undefined:()=>start(WILD_MONSTERS.length)} style={{background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
                 <img src={`/assets/${BOSS_MONSTER.img}.png`} style={{width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=BOSS_MONSTER.emoji;s.style.fontSize="40px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:900,fontSize:13,marginTop:4}}>{BOSS_MONSTER.name}</div>
                 <div style={{fontSize:11,color:BOSS_MONSTER.color,fontWeight:900,marginTop:2}}>Lv.{BOSS_MONSTER.lv} 👑ボス</div>
@@ -1679,7 +1706,7 @@ function BattleModal({child,data,update,onClose}){
           <div style={{position:"absolute",bottom:14,right:14,width:"45%"}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
           <div style={{position:"absolute",top:44,left:0,right:0,textAlign:"center",color:"#7fe0ff",fontWeight:900,fontSize:13,letterSpacing:3,textShadow:"0 0 6px #2aa0ff"}}>ROUND {Math.min(round,MAXR)} / {MAXR}</div>
           <div style={{position:"absolute",right:"12%",top:"22%",textAlign:"center"}}>
-            <img src={oppSrc} style={{width:opp.boss?116:98,height:opp.boss?116:98,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":(opp.boss?`drop-shadow(0 0 14px ${opp.color})`:"none"),animation:hit?.who==="opp"?"btShake .4s":"none"}} onError={e=>{const t=e.target;if(!t.dataset.fb){t.dataset.fb="1";t.src=`/assets/${opp.img}.png`;}else{const s=document.createElement("span");s.textContent=opp.emoji;s.style.fontSize="64px";t.replaceWith(s);}}}/>
+            <img src={oppSrc} style={{width:opp.boss?156:98,height:opp.boss?156:98,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 12px #fff)":(opp.boss?`drop-shadow(0 0 20px ${opp.color})`:"none"),animation:hit?.who==="opp"?"btShake .4s":(opp.boss?"btIdle 2.6s ease-in-out infinite":"none")}} onError={e=>{const t=e.target;if(!t.dataset.fb){t.dataset.fb="1";t.src=`/assets/${opp.img}.png`;}else{const s=document.createElement("span");s.textContent=opp.emoji;s.style.fontSize="64px";t.replaceWith(s);}}}/>
             {hit?.who==="opp"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
           <div style={{position:"absolute",left:"8%",bottom:"26%",textAlign:"center"}}>
@@ -1849,7 +1876,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }));
+    update(d => healMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -1861,7 +1888,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => ({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }));
+    update(d => healMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -2855,6 +2882,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     } else {
       showFlash(pts, task.emoji);
       addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
+      if(pts>0) update(d=>healMon(d,child.id,0.25));  // お手伝いでHP回復
     }
   };
 
@@ -6068,7 +6096,8 @@ function SeedMonster({ child, data, size=90, update }) {
         update(d => {
           const c = (d.monsterCare||{})[child.id] || {};
           if (c.last === today) return d;
-          return {...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}};
+          // なでなで(1日1回)でHPも回復
+          return healMon({...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}}, child.id, 0.3);
         });
       }
     }
