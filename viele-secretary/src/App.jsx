@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth, bestDays } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth, bestDays, shugojin } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -3082,6 +3082,22 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 10, wordBreak: "break-word" }}>取得に失敗：{String((error && error.message) || error)}</div>}
 
       {birth && birth.date && !fortune && !loading && !error && <Empty>「更新」を押すと運気が出ます。</Empty>}
+
+      {birth && birth.date && (() => {
+        const s = shugojin(birth);
+        return s ? (
+          <div style={{ background: `linear-gradient(135deg, ${C.purple}1F, ${C.accent}14)`, border: `1px solid ${C.purple}`, borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: C.accent, fontWeight: 700, letterSpacing: 1, marginBottom: 2 }}>🛡️ あなたの守護神</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{s.label}<span style={{ fontSize: 13, color: C.faint, fontWeight: 400 }}>　{s.sub ? `（副：${s.subLabel}）` : ""}</span></div>
+            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 4 }}>{s.meaning}</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>{s.summary}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <span style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "3px 10px" }}>開運色 <b style={{ color: C.text }}>{s.color}</b></span>
+              <span style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "3px 10px" }}>吉方位 <b style={{ color: C.text }}>{s.direction}</b></span>
+            </div>
+          </div>
+        ) : null;
+      })()}
 
       {birth && birth.date && (() => {
         const detail = sanmeiDetail(birth);
