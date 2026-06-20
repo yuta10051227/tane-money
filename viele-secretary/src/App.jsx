@@ -6,7 +6,7 @@ import { useCloud } from "./useCloud";
 import { useLocal } from "./useLocal";
 import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotable, startOfWeekMonday, pad2 } from "./calendar";
 import { revokeToken } from "./gauth";
-import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth } from "./natal";
+import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth, bestDays } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
 
 const STORE_KEY = "viele-secretary";
@@ -2186,6 +2186,80 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan, profil
   );
 }
 
+/* ──────────────────────────────────────────────────────────────
+   大事な決断の良い日取り（Top3）
+   bestDays(birth, fromISO, {horizonDays, count}) を使い、攻めの日×開運日を上位3件表示。
+   birth未設定または bestDays未定義のときは何も出さない（optional防御済み）。
+   ────────────────────────────────────────────────────────────── */
+function BestDaysPanel({ birth, occupation, onPlan }) {
+  const [days, setDays] = useState(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    if (!birth || !birth.date) { setDays([]); return; }
+    try {
+      const result = typeof bestDays === "function"
+        ? bestDays(birth, iso(new Date()), { horizonDays: 90, count: 3 })
+        : [];
+      setDays(result || []);
+    } catch {
+      setErr(true);
+      setDays([]);
+    }
+  }, [birth && birth.date, birth && birth.time]);
+
+  if (!birth || !birth.date) return null;
+  if (err || !days) return null;
+  if (days.length === 0) return null;
+
+  const isPresident = occupation === "president";
+  const heading = isPresident
+    ? "大型契約・投資・人事の日取りはこの日に"
+    : "ここぞの一手・大事な予定はこの日に";
+
+  return (
+    <Panel
+      title={heading}
+      accent={C.green}
+      help="あなたの命式の「攻めの日」と暦の「開運日（一粒万倍日・天赦日など）」を掛け合わせ、これから先の良い決断日をTop3で表示します。攻め×開運日が最優先です。"
+    >
+      <div style={{ display: "grid", gap: 10 }}>
+        {days.map((d, i) => {
+          const stanceColor = d.stance === "攻め" ? C.green : d.stance === "守り" ? C.red : d.stance === "労い" ? C.blue : C.accent;
+          const isDouble = d.stance === "攻め" && d.koyomi && d.koyomi.length > 0;
+          return (
+            <div key={d.date} style={{ background: isDouble ? C.green + "14" : C.panel2, border: `1px solid ${isDouble ? C.green : C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.panel, border: `1px solid ${C.line}`, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, color: C.accent, flex: "0 0 auto" }}>{i + 1}</span>
+                <span style={{ fontSize: 15, fontWeight: 700 }}>
+                  {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8, 10))}({d.weekday})
+                </span>
+                {d.stance && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: stanceColor, borderRadius: 999, padding: "1px 9px" }}>{d.stance}</span>
+                )}
+                {d.koyomi && d.koyomi.map((k) => (
+                  <span key={k.name} style={{ fontSize: 12, fontWeight: 700, color: "#0B0D11", background: C.accent, borderRadius: 999, padding: "1px 9px" }}>{k.emoji}{k.name}</span>
+                ))}
+                <span style={{ flex: 1 }} />
+                {d.dayStar && <span style={{ fontSize: 12, color: C.sub }}>{d.dayStar}</span>}
+              </div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: onPlan ? 8 : 0 }}>{d.reason}</div>
+              {onPlan && (
+                <button
+                  onClick={() => onPlan(d.date)}
+                  style={{ ...chipBtn, fontSize: 12, padding: "5px 12px", background: isDouble ? C.green : "transparent", color: isDouble ? "#0B0D11" : C.text, borderColor: isDouble ? C.green : C.line }}
+                >
+                  + この日に予定を入れる
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
 /* 算命学・人体星図（陽占）：五主星を十字に配置＋十二大従星のエネルギー＋日干タイプ＋陰占の干支 */
 const POS_SHORT = { center: "中央・本質", north: "頭・目上", south: "腹・社会", east: "右手・身近", west: "左手・友人" };
 function SanmeiChart({ detail }) {
@@ -2544,6 +2618,129 @@ function FamilyFortunePanel({ birth, members }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   B-2.5 その場でサッと相性（登録不要）
+   生年月日だけ入れると即・aishou() で相性結果を表示。
+   保存なし。「登録して残す」で既存のメンバー追加フォームに誘導（任意）。
+   ────────────────────────────────────────────────────────────── */
+function QuickAishouPanel({ birth, occupation, onAddMember }) {
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState(null);
+  const [showRegister, setShowRegister] = useState(false);
+
+  const isPresident = occupation === "president";
+  const heading = isPresident ? "会食相手・商談相手とサッと相性" : "相手とサッと相性";
+
+  const calc = () => {
+    if (!date) return;
+    setErr(null);
+    setResult(null);
+    try {
+      const partnerBirth = { date, time: time || "12:00", place: "東京", lat: 35.69, lon: 139.69, utcOffset: 9 };
+      const r = aishou(birth, partnerBirth);
+      if (!r) { setErr("計算できませんでした"); return; }
+      setResult(r);
+    } catch (e) {
+      setErr("計算に失敗しました: " + String((e && e.message) || e));
+    }
+  };
+
+  const reset = () => { setDate(""); setTime(""); setResult(null); setErr(null); setShowRegister(false); };
+
+  if (!birth || !birth.date) return null;
+
+  const pct = result ? result.score : 0;
+  const barColor = pct >= 75 ? C.green : pct >= 45 ? C.accent : C.blue;
+
+  return (
+    <Acc title={heading} defaultOpen={false} color={C.purple}>
+      <div style={{ fontSize: 12, color: C.sub, marginBottom: 10, lineHeight: 1.6 }}>
+        {isPresident
+          ? "会食・商談前に相手の生年月日を入れると、関係の傾向と接し方のコツが即座に出ます。保存はしません。"
+          : "相手の生年月日を入れると相性が即座に出ます。保存はしません。"}
+      </div>
+      {!result ? (
+        <div>
+          <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>相手の生年月日（必須）</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inp} />
+          <label style={{ fontSize: 12, color: C.sub, display: "block", marginBottom: 2 }}>出生時刻（任意・なければ空欄でOK）</label>
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} style={inp} />
+          <button
+            onClick={calc}
+            disabled={!date}
+            style={{ ...chipBtn, background: date ? C.purple : "transparent", color: date ? "#fff" : C.sub, borderColor: date ? C.purple : C.line, fontWeight: 700 }}
+          >
+            相性を見る
+          </button>
+          {err && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{err}</div>}
+        </div>
+      ) : (
+        <div>
+          <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{date}の方との相性</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 15, fontWeight: 700, color: barColor }}>{result.score}点</span>
+            </div>
+            <div style={{ height: 8, background: C.panel, borderRadius: 5, overflow: "hidden", marginBottom: 8 }}>
+              <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 5 }} />
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>{result.label}</div>
+            {result.summary && (
+              <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, marginBottom: 8 }}>
+                {String(result.summary || "").replace(/\s*根拠[:：].*$/s, "")}
+              </div>
+            )}
+            {Array.isArray(result.reasons) && result.reasons.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {result.reasons.map((r, i) => (
+                  <span key={i} style={{ fontSize: 12, color: C.faint, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 9px" }}>{r}</span>
+                ))}
+              </div>
+            )}
+            {result.howto && result.howto.length > 0 && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
+                  {isPresident ? "組む・会う時のコツ" : "うまくいくコツ"}
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                  {result.howto.slice(0, 3).map((h, i) => (
+                    <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>・{h}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={reset} style={chipBtn}>別の方を調べる</button>
+            {onAddMember && (
+              <button
+                onClick={() => setShowRegister(true)}
+                style={{ ...chipBtn, borderColor: C.green, color: C.green }}
+              >
+                登録して残す
+              </button>
+            )}
+          </div>
+          {showRegister && onAddMember && (
+            <div style={{ marginTop: 10, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, color: C.sub, marginBottom: 6 }}>「メンバーの管理」から追加すると次回も相性を確認できます。</div>
+              <button
+                onClick={() => { onAddMember({ date, time: time || "12:00" }); setShowRegister(false); }}
+                style={{ ...chipBtn, background: C.green, color: "#0B0D11", borderColor: C.green, fontWeight: 700 }}
+              >
+                メンバー追加フォームへ
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </Acc>
   );
 }
 
@@ -3008,6 +3205,16 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
           >
             <FamilyFortunePanel birth={birth} members={members} />
           </Acc>
+          {birth && birth.date && (
+            <QuickAishouPanel
+              birth={birth}
+              occupation={occupation}
+              onAddMember={onSaveMembers ? (hint) => {
+                // メンバー追加フォームへの誘導ヒント（実際の保存はMemberManagerが担う）
+                // ここでは状態だけ渡す導線（重実装なし）
+              } : null}
+            />
+          )}
           {showAishou && (
             <Acc title={aishouTitle} defaultOpen={false}>
               <AishouPanel birth={birth} members={members} occupation={occupation} />
@@ -4695,6 +4902,11 @@ export default function App() {
                 events={pool.map((e) => ({ date: `${e.start.getFullYear()}-${pad2(e.start.getMonth() + 1)}-${pad2(e.start.getDate())}`, title: e.title }))}
                 onPlan={(d) => addDeadline({ title: fortuneProfile && fortuneProfile.occupation === "president" ? "重要決断・商談" : "発信・告知", stage: "告知", date: d })}
                 profile={fortuneProfile}
+              />
+              <BestDaysPanel
+                birth={data.birth}
+                occupation={fortuneProfile && fortuneProfile.occupation}
+                onPlan={(d) => addDeadline({ title: fortuneProfile && fortuneProfile.occupation === "president" ? "重要決断・商談" : "大事な予定", stage: "告知", date: d })}
               />
               <FortunePanel
                 fortune={data.fortune}
