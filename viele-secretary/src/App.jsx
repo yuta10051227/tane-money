@@ -3640,13 +3640,13 @@ function LoginGate({ onLogin, error }) {
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: C.bg, color: C.text, overflowY: "auto" }}>
       <div style={{ width: "100%", maxWidth: 420, padding: "40px 24px 48px", boxSizing: "border-box" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, letterSpacing: 4, color: C.accent }}>ひとり社長のための</div>
+          <div style={{ fontSize: 12, letterSpacing: 4, color: C.accent }}>社長・ひとり起業家のための</div>
           <h1 style={{ fontSize: 30, margin: "6px 0 12px" }}>ひとり秘書</h1>
           <p style={{ color: C.text, fontSize: 16, fontWeight: 700, lineHeight: 1.7, margin: "0 0 6px" }}>
-            講座の締切も、告知の段取りも。<br />ぜんぶ逆算して「抜け漏れ」を防ぐ秘書。
+            講座の締切も、経営の段取りも。<br />ぜんぶ逆算して「抜け漏れ」を防ぐ秘書。
           </p>
           <p style={{ color: C.sub, fontSize: 13, lineHeight: 1.7, margin: "0 0 24px" }}>
-            講座・コーチング・サロンを<strong style={{ color: C.text }}>ひとりで回す人</strong>のための、<br />段取り＆集客スケジュール管理ツールです。
+            事業を<strong style={{ color: C.text }}>ひとりで背負う人</strong>のための、段取り・意思決定・運気サポート。<br />ひとり起業家から会社経営者まで。
           </p>
         </div>
 
