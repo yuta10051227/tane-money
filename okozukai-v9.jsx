@@ -299,6 +299,8 @@ function startRealtimeSync(updateFn){
             if(prev.battleFragments){merged.battleFragments={...(merged.battleFragments||{})};Object.keys(prev.battleFragments).forEach(cid=>{merged.battleFragments[cid]=Math.max(prev.battleFragments[cid]||0,merged.battleFragments[cid]||0);});}
             if(prev.battleFragDate) merged.battleFragDate={...(merged.battleFragDate||{}),...prev.battleFragDate};
             if(prev.battleFragOpps) merged.battleFragOpps={...(merged.battleFragOpps||{}),...prev.battleFragOpps};
+            if(prev.battleWins){merged.battleWins={...(merged.battleWins||{})};Object.keys(prev.battleWins).forEach(cid=>{merged.battleWins[cid]=Math.max(prev.battleWins[cid]||0,merged.battleWins[cid]||0);});}
+            if(prev.monsterEquip) merged.monsterEquip={...(merged.monsterEquip||{}),...prev.monsterEquip};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1555,6 +1557,21 @@ const WILD_MONSTERS = [
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
 const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
+// そうび(アイテム): 遊ぶ条件で解放→装備でステUP。お金は使わない
+const EQUIPMENT = [
+  {id:"eq_cap",   name:"ランナーキャップ",   e:"🧢", atk:4, def:0, hp:0,  need:{k:"lv",v:3},     hint:"レベル3で 解放"},
+  {id:"eq_shield",name:"まもりのたて",       e:"🛡", atk:0, def:6, hp:0,  need:{k:"tasks",v:30}, hint:"おてつだい30回で 解放"},
+  {id:"eq_ribbon",name:"げんきリボン",       e:"🎀", atk:0, def:0, hp:30, need:{k:"care",v:5},   hint:"なでなで5日で 解放"},
+  {id:"eq_sword", name:"ゆうきのつるぎ",     e:"⚔", atk:9, def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で 解放"},
+  {id:"eq_glasses",name:"まなびメガネ",      e:"👓", atk:0, def:5, hp:12, need:{k:"streak",v:7}, hint:"7日れんぞくで 解放"},
+  {id:"eq_crown", name:"おうじゃのかんむり", e:"👑", atk:6, def:6, hp:25, need:{k:"lv",v:12},    hint:"レベル12で 解放"},
+];
+function equipMeta(data, child){
+  const m=getMonState(data,child);
+  return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
+           wins:(data.battleWins||{})[child.id]||0, streak:(data.streak||{})[child.id]?.max||0 };
+}
+const equipUnlocked = (item, meta)=> (meta[item.need.k]||0) >= item.need.v;
 // 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
 const PLAYER_MOVES = [
   {n:"エナジーボール", e:"🔆", c:"#34C77B"},
@@ -1572,11 +1589,12 @@ function monLevel(exp){ let lv=1,need=60,e=exp||0; while(e>=need&&lv<50){e-=need
 function battleStats(data, child){
   const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5};
   const L=monLevel((data.monsterExp||{})[child.id]||0); const lv=L.lv;
+  const eq=EQUIPMENT.find(e=>e.id===(data.monsterEquip||{})[child.id])||null;
   return {
-    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2,
-    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6),
-    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14)),
-    lv, exp:L, iv,
+    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2+(eq?.hp||0),
+    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6)+(eq?.atk||0),
+    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14))+(eq?.def||0),
+    lv, exp:L, iv, equip:eq,
     curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう",
     move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
   };
@@ -1608,6 +1626,38 @@ function HPBar({label,hp,max,color}){
     <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:800,marginBottom:3}}><span>{label}</span><span>{Math.max(0,hp)}/{max}</span></div>
     <div style={{height:12,borderRadius:999,background:"rgba(255,255,255,.15)",overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:pct>50?color:pct>20?"#f5c842":"#e0564f",borderRadius:999,transition:"width .4s"}}/></div>
   </div>);
+}
+function EquipModal({child,data,update,onClose}){
+  const meta=equipMeta(data,child);
+  const cur=(data.monsterEquip||{})[child.id]||null;
+  const stats=battleStats(data,child);
+  const setEq=(id)=>update(d=>({...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:id}}));
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(8,6,18,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"84vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"16px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${BORDER}`}}>
+          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🎒 そうび</span>
+          <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
+        </div>
+        <div style={{padding:"10px 16px 4px",fontSize:12,color:TEXTS,fontWeight:700}}>いまの強さ：HP {stats.hp} ・ ⚔{stats.atk} ・ 🛡{stats.def}{stats.equip?`（${stats.equip.e}${stats.equip.name}）`:""}</div>
+        <div style={{overflowY:"auto",padding:"6px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+          {EQUIPMENT.map(it=>{
+            const unlocked=equipUnlocked(it,meta); const on=cur===it.id;
+            return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12,opacity:unlocked?1:0.65}}>
+              <div style={{fontSize:30,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{unlocked?it.name:"？？？"}</div>
+                <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[it.hp?`HP+${it.hp}`:"",it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:""].filter(Boolean).join("  ")}</div>
+                {!unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
+              </div>
+              {unlocked&&<button onClick={()=>setEq(on?null:it.id)} style={{background:on?MUTED:GP,border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>{on?"はずす":"そうび"}</button>}
+            </div>;
+          })}
+          <div style={{textAlign:"center",color:MUTED,fontSize:11,marginTop:4}}>お手伝い・なでなで・バトルで あたらしい そうびが 解放されるよ</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 function BattleModal({child,data,update,onClose}){
   const stats  = battleStats(data,child);
@@ -1641,6 +1691,7 @@ function BattleModal({child,data,update,onClose}){
   const [afrm,setAfrm]=useState(0); // 敵の3コマアニメ用
   useEffect(()=>{const id=setInterval(()=>setAfrm(f=>f+1),380);return()=>clearInterval(id);},[]);
   const oppSrc = opp.boss ? `/assets/${opp.img}.png` : `/assets/${opp.img}_${afrm%3}.png`;
+  const [showEquip,setShowEquip]=useState(false);
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
   const start=(i)=>{ if(lowHP) return; const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
@@ -1663,6 +1714,7 @@ function BattleModal({child,data,update,onClose}){
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
       nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
+      if(r==="win") nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
       if(canFrag){
         nd.battleFragments={...(d.battleFragments||{}),[child.id]:newFrag};
         if(converted) nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1};
@@ -1710,6 +1762,7 @@ function BattleModal({child,data,update,onClose}){
             <div style={{color:"#ffb3ae",fontWeight:800,fontSize:13}}>つかれて たたかえない…💤</div>
             <div style={{color:"rgba(255,255,255,.6)",fontSize:11,marginTop:2}}>お手伝い・なでなで で かいふくしよう！（あさになると 元気に）</div>
           </div>}
+          <button onClick={()=>setShowEquip(true)} style={{width:"100%",marginBottom:12,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:14,padding:"11px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>🎒 そうびを 変える{stats.equip?`（${stats.equip.e}${stats.equip.name}）`:""}</button>
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {WILD_MONSTERS.map((w,i)=>{
@@ -1803,6 +1856,7 @@ function BattleModal({child,data,update,onClose}){
         @keyframes btWinJump{0%,100%{transform:translateY(0)}30%{transform:translateY(-22px)}55%{transform:translateY(-4px)}70%{transform:translateY(-12px)}}
         @keyframes btLoseText{0%{transform:scale(1.5);opacity:0}50%{opacity:1}100%{opacity:1}}
       `}</style>
+      {showEquip && <EquipModal child={child} data={data} update={update} onClose={()=>setShowEquip(false)}/>}
     </div>
   );
 }
@@ -1811,6 +1865,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n11", e:"🎒", t:"そうび（アイテム）登場！", b:"バトル画面の「🎒そうび」から、ぼうし・たて・つるぎ などを装備してステータスUP！レベル・お手伝い・なでなで・連続・バトル勝利など、いろんな がんばりで新しいそうびが解放されるよ。"},
   {id:"n10", e:"🧩", t:"バトル報酬が「チケットのかけら」に", b:"バトルに勝つと「ガチャチケットのかけら」がもらえるよ。5枚あつめると🎟ガチャチケット1枚に！同じモンスターからは1日1かけらまで（でもEXPは毎回もらえる）。いろんな相手と戦って集めよう！"},
   {id:"n09", e:"🆙", t:"モンスターに レベル登場！", b:"お手伝い・なでなで・バトル勝利で EXP が貯まって レベルアップ！レベルが上がると HP・こうげき・ぼうぎょ が強くなるよ。個体値(才能)が高い子ほど ぐんぐん伸びる！"},
   {id:"n08", e:"⚔", t:"モンスターバトル＆ボス登場！", b:"育てたモンスターで野生モンスターとバトル！「⚔モンスターバトル」ボタンから。3ターン勝負で、勝つと🎟ガチャチケットがもらえてガチャをもう1回引けるよ。ヌシ・ドラゴに勝つと秘密のボスも出現！"},
