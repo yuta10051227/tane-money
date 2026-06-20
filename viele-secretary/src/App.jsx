@@ -71,6 +71,9 @@ const CAT_PRESETS = [
   { id: "school", name: "講師・スクール", labels: { 施術: "講座・レッスン", 制作: "教材制作", 集客: "集客", 経営: "運営" } },
   { id: "creator", name: "クリエイター・制作業", labels: { 施術: "受託・納品", 制作: "自主制作", 集客: "集客", 経営: "経営" } },
   { id: "shop", name: "物販・ショップ", labels: { 施術: "接客・対応", 制作: "商品準備", 集客: "集客", 経営: "経営" } },
+  { id: "president", name: "会社経営・社長", labels: { 施術: "営業・商談", 制作: "事業・商品", 集客: "集客・広報", 経営: "組織・財務" } },
+  { id: "uranai", name: "占い師・鑑定士", labels: { 施術: "鑑定・セッション", 制作: "コンテンツ", 集客: "集客", 経営: "運営" } },
+  { id: "other", name: "その他", labels: {} },
 ];
 
 /* ──────────────────────────────────────────────────────────────
@@ -312,6 +315,50 @@ const TEMPLATES = {
     { label: "衣装・メイクの準備", daysBefore: 3 },
     { label: "機材充電・SDカード確認", daysBefore: 1 },
   ],
+  // ── 会社経営・社長向けテンプレ ──
+  "役員会・経営会議": [
+    { label: "議題・アジェンダの確定", daysBefore: 7 },
+    { label: "資料・数値データの準備", daysBefore: 5 },
+    { label: "各役員・参加者へ事前送付", daysBefore: 3 },
+    { label: "会場・Zoom URLを確認・共有", daysBefore: 2 },
+    { label: "議事録担当・進行手順を確認", daysBefore: 1 },
+  ],
+  "決算・資金繰り確認": [
+    { label: "試算表・残高確認（税理士と共有）", daysBefore: 14 },
+    { label: "入出金予定の洗い出し", daysBefore: 10 },
+    { label: "借入・融資ラインの確認", daysBefore: 7 },
+    { label: "次月の資金繰り計画を作成", daysBefore: 3 },
+    { label: "経営幹部への共有・説明", daysBefore: 1 },
+  ],
+  "採用面接": [
+    { label: "求人票・採用条件の最終確認", daysBefore: 10 },
+    { label: "候補者の書類・職歴を確認", daysBefore: 5 },
+    { label: "面接官・会場・日程を確定・連絡", daysBefore: 3 },
+    { label: "評価シートを準備", daysBefore: 2 },
+    { label: "当日の進行・質問リストを確認", daysBefore: 1 },
+  ],
+  "会食・接待": [
+    { label: "相手の好み・アレルギーを確認", daysBefore: 7 },
+    { label: "店の予約・個室確認", daysBefore: 5 },
+    { label: "手土産・用意物を手配", daysBefore: 3 },
+    { label: "当日の議題・話す内容を整理", daysBefore: 2 },
+    { label: "ドレスコード・交通を確認", daysBefore: 1 },
+  ],
+  "視察・出張（社長）": [
+    { label: "視察先アポ・アジェンダ確認", daysBefore: 14 },
+    { label: "交通・宿泊を手配", daysBefore: 10 },
+    { label: "必要な資料・名刺・手土産を準備", daysBefore: 5 },
+    { label: "秘書・担当者への引き継ぎ確認", daysBefore: 3 },
+    { label: "スケジュール・連絡先を最終確認", daysBefore: 1 },
+  ],
+  "周年・表彰式典": [
+    { label: "式次第・プログラムを確定", daysBefore: 30 },
+    { label: "招待状・案内を発送", daysBefore: 21 },
+    { label: "表彰状・記念品を手配", daysBefore: 14 },
+    { label: "会場・ケータリングを確認", daysBefore: 7 },
+    { label: "スタッフ役割分担・リハーサル", daysBefore: 2 },
+    { label: "当日の進行表を最終確認", daysBefore: 1 },
+  ],
 };
 
 /* 二段ローンチ等の「逆算テンプレ」。基準日(offset 0)からの相対日数で締切群を自動生成 */
@@ -378,6 +425,13 @@ const AUTO_RULES = [
   { kw: /誕生日|誕生会|バースデー|記念日|アニバーサリー|birthday/i, tpl: "誕生日・記念日" },
   { kw: /旅行|家族旅行|帰省| travel|trip/i, tpl: "旅行" },
   { kw: /日帰り/, tpl: "日帰り" },
+  // 会社経営・社長向けルール（AUTO_RULES に追加）
+  { kw: /役員会|経営会議|取締役会|株主総会/, tpl: "役員会・経営会議" },
+  { kw: /決算|資金繰り|月次|試算表/, tpl: "決算・資金繰り確認" },
+  { kw: /採用面接|面接|選考/, tpl: "採用面接" },
+  { kw: /会食|接待|接客|懇親会/, tpl: "会食・接待" },
+  { kw: /周年|表彰|式典/, tpl: "周年・表彰式典" },
+  { kw: /視察|出張.*社長|社長.*出張/, tpl: "視察・出張（社長）" },
   { kw: /撮影|収録|ロケ|撮り/, tpl: "撮影・収録" },
   { kw: /出店|マルシェ|クラフト|ハンドメイド|ハンドメード|手作り/, tpl: "ハンドメイド出店" },
   { kw: /新作リリース|新作公開|作品リリース/, tpl: "ハンドメイド新作リリース" },
@@ -482,6 +536,7 @@ function makeSeed() {
     fortune: null,
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     sampleNotice: true, // サンプルデータ識別フラグ
+    profile: null,      // オンボーディングで収集するプロフィール（未設定=null）
     updatedAt: Date.now(),
   };
 }
@@ -1450,6 +1505,160 @@ function Acc({ title, color, badge, defaultOpen, children }) {
   );
 }
 
+/* ──────────────────────────────────────────────────────────────
+   初回ヒアリング ウィザード（OnboardingWizard）
+   profile未設定かつsampleNotice状態のとき表示。「あとで」で全スキップ可。
+   保存先: data.profile = { occupation, scale, usage, uranaiLevel, done:true }
+   ────────────────────────────────────────────────────────────── */
+const ONBOARD_OCCUPATIONS = [
+  { id: "salon",     label: "施術家・サロン",    emoji: "💆" },
+  { id: "coach",     label: "コーチ・コンサル",  emoji: "🎯" },
+  { id: "school",    label: "講師・スクール",    emoji: "📚" },
+  { id: "creator",   label: "クリエイター",      emoji: "🎨" },
+  { id: "shop",      label: "物販・ショップ",    emoji: "🛒" },
+  { id: "uranai",    label: "占い師・鑑定士",    emoji: "🔮" },
+  { id: "president", label: "会社経営・社長",    emoji: "🏢" },
+  { id: "other",     label: "その他",            emoji: "✨" },
+];
+const ONBOARD_SCALES = [
+  { id: "solo",    label: "ひとりで回している",    emoji: "🙋" },
+  { id: "team",    label: "小チーム（スタッフ数人）", emoji: "👥" },
+  { id: "company", label: "組織・会社として動いている", emoji: "🏢" },
+];
+const ONBOARD_USAGES = [
+  { id: "work",         label: "仕事だけ管理したい",      emoji: "💼" },
+  { id: "work_private", label: "仕事もプライベートも",    emoji: "🌐" },
+  { id: "split",        label: "仕事とプライベートを分けたい", emoji: "↔️" },
+];
+const ONBOARD_URANAI = [
+  { id: "high", label: "占いが大好き・ガッツリ使いたい", emoji: "⭐" },
+  { id: "mid",  label: "ほどほどに参考にしたい",         emoji: "🌙" },
+  { id: "low",  label: "データ・論理派・占いは控えめで",  emoji: "📊" },
+];
+
+function OnboardingWizard({ onSave, onSkip }) {
+  const [step, setStep] = useState(0); // 0=生年月日, 1=職種, 2=規模, 3=用途, 4=運気濃さ
+  const [birth, setBirth] = useState("");
+  const [occupation, setOccupation] = useState(null);
+  const [scale, setScale] = useState(null);
+  const [usage, setUsage] = useState(null);
+  const [uranaiLevel, setUranaiLevel] = useState(null);
+
+  const finish = (uranai) => {
+    const profile = {
+      occupation: occupation || "other",
+      scale: scale || "solo",
+      usage: usage || "work",
+      uranaiLevel: uranai || uranaiLevel || "mid",
+      done: true,
+    };
+    const catPreset = CAT_PRESETS.find((p) => p.id === (occupation || "other"));
+    onSave({ profile, birth: birth || null, catLabels: catPreset ? catPreset.labels : {} });
+  };
+
+  const BigBtn = ({ emoji, label, active, onClick }) => (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        width: "100%", padding: "13px 14px", marginBottom: 8, borderRadius: 12,
+        border: `2px solid ${active ? C.accent : C.line}`,
+        background: active ? C.accent + "22" : C.panel2,
+        color: C.text, fontSize: 15, fontWeight: active ? 700 : 400,
+        cursor: "pointer", textAlign: "left", font: "inherit",
+      }}
+    >
+      <span style={{ fontSize: 22, flex: "0 0 auto" }}>{emoji}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {active && <span style={{ color: C.accent, fontSize: 18 }}>✓</span>}
+    </button>
+  );
+
+  const StepIndicator = () => (
+    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 18 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} style={{ width: i === step ? 24 : 8, height: 8, borderRadius: 4, background: i === step ? C.accent : i < step ? C.green : C.line, transition: "width 0.2s" }} />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 16, padding: "20px 18px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: C.accent, fontWeight: 700, letterSpacing: 0.5 }}>ひとり秘書 セットアップ</div>
+          <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2 }}>
+            {step === 0 && "生年月日を教えてください"}
+            {step === 1 && "あなたのお仕事は？"}
+            {step === 2 && "チームの規模は？"}
+            {step === 3 && "何を管理したいですか？"}
+            {step === 4 && "運気の濃さを選んでください"}
+          </div>
+        </div>
+        <button onClick={onSkip} style={{ ...iconBtn, fontSize: 12, width: "auto", padding: "4px 10px", border: `1px solid ${C.line}`, borderRadius: 8, color: C.sub }}>あとで</button>
+      </div>
+      <StepIndicator />
+
+      {step === 0 && (
+        <>
+          <div style={{ fontSize: 13, color: C.sub, marginBottom: 10, lineHeight: 1.6 }}>
+            入れると「今日のコンディション」と経営カレンダーが使えます。任意でOK。
+          </div>
+          <input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} style={{ ...inp, marginBottom: 12 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setStep(1)}
+              style={{ flex: 1, height: 44, borderRadius: 10, border: "none", background: C.accent, color: "#0B0D11", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
+            >
+              {birth ? "次へ" : "スキップして次へ"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          {ONBOARD_OCCUPATIONS.map((o) => (
+            <BigBtn key={o.id} emoji={o.emoji} label={o.label} active={occupation === o.id}
+              onClick={() => { setOccupation(o.id); setTimeout(() => setStep(2), 150); }} />
+          ))}
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          {ONBOARD_SCALES.map((s) => (
+            <BigBtn key={s.id} emoji={s.emoji} label={s.label} active={scale === s.id}
+              onClick={() => { setScale(s.id); setTimeout(() => setStep(3), 150); }} />
+          ))}
+        </>
+      )}
+
+      {step === 3 && (
+        <>
+          {ONBOARD_USAGES.map((u) => (
+            <BigBtn key={u.id} emoji={u.emoji} label={u.label} active={usage === u.id}
+              onClick={() => { setUsage(u.id); setTimeout(() => setStep(4), 150); }} />
+          ))}
+        </>
+      )}
+
+      {step === 4 && (
+        <>
+          {ONBOARD_URANAI.map((u) => (
+            <BigBtn key={u.id} emoji={u.emoji} label={u.label} active={uranaiLevel === u.id}
+              onClick={() => { setUranaiLevel(u.id); setTimeout(() => finish(u.id), 200); }} />
+          ))}
+          <button
+            onClick={() => finish("mid")}
+            style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: `1px solid ${C.line}`, background: "transparent", color: C.sub, fontSize: 14, cursor: "pointer", marginTop: 4 }}
+          >スキップして完了</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* 業種プロンプト（catLabels 未設定の初回のみ表示。1タップで区分名を切替） */
 function IndustryPrompt({ onSelect, onDismiss }) {
   return (
@@ -1609,8 +1818,23 @@ function ScheduleImport({ importing, msg, count, onPick, onClear }) {
   );
 }
 
+// プロフィール(occupation)ごとの「攻め/守り/整える/労い」の一手コピー
+const PROFILE_ADVICE = {
+  president: {
+    攻め: (outstanding, next, tip) => outstanding > 0
+      ? `攻めどき。未回収¥${outstanding.toLocaleString("ja-JP")}を動かして、キャッシュを手元に。${tip}`
+      : next ? `攻めどき。「${next.time} ${next.title}」で意思決定・商談を前に進めましょう。${tip}`
+      : `攻めどき。今日は契約・投資・採用など大事な決断を前に進める日です。${tip}`,
+    守り: (late, soon) => late + soon > 0
+      ? `守りの日。まず${late ? `遅れ${late}件` : ""}${late && soon ? "・" : ""}${soon ? `もうすぐ${soon}件` : ""}の抜け漏れを確認。組織の足場を固めましょう。`
+      : "守りの日。新規の大きな判断より、既存の数字・契約・チームの点検を。",
+    労い: () => "労いの日。幹部・メンバーへの感謝と承認を。今日のキーマンは人です。",
+    整える: () => "整える日。会議・資料・数字の整理を淡々と。今日は仕込みの日です。",
+  },
+};
+
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews }) {
+function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews, profile }) {
   const [more, setMore] = useState(false); // 副次情報（運気/売上/ニュース）の折りたたみ
   // 占術コンディションは決定論(dayEnergy)で常に算出 → AIが無くても「今日のスタンス」が出る。
   // AIの鑑定文(fortune.today)は付加情報として併用する。
@@ -1653,17 +1877,25 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
   const advice = (() => {
     if (!mode) return null;
     const s = t.stance || (sc >= 4 ? "攻め" : sc > 0 && sc <= 2 ? "守り" : "整える");
+    const occ = profile && profile.occupation;
+    const pAdv = occ && PROFILE_ADVICE[occ];
     if (s === "攻め") {
       const tip = sm && sm.attack ? ` ${sm.emoji}${sm.attack}` : "";
+      if (pAdv && pAdv.攻め) return pAdv.攻め(outstanding, next, tip);
       if (outstanding > 0) return `攻めどき。未処理の¥${outstanding.toLocaleString("ja-JP")}を回収して、売上を取りにいきましょう。${tip}`;
       if (next) return `攻めどき。まず「${next.time} ${next.title}」に集中を。${tip}`;
       return `攻めどき。発信・営業を今日の前半に寄せましょう。${tip}`;
     }
     if (s === "守り") {
+      if (pAdv && pAdv.守り) return pAdv.守り(late, soon);
       if (late + soon > 0) return `守りの日。まず${late ? `遅れ${late}件` : ""}${late && soon ? "・" : ""}${soon ? `もうすぐ${soon}件` : ""}の抜け漏れを片付けて、足場を固めましょう。`;
       return "守りの日。新規を広げるより、既存の見直しと準備の整理を。";
     }
-    if (s === "労い") return "労いの日。詰め込みすぎず、休む時間も今日の予定に入れましょう。";
+    if (s === "労い") {
+      if (pAdv && pAdv.労い) return pAdv.労い();
+      return "労いの日。詰め込みすぎず、休む時間も今日の予定に入れましょう。";
+    }
+    if (pAdv && pAdv.整える) return pAdv.整える();
     return "整える日。今日の予定を淡々と。無理に広げないのが吉。";
   })();
   const Row = ({ icon, label, color, onClick }) => (
@@ -1756,7 +1988,7 @@ const STANCE_UI = dyn(() => { const t = THEMES[THEME_NAME]; return {
   整える: { color: t.accent, mark: "整", tip: "淡々と整える日" },
   守り: { color: t.red, mark: "守", tip: "守りを固める・背伸びしない" },
 }; });
-function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
+function BizCalendar({ birth, trips, deadlines, launches, events, onPlan, profile }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
   const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
@@ -1867,7 +2099,11 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
                       {l.emoji}{l.name}
                     </span>
                   ))}
-                  {isDoubleDay && <span style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>攻め×開運日 ダブルで良い日！</span>}
+                  {isDoubleDay && <span style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>
+                    {(profile && profile.occupation === "president")
+                      ? "攻め×開運日 — 契約・投資・人事など大事な決断はこの日に"
+                      : "攻め×開運日 ダブルで良い日！"}
+                  </span>}
                 </div>
               );
             })()}
@@ -1913,7 +2149,11 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan }) {
         <div style={{ background: C.panel2, borderRadius: 10, padding: "10px 12px", marginTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 4 }}>🟢 {isCurrent ? "この先の" : "今月の"}狙い目（攻めの日）</div>
           <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{attackDays.map((d) => `${mm + 1}/${d}`).join("・")}</div>
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>発信・営業・新講座の販売開始日をここに寄せると伸びやすい流れです。{sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
+            {(profile && profile.occupation === "president")
+              ? `契約・投資・採用・重要な意思決定はこの日に寄せると流れに乗れます。${sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}`
+              : `発信・営業・新講座の販売開始日をここに寄せると伸びやすい流れです。${sm && sm.attack ? `${sm.emoji}あなたは${sm.star}。${sm.attack}` : ""}`}
+          </div>
         </div>
       )}
       {/* 守りの日に重なった締切の警告 */}
@@ -2496,8 +2736,8 @@ function fallbackDownload(dataUrl) {
    FortunePanel（本体）
    ────────────────────────────────────────────────────────────── */
 /* 算命学・運氣の流れ：今日を主役に。今月/今年は初期は畳んでおき、見たい人だけ開く（過密回避） */
-function SanmeiFlow({ birth }) {
-  const [showMore, setShowMore] = useState(false);
+function SanmeiFlow({ birth, uranaiLevel }) {
+  const [showMore, setShowMore] = useState(uranaiLevel === "high");
   const un = useMemo(() => sanmeiUn(birth, iso(new Date())), [birth && birth.date, birth && birth.time]);
   // 今日の開運日（optional: koyomiが未定義でも落ちない）
   const todayKoyomi = useMemo(() => {
@@ -2517,7 +2757,7 @@ function SanmeiFlow({ birth }) {
     <Acc
       title="算命学・運氣の流れ（今日の動き）"
       color={C.purple}
-      defaultOpen
+      defaultOpen={uranaiLevel !== "low"}
       badge={<span style={{ fontSize: 13, color: stColor, fontWeight: 700 }}>今日{un.day.emoji}{un.day.star}</span>}
     >
       <div style={{ fontSize: 13, color: C.faint, marginBottom: 8 }}>あなたの日干に、今動いている星（十大主星）を重ねて"流れ・動き方"を出します。人体星図と同じ星の言葉です。</div>
@@ -2574,7 +2814,7 @@ function SanmeiFlow({ birth }) {
   );
 }
 
-function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers }) {
+function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSaveBirth, members, onSaveMembers, uranaiLevel, usage }) {
   const f = fortune || {};
   const t = f.today || {};
   const tm = f.tomorrow || {};
@@ -2597,6 +2837,16 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       right={<button onClick={onRefresh} disabled={loading} style={chipBtn}>{loading ? "占い中…" : "更新"}</button>}
     >
       {aiOff && <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>※ AI機能は現在オフです</div>}
+      {uranaiLevel === "low" && (
+        <div style={{ fontSize: 12, color: C.faint, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+          ※ 論理・データ派モード：占い情報は参考程度に表示しています。
+        </div>
+      )}
+      {uranaiLevel === "high" && birth && birth.date && (
+        <div style={{ fontSize: 12, color: C.accent, fontWeight: 700, background: C.accent + "14", border: `1px solid ${C.accent}`, borderRadius: 8, padding: "6px 10px", marginBottom: 10 }}>
+          ⭐ 占い好きモード：今日の開運日・運気をフルに活用しましょう！
+        </div>
+      )}
       {(!birth || !birth.date) && (
         <BirthQuickInput onSave={onSaveBirth} />
       )}
@@ -2623,7 +2873,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
 
       {birth && birth.date && <TenchusatsuDaiunAcc birth={birth} />}
 
-      {birth && birth.date && <SanmeiFlow birth={birth} />}
+      {birth && birth.date && <SanmeiFlow birth={birth} uranaiLevel={uranaiLevel} />}
 
       {birth && birth.date && (
         <>
@@ -2691,6 +2941,7 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
       </div>
     </Panel>
 
+    {/* usage=work/split のとき家族相性セクションは控えめ（title変更・AishouPanel非表示）。work_private なら通常表示 */}
     <Panel
       title="家族・チームの相性と運気"
       accent={FAMILY_COLOR}
@@ -2700,15 +2951,18 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
         <MemberManager members={members} onSaveMembers={onSaveMembers} />
       </Acc>
       <Acc
-        title="今日のチーム運気"
-        defaultOpen
+        title={usage === "work" || usage === "split" ? "今日のチーム運気" : "今日のチーム・家族の運気"}
+        defaultOpen={usage !== "work"}
         badge={<span style={{ fontSize: 12, color: FAMILY_COLOR, fontWeight: 700 }}>{(members || []).length > 0 ? (() => { try { const all = (birth && birth.date ? [{ name: birth.name || "あなた", birth }] : []).concat((members || []).map((m) => ({ name: m.name, birth: m.birth }))); const r = familyFortune(all); return "★★★★★".slice(0, r.teamScore) + "☆☆☆☆☆".slice(0, 5 - r.teamScore); } catch { return ""; } })() : ""}</span>}
       >
         <FamilyFortunePanel birth={birth} members={members} />
       </Acc>
-      <Acc title="相性チャート" defaultOpen={false}>
-        <AishouPanel birth={birth} members={members} />
-      </Acc>
+      {/* usage=work/split のとき相性チャート(家族)は非表示。work_private なら表示 */}
+      {usage !== "work" && usage !== "split" && (
+        <Acc title="相性チャート" defaultOpen={false}>
+          <AishouPanel birth={birth} members={members} />
+        </Acc>
+      )}
     </Panel>
     </>
   );
@@ -3582,7 +3836,17 @@ export default function App() {
   const local = useLocal(STORE_KEY, seed);
   const { data, loading, error, update } = firebaseEnabled ? cloud : local;
   // 区分の表示名を業種設定で差し替え（描画前に反映。子コンポーネントは labelOf() で参照）
-  CAT_LABELS = (data && data.catLabels) || {};
+  // profile.occupation からも自動でプリセットを適用（catLabels が明示設定されていれば優先）
+  CAT_LABELS = (() => {
+    const explicit = (data && data.catLabels) || {};
+    if (Object.keys(explicit).length > 0) return explicit;
+    const occ = data && data.profile && data.profile.occupation;
+    if (occ) {
+      const preset = CAT_PRESETS.find((p) => p.id === occ);
+      if (preset) return preset.labels;
+    }
+    return {};
+  })();
   // テーマを描画前に反映（C や inp/chipBtn/iconBtn が現在テーマの色で解決される）
   THEME_NAME = data && data.theme === "light" ? "light" : "dark";
 
@@ -4114,8 +4378,28 @@ export default function App() {
         {activeTab === "home" && (() => {
           const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
           const remaining = alerts.late.length + alerts.soon.length + pendingTasks;
+          const profile = data.profile || null;
+          const uranaiLevel = (profile && profile.uranaiLevel) || null;
+          const usage = (profile && profile.usage) || null;
+          // オンボーディングウィザード：profile未完了かつスキップ済みでなければ表示
+          const showOnboarding = !(profile && profile.done) && !data.onboardingSkipped;
           return (
             <>
+              {/* 初回ヒアリング ウィザード */}
+              {showOnboarding && (
+                <OnboardingWizard
+                  onSave={({ profile: p, birth: b, catLabels }) => {
+                    const patch = { profile: p, onboardingSkipped: false };
+                    if (b) {
+                      const pref = PREFS.find((x) => x[0] === "東京");
+                      patch.birth = { date: b, time: "12:00", place: "東京", lat: pref[1], lon: pref[2], utcOffset: 9, gender: "" };
+                    }
+                    if (catLabels && Object.keys(catLabels).length > 0) patch.catLabels = catLabels;
+                    update(patch);
+                  }}
+                  onSkip={() => update({ onboardingSkipped: true })}
+                />
+              )}
               {/* サンプルデータ識別バナー */}
               {data.sampleNotice && (
                 <div style={{ background: C.panel, border: `2px solid ${C.accent}`, borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
@@ -4177,7 +4461,7 @@ export default function App() {
                   onDismiss={() => update({ industryPromptDismissed: true })}
                 />
               )}
-              <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} />
+              <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} profile={profile} />
               {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
               {(!data.birth || !data.birth.date) && !data.sampleNotice && (
                 <BirthQuickInput
@@ -4189,6 +4473,13 @@ export default function App() {
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               {catMsg && (
                 <div style={{ background: C.green + "1A", border: `1px solid ${C.green}`, color: C.text, borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 13 }}>✓ {catMsg}</div>
+              )}
+              {/* usage=split: 仕事/プライベートの表示切替ラベル（カテゴリフィルタの案内） */}
+              {usage === "split" && (
+                <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px 12px", marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.accent }}>↔️ 仕事とプライベートを分けて管理中</span>
+                  <span style={{ fontSize: 12, color: C.sub }}>仕事=区分タグあり ／ プライベート=「家族」カラー</span>
+                </div>
               )}
               <Schedule days={dayBuckets} {...calProps} onSetCat={setEventCat} onSetAxis={setEventAxis} writableIds={writableCalIds} onEditEvent={updateCalEvent} onDeleteEvent={deleteCalEvent} editBusy={calWriteBusy} />
               <TimeMeter entries={scheduleEntries} {...calProps} />
@@ -4211,6 +4502,32 @@ export default function App() {
                       <span style={{ fontSize: 14 }}>「{t.label}」タブを表示する</span>
                     </label>
                   ))}
+                </div>
+                {/* プロフィール設定（ウィザード完了後の変更用） */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>プロフィール設定</div>
+                  {profile && profile.done ? (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <span style={{ fontSize: 13, color: C.sub }}>
+                        職種: {(ONBOARD_OCCUPATIONS.find((o) => o.id === profile.occupation) || {}).label || profile.occupation}
+                        ・ 規模: {(ONBOARD_SCALES.find((s) => s.id === profile.scale) || {}).label || profile.scale}
+                        ・ 用途: {(ONBOARD_USAGES.find((u) => u.id === profile.usage) || {}).label || profile.usage}
+                        ・ 運気: {(ONBOARD_URANAI.find((u) => u.id === profile.uranaiLevel) || {}).label || profile.uranaiLevel}
+                      </span>
+                      <button
+                        onClick={() => update({ profile: null, onboardingSkipped: false })}
+                        style={{ ...chipBtn, fontSize: 12, color: C.sub, borderColor: C.line }}
+                      >再設定</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, color: C.sub }}>まだ設定されていません。</span>
+                      <button
+                        onClick={() => update({ onboardingSkipped: false })}
+                        style={{ ...chipBtn, fontSize: 12, background: C.accent, color: "#0B0D11", borderColor: C.accent }}
+                      >セットアップを開始</button>
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <button
@@ -4307,23 +4624,37 @@ export default function App() {
           />
         )}
 
-        {activeTab === "fortune" && (
-          <BizCalendar birth={data.birth} trips={data.trips} deadlines={data.deadlines} launches={data.launches} events={pool.map((e) => ({ date: `${e.start.getFullYear()}-${pad2(e.start.getMonth() + 1)}-${pad2(e.start.getDate())}`, title: e.title }))} onPlan={(d) => addDeadline({ title: "発信・告知", stage: "告知", date: d })} />
-        )}
-
-        {activeTab === "fortune" && (
-          <FortunePanel
-            fortune={data.fortune}
-            loading={fortuneLoading}
-            error={fortuneError}
-            aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
-            onRefresh={() => refreshFortune()}
-            birth={data.birth}
-            onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
-            members={data.members || []}
-            onSaveMembers={(m) => update({ members: m })}
-          />
-        )}
+        {activeTab === "fortune" && (() => {
+          const fortuneProfile = data.profile || null;
+          const fortuneUranai = (fortuneProfile && fortuneProfile.uranaiLevel) || null;
+          const fortuneUsage = (fortuneProfile && fortuneProfile.usage) || null;
+          return (
+            <>
+              <BizCalendar
+                birth={data.birth}
+                trips={data.trips}
+                deadlines={data.deadlines}
+                launches={data.launches}
+                events={pool.map((e) => ({ date: `${e.start.getFullYear()}-${pad2(e.start.getMonth() + 1)}-${pad2(e.start.getDate())}`, title: e.title }))}
+                onPlan={(d) => addDeadline({ title: fortuneProfile && fortuneProfile.occupation === "president" ? "重要決断・商談" : "発信・告知", stage: "告知", date: d })}
+                profile={fortuneProfile}
+              />
+              <FortunePanel
+                fortune={data.fortune}
+                loading={fortuneLoading}
+                error={fortuneError}
+                aiOff={!!(data.fortune && data.fortune.aiEnabled === false)}
+                onRefresh={() => refreshFortune()}
+                birth={data.birth}
+                onSaveBirth={(b) => { update({ birth: b }); refreshFortune(b); }}
+                members={data.members || []}
+                onSaveMembers={(m) => update({ members: m })}
+                uranaiLevel={fortuneUranai}
+                usage={fortuneUsage}
+              />
+            </>
+          );
+        })()}
 
         <footer style={{ textAlign: "center", color: C.faint, fontSize: 12, padding: "12px 0 32px" }}>
           ← 横スワイプ / 上のタブで切替 ・ {firebaseEnabled ? "全端末で同期" : "ローカル保存"}
