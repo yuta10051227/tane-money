@@ -1536,13 +1536,24 @@ function GachaAnim({ result, onClose }) {
 // BATTLE MODE (野生CPUと対戦・育てた度で強くなる・勝利でガチャチケット)
 // ═══════════════════════════════════════════════════════
 const WILD_MONSTERS = [
-  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f"},
-  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff"},
-  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e"},
-  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0"},
-  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59"},
-  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f"},
+  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f", move:{n:"ねばねばショット", e:"🫧", c:"#7bd88f"}},
+  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff", move:{n:"ソニックウェーブ", e:"🌀", c:"#9b8cff"}},
+  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e", move:{n:"トゲミサイル", e:"📌", c:"#f0a35e"}},
+  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0", move:{n:"ホネつぶて", e:"🦴", c:"#cfd6e0"}},
+  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59", move:{n:"ひのたま", e:"🔥", c:"#ff7a59"}},
+  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"}},
 ];
+// 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
+const PLAYER_MOVES = [
+  {n:"エナジーボール", e:"🔆", c:"#34C77B"},
+  {n:"スターショット", e:"⭐", c:"#ffd24a"},
+  {n:"はっぱカッター", e:"🍃", c:"#5fd17a"},
+  {n:"アクアジェット", e:"💧", c:"#4a9eff"},
+  {n:"マジックフレア", e:"✨", c:"#b07bff"},
+  {n:"こがねブラスト", e:"🪙", c:"#E8B83E"},
+  {n:"いなずまスパーク", e:"⚡", c:"#ffe14a"},
+];
+const pickMove = (id)=> PLAYER_MOVES[[...String(id||"")].reduce((a,c)=>a+c.charCodeAt(0),0) % PLAYER_MOVES.length];
 function HPBar({label,hp,max,color}){
   const pct=Math.max(0,Math.round(hp/max*100));
   return (<div>
@@ -1560,6 +1571,7 @@ function BattleModal({child,data,update,onClose}){
   const pDEF   = 6  + pStage*3 + (iv.def||5)*2;
   const pImg   = `/assets/monster_${mon.curId}_f0.png`;
   const pName  = (data.monsterNickname||{})[child.id] || mon.def?.label || "あいぼう";
+  const pMove  = pickMove(mon.curId);
   const [oppIdx,setOppIdx]=useState(0);
   const opp = WILD_MONSTERS[oppIdx];
   const oMaxHP = 50 + opp.lv*28;
@@ -1598,10 +1610,10 @@ function BattleModal({child,data,update,onClose}){
     setBusy(true);
     const dp=dmgCalc(pATK,oDEF); const newO=Math.max(0,oHP-dp);
     const de=dmgCalc(oATK,pDEF); const newP=Math.max(0,pHP-de);
-    setLog(`${pName}の こうげき！`); setProj("p");
+    setLog(`${pName}の ${pMove.n}！`); setProj("p");
     t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450);
       if(newO<=0){ t(()=>finish("win"),720); return; }
-      t(()=>{ setLog(`${opp.name}の こうげき！`); setProj("o");
+      t(()=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
         t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450);
           if(newP<=0){ t(()=>finish("lose"),720); return; }
           t(()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } },520);
@@ -1650,8 +1662,8 @@ function BattleModal({child,data,update,onClose}){
             <img src={pImg} style={{width:104,height:104,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="player"?"brightness(3) drop-shadow(0 0 10px #fff)":"none",animation:hit?.who==="player"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             {hit?.who==="player"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ff6a6a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
-          {proj==="p"&&<div style={{position:"absolute",left:"22%",bottom:"40%",width:26,height:26,borderRadius:"50%",background:"radial-gradient(circle,#fff,#34C77B)",boxShadow:"0 0 16px #34C77B",animation:"btProjP .45s linear forwards",zIndex:4}}/>}
-          {proj==="o"&&<div style={{position:"absolute",right:"22%",top:"30%",width:26,height:26,borderRadius:"50%",background:`radial-gradient(circle,#fff,${opp.color})`,boxShadow:`0 0 16px ${opp.color}`,animation:"btProjO .45s linear forwards",zIndex:4}}/>}
+          {proj==="p"&&<div style={{position:"absolute",left:"24%",bottom:"42%",fontSize:30,filter:`drop-shadow(0 0 10px ${pMove.c})`,animation:"btProjP .45s linear forwards",zIndex:4}}>{pMove.e}</div>}
+          {proj==="o"&&<div style={{position:"absolute",right:"24%",top:"32%",fontSize:30,filter:`drop-shadow(0 0 10px ${opp.move.c})`,animation:"btProjO .45s linear forwards",zIndex:4}}>{opp.move.e}</div>}
           {vs&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:6}}><div style={{fontSize:64,fontWeight:900,color:"#fff",textShadow:"0 0 22px #ff3b6b,0 0 8px #fff",animation:"btVs 1.1s ease-out"}}>VS</div></div>}
         </div>
       )}
