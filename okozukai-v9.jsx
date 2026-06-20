@@ -1565,48 +1565,54 @@ function BattleModal({child,data,update,onClose}){
   const oMaxHP = 50 + opp.lv*28;
   const oATK   = 9 + opp.lv*5;
   const oDEF   = 4 + opp.lv*3;
+  const MAXR=3;
   const [phase,setPhase]=useState("select");
   const [pHP,setPHP]=useState(pMaxHP);
   const [oHP,setOHP]=useState(oMaxHP);
-  const [turn,setTurn]=useState("player");
+  const [round,setRound]=useState(1);
+  const [busy,setBusy]=useState(true);
+  const [proj,setProj]=useState(null);
+  const [hit,setHit]=useState(null);
+  const [vs,setVs]=useState(false);
   const [log,setLog]=useState("");
-  const [fx,setFx]=useState(null);
   const [result,setResult]=useState(null);
   const [reward,setReward]=useState(null);
+  const timers=useRef([]);
+  const t=(fn,ms)=>{const id=setTimeout(fn,ms);timers.current.push(id);};
+  useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);
+  const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
-  const start=(i)=>{ const o=WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setTurn("player"); setResult(null); setReward(null); setLog(`${o.name}が あらわれた！`); setPhase("fight"); };
+  const start=(i)=>{ const o=WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
   const finish=(r)=>{
-    setResult(r); setPhase("result");
+    setResult(r); setLog(r==="win"?"WIN！":"LOSE…");
     if(r==="win"){
-      const today=todayKey();
-      const lastWin=(data.battleWinDate||{})[child.id];
-      if(lastWin!==today){
-        setReward("ticket");
-        update(d=>({...d,
-          battleTickets:{...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1},
-          battleWinDate:{...(d.battleWinDate||{}),[child.id]:today}}));
-      } else setReward("none");
+      const today=todayKey(); const lastWin=(data.battleWinDate||{})[child.id];
+      if(lastWin!==today){ setReward("ticket"); update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1},battleWinDate:{...(d.battleWinDate||{}),[child.id]:today}})); }
+      else setReward("none");
     }
   };
-  const oppAttack=()=>{
-    const d=dmgCalc(oATK,pDEF);
-    setFx({who:"player",dmg:d}); setTimeout(()=>setFx(null),500);
-    setPHP(ph=>{const np=Math.max(0,ph-d); if(np<=0) setTimeout(()=>finish("lose"),650); return np;});
-    setLog(`${opp.name}の こうげき！ ${d} ダメージ！`);
-    setTurn("player");
-  };
-  const playerAttack=()=>{
-    if(phase!=="fight"||turn!=="player"||result) return;
-    const d=dmgCalc(pATK,oDEF);
-    setFx({who:"opp",dmg:d}); setTimeout(()=>setFx(null),500);
-    const no=Math.max(0,oHP-d); setOHP(no); setLog(`${pName}の こうげき！ ${d} ダメージ！`);
-    if(no<=0){ setTimeout(()=>finish("win"),650); return; }
-    setTurn("opp"); setTimeout(oppAttack,950);
+  const finishByHP=(o,p)=> finish((p/pMaxHP) >= (o/oMaxHP) ? "win" : "lose");
+  // 1ターン=自分の攻撃→相手の攻撃。3ターンで決着(KOが無ければHP割合で判定)
+  const doRound=()=>{
+    if(busy||result||phase!=="fight") return;
+    setBusy(true);
+    const dp=dmgCalc(pATK,oDEF); const newO=Math.max(0,oHP-dp);
+    const de=dmgCalc(oATK,pDEF); const newP=Math.max(0,pHP-de);
+    setLog(`${pName}の こうげき！`); setProj("p");
+    t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450);
+      if(newO<=0){ t(()=>finish("win"),720); return; }
+      t(()=>{ setLog(`${opp.name}の こうげき！`); setProj("o");
+        t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450);
+          if(newP<=0){ t(()=>finish("lose"),720); return; }
+          t(()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } },520);
+        },470);
+      },560);
+    },470);
   };
   return (
-    <div style={{position:"fixed",inset:0,zIndex:1000,background:"linear-gradient(180deg,#1a1530,#0a0815)",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{padding:"calc(12px + env(safe-area-inset-top)) 16px 8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <span style={{color:"#fff",fontWeight:900,fontSize:16}}>⚔ バトル</span>
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"#070611",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div style={{padding:"calc(12px + env(safe-area-inset-top)) 16px 8px",display:"flex",alignItems:"center",justifyContent:"space-between",zIndex:5}}>
+        <span style={{color:"#7fe0ff",fontWeight:900,fontSize:15,letterSpacing:1,textShadow:"0 0 8px #2aa0ff"}}>⚔ デジタルバトル</span>
         <button onClick={onClose} style={{background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,color:"#fff",padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
       </div>
       {phase==="select" && (
@@ -1615,7 +1621,7 @@ function BattleModal({child,data,update,onClose}){
             <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
             <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>HP {pMaxHP} · ⚔{pATK} · 🛡{pDEF}</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:3}}>お手伝い・なでなで・進化で つよくなる！</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:3}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
           </div>
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -1631,39 +1637,52 @@ function BattleModal({child,data,update,onClose}){
           </div>
         </div>
       )}
-      {(phase==="fight"||phase==="result") && (
-        <div style={{flex:1,display:"flex",flexDirection:"column",position:"relative"}}>
-          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
-            <div style={{width:"72%",maxWidth:250,marginBottom:8}}><HPBar label={opp.name} hp={oHP} max={oMaxHP} color={opp.color}/></div>
-            <div style={{fontSize:72,animation:fx?.who==="opp"?"btShake .4s":"none"}}>{opp.emoji}</div>
-            {fx?.who==="opp"&&<div style={{position:"absolute",top:"34%",fontSize:32,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{fx.dmg}</div>}
+      {phase==="fight" && (
+        <div style={{flex:1,position:"relative",overflow:"hidden",backgroundColor:"#0a0a18",backgroundImage:"linear-gradient(rgba(90,170,255,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(90,170,255,.10) 1px,transparent 1px)",backgroundSize:"26px 26px"}}>
+          <div style={{position:"absolute",top:10,left:14,width:"45%"}}><HPBar label={opp.name} hp={oHP} max={oMaxHP} color={opp.color}/></div>
+          <div style={{position:"absolute",bottom:14,right:14,width:"45%"}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
+          <div style={{position:"absolute",top:44,left:0,right:0,textAlign:"center",color:"#7fe0ff",fontWeight:900,fontSize:13,letterSpacing:3,textShadow:"0 0 6px #2aa0ff"}}>ROUND {Math.min(round,MAXR)} / {MAXR}</div>
+          <div style={{position:"absolute",right:"12%",top:"22%",textAlign:"center"}}>
+            <div style={{fontSize:64,filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":"none",animation:hit?.who==="opp"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}}>{opp.emoji}</div>
+            {hit?.who==="opp"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
-          <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
-            {fx?.who==="player"&&<div style={{position:"absolute",top:"6%",fontSize:32,fontWeight:900,color:"#ff6a6a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{fx.dmg}</div>}
-            <img src={pImg} style={{width:110,height:110,objectFit:"contain",imageRendering:"pixelated",animation:fx?.who==="player"?"btShake .4s":"none"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
-            <div style={{width:"72%",maxWidth:250,marginTop:8}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
+          <div style={{position:"absolute",left:"8%",bottom:"26%",textAlign:"center"}}>
+            <img src={pImg} style={{width:104,height:104,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="player"?"brightness(3) drop-shadow(0 0 10px #fff)":"none",animation:hit?.who==="player"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
+            {hit?.who==="player"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ff6a6a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
-          <div style={{padding:"10px 18px calc(18px + env(safe-area-inset-bottom))",background:"rgba(0,0,0,.3)"}}>
-            <div style={{color:"#fff",fontSize:13,fontWeight:700,textAlign:"center",minHeight:20,marginBottom:10}}>{log}</div>
-            {phase==="fight" && !result && (
-              <button onClick={playerAttack} disabled={turn!=="player"} style={{width:"100%",background:turn==="player"?"#ff7a59":"rgba(255,255,255,.15)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:900,fontSize:17,cursor:turn==="player"?"pointer":"default",fontFamily:F}}>{turn==="player"?"こうげき！⚔":"あいての ターン…"}</button>
-            )}
-            {result && (
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:22,fontWeight:900,color:result==="win"?"#ffd24a":"#fff",marginBottom:6}}>{result==="win"?"🎉 かった！":"つよかった…！"}</div>
-                {result==="win"&&reward==="ticket"&&<div style={{color:"#bff0c8",fontSize:13,fontWeight:800,marginBottom:10}}>🎟 ガチャチケットを 1まい もらった！</div>}
-                {result==="win"&&reward==="none"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>きょうのチケットは もうもらったよ（また あした）</div>}
-                {result==="lose"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>もっと お世話して つよくなろう！</div>}
-                <div style={{display:"flex",gap:10}}>
-                  <button onClick={()=>setPhase("select")} style={{flex:1,background:"rgba(255,255,255,.15)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,cursor:"pointer",fontFamily:F}}>もういちど</button>
-                  <button onClick={onClose} style={{flex:1,background:"#34C77B",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,cursor:"pointer",fontFamily:F}}>おわる</button>
-                </div>
-              </div>
-            )}
-          </div>
+          {proj==="p"&&<div style={{position:"absolute",left:"22%",bottom:"40%",width:26,height:26,borderRadius:"50%",background:"radial-gradient(circle,#fff,#34C77B)",boxShadow:"0 0 16px #34C77B",animation:"btProjP .45s linear forwards",zIndex:4}}/>}
+          {proj==="o"&&<div style={{position:"absolute",right:"22%",top:"30%",width:26,height:26,borderRadius:"50%",background:`radial-gradient(circle,#fff,${opp.color})`,boxShadow:`0 0 16px ${opp.color}`,animation:"btProjO .45s linear forwards",zIndex:4}}/>}
+          {vs&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:6}}><div style={{fontSize:64,fontWeight:900,color:"#fff",textShadow:"0 0 22px #ff3b6b,0 0 8px #fff",animation:"btVs 1.1s ease-out"}}>VS</div></div>}
         </div>
       )}
-      <style>{`@keyframes btShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}@keyframes btDmg{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:1;transform:scale(1.25)}100%{transform:translateY(-34px);opacity:0}}`}</style>
+      {phase!=="select" && (
+        <div style={{padding:"10px 18px calc(18px + env(safe-area-inset-bottom))",background:"rgba(0,0,0,.45)",zIndex:5}}>
+          {!result && <>
+            <div style={{color:"#cfe6ff",fontSize:12,fontWeight:700,textAlign:"center",minHeight:18,marginBottom:8}}>{log}</div>
+            <button onClick={doRound} disabled={busy} style={{width:"100%",background:busy?"rgba(255,255,255,.15)":"linear-gradient(135deg,#ff7a59,#ff3b6b)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:900,fontSize:17,cursor:busy?"default":"pointer",fontFamily:F}}>{busy?"…":"こうげき！⚔"}</button>
+          </>}
+          {result && (
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:24,fontWeight:900,color:result==="win"?"#ffd24a":"#fff",marginBottom:6,textShadow:result==="win"?"0 0 12px #ffd24a":"none"}}>{result==="win"?"🎉 WIN！":"LOSE…"}</div>
+              {result==="win"&&reward==="ticket"&&<div style={{color:"#bff0c8",fontSize:13,fontWeight:800,marginBottom:10}}>🎟 ガチャチケットを 1まい もらった！</div>}
+              {result==="win"&&reward==="none"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>きょうのチケットは もうもらったよ（また あした）</div>}
+              {result==="lose"&&<div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginBottom:10}}>もっと お世話して つよくなろう！</div>}
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>{setPhase("select");setResult(null);}} style={{flex:1,background:"rgba(255,255,255,.15)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,cursor:"pointer",fontFamily:F}}>もういちど</button>
+                <button onClick={onClose} style={{flex:1,background:"#34C77B",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,cursor:"pointer",fontFamily:F}}>おわる</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      <style>{`
+        @keyframes btShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}60%{transform:translateX(9px)}}
+        @keyframes btDmg{0%{transform:translateX(-50%) translateY(0) scale(.6);opacity:0}30%{opacity:1;transform:translateX(-50%) scale(1.25)}100%{transform:translateX(-50%) translateY(-34px);opacity:0}}
+        @keyframes btIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes btProjP{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(56vw,-26vh) scale(1.15);opacity:1}}
+        @keyframes btProjO{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(-56vw,24vh) scale(1.15);opacity:1}}
+        @keyframes btVs{0%{transform:scale(2.6);opacity:0}25%{transform:scale(1);opacity:1}75%{opacity:1}100%{transform:scale(1.15);opacity:0}}
+      `}</style>
     </div>
   );
 }
