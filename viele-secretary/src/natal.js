@@ -822,6 +822,146 @@ const STAR_MOVE = {
   玉堂星: "学び直す流れ。情報収集・知識の整理・じっくり思考が活きる。",
 };
 
+/* ════════════════════════════════════════════════════════════════
+   開運日（暦注・選日）の決定論計算  ── AI不使用・完全決定論 ──
+   対象日の「節月（月支）・日干支・日支」から、占い好き層に刺さる
+   吉日レイヤー（一粒万倍日 / 天赦日 / 寅・巳・己巳の日）を判定する。
+
+   ◆ 計算の土台
+     - 節月(月支)・日干支は computeChart({date}) を流用（太陽黄経で節入りを判定するため、
+       一粒万倍日に必要な「節月」が暦どおりに切り替わる）。
+     - 季節（立春後/立夏後/立秋後/立冬後）も節月から導出する。
+   ◆ 対象外（コメントで明記）
+     - 六曜（大安・仏滅 等）は旧暦（朔=新月基準の太陰太陽暦）が必要なため今回は対象外。
+       本エンジンは旧暦変換を持たないので、誤った大安を出さないよう実装しない。
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 一粒万倍日（いちりゅうまんばいび）──────────────────────────
+   定義: 「節月の十二支」と「その日の十二支」の組み合わせで決まる選日。
+   一粒の籾が万倍にも実る吉日。新規開始・種まき（開業・出資・財布の新調等）に吉。
+   下記は暦注に広く用いられる標準表（『暦の百科事典』等で流布する対応）。
+   各節月につき該当する日の十二支が2つある。
+     節月(月支)   該当する日の十二支
+     ────────────────────────────
+     寅月(立春〜)   丑 ・ 午
+     卯月(啓蟄〜)   酉 ・ 寅
+     辰月(清明〜)   子 ・ 卯
+     巳月(立夏〜)   卯 ・ 辰
+     午月(芒種〜)   巳 ・ 午
+     未月(小暑〜)   午 ・ 酉
+     申月(立秋〜)   子 ・ 未
+     酉月(白露〜)   卯 ・ 申
+     戌月(寒露〜)   午 ・ 酉
+     亥月(立冬〜)   酉 ・ 戌
+     子月(大雪〜)   子 ・ 亥
+     丑月(小寒〜)   子 ・ 卯
+   ※ この表は senjutsu 系の暦注計算でも用いられる公知の標準対応。 */
+const ICHIRYU = {
+  寅: ["丑", "午"], 卯: ["酉", "寅"], 辰: ["子", "卯"], 巳: ["卯", "辰"],
+  午: ["巳", "午"], 未: ["午", "酉"], 申: ["子", "未"], 酉: ["卯", "申"],
+  戌: ["午", "酉"], 亥: ["酉", "戌"], 子: ["子", "亥"], 丑: ["子", "卯"],
+};
+
+/* ── 天赦日（てんしゃび／てんしゃにち）──────────────────────────
+   定義: 季節（立春後・立夏後・立秋後・立冬後）と、その日の「日干支」の組み合わせ。
+     立春後（春＝寅卯辰月）  … 戊寅(つちのえ とら)
+     立夏後（夏＝巳午未月）  … 甲午(きのえ うま)
+     立秋後（秋＝申酉戌月）  … 戊申(つちのえ さる)
+     立冬後（冬＝亥子丑月）  … 甲子(きのえ ね)
+   百神が天に昇り万物の罪を赦すとされる最上の大吉日。年に5〜6回しか巡らない。
+   何を始めるにも良い「最強開運日」。 */
+const TENSHA = {
+  寅: "戊寅", 卯: "戊寅", 辰: "戊寅", // 春
+  巳: "甲午", 午: "甲午", 未: "甲午", // 夏
+  申: "戊申", 酉: "戊申", 戌: "戊申", // 秋
+  亥: "甲子", 子: "甲子", 丑: "甲子", // 冬
+};
+
+// その日の節月(月支)・日干支・日支を軽量に取得（computeChart を流用）。
+function dayKoyomiKeys(dateISO) {
+  const c = computeChart({ date: dateISO, time: "12:00" });
+  const monthBranch = String(c.monthPillar).slice(-1); // 節月の十二支
+  const dayGanZhi = String(c.dayPillar);               // 日干支（例: 戊寅）
+  const dayBranch = dayGanZhi.slice(-1);               // 日支
+  return { monthBranch, dayGanZhi, dayBranch };
+}
+
+/* 1) koyomi(dateISO) → その日の開運日ラベル
+   返り値:
+     {
+       date: "YYYY-MM-DD",
+       labels: [{ key, name, emoji, good:boolean }],   // 該当した選日（good=吉日）
+       score: number,   // 吉度（good な選日の重み合計。天赦日=+2, 一粒万倍=+1, 寅/巳/己巳=+1）
+       best:  boolean,  // 最強日（天赦日、または 天赦×一粒万倍 等）なら true
+     }
+   該当する選日が無い日は labels:[], score:0, best:false。 */
+export function koyomi(dateISO) {
+  const date = String(dateISO).slice(0, 10);
+  const labels = [];
+  let score = 0;
+  try {
+    const { monthBranch, dayGanZhi, dayBranch } = dayKoyomiKeys(date);
+
+    // 天赦日（最上級・重み2）
+    const isTensha = TENSHA[monthBranch] === dayGanZhi;
+    if (isTensha) {
+      labels.push({ key: "tensha", name: "天赦日", emoji: "🎍", good: true });
+      score += 2;
+    }
+
+    // 一粒万倍日（重み1）
+    const isIchiryu = (ICHIRYU[monthBranch] || []).includes(dayBranch);
+    if (isIchiryu) {
+      labels.push({ key: "ichiryu", name: "一粒万倍日", emoji: "🌾", good: true });
+      score += 1;
+    }
+
+    // 己巳の日（日干支=己巳。弁財天の縁日・金運の最上日。寅/巳より上位扱いで先に判定）
+    const isTsuchinotoMi = dayGanZhi === "己巳";
+    if (isTsuchinotoMi) {
+      labels.push({ key: "tsuchinotomi", name: "己巳の日", emoji: "💰", good: true });
+      score += 1;
+    }
+    // 巳の日（日支=巳。己巳の日でなければ通常の巳の日として。金運・財運）
+    if (!isTsuchinotoMi && dayBranch === "巳") {
+      labels.push({ key: "mi", name: "巳の日", emoji: "🐍", good: true });
+      score += 1;
+    }
+    // 寅の日（日支=寅。金運が「すぐ戻る」旅立ち・金運の日）
+    if (dayBranch === "寅") {
+      labels.push({ key: "tora", name: "寅の日", emoji: "🐯", good: true });
+      score += 1;
+    }
+
+    // best: 天赦日、または「天赦×一粒万倍」など吉日が重なった最強日。
+    // 単独の一粒万倍/寅/巳より明確に上位の日のみ true。
+    const best = isTensha || (isIchiryu && (isTsuchinotoMi || dayBranch === "巳" || dayBranch === "寅"));
+
+    return { date, labels, score, best };
+  } catch {
+    return { date, labels: [], score: 0, best: false };
+  }
+}
+
+/* 2) koyomiMonth(year, month) → カレンダー用（month は 1〜12）
+   返り値: { "YYYY-MM-DD": [{key,name,emoji}], ... }
+     その月の各日のうち good な選日が1つ以上ある日だけをキーに持つ。
+     値は koyomi().labels から good な選日を {key,name,emoji} に整形した配列。
+   内部で各日 koyomi() を呼ぶ。 */
+export function koyomiMonth(year, month) {
+  const out = {};
+  const y = Number(year), m = Number(month);
+  if (!y || !m || m < 1 || m > 12) return out;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const k = koyomi(iso);
+    const good = (k.labels || []).filter((l) => l.good).map(({ key, name, emoji }) => ({ key, name, emoji }));
+    if (good.length) out[iso] = good;
+  }
+  return out;
+}
+
 // 本人の日干 × その日の年柱/月柱/日柱 から、今動く主星を返す。出生情報が無ければ null。
 export function sanmeiUn(birth, dateISO) {
   try {
