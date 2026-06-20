@@ -1596,6 +1596,9 @@ function BattleModal({child,data,update,onClose}){
   const timers=useRef([]);
   const t=(fn,ms)=>{const id=setTimeout(fn,ms);timers.current.push(id);};
   useEffect(()=>()=>timers.current.forEach(clearTimeout),[]);
+  const [afrm,setAfrm]=useState(0); // 敵の3コマアニメ用
+  useEffect(()=>{const id=setInterval(()=>setAfrm(f=>f+1),380);return()=>clearInterval(id);},[]);
+  const oppSrc = opp.boss ? `/assets/${opp.img}.png` : `/assets/${opp.img}_${afrm%3}.png`;
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
   const start=(i)=>{ const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(pMaxHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
@@ -1676,7 +1679,7 @@ function BattleModal({child,data,update,onClose}){
           <div style={{position:"absolute",bottom:14,right:14,width:"45%"}}><HPBar label={pName} hp={pHP} max={pMaxHP} color="#34C77B"/></div>
           <div style={{position:"absolute",top:44,left:0,right:0,textAlign:"center",color:"#7fe0ff",fontWeight:900,fontSize:13,letterSpacing:3,textShadow:"0 0 6px #2aa0ff"}}>ROUND {Math.min(round,MAXR)} / {MAXR}</div>
           <div style={{position:"absolute",right:"12%",top:"22%",textAlign:"center"}}>
-            <img src={`/assets/${opp.img}.png`} style={{width:opp.boss?104:80,height:opp.boss?104:80,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":(opp.boss?`drop-shadow(0 0 14px ${opp.color})`:"none"),animation:hit?.who==="opp"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}} onError={e=>{const s=document.createElement("span");s.textContent=opp.emoji;s.style.fontSize="64px";e.target.replaceWith(s);}}/>
+            <img src={oppSrc} style={{width:opp.boss?116:98,height:opp.boss?116:98,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="opp"?"brightness(3) drop-shadow(0 0 10px #fff)":(opp.boss?`drop-shadow(0 0 14px ${opp.color})`:"none"),animation:hit?.who==="opp"?"btShake .4s":"none"}} onError={e=>{const t=e.target;if(!t.dataset.fb){t.dataset.fb="1";t.src=`/assets/${opp.img}.png`;}else{const s=document.createElement("span");s.textContent=opp.emoji;s.style.fontSize="64px";t.replaceWith(s);}}}/>
             {hit?.who==="opp"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ffd24a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
           <div style={{position:"absolute",left:"8%",bottom:"26%",textAlign:"center"}}>
