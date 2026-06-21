@@ -301,6 +301,8 @@ function startRealtimeSync(updateFn){
             if(prev.battleFragOpps) merged.battleFragOpps={...(merged.battleFragOpps||{}),...prev.battleFragOpps};
             if(prev.battleWins){merged.battleWins={...(merged.battleWins||{})};Object.keys(prev.battleWins).forEach(cid=>{merged.battleWins[cid]=Math.max(prev.battleWins[cid]||0,merged.battleWins[cid]||0);});}
             if(prev.monsterEquip) merged.monsterEquip={...(merged.monsterEquip||{}),...prev.monsterEquip};
+            if(prev.healPotions){merged.healPotions={...(merged.healPotions||{})};Object.keys(prev.healPotions).forEach(cid=>{merged.healPotions[cid]=Math.max(prev.healPotions[cid]||0,merged.healPotions[cid]||0);});}
+            if(prev.equipUnlock){merged.equipUnlock={...(merged.equipUnlock||{})};Object.keys(prev.equipUnlock).forEach(cid=>{merged.equipUnlock[cid]=[...new Set([...(merged.equipUnlock[cid]||[]),...(prev.equipUnlock[cid]||[])])];});}
             if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
             if(prev.expedition) merged.expedition={...(merged.expedition||{}),...prev.expedition};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
@@ -1559,21 +1561,26 @@ const WILD_MONSTERS = [
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
 const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
-// そうび(アイテム): 遊ぶ条件で解放→装備でステUP。お金は使わない
+// そうび(アイテム): ぶき＋たての2スロット。遊ぶ条件orドロップで解放→装備でステUP。お金は使わない
 const EQUIPMENT = [
-  {id:"eq_cap",   name:"ランナーキャップ",   e:"🧢", atk:4, def:0, hp:0,  need:{k:"lv",v:3},     hint:"レベル3で 解放"},
-  {id:"eq_shield",name:"まもりのたて",       e:"🛡", atk:0, def:6, hp:0,  need:{k:"tasks",v:30}, hint:"おてつだい30回で 解放"},
-  {id:"eq_ribbon",name:"げんきリボン",       e:"🎀", atk:0, def:0, hp:30, need:{k:"care",v:5},   hint:"なでなで5日で 解放"},
-  {id:"eq_sword", name:"ゆうきのつるぎ",     e:"⚔", atk:9, def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で 解放"},
-  {id:"eq_glasses",name:"まなびメガネ",      e:"👓", atk:0, def:5, hp:12, need:{k:"streak",v:7}, hint:"7日れんぞくで 解放"},
-  {id:"eq_crown", name:"おうじゃのかんむり", e:"👑", atk:6, def:6, hp:25, need:{k:"lv",v:12},    hint:"レベル12で 解放"},
+  // ── ぶき(weapon)＝こうげき系 ──
+  {id:"eq_w_basic", slot:"weapon", name:"きほんのつるぎ", e:"🗡", atk:4, def:0, hp:0,  need:{k:"lv",v:1},     hint:"さいしょから"},
+  {id:"eq_w_fire",  slot:"weapon", name:"ほのおのつるぎ", e:"🔥", atk:7, def:0, hp:0,  need:{k:"streak",v:7}, hint:"7日れんぞくで"},
+  {id:"eq_w_brave", slot:"weapon", name:"ゆうきのつるぎ", e:"⚔", atk:11,def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で"},
+  {id:"eq_w_star",  slot:"weapon", name:"スターロッド",   e:"🌟", atk:8, def:0, hp:12, need:{k:"lv",v:12},    hint:"レベル12で"},
+  // ── たて(shield)＝ぼうぎょ系 ──
+  {id:"eq_s_basic", slot:"shield", name:"きほんのたて",   e:"🔰", atk:0, def:4, hp:0,  need:{k:"tasks",v:10}, hint:"おてつだい10回で"},
+  {id:"eq_s_guard", slot:"shield", name:"まもりのたて",   e:"🛡", atk:0, def:9, hp:0,  need:{k:"tasks",v:40}, hint:"おてつだい40回で"},
+  {id:"eq_s_ribbon",slot:"shield", name:"げんきリボン",   e:"🎀", atk:0, def:2, hp:32, need:{k:"care",v:5},   hint:"なでなで5日で"},
+  {id:"eq_s_crown", slot:"shield", name:"おうじゃのかんむり",e:"👑",atk:0, def:7, hp:26, need:{k:"lv",v:15},    hint:"レベル15で"},
 ];
+const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
 function equipMeta(data, child){
   const m=getMonState(data,child);
   return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
            wins:(data.battleWins||{})[child.id]||0, streak:(data.streak||{})[child.id]?.max||0 };
 }
-const equipUnlocked = (item, meta)=> (meta[item.need.k]||0) >= item.need.v;
+const equipUnlocked = (item, meta, dropped)=> ((meta[item.need.k]||0) >= item.need.v) || (Array.isArray(dropped) && dropped.includes(item.id));
 // 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
 const PLAYER_MOVES = [
   {n:"エナジーボール", e:"🔆", c:"#34C77B"},
@@ -1591,12 +1598,15 @@ function monLevel(exp){ let lv=1,need=60,e=exp||0; while(e>=need&&lv<50){e-=need
 function battleStats(data, child){
   const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5};
   const L=monLevel((data.monsterExp||{})[child.id]||0); const lv=L.lv;
-  const eq=EQUIPMENT.find(e=>e.id===(data.monsterEquip||{})[child.id])||null;
+  const eqRaw=(data.monsterEquip||{})[child.id];
+  const eqIds=(eqRaw&&typeof eqRaw==="object")?[eqRaw.weapon,eqRaw.shield]:(eqRaw?[eqRaw]:[]);
+  const eqItems=eqIds.map(id=>EQUIPMENT.find(e=>e.id===id)).filter(Boolean);
+  const eb=(k)=>eqItems.reduce((s,e)=>s+(e[k]||0),0);
   return {
-    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2+(eq?.hp||0),
-    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6)+(eq?.atk||0),
-    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14))+(eq?.def||0),
-    lv, exp:L, iv, equip:eq,
+    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2+eb("hp"),
+    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6)+eb("atk"),
+    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14))+eb("def"),
+    lv, exp:L, iv, equip:eqItems,
     curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう",
     move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
   };
@@ -1631,31 +1641,39 @@ function HPBar({label,hp,max,color}){
 }
 function EquipModal({child,data,update,onClose}){
   const meta=equipMeta(data,child);
-  const cur=(data.monsterEquip||{})[child.id]||null;
+  const dropped=(data.equipUnlock||{})[child.id]||[];
+  const eqRaw=(data.monsterEquip||{})[child.id];
+  const cur=(eqRaw&&typeof eqRaw==="object")?eqRaw:{};
   const stats=battleStats(data,child);
-  const setEq=(id)=>update(d=>({...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:id}}));
+  const collected=EQUIPMENT.filter(it=>equipUnlocked(it,meta,dropped)).length;
+  const setEq=(slot,id)=>update(d=>{ const r=(d.monsterEquip||{})[child.id]; const obj=(r&&typeof r==="object")?r:{}; return {...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:{...obj,[slot]:id}}}; });
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(8,6,18,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
-      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"84vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"86vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"16px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${BORDER}`}}>
-          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🎒 そうび</span>
+          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🎒 そうび図鑑 <span style={{fontSize:12,color:MUTED,fontWeight:700}}>{collected}/{EQUIPMENT.length}</span></span>
           <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
         </div>
-        <div style={{padding:"10px 16px 4px",fontSize:12,color:TEXTS,fontWeight:700}}>いまの強さ：HP {stats.hp} ・ ⚔{stats.atk} ・ 🛡{stats.def}{stats.equip?`（${stats.equip.e}${stats.equip.name}）`:""}</div>
+        <div style={{padding:"10px 16px 4px",fontSize:12,color:TEXTS,fontWeight:700}}>いまの強さ：HP {stats.hp} ・ ⚔{stats.atk} ・ 🛡{stats.def}</div>
         <div style={{overflowY:"auto",padding:"6px 16px calc(20px + env(safe-area-inset-bottom))"}}>
-          {EQUIPMENT.map(it=>{
-            const unlocked=equipUnlocked(it,meta); const on=cur===it.id;
-            return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12,opacity:unlocked?1:0.65}}>
-              <div style={{fontSize:30,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{unlocked?it.name:"？？？"}</div>
-                <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[it.hp?`HP+${it.hp}`:"",it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:""].filter(Boolean).join("  ")}</div>
-                {!unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
-              </div>
-              {unlocked&&<button onClick={()=>setEq(on?null:it.id)} style={{background:on?MUTED:GP,border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>{on?"はずす":"そうび"}</button>}
-            </div>;
-          })}
-          <div style={{textAlign:"center",color:MUTED,fontSize:11,marginTop:4}}>お手伝い・なでなで・バトルで あたらしい そうびが 解放されるよ</div>
+          {EQ_SLOTS.map(sl=>(
+            <div key={sl.k}>
+              <div style={{fontWeight:900,fontSize:13,color:TEXT,margin:"8px 2px 6px"}}>{sl.t}</div>
+              {EQUIPMENT.filter(it=>it.slot===sl.k).map(it=>{
+                const unlocked=equipUnlocked(it,meta,dropped); const on=cur[sl.k]===it.id;
+                return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:BORDER}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:0.6}}>
+                  <div style={{fontSize:28,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{unlocked?it.name:"？？？"}</div>
+                    <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[it.hp?`HP+${it.hp}`:"",it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:""].filter(Boolean).join("  ")}</div>
+                    {!unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
+                  </div>
+                  {unlocked&&<button onClick={()=>setEq(sl.k,on?null:it.id)} style={{background:on?MUTED:GP,border:"none",borderRadius:10,padding:"8px 13px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>{on?"はずす":"そうび"}</button>}
+                </div>;
+              })}
+            </div>
+          ))}
+          <div style={{textAlign:"center",color:MUTED,fontSize:11,marginTop:6}}>お手伝い・なでなで・連続・バトルや、まれにドロップで集まるよ</div>
         </div>
       </div>
     </div>
@@ -1668,6 +1686,16 @@ function BattleModal({child,data,update,onClose}){
   const lowHP  = curHP < Math.max(20, Math.round(pMaxHP*0.2));
   const fragNow = (data.battleFragments||{})[child.id]||0;
   const ticketNow = (data.battleTickets||{})[child.id]||0;
+  // ポイントでHP回復(おこづかいの使い道＝トレードオフを学ぶ)
+  const myBalB = (data.logs||[]).filter(l=>l.cid===child.id).reduce((s,l)=>s+l.pts,0);
+  const healCost = Math.max(10, Math.round((pMaxHP-curHP)*0.5));
+  const healByPoints = ()=>{
+    if(curHP>=pMaxHP || myBalB<healCost) return;
+    update(d=>{ const e={id:uid(),cid:child.id,type:"reward",label:"💊 げんきドリンク（バトル回復）",pts:-healCost,date:new Date().toISOString()}; addLogToFirestore(e);
+      return {...d, logs:[e,...d.logs], monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}}; });
+  };
+  const potions=(data.healPotions||{})[child.id]||0;
+  const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}})); };
   const [oppIdx,setOppIdx]=useState(0);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
@@ -1686,6 +1714,7 @@ function BattleModal({child,data,update,onClose}){
   const [log,setLog]=useState("");
   const [result,setResult]=useState(null);
   const [reward,setReward]=useState(null);
+  const [drop,setDrop]=useState(null); // たまのドロップ {kind:"potion"|"equip", name}
   const [confetti]=useState(()=>[...Array(30)].map(()=>({x:Math.round(Math.random()*100),s:14+Math.round(Math.random()*18),d:(1.6+Math.random()*1.6).toFixed(2),dl:(Math.random()*0.9).toFixed(2),e:"⭐✨🎉🎊💫🎟🌟"[Math.floor(Math.random()*7)]})));
   const timers=useRef([]);
   const t=(fn,ms)=>{const id=setTimeout(fn,ms);timers.current.push(id);};
@@ -1696,7 +1725,7 @@ function BattleModal({child,data,update,onClose}){
   const [showEquip,setShowEquip]=useState(false);
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
-  const start=(i)=>{ if(lowHP) return; const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
+  const start=(i)=>{ if(lowHP) return; const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setDrop(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
   const finish=(r,finalHP)=>{
     setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
     const today=todayKey();
@@ -1712,11 +1741,21 @@ function BattleModal({child,data,update,onClose}){
     const converted=canFrag && (curFrag+1>=5);
     const newFrag=canFrag ? (converted?(curFrag+1-5):(curFrag+1)) : curFrag;
     if(r==="win") setReward(canFrag?(converted?"ticket":"fragment"):"none");
+    // たまのドロップ(勝利時): 回復アイテム or まだ持ってない装備
+    let dropInfo=null;
+    if(r==="win"){
+      const roll=Math.random();
+      if(roll<0.12) dropInfo={kind:"potion"};
+      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+    }
+    if(dropInfo) setDrop(dropInfo);
     update(d=>{ const nd={...d};
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
       nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
       if(r==="win") nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
+      if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
+      if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(canFrag){
         nd.battleFragments={...(d.battleFragments||{}),[child.id]:newFrag};
         if(converted) nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1};
@@ -1758,13 +1797,17 @@ function BattleModal({child,data,update,onClose}){
             <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>Lv.{stats.lv} · ⚔{pATK} · 🛡{pDEF}</div>
             <div style={{width:190,maxWidth:"82%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
             <div style={{width:190,maxWidth:"82%",margin:"5px auto 0"}}><HPBar label="EXP" hp={stats.exp.into} max={stats.exp.need} color="#ffd24a"/></div>
+            {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+              {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 かいふくアイテム ×{potions}</button>}
+              <button onClick={healByPoints} disabled={myBalB<healCost} style={{background:myBalB<healCost?"rgba(255,255,255,.12)":"#34C77B",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:myBalB<healCost?"default":"pointer",fontFamily:F}}>💊 ポイントで({healCost}pt){myBalB<healCost?"・たりない":""}</button>
+            </div>}
             <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:5}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
           </div>
           {lowHP && <div style={{background:"rgba(224,86,79,.15)",border:"1.5px solid #e0564f",borderRadius:12,padding:"10px 12px",marginBottom:10,textAlign:"center"}}>
             <div style={{color:"#ffb3ae",fontWeight:800,fontSize:13}}>つかれて たたかえない…💤</div>
             <div style={{color:"rgba(255,255,255,.6)",fontSize:11,marginTop:2}}>お手伝い・なでなで で かいふくしよう！（あさになると 元気に）</div>
           </div>}
-          <button onClick={()=>setShowEquip(true)} style={{width:"100%",marginBottom:12,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:14,padding:"11px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>🎒 そうびを 変える{stats.equip?`（${stats.equip.e}${stats.equip.name}）`:""}</button>
+          <button onClick={()=>setShowEquip(true)} style={{width:"100%",marginBottom:12,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:14,padding:"11px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>🎒 そうび図鑑{stats.equip&&stats.equip.length?`（${stats.equip.map(e=>e.e).join("")}）`:""}</button>
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {WILD_MONSTERS.map((w,i)=>{
@@ -1819,6 +1862,8 @@ function BattleModal({child,data,update,onClose}){
               {reward==="ticket"&&<div style={{marginTop:8,fontSize:16,fontWeight:900,color:"#fff5cc",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🧩×5 → 🎟 ガチャチケット 完成！</div>}
               {reward==="fragment"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#cfe6ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🧩 チケットのかけら GET！（{fragNow}/5）</div>}
               {reward==="none"&&<div style={{marginTop:8,fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",zIndex:2,textShadow:"0 2px 8px #000"}}>このモンスターの かけらは きょうGET済み（EXPはGET！）</div>}
+              {drop?.kind==="potion"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#bff0c8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>💊 かいふくアイテムを 見つけた！</div>}
+              {drop?.kind==="equip"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#ffd9a8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🎁 そうび「{drop.e}{drop.name}」を 見つけた！</div>}
             </div>
           )}
           {result==="lose"&&(
@@ -1869,6 +1914,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n15", e:"🎒", t:"そうびが2スロット＆図鑑に！", b:"「⚔ぶき」と「🛡たて」を2つ同時に装備できるように！そうびは図鑑になって、お手伝い・連続・バトル、そして“まれにドロップ”でも集まるよ。バトルで勝つと たまに💊回復アイテムや そうびが見つかる！HPはポイントでも回復できる。"},
   {id:"n14", e:"🗺", t:"旅先がえらべるように！", b:"とっくんの旅は「近くの森・海辺・山・遺跡・天空の島・まおうの城」から選べるよ。遠い旅先ほど 時間はかかるけどEXPがたくさん！レベルが上がると新しい旅先が解放。バトルも、強い敵ほど もらえるEXPが多い（選ぶ画面に表示）。"},
   {id:"n13", e:"🧭", t:"とっくんの旅 登場！", b:"ホームの「🧭とっくんの旅」からモンスターを旅に出すと、時間が経つとEXP（ときどき🧩かけらも）がもらえるよ。放置でコツコツ育てよう！"},
   {id:"n12", e:"🎯", t:"きょうのミッション登場！", b:"毎日の「お手伝い3回・なでなで・ガチャ・バトル1勝」をクリアでEXP！ぜんぶ達成すると🧩チケットのかけらももらえるよ。ホーム上部に出ます。"},
@@ -3463,6 +3509,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           const gotFrag=Math.random()<dest.frag;
           let nd={...d, expedition:{...(d.expedition||{}),[child.id]:null}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+dest.exp}};
           if(gotFrag){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
+          if(Math.random()<0.15) nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};  // たまに回復アイテム
           return nd;
         });
         const pct=started?Math.min(100,Math.round((1-remain/DUR)*100)):0;
