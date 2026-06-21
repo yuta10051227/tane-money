@@ -301,6 +301,7 @@ function startRealtimeSync(updateFn){
             if(prev.battleFragOpps) merged.battleFragOpps={...(merged.battleFragOpps||{}),...prev.battleFragOpps};
             if(prev.battleWins){merged.battleWins={...(merged.battleWins||{})};Object.keys(prev.battleWins).forEach(cid=>{merged.battleWins[cid]=Math.max(prev.battleWins[cid]||0,merged.battleWins[cid]||0);});}
             if(prev.monsterEquip) merged.monsterEquip={...(merged.monsterEquip||{}),...prev.monsterEquip};
+            if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1865,6 +1866,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n12", e:"🎯", t:"きょうのミッション登場！", b:"毎日の「お手伝い3回・なでなで・ガチャ・バトル1勝」をクリアでEXP！ぜんぶ達成すると🧩チケットのかけらももらえるよ。ホーム上部に出ます。"},
   {id:"n11", e:"🎒", t:"そうび（アイテム）登場！", b:"バトル画面の「🎒そうび」から、ぼうし・たて・つるぎ などを装備してステータスUP！レベル・お手伝い・なでなで・連続・バトル勝利など、いろんな がんばりで新しいそうびが解放されるよ。"},
   {id:"n10", e:"🧩", t:"バトル報酬が「チケットのかけら」に", b:"バトルに勝つと「ガチャチケットのかけら」がもらえるよ。5枚あつめると🎟ガチャチケット1枚に！同じモンスターからは1日1かけらまで（でもEXPは毎回もらえる）。いろんな相手と戦って集めよう！"},
   {id:"n09", e:"🆙", t:"モンスターに レベル登場！", b:"お手伝い・なでなで・バトル勝利で EXP が貯まって レベルアップ！レベルが上がると HP・こうげき・ぼうぎょ が強くなるよ。個体値(才能)が高い子ほど ぐんぐん伸びる！"},
@@ -1876,6 +1878,13 @@ const NEWS = [
   {id:"n03", e:"📅", t:"おてつだいが 平日/休日タブに", b:"毎日のおてつだいを、平日／休日のタブで切り替えられるようになりました。今日に合うタブが自動で開きます。"},
   {id:"n02", e:"🎰", t:"ガチャに確定演出＆新シリーズ", b:"SR以上で水やりの瞬間に流れ星・オーロラなどの予兆演出が出るように。図鑑に「世界のお金」シリーズも追加！"},
   {id:"n01", e:"🖼", t:"背景きせかえ追加", b:"累計クリアで、海・夕焼け・夜空・宇宙・オーロラ・桜・森 などの背景が解放されます。"},
+];
+// デイリーミッション(毎日リセット)。クリアでEXP、全クリアで🧩かけら
+const MISSIONS = [
+  {id:"m_task",   e:"✅", label:"お手伝いを 3かい", goal:3, metric:"tasks",  exp:10},
+  {id:"m_care",   e:"🤚", label:"モンスターを なでなで", goal:1, metric:"care", exp:8},
+  {id:"m_gacha",  e:"🎰", label:"ガチャを ひく", goal:1, metric:"gacha", exp:8},
+  {id:"m_battle", e:"⚔", label:"バトルに 1かい かつ", goal:1, metric:"battle", exp:12},
 ];
 function NewsModal({onClose}){
   return (
@@ -3349,7 +3358,51 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* ── ストリーク消滅リマインダー ── */}
+      {/* 🎯 きょうのミッション(毎日リセット) */}
+      {effectiveTab==="daily" && (()=>{
+        const tISO=todayISO(), tk=todayKey();
+        const metrics={
+          tasks: myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(tISO)).length,
+          care: (data.monsterCare?.[child.id]?.last===tk)?1:0,
+          gacha: (data.gachaDate?.[child.id]===tk)?1:0,
+          battle: (data.battleFragDate?.[child.id]===tk)?1:0,
+        };
+        const mcRaw=data.missionClaimed?.[child.id];
+        const claimed=(mcRaw&&mcRaw.date===tk)?(mcRaw.ids||[]):[];
+        const allClaimed=claimed.length>=MISSIONS.length;
+        const doneCount=MISSIONS.filter(m=>metrics[m.metric]>=m.goal).length;
+        const claim=(id,exp)=>update(d=>{
+          const mc=d.missionClaimed?.[child.id]; const ids=(mc&&mc.date===tk)?(mc.ids||[]):[];
+          if(ids.includes(id))return d; const nids=[...ids,id];
+          let nd={...d, missionClaimed:{...(d.missionClaimed||{}),[child.id]:{date:tk,ids:nids}}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+exp}};
+          if(nids.length>=MISSIONS.length){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
+          return nd;
+        });
+        return (
+          <div style={{padding:"10px 16px 0"}}>
+            <div style={{background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:16,padding:"12px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>🎯 きょうのミッション</span>
+                <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{doneCount}/{MISSIONS.length}{allClaimed?" ✓":""}</span>
+              </div>
+              {MISSIONS.map(m=>{
+                const prog=Math.min(metrics[m.metric],m.goal); const done=prog>=m.goal; const isClaimed=claimed.includes(m.id);
+                return <div key={m.id} style={{display:"flex",alignItems:"center",gap:9,padding:"5px 0"}}>
+                  <span style={{fontSize:17,width:22,textAlign:"center"}}>{m.e}</span>
+                  <div style={{flex:1,minWidth:0,fontSize:12.5,fontWeight:700,color:done?(darkBG?"#bff0c8":G):(darkBG?"rgba(255,255,255,0.75)":TEXT)}}>{m.label} <span style={{color:MUTED,fontWeight:600}}>{prog}/{m.goal}</span></div>
+                  {isClaimed
+                    ? <span style={{fontSize:11,fontWeight:800,color:MUTED,flexShrink:0}}>✓ もらった</span>
+                    : done
+                    ? <button onClick={()=>claim(m.id,m.exp)} style={{background:GP,border:"none",borderRadius:999,padding:"5px 12px",color:"#fff",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,flexShrink:0}}>+{m.exp}EXP</button>
+                    : <span style={{fontSize:11,color:MUTED,flexShrink:0}}>あと{m.goal-prog}</span>}
+                </div>;
+              })}
+              {allClaimed && <div style={{marginTop:6,fontSize:11,color:darkBG?"#bff0c8":G,fontWeight:700,textAlign:"center"}}>🎉 ぜんぶ達成！🧩 かけらGET！</div>}
+            </div>
+          </div>
+        );
+      })()}
+
       {curStreak>=3 && !todayTaskDone && effectiveTab==="daily" && (
         <div style={{margin:"10px 16px 0",background:`linear-gradient(135deg,#fff8e1,#fffde7)`,border:`2px solid ${GOLD}`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:24}}>🔥</span>
