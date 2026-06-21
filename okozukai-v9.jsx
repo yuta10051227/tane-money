@@ -302,6 +302,7 @@ function startRealtimeSync(updateFn){
             if(prev.battleWins){merged.battleWins={...(merged.battleWins||{})};Object.keys(prev.battleWins).forEach(cid=>{merged.battleWins[cid]=Math.max(prev.battleWins[cid]||0,merged.battleWins[cid]||0);});}
             if(prev.monsterEquip) merged.monsterEquip={...(merged.monsterEquip||{}),...prev.monsterEquip};
             if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
+            if(prev.expedition) merged.expedition={...(merged.expedition||{}),...prev.expedition};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1866,6 +1867,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n13", e:"🧭", t:"とっくんの旅（1時間）登場！", b:"ホームの「🧭とっくんの旅」からモンスターを旅に出すと、1時間後にEXP（ときどき🧩かけらも）がもらえるよ。放置でコツコツ育てよう！"},
   {id:"n12", e:"🎯", t:"きょうのミッション登場！", b:"毎日の「お手伝い3回・なでなで・ガチャ・バトル1勝」をクリアでEXP！ぜんぶ達成すると🧩チケットのかけらももらえるよ。ホーム上部に出ます。"},
   {id:"n11", e:"🎒", t:"そうび（アイテム）登場！", b:"バトル画面の「🎒そうび」から、ぼうし・たて・つるぎ などを装備してステータスUP！レベル・お手伝い・なでなで・連続・バトル勝利など、いろんな がんばりで新しいそうびが解放されるよ。"},
   {id:"n10", e:"🧩", t:"バトル報酬が「チケットのかけら」に", b:"バトルに勝つと「ガチャチケットのかけら」がもらえるよ。5枚あつめると🎟ガチャチケット1枚に！同じモンスターからは1日1かけらまで（でもEXPは毎回もらえる）。いろんな相手と戦って集めよう！"},
@@ -2981,6 +2983,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [showZukan, setShowZukan] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
   const [showNews, setShowNews] = useState(false);
+  const [nowTs, setNowTs] = useState(Date.now());
+  useEffect(()=>{const id=setInterval(()=>setNowTs(Date.now()),20000);return()=>clearInterval(id);},[]);
   const [newsSeen, setNewsSeen] = useState(()=>{try{return localStorage.getItem("tane_news_seen")||"";}catch(e){return "";}});
   const hasNews = NEWS.length>0 && newsSeen!==NEWS[0].id;
   const openNews = ()=>{ setShowNews(true); try{localStorage.setItem("tane_news_seen",NEWS[0].id);}catch(e){} setNewsSeen(NEWS[0].id); };
@@ -3398,6 +3402,41 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </div>;
               })}
               {allClaimed && <div style={{marginTop:6,fontSize:11,color:darkBG?"#bff0c8":G,fontWeight:700,textAlign:"center"}}>🎉 ぜんぶ達成！🧩 かけらGET！</div>}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 🧭 とっくんの旅(1時間でEXP・放置系) */}
+      {effectiveTab==="daily" && (()=>{
+        const DUR=3600000;
+        const exp=data.expedition?.[child.id];
+        const started=exp&&exp.start;
+        const remain=started?Math.max(0,DUR-(nowTs-new Date(exp.start).getTime())):0;
+        const back=started&&remain<=0;
+        const send=()=>update(d=>({...d,expedition:{...(d.expedition||{}),[child.id]:{start:new Date().toISOString()}}}));
+        const claim=()=>update(d=>{
+          const gotFrag=Math.random()<0.4;
+          let nd={...d, expedition:{...(d.expedition||{}),[child.id]:null}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+40}};
+          if(gotFrag){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
+          return nd;
+        });
+        const pct=started?Math.min(100,Math.round((1-remain/DUR)*100)):0;
+        return (
+          <div style={{padding:"10px 16px 0"}}>
+            <div style={{background:darkBG?"rgba(123,97,201,0.14)":"#f1ecfb",border:`1.5px solid ${darkBG?"rgba(155,124,255,0.4)":P+"55"}`,borderRadius:16,padding:"12px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:24}}>🧭</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:800,fontSize:13,color:darkBG?"#d9ccff":P}}>とっくんの旅</div>
+                  <div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.55)":TEXTS,marginTop:1}}>
+                    {!started?"1時間 旅に出ると EXPがもらえるよ":back?"旅から かえってきた！":`旅のとちゅう… のこり ${Math.ceil(remain/60000)}分`}
+                  </div>
+                </div>
+                {!started && <button onClick={send} style={{background:P,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>旅にだす</button>}
+                {back && <button onClick={claim} style={{background:GP,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:900,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>🎁 うけとる</button>}
+              </div>
+              {started && !back && <div style={{height:7,borderRadius:999,background:darkBG?"rgba(255,255,255,0.12)":"#e3dbf5",overflow:"hidden",marginTop:9}}><div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${P},#9b7cff)`,borderRadius:999,transition:"width .5s"}}/></div>}
             </div>
           </div>
         );
