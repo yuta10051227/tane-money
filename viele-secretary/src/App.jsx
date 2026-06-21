@@ -454,6 +454,81 @@ function pickTripTemplate(title) {
 }
 
 /* ──────────────────────────────────────────────────────────────
+   年中行事データ＋日付算出
+   ────────────────────────────────────────────────────────────── */
+
+// 指定年の「第N曜日」の日付(Date)を返す
+// month: 1-12, weekday: 0=日..6=土, nth: 第nth
+function nthWeekday(year, month, weekday, nth) {
+  const first = new Date(year, month - 1, 1);
+  const diff = (weekday - first.getDay() + 7) % 7;
+  const day = 1 + diff + (nth - 1) * 7;
+  return new Date(year, month - 1, day);
+}
+
+// 今日以降の「次回該当日」を返す（過ぎていれば翌年）
+function nextAnnualDate(computeFn) {
+  const today = startOfDay(new Date());
+  const y = today.getFullYear();
+  let d = computeFn(y);
+  if (startOfDay(d) < today) d = computeFn(y + 1);
+  return iso(d);
+}
+
+// 固定月日の次回日付
+function fixedDate(month, day) {
+  return nextAnnualDate((y) => new Date(y, month - 1, day));
+}
+// 第N曜日の次回日付
+function nthWeekdayDate(month, weekday, nth) {
+  return nextAnnualDate((y) => nthWeekday(y, month, weekday, nth));
+}
+
+// プリセット年中行事一覧
+// id: 一意キー, name: 表示名, emoji, getDate: ()=>ISO, template: 逆算チェーン型
+const ANNUAL_EVENTS = [
+  { id: "mothers_day",   name: "母の日",   emoji: "🌸", getDate: () => nthWeekdayDate(5, 0, 2),  template: "誕生日・記念日" },
+  { id: "fathers_day",   name: "父の日",   emoji: "👔", getDate: () => nthWeekdayDate(6, 0, 3),  template: "誕生日・記念日" },
+  { id: "keiro_day",     name: "敬老の日", emoji: "🎎", getDate: () => nthWeekdayDate(9, 1, 3),  template: "誕生日・記念日" },
+  { id: "valentine",     name: "バレンタイン", emoji: "🍫", getDate: () => fixedDate(2, 14), template: "誕生日・記念日" },
+  { id: "white_day",     name: "ホワイトデー", emoji: "🍬", getDate: () => fixedDate(3, 14), template: "誕生日・記念日" },
+  { id: "ochugen",       name: "お中元",   emoji: "🎁", getDate: () => fixedDate(7, 1),  template: "誕生日・記念日" },
+  { id: "oseibo",        name: "お歳暮",   emoji: "🎁", getDate: () => fixedDate(12, 1), template: "誕生日・記念日" },
+  { id: "christmas",     name: "クリスマス", emoji: "🎄", getDate: () => fixedDate(12, 25), template: "誕生日・記念日" },
+  { id: "omisoka",       name: "大晦日",   emoji: "🎍", getDate: () => fixedDate(12, 31), template: "誕生日・記念日" },
+];
+
+// デフォルトでONにする行事ID
+const ANNUAL_DEFAULT_ON = new Set(["mothers_day", "fathers_day", "keiro_day", "valentine", "christmas"]);
+
+// 有効な行事を「あと何日」付きで返す（45日以内のみ。disabledを除外）
+function getUpcomingAnnualEvents(settings) {
+  const s = settings || {};
+  return ANNUAL_EVENTS
+    .filter((ev) => {
+      // settingsに明示されていなければデフォルト値を使う
+      const on = ev.id in s ? s[ev.id] : ANNUAL_DEFAULT_ON.has(ev.id);
+      return on;
+    })
+    .map((ev) => ({ ...ev, dateISO: ev.getDate(), days: daysUntil(ev.getDate()) }))
+    .filter((ev) => ev.days >= 0 && ev.days <= 45)
+    .sort((a, b) => a.days - b.days);
+}
+
+// ユーザー登録の記念日を「あと何日」付きで返す（45日以内のみ）
+// anniversaries: [{ id, name, month, day, emoji }]
+function getUpcomingUserAnniversaries(anniversaries) {
+  return (anniversaries || [])
+    .map((a) => {
+      const dateISO = fixedDate(a.month, a.day);
+      const days = daysUntil(dateISO);
+      return { ...a, dateISO, days };
+    })
+    .filter((a) => a.days >= 0 && a.days <= 45)
+    .sort((a, b) => a.days - b.days);
+}
+
+/* ──────────────────────────────────────────────────────────────
    今週の予定（時間配分メーターの元データ）
    Phase2でGoogleカレンダー連携に差し替える前提のローカル定数。
    cat: 施術/制作/集客/経営   axis: 労働(自分が動く) / 仕組み(資産になる)
@@ -537,6 +612,8 @@ function makeSeed() {
     manualEvents: [], // スクショ取り込み(TimeTree等)の予定
     sampleNotice: true, // サンプルデータ識別フラグ
     profile: null,      // オンボーディングで収集するプロフィール（未設定=null）
+    anniversaries: [],  // ユーザー登録の記念日 [{ id, name, month, day, emoji? }]
+    annivSettings: {},  // 年中行事のオン/オフ { [eventId]: true|false }
     updatedAt: Date.now(),
   };
 }
@@ -626,6 +703,168 @@ function Check({ done, onClick }) {
     >
       {done ? "✓" : ""}
     </button>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   年中行事・記念日パネル
+   設定（オン/オフ）＋大切な人の記念日管理＋近日通知＋逆算導線
+   ────────────────────────────────────────────────────────────── */
+function AnniversaryPanel({ annivSettings, anniversaries, onUpdateSettings, onUpdateAnniversaries, onAddTrip }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [form, setForm] = useState({ name: "", month: "", day: "", emoji: "" });
+
+  const settings = annivSettings || {};
+  const annivs = anniversaries || [];
+
+  const toggleEvent = (id) => {
+    const cur = id in settings ? settings[id] : ANNUAL_DEFAULT_ON.has(id);
+    onUpdateSettings({ ...settings, [id]: !cur });
+  };
+  const isOn = (id) => (id in settings ? settings[id] : ANNUAL_DEFAULT_ON.has(id));
+
+  const addAnniversary = () => {
+    const m = Number(form.month), d = Number(form.day);
+    if (!form.name.trim() || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return;
+    const next = [...annivs, { id: "av" + Date.now(), name: form.name.trim(), month: m, day: d, emoji: form.emoji.trim() || "🎂" }];
+    onUpdateAnniversaries(next);
+    setForm({ name: "", month: "", day: "", emoji: "" });
+    setShowAddForm(false);
+  };
+  const removeAnniversary = (id) => {
+    const item = annivs.find((a) => a.id === id);
+    if (window.confirm(`「${item ? item.name : "この記念日"}」を削除しますか？`)) {
+      onUpdateAnniversaries(annivs.filter((a) => a.id !== id));
+    }
+  };
+
+  // 近日の年中行事（45日以内）
+  const upcomingAnnual = getUpcomingAnnualEvents(settings);
+  // 近日のユーザー登録記念日（45日以内）
+  const upcomingUser = getUpcomingUserAnniversaries(annivs);
+
+  const makeChain = (name, dateISO, template) => {
+    onAddTrip({ title: name + "の準備", template, date: dateISO });
+  };
+
+  return (
+    <Panel
+      title="年中行事・記念日"
+      accent={FAMILY_COLOR}
+      help="母の日・父の日・バレンタインなど大切な人への行事を45日前から教えてくれます。「準備の段取りをつくる」を押すと逆算チェーンを自動生成します。大切な人の誕生日や記念日も登録できます。"
+      right={
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setShowAddForm((v) => !v)} style={chipBtn}>＋記念日を追加</button>
+          <button onClick={() => setShowSettings((v) => !v)} style={{ ...iconBtn, fontSize: 15, color: showSettings ? FAMILY_COLOR : C.sub }} title="どの行事を気にするか設定">⚙</button>
+        </div>
+      }
+    >
+      {/* 記念日追加フォーム */}
+      {showAddForm && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>大切な人の誕生日や記念日を登録します（毎年通知）。</div>
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="名前（例：お母さんの誕生日）" style={inp} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} placeholder="月" inputMode="numeric" style={{ ...inp, width: 72, flex: "0 0 auto" }} />
+            <span style={{ fontSize: 14, color: C.sub, lineHeight: "38px" }}>月</span>
+            <input value={form.day} onChange={(e) => setForm({ ...form, day: e.target.value })} placeholder="日" inputMode="numeric" style={{ ...inp, width: 72, flex: "0 0 auto" }} />
+            <span style={{ fontSize: 14, color: C.sub, lineHeight: "38px" }}>日</span>
+            <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} placeholder="絵文字（任意）" style={{ ...inp, width: 90, flex: "0 0 auto" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+            <button onClick={addAnniversary} style={{ ...chipBtn, background: FAMILY_COLOR, color: "#fff", borderColor: FAMILY_COLOR }}>追加</button>
+            <button onClick={() => setShowAddForm(false)} style={chipBtn}>閉じる</button>
+          </div>
+        </div>
+      )}
+
+      {/* 年中行事のオン/オフ設定 */}
+      {showSettings && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>気にする年中行事を選ぶ</div>
+          <div style={{ display: "grid", gap: 4 }}>
+            {ANNUAL_EVENTS.map((ev) => (
+              <label key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "4px 0" }}>
+                <input
+                  type="checkbox"
+                  checked={isOn(ev.id)}
+                  onChange={() => toggleEvent(ev.id)}
+                  style={{ width: 17, height: 17, flex: "0 0 auto", accentColor: FAMILY_COLOR }}
+                />
+                <span style={{ fontSize: 14 }}>{ev.emoji} {ev.name}</span>
+              </label>
+            ))}
+          </div>
+          <button onClick={() => setShowSettings(false)} style={{ ...chipBtn, marginTop: 8, fontSize: 12 }}>閉じる</button>
+        </div>
+      )}
+
+      {/* 近日の年中行事 */}
+      {upcomingAnnual.length === 0 && upcomingUser.length === 0 && annivs.length === 0 && (
+        <div style={{ fontSize: 13, color: C.faint, padding: "8px 0" }}>
+          45日以内に近づく行事はありません。右上の設定で気にする行事を増やせます。
+        </div>
+      )}
+      <div style={{ display: "grid", gap: 10 }}>
+        {[...upcomingAnnual, ...upcomingUser].map((ev) => {
+          const isUrgent = ev.days <= 14;
+          const dotColor = ev.days <= 7 ? C.red : ev.days <= 14 ? C.orange : FAMILY_COLOR;
+          return (
+            <div key={ev.id} style={{ background: C.panel2, borderRadius: 12, padding: "10px 14px", borderLeft: `3px solid ${dotColor}` }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <span style={{ fontSize: 20, flex: "0 0 auto", marginTop: 1 }}>{ev.emoji || "🎂"}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{ev.name}</div>
+                  <div style={{ fontSize: 12, color: dotColor, fontWeight: 700, marginTop: 2 }}>
+                    {ev.days === 0 ? "今日！" : `あと ${ev.days} 日`}
+                    <span style={{ color: C.sub, fontWeight: 400, marginLeft: 6 }}>（{fmt(ev.dateISO)}）</span>
+                  </div>
+                  {isUrgent && ev.days > 0 && (
+                    <div style={{ fontSize: 12, color: C.sub, marginTop: 3, lineHeight: 1.4 }}>
+                      そろそろ準備を始めると安心です。
+                    </div>
+                  )}
+                </div>
+                {ev.days > 0 && (
+                  <button
+                    onClick={() => makeChain(ev.name, ev.dateISO, ev.template || "誕生日・記念日")}
+                    style={{ ...chipBtn, fontSize: 12, padding: "6px 10px", minHeight: 34, background: FAMILY_COLOR + "18", borderColor: FAMILY_COLOR, color: FAMILY_COLOR, flex: "0 0 auto" }}
+                    title="準備の逆算チェーンを仕事タブに作成"
+                  >段取りをつくる</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 登録済み記念日一覧（近日以外のものも表示） */}
+      {annivs.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>登録した記念日</div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {annivs.map((a) => {
+              const dateISO = fixedDate(a.month, a.day);
+              const days = daysUntil(dateISO);
+              return (
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.line}` }}>
+                  <span style={{ fontSize: 16, flex: "0 0 auto" }}>{a.emoji || "🎂"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14 }}>{a.name}</span>
+                    <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>{a.month}/{a.day}</span>
+                    <span style={{ fontSize: 12, color: days <= 14 ? C.orange : C.faint, marginLeft: 8 }}>
+                      {days === 0 ? "今日！" : days > 0 ? `あと${days}日` : "今年は終了"}
+                    </span>
+                  </div>
+                  <button onClick={() => removeAnniversary(a.id)} style={iconBtn} title="削除">✕</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -1846,7 +2085,7 @@ const PROFILE_ADVICE = {
 };
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
-function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews, profile }) {
+function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews, profile, annivSettings, anniversaries }) {
   const [more, setMore] = useState(false); // 副次情報（運気/売上/ニュース）の折りたたみ
   // 占術コンディションは決定論(dayEnergy)で常に算出 → AIが無くても「今日のスタンス」が出る。
   // AIの鑑定文(fortune.today)は付加情報として併用する。
@@ -1973,6 +2212,30 @@ function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, o
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5 }}><b style={{ color: mode.color }}>今日の一手</b>　{advice}</span>
         </button>
       )}
+      {/* 近日の年中行事・記念日（45日以内）：控えめに1〜2件だけ表示 */}
+      {(() => {
+        const allUpcoming = [
+          ...getUpcomingAnnualEvents(annivSettings),
+          ...getUpcomingUserAnniversaries(anniversaries),
+        ].sort((a, b) => a.days - b.days).slice(0, 2);
+        if (!allUpcoming.length) return null;
+        return (
+          <div style={{ background: FAMILY_COLOR + "14", border: `1px solid ${FAMILY_COLOR}44`, borderRadius: 10, padding: "8px 11px", margin: "4px 0 6px" }}>
+            {allUpcoming.map((ev) => (
+              <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: "2px 0", fontSize: 13, color: C.text }}>
+                <span style={{ flex: "0 0 auto" }}>{ev.emoji || "🎂"}</span>
+                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.4 }}>
+                  <b style={{ color: FAMILY_COLOR }}>{ev.name}</b>
+                  <span style={{ color: C.sub, marginLeft: 6 }}>
+                    {ev.days === 0 ? "今日！" : `あと${ev.days}日`}（{fmt(ev.dateISO)}）
+                  </span>
+                </span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>ホームの「年中行事・記念日」パネルで準備の段取りを確認できます。</div>
+          </div>
+        );
+      })()}
       {/* 主要：今日の予定は常に表示（要対応の内訳は直下の「今日の要対応」パネルに集約して重複を回避） */}
       <Row icon="📅" label={(today || []).length ? `今日の予定 ${today.length}件${next ? `／次 ${next.time} ${next.title}` : ""}` : "今日の予定はありません"} onClick={() => onTab("home")} />
       {/* 副次：運気・攻めの日・未処理・ニュースは折りたたみ（情報過多の防止） */}
@@ -4739,7 +5002,7 @@ export default function App() {
                   onDismiss={() => update({ industryPromptDismissed: true })}
                 />
               )}
-              <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} profile={profile} />
+              <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} profile={profile} annivSettings={data.annivSettings} anniversaries={data.anniversaries} />
               {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
               {(!data.birth || !data.birth.date) && !data.sampleNotice && (
                 <BirthQuickInput
@@ -4749,6 +5012,13 @@ export default function App() {
                 />
               )}
               <AlertSummary alerts={alerts} notify={notify} notifySupported={notifySupported} onEnableNotify={enableNotify} />
+              <AnniversaryPanel
+                annivSettings={data.annivSettings}
+                anniversaries={data.anniversaries}
+                onUpdateSettings={(s) => update({ annivSettings: s })}
+                onUpdateAnniversaries={(a) => update({ anniversaries: a })}
+                onAddTrip={addTrip}
+              />
               {usingCal && <AddEventBar calList={calList} onCreate={createCalEvent} busy={calWriteBusy} msg={calWriteMsg} onReconnect={connectCalendar} />}
               {catMsg && (
                 <div style={{ background: C.green + "1A", border: `1px solid ${C.green}`, color: C.text, borderRadius: 10, padding: "8px 12px", marginBottom: 10, fontSize: 13 }}>✓ {catMsg}</div>
