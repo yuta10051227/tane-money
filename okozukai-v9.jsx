@@ -1702,7 +1702,7 @@ function BattleModal({child,data,update,onClose}){
     const today=todayKey();
     const hpSave=Math.max(0,Math.round(finalHP));
     const unlockBoss=(r==="win") && opp.lv>=7 && !opp.boss;
-    const expGain=(r==="win") ? (opp.boss?60:25) : 6;  // EXPは常にもらえる
+    const expGain=(r==="win") ? battleExp(opp) : Math.round(battleExp(opp)*0.25);  // 強い敵ほど多い・負けても少しもらえる
     // チケットのかけら: 勝利でかけら+1(同じモンスターは1日1かけらまで)。5枚で🎟チケット1枚に
     const oppKey=opp.boss?"boss":String(oppIdx);
     const fragDateOk=(data.battleFragDate||{})[child.id]===today;
@@ -1773,7 +1773,8 @@ function BattleModal({child,data,update,onClose}){
               return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
                 <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
-                <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥つよい":""}</div>
+                <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥":""}</div>
+                <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(w)}</div>
               </button>;
             })}
             {bossUnlocked ? (
@@ -1781,6 +1782,7 @@ function BattleModal({child,data,update,onClose}){
                 <img src={`/assets/${BOSS_MONSTER.img}.png`} style={{width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=BOSS_MONSTER.emoji;s.style.fontSize="40px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:900,fontSize:13,marginTop:4}}>{BOSS_MONSTER.name}</div>
                 <div style={{fontSize:11,color:BOSS_MONSTER.color,fontWeight:900,marginTop:2}}>Lv.{BOSS_MONSTER.lv} 👑ボス</div>
+                <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(BOSS_MONSTER)}</div>
               </button>
             ) : (
               <div style={{background:"rgba(255,255,255,.04)",border:"1.5px dashed rgba(255,255,255,.2)",borderRadius:16,padding:"14px 8px",textAlign:"center",opacity:.8}}>
@@ -1867,7 +1869,8 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
-  {id:"n13", e:"🧭", t:"とっくんの旅（1時間）登場！", b:"ホームの「🧭とっくんの旅」からモンスターを旅に出すと、1時間後にEXP（ときどき🧩かけらも）がもらえるよ。放置でコツコツ育てよう！"},
+  {id:"n14", e:"🗺", t:"旅先がえらべるように！", b:"とっくんの旅は「近くの森・海辺・山・遺跡・天空の島・まおうの城」から選べるよ。遠い旅先ほど 時間はかかるけどEXPがたくさん！レベルが上がると新しい旅先が解放。バトルも、強い敵ほど もらえるEXPが多い（選ぶ画面に表示）。"},
+  {id:"n13", e:"🧭", t:"とっくんの旅 登場！", b:"ホームの「🧭とっくんの旅」からモンスターを旅に出すと、時間が経つとEXP（ときどき🧩かけらも）がもらえるよ。放置でコツコツ育てよう！"},
   {id:"n12", e:"🎯", t:"きょうのミッション登場！", b:"毎日の「お手伝い3回・なでなで・ガチャ・バトル1勝」をクリアでEXP！ぜんぶ達成すると🧩チケットのかけらももらえるよ。ホーム上部に出ます。"},
   {id:"n11", e:"🎒", t:"そうび（アイテム）登場！", b:"バトル画面の「🎒そうび」から、ぼうし・たて・つるぎ などを装備してステータスUP！レベル・お手伝い・なでなで・連続・バトル勝利など、いろんな がんばりで新しいそうびが解放されるよ。"},
   {id:"n10", e:"🧩", t:"バトル報酬が「チケットのかけら」に", b:"バトルに勝つと「ガチャチケットのかけら」がもらえるよ。5枚あつめると🎟ガチャチケット1枚に！同じモンスターからは1日1かけらまで（でもEXPは毎回もらえる）。いろんな相手と戦って集めよう！"},
@@ -1888,6 +1891,46 @@ const MISSIONS = [
   {id:"m_gacha",  e:"🎰", label:"ガチャを ひく", goal:1, metric:"gacha", exp:8},
   {id:"m_battle", e:"⚔", label:"バトルに 1かい かつ", goal:1, metric:"battle", exp:12},
 ];
+// とっくんの旅先(レベルで解放・遠いほど時間とEXP大)
+const EXPEDITIONS = [
+  {id:"forest",  name:"近くの森",     e:"🌳", mins:30,  exp:25,  frag:0.25, needLv:1},
+  {id:"beach",   name:"きらめく海辺", e:"🏖", mins:60,  exp:45,  frag:0.35, needLv:3},
+  {id:"mountain",name:"たかい山おく", e:"⛰", mins:90,  exp:75,  frag:0.45, needLv:6},
+  {id:"ruins",   name:"ふしぎな遺跡", e:"🏛", mins:120, exp:110, frag:0.55, needLv:10},
+  {id:"sky",     name:"天空の島",     e:"☁", mins:150, exp:160, frag:0.7,  needLv:16},
+  {id:"castle",  name:"まおうの城",   e:"🏰", mins:180, exp:230, frag:0.9,  needLv:25},
+];
+// 敵を倒したときのEXP(強いほど多い)
+const battleExp = (opp)=> opp.boss ? 70 : 10 + opp.lv*4;
+function ExpeditionModal({child,data,update,onClose}){
+  const lv=monLevel((data.monsterExp||{})[child.id]||0).lv;
+  const go=(id)=>{ update(d=>({...d,expedition:{...(d.expedition||{}),[child.id]:{start:new Date().toISOString(),dest:id}}})); onClose(); };
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(8,6,18,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"84vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{padding:"16px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${BORDER}`}}>
+          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🧭 とっくんの旅先</span>
+          <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
+        </div>
+        <div style={{padding:"4px 16px 6px",fontSize:12,color:TEXTS}}>遠い旅先ほど 時間はかかるけど EXPがたくさん！（レベルで解放）</div>
+        <div style={{overflowY:"auto",padding:"8px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+          {EXPEDITIONS.map(ex=>{
+            const ok=lv>=ex.needLv;
+            return <div key={ex.id} style={{background:CARD,border:`2px solid ${ok?P+"55":BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12,opacity:ok?1:0.6}}>
+              <div style={{fontSize:30,flexShrink:0,filter:ok?"none":"grayscale(1) brightness(.7)"}}>{ex.e}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{ok?ex.name:"？？？"}</div>
+                <div style={{fontSize:11,color:TEXTS,marginTop:2}}>⏱ {ex.mins>=60?`${ex.mins/60}時間`:`${ex.mins}分`} ・ 🆙 EXP+{ex.exp} ・ 🧩{Math.round(ex.frag*100)}%</div>
+                {!ok&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 レベル{ex.needLv}で 解放</div>}
+              </div>
+              {ok&&<button onClick={()=>go(ex.id)} style={{background:P,border:"none",borderRadius:10,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>旅にだす</button>}
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 function NewsModal({onClose}){
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(8,6,18,.6)",backdropFilter:"blur(2px)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
@@ -2984,6 +3027,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [showBattle, setShowBattle] = useState(false);
   const [showNews, setShowNews] = useState(false);
   const [nowTs, setNowTs] = useState(Date.now());
+  const [showExped, setShowExped] = useState(false);
   useEffect(()=>{const id=setInterval(()=>setNowTs(Date.now()),20000);return()=>clearInterval(id);},[]);
   const [newsSeen, setNewsSeen] = useState(()=>{try{return localStorage.getItem("tane_news_seen")||"";}catch(e){return "";}});
   const hasNews = NEWS.length>0 && newsSeen!==NEWS[0].id;
@@ -3407,17 +3451,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         );
       })()}
 
-      {/* 🧭 とっくんの旅(1時間でEXP・放置系) */}
+      {/* 🧭 とっくんの旅(旅先を選択・遠いほどEXP大・放置系) */}
       {effectiveTab==="daily" && (()=>{
-        const DUR=3600000;
         const exp=data.expedition?.[child.id];
         const started=exp&&exp.start;
+        const dest=EXPEDITIONS.find(e=>e.id===exp?.dest)||EXPEDITIONS[0];
+        const DUR=dest.mins*60000;
         const remain=started?Math.max(0,DUR-(nowTs-new Date(exp.start).getTime())):0;
         const back=started&&remain<=0;
-        const send=()=>update(d=>({...d,expedition:{...(d.expedition||{}),[child.id]:{start:new Date().toISOString()}}}));
         const claim=()=>update(d=>{
-          const gotFrag=Math.random()<0.4;
-          let nd={...d, expedition:{...(d.expedition||{}),[child.id]:null}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+40}};
+          const gotFrag=Math.random()<dest.frag;
+          let nd={...d, expedition:{...(d.expedition||{}),[child.id]:null}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+dest.exp}};
           if(gotFrag){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
           return nd;
         });
@@ -3426,15 +3470,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{padding:"10px 16px 0"}}>
             <div style={{background:darkBG?"rgba(123,97,201,0.14)":"#f1ecfb",border:`1.5px solid ${darkBG?"rgba(155,124,255,0.4)":P+"55"}`,borderRadius:16,padding:"12px 14px"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:24}}>🧭</span>
+                <span style={{fontSize:24}}>{started?dest.e:"🧭"}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:800,fontSize:13,color:darkBG?"#d9ccff":P}}>とっくんの旅</div>
                   <div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.55)":TEXTS,marginTop:1}}>
-                    {!started?"1時間 旅に出ると EXPがもらえるよ":back?"旅から かえってきた！":`旅のとちゅう… のこり ${Math.ceil(remain/60000)}分`}
+                    {!started?"旅先をえらんで EXPをかせごう！":back?`${dest.name}から かえってきた！`:`${dest.name}へ 旅のとちゅう… のこり ${Math.ceil(remain/60000)}分`}
                   </div>
                 </div>
-                {!started && <button onClick={send} style={{background:P,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>旅にだす</button>}
-                {back && <button onClick={claim} style={{background:GP,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:900,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>🎁 うけとる</button>}
+                {!started && <button onClick={()=>setShowExped(true)} style={{background:P,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>旅先をえらぶ</button>}
+                {back && <button onClick={claim} style={{background:GP,border:"none",borderRadius:999,padding:"8px 14px",color:"#fff",fontWeight:900,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>🎁 EXP+{dest.exp} うけとる</button>}
               </div>
               {started && !back && <div style={{height:7,borderRadius:999,background:darkBG?"rgba(255,255,255,0.12)":"#e3dbf5",overflow:"hidden",marginTop:9}}><div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${P},#9b7cff)`,borderRadius:999,transition:"width .5s"}}/></div>}
             </div>
@@ -3502,6 +3546,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {gachaRes && <GachaAnim result={gachaRes} onClose={()=>setGachaRes(null)}/>}
       {showBattle && <BattleModal child={child} data={data} update={update} onClose={()=>setShowBattle(false)}/>}
       {showNews && <NewsModal onClose={()=>setShowNews(false)}/>}
+      {showExped && <ExpeditionModal child={child} data={data} update={update} onClose={()=>setShowExped(false)}/>}
 
       {/* Reward confirm */}
       {rewardPop && (
