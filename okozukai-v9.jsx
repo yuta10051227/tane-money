@@ -7260,6 +7260,21 @@ function WeeklyReport({child,data,onClose}){
   const gachaCount=logs.filter(l=>l.type==="gacha").length;
   const curBal=bal(data.logs,child.id);
   const interest=data.interestEnabled?Math.floor(curBal*(data.interestRate||0.05)):0;
+  // ── C: お金の学び 計測指標 ──
+  const validQuiz=new Set(ALL_TIPS.map(t=>t.id));
+  const quizMastered=((data.tipsQuiz||{})[child.id]||[]).filter(id=>validQuiz.has(id)).length;  // クイズ正解(累計マスター)
+  const tipsWeek=logs.filter(l=>l.type==="tips").length;                                          // 今週読んだまめちしき
+  const investWeek=logs.filter(l=>["invest_buy","invest_sell","forex_buy","forex_sell"].includes(l.type)).length; // 投資チャレンジ
+  const goalsDone=(data.goals||[]).filter(g=>g.cid===child.id&&g.done).length;                    // 目標達成(累計)
+  const streakCur=(data.streak||{})[child.id]?.cur||0;
+  const netWeek=earned-deducted;
+  // おかねの学びスコア(0-100): 学び30+継続20+お手伝い20+お金の行動20+収支プラス10。週ごとの伸びを親が追える単一指標
+  const sLearn=Math.round(quizMastered/ALL_TIPS.length*30);
+  const sStreak=Math.round(Math.min(streakCur,7)/7*20);
+  const sTask=Math.round(Math.min(taskCount,10)/10*20);
+  const sMoney=Math.min(20, goalsDone*8 + Math.min(investWeek,4)*3);
+  const sNet=netWeek>=0?10:0;
+  const learnScore=Math.min(100, sLearn+sStreak+sTask+sMoney+sNet);
   return(
     <div style={{position:"fixed",inset:0,background:"#0009",zIndex:990,display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
       <div style={{background:CARD,borderRadius:"24px 24px 0 0",padding:"24px 20px 40px",width:"100%",maxWidth:420,boxShadow:"0 -8px 40px #0004"}}>
@@ -7281,9 +7296,36 @@ function WeeklyReport({child,data,onClose}){
             </div>
           ))}
         </div>
+        {/* ── C: お金の学び 計測サマリ ── */}
+        <div style={{background:PS,border:`1.5px solid ${P}40`,borderRadius:14,padding:"13px 14px",marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{fontWeight:800,fontSize:13,color:TEXT}}>🧠 おかねの学び</span>
+            <span style={{fontWeight:900,fontSize:18,color:P}}>{learnScore}<span style={{fontSize:11,color:MUTED,fontWeight:700}}>/100</span></span>
+          </div>
+          <div style={{height:9,borderRadius:999,background:"#0001",overflow:"hidden",marginBottom:4}}>
+            <div style={{height:"100%",width:`${learnScore}%`,background:`linear-gradient(90deg,${P},${G})`,borderRadius:999,transition:"width .5s"}}/>
+          </div>
+          <div style={{fontSize:11,color:MUTED,marginBottom:10}}>学び{sLearn}＋継続{sStreak}＋お手伝い{sTask}＋お金の行動{sMoney}＋収支{sNet}。毎週どう伸びたか比べてみてください</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[
+              ["💡","まめちしきクイズ正解",`${quizMastered}/${ALL_TIPS.length}`,"累計マスター"],
+              ["📖","今週 読んだ知識",`${tipsWeek}`,"件"],
+              ["📈","投資チャレンジ",`${investWeek}`,"今週の回数"],
+              ["🎯","目標 達成",`${goalsDone}`,"累計"],
+            ].map(([e,l,v,sub],i)=>(
+              <div key={i} style={{background:CARD,borderRadius:10,padding:"9px 11px",display:"flex",alignItems:"center",gap:9}}>
+                <span style={{fontSize:18}}>{e}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{l}</div>
+                  <div style={{fontWeight:900,fontSize:14,color:TEXT}}>{v}<span style={{fontSize:10,color:MUTED,fontWeight:600,marginLeft:3}}>{sub}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <div style={{background:`${G}15`,border:`1.5px solid ${G}40`,borderRadius:14,padding:"12px 14px",marginBottom:16}}>
           <p style={{margin:0,fontSize:13,fontWeight:700,lineHeight:1.7,color:TEXT}}>
-            {taskCount>=5?"🌟 すごい！今週はお手伝いをたくさんしたね！":taskCount>=3?"👍 いい調子！来週もがんばろう！":"💪 来週はもっとお手伝いに挑戦してみよう！"}
+            {learnScore>=70?"🌟 お金の学びがぐんぐん伸びています！この調子で続けましょう。":quizMastered<5?"💡 まめちしきクイズに挑戦すると『お金の知識』が伸びます。お子さんに勧めてみて。":taskCount>=5?"🌟 すごい！今週はお手伝いをたくさんしたね！":taskCount>=3?"👍 いい調子！来週もがんばろう！":"💪 来週はもっとお手伝いに挑戦してみよう！"}
           </p>
         </div>
         <button onClick={onClose} style={{width:"100%",background:G,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>とじる</button>
