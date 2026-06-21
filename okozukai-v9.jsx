@@ -2058,6 +2058,8 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n23", e:"⚔", t:"モンスター固有のレア武器＆ドロップ図鑑！", b:"モンスターを倒すと、それぞれ固有のレア武器を低確率でドロップするようになったよ（スライムソード〜ヤミノツルギ）。『記録』タブの「ドロップ図鑑」で、どのモンスターが何を落とすか・集めたかを確認できる。周回してコンプを目指そう！さらにバトルのHPは1分で1回復するようになったよ。"},
+  {id:"n22", e:"💰", t:"投資の「配当」がもらえるように！", b:"株を持っているだけで、毎週「配当」がもらえるようになったよ（持つだけで1%、7日2%・30日3.5%・90日5%と長く持つほどUP）。本物の株とおなじで、すぐ売らずにコツコツ長く持つほど増える！短期で売り買いすると手数料で損しやすいので、長期でじっくりがコツだよ。"},
   {id:"n21", e:"🥚", t:"ヤミノオウのタマゴ 登場！", b:"バトルで「ヤミノオウ」を倒すと、まれに🥚タマゴをドロップ！「記録」タブからお世話して育てると、ヤミノタマゴ→ヤミノコ→じぶんだけの👑ヤミノオウに最終進化するよ。育てきると「ひみつのなかま」で すがたにできる。毎日コツコツお世話するのが ポイント！"},
   {id:"n20", e:"✨", t:"こまかい使いやすさ改善！", b:"・ガチャの近くに「きょうのお手伝い数」を表示＝先にお手伝いするとタネがもっと元気に🌱 ・暗い画面の文字を見やすく（コントラスト改善）・記録の「取り消し」はまちがい防止で2タップ確認に・プレミア装備は一度 解放したら、貯金を使っても外れません・バトルのかけら計算など こまかいバグを修正しました。"},
   {id:"n19", e:"💎", t:"プレミア装備が貯金で手に入る！", b:"これまで「近日登場」だったプレミア装備が、貯金や目標達成で解放できるようになったよ！「⚡いかずちの剣」=貯金500pt、「🐉りゅうおうの剣」=目標3回達成、「💎ダイヤのよろい」=貯金1000pt、「🌈にじのオーラ」=目標5回達成。コツコツ貯めるほど 最強そうびに近づくよ。あと、毎日ミッションの「ガチャ」が「まめちしき」に変わって、お金の勉強でEXPがもらえるようになりました。"},
@@ -6456,7 +6458,8 @@ function applyInterest(data,update,cid){
   }));
 }
 
-// ── Long-term Holding Bonus（週1回・7日1%/30日2%/90日3%＝長く持つほど報われる） ─────
+// ── 配当＋長期保有ボーナス（毎週・持つだけで1%、長く持つほどUP最大5%＝「持ち続けると増える」を体験） ─────
+// 実データの株価は短期だと横ばい＋手数料で利益が出にくいので、保有報酬を厚くして"長期で増える"を実感できるように
 function applyHoldingBonus(data,update,cid){
   const week=Math.floor(Date.now()/(7*86400000));  // 週単位で支払い
   if((data.holdBonusLastDate||{})[cid]===week) return;
@@ -6467,17 +6470,16 @@ function applyHoldingBonus(data,update,cid){
   const now=Date.now();
   let totalBonus=0;
   holdings.forEach(h=>{
-    if(!h.firstBuyDate) return;
-    const days=(now-new Date(h.firstBuyDate).getTime())/86400000;
-    const rate = days>=90?0.03 : days>=30?0.02 : days>=7?0.01 : 0;
-    if(rate<=0) return;
     const st=stocks.find(x=>x.id===h.stockId);
     if(!st) return;
+    const days=h.firstBuyDate?(now-new Date(h.firstBuyDate).getTime())/86400000:0;
+    // 配当(基本1%)＋長期ボーナス: 7日2% / 30日3.5% / 90日5%
+    const rate = days>=90?0.05 : days>=30?0.035 : days>=7?0.02 : 0.01;
     totalBonus+=Math.floor(toPts(st,st.price)*h.qty*rate);
   });
   if(totalBonus<=0) return;
   update(d=>({...d,
-    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`📦 長期保有ボーナス（長く持つほどUP・週1回）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
+    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`💰 配当＋長期保有ボーナス（毎週・長く持つほどUP）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
     holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:week},
   }));
 }
