@@ -334,6 +334,8 @@ function startRealtimeSync(updateFn){
             if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
             // darkEgg(ヤミノオウの卵): お世話度は多い方を採用＝同期巻き戻しで育成が消えない
             if(prev.darkEgg){merged.darkEgg={...(merged.darkEgg||{})};Object.keys(prev.darkEgg).forEach(cid=>{const p=prev.darkEgg[cid]||{},m=merged.darkEgg[cid]||{};merged.darkEgg[cid]=((p.care||0)>=(m.care||0))?p:m;});}
+            // 家族バトル・シーズン: 新しい週(シーズン)を優先、同週はbaseをマージ
+            if(prev.battleSeason){ if(!merged.battleSeason || (prev.battleSeason.week||0)>(merged.battleSeason.week||0)) merged.battleSeason=prev.battleSeason; else if((prev.battleSeason.week||0)===(merged.battleSeason.week||0)) merged.battleSeason={...merged.battleSeason, base:{...(prev.battleSeason.base||{}),...(merged.battleSeason.base||{})}, champ:merged.battleSeason.champ||prev.battleSeason.champ}; }
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
             if(_processedApprovalIds.size>0){
               merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
@@ -1714,6 +1716,15 @@ function battleStats(data, child){
 }
 // HP自然回復: 1分で1回復(時間経過ぶんを保存値に加算)
 const HP_REGEN_MS=60000;
+// ── 家族バトル: 戦闘力(BP)とハンデ ──
+function battlePower(data, member){ const s=battleStats(data,member); return Math.round(s.atk*3 + s.def*3 + s.hp); }
+// 年齢ハンデ(年下ほど有利・親はひかえめ)＝総合戦闘力ランキングを公平に
+function bpHandicap(member){
+  if(member.isParent || member.role==="parent" || member.displayMode==="adult") return 0.85;
+  if(member.displayMode==="junior") return 1.35;
+  if(member.ageMode==="young") return 1.2;
+  return 1.0;
+}
 function regenHP(stored, ts, max){
   const regen = ts ? Math.floor((Date.now()-ts)/HP_REGEN_MS) : 0;
   return Math.max(0, Math.min(max, stored + Math.max(0,regen)));
@@ -1830,6 +1841,7 @@ function BattleModal({child,data,update,onClose}){
   useEffect(()=>{const id=setInterval(()=>setHpTick(t=>t+1),20000);return()=>clearInterval(id);},[]);
   const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}})); };
   const [oppIdx,setOppIdx]=useState(0);
+  const [showSeason,setShowSeason]=useState(false);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
   const oMaxHP = 50 + opp.lv*28;
@@ -1961,6 +1973,7 @@ function BattleModal({child,data,update,onClose}){
             <div style={{color:"rgba(255,255,255,.6)",fontSize:11,marginTop:2}}>お手伝い・なでなで で かいふくしよう！（あさになると 元気に）</div>
           </div>}
           <button onClick={()=>setShowEquip(true)} style={{width:"100%",marginBottom:12,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:14,padding:"11px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>🎒 そうび図鑑{stats.equip&&stats.equip.length?`（${stats.equip.map(e=>e.e).join("")}）`:""}</button>
+          <button onClick={()=>setShowSeason(true)} style={{width:"100%",marginBottom:12,background:"linear-gradient(135deg,#E8B83E,#d99a2b)",border:"none",borderRadius:14,padding:"12px",color:"#3a2a00",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(232,184,62,.4)"}}>🏆 家族バトル・シーズン（順位を見る）</button>
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {WILD_MONSTERS.map((w,i)=>{
@@ -2060,6 +2073,7 @@ function BattleModal({child,data,update,onClose}){
         @keyframes btLoseText{0%{transform:scale(1.5);opacity:0}50%{opacity:1}100%{opacity:1}}
       `}</style>
       {showEquip && <EquipModal child={child} data={data} update={update} onClose={()=>setShowEquip(false)}/>}
+      {showSeason && <FamilyBattleSeason child={child} data={data} update={update} onClose={()=>setShowSeason(false)}/>}
     </div>
   );
 }
@@ -7394,6 +7408,117 @@ function PointTransferModal({ child, data, update, onClose }) {
 }
 
 // ── Weekly Report ─────────────────────────────────────
+// ── 家族バトル・シーズン(戦闘力ランキング/ハンデ・週次シーズン/お金行動で強くなる可視化/投資で強化) ──
+function FamilyBattleSeason({child, data, update, onClose}){
+  const members=[...(data.children||[]),...(data.parents||[])].filter(Boolean);
+  const week=Math.floor(Date.now()/(7*86400000));
+  const bs=data.battleSeason;
+  useEffect(()=>{
+    if(!bs || bs.week!==week){
+      let champ=null;
+      if(bs && bs.base){
+        let best=null;
+        members.forEach(m=>{ const g=Math.max(0,battlePower(data,m)-(bs.base[m.id]??battlePower(data,m))); if(!best||g>best.score) best={name:m.name,score:g}; });
+        if(best && best.score>0) champ=best;
+      }
+      const base={}; members.forEach(m=>{ base[m.id]=battlePower(data,m); });
+      update(d=>({...d, battleSeason:{week, base, champ}}));
+    }
+  // eslint-disable-next-line
+  },[week]);
+  const base=(bs&&bs.week===week)?(bs.base||{}):{};
+  const champ=(bs&&bs.week===week)?bs.champ:null;
+  const [tab,setTab]=useState("growth");  // growth=今シーズンの成長 / power=そうごう戦闘力
+  const rows=members.map(m=>{ const bp=battlePower(data,m); return {m,bp,growth:Math.max(0,bp-(base[m.id]??bp)),adj:Math.round(bp*bpHandicap(m))}; })
+    .sort((a,b)=> tab==="growth" ? b.growth-a.growth : b.adj-a.adj);
+  const ms=battleStats(data,child); const myBP=battlePower(data,child);
+  const eqNames=(ms.equip||[]).map(e=>`${e.e}${e.name}`).join(" ")||"そうび なし";
+  const myBal=bal(data.logs, child.id);
+  const balGear=EQUIPMENT.filter(it=>it.need.k==="bal").sort((a,b)=>a.need.v-b.need.v);
+  const seasonStart=new Date(week*7*86400000), seasonEnd=new Date((week*7+6)*86400000);
+  const md=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  const medal=i=>["🥇","🥈","🥉"][i]||`${i+1}位`;
+  return (
+    <div style={{position:"fixed",inset:0,background:"#0009",zIndex:992,display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:BG,borderRadius:"24px 24px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:440,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px #0004"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:900,fontSize:18,color:TEXT}}>🏆 家族バトル・シーズン</div>
+            <div style={{color:MUTED,fontSize:12,marginTop:1}}>今シーズン {md(seasonStart)}〜{md(seasonEnd)}・毎週リセット</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
+        </div>
+        {champ && <div style={{background:`linear-gradient(135deg,${GOLDS},#fff)`,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"8px 12px",marginBottom:10,fontSize:12.5,fontWeight:800,color:"#7a5a00"}}>👑 前シーズンの王者：{champ.name}（戦闘力 +{champ.score} 成長）</div>}
+        {/* タブ切り替え */}
+        <div style={{display:"flex",gap:6,marginBottom:12,background:CARDS,borderRadius:12,padding:4}}>
+          {[["growth","今シーズンの成長"],["power","そうごう戦闘力"]].map(([k,l])=>(
+            <button key={k} onClick={()=>setTab(k)} style={{flex:1,background:tab===k?"#fff":"transparent",border:tab===k?`1.5px solid ${GP}`:"1.5px solid transparent",borderRadius:9,padding:"7px",fontWeight:800,fontSize:12,color:tab===k?GP:MUTED,cursor:"pointer",fontFamily:F}}>{l}</button>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:MUTED,marginBottom:8,lineHeight:1.5}}>{tab==="growth"?"今週どれだけ強くなったか＝お金の行動や育成で伸びる。年れいに関係なく公平！":"いまの戦闘力にハンデ補正（年下ほど有利・親はひかえめ）をかけた総合順位。"}</div>
+        {/* ランキング */}
+        <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:16}}>
+          {rows.map((r,i)=>{
+            const me=r.m.id===child.id;
+            return (
+              <div key={r.m.id} style={{display:"flex",alignItems:"center",gap:10,background:me?GS:CARD,border:me?`2px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:12,padding:"9px 12px"}}>
+                <span style={{fontSize:16,width:30,textAlign:"center",fontWeight:900,color:i<3?GOLD:MUTED}}>{medal(i)}</span>
+                <ChildAvatar child={r.m} size={32}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:800,fontSize:13,color:TEXT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.m.name}{me?"（あなた）":""}</div>
+                  <div style={{fontSize:10.5,color:MUTED}}>戦闘力 {r.bp}{tab==="power"?` → 補正後 ${r.adj}`:""}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontWeight:900,fontSize:16,color:tab==="growth"?(r.growth>0?G:MUTED):GP}}>{tab==="growth"?`+${r.growth}`:r.adj}</div>
+                  <div style={{fontSize:9,color:MUTED}}>{tab==="growth"?"成長":"そうごう"}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* お金行動で強くなる：自分の強さの内訳 */}
+        <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"13px 14px",marginBottom:12}}>
+          <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>💪 あなたの強さの内訳（戦闘力 {myBP}）</div>
+          {[
+            ["📊","レベル",`Lv.${ms.lv}`,"クイズ正解・お手伝いで EXP→レベルUP"],
+            ["⚔","そうび",eqNames,"武器をドロップして『そうび』すると強くなる"],
+            ["🌱","育成",`${(getMonState(data,child).careDays||0)}日 なでなで`,"進化と なでなでで ステータスUP"],
+          ].map(([e,l,v,hint],i)=>(
+            <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"5px 0",borderTop:i?`1px solid ${BORDER}`:"none"}}>
+              <span style={{fontSize:16,width:20,textAlign:"center"}}>{e}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:800,color:TEXT}}>{l}：<span style={{color:GP}}>{v}</span></div>
+                <div style={{fontSize:10.5,color:MUTED,marginTop:1,lineHeight:1.4}}>{hint}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* 投資で強化する動線：貯金で強い装備が解放 */}
+        <div style={{background:BS,border:`1.5px solid ${B}40`,borderRadius:14,padding:"13px 14px"}}>
+          <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:3}}>📈 投資で もっと強く</div>
+          <div style={{fontSize:11,color:TEXTS,marginBottom:9,lineHeight:1.5}}>株の配当で貯金を増やすと、強い装備が解放！（いまの貯金 {myBal.toLocaleString()}pt）</div>
+          {balGear.map(it=>{
+            const got=myBal>=it.need.v; const rem=it.need.v-myBal;
+            return (
+              <div key={it.id} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 0"}}>
+                <span style={{fontSize:18,filter:got?"none":"grayscale(1) opacity(.5)"}}>{it.e}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:800,color:got?TEXT:MUTED}}>{it.name} <span style={{fontSize:10,color:B}}>{[it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:"",it.hp?`HP+${it.hp}`:""].filter(Boolean).join(" ")}</span></div>
+                  <div style={{height:5,borderRadius:999,background:"#0001",overflow:"hidden",marginTop:3}}>
+                    <div style={{height:"100%",width:`${Math.min(100,Math.round(myBal/it.need.v*100))}%`,background:got?G:B,borderRadius:999}}/>
+                  </div>
+                </div>
+                <span style={{fontSize:10.5,fontWeight:800,color:got?G:MUTED,flexShrink:0,width:64,textAlign:"right"}}>{got?"解放ずみ":`あと${rem.toLocaleString()}`}</span>
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={onClose} style={{width:"100%",marginTop:16,background:GP,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>とじる</button>
+      </div>
+    </div>
+  );
+}
+
 function WeeklyReport({child,data,onClose}){
   const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-7);
   const logs=(data.logs||[]).filter(l=>l.cid===child.id&&l.date>=cutoff.toISOString());
