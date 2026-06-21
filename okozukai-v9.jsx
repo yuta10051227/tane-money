@@ -1508,7 +1508,7 @@ function GachaAnim({ result, onClose }) {
           </div>
           {result.bonusPts>0&&<div style={{display:"inline-block",background:GOLDS,borderRadius:10,padding:"5px 14px",marginBottom:14,fontSize:12,fontWeight:800,color:"#9a7000"}}>🔥 ストリークボーナス +{result.bonusPts}pt</div>}
           <div style={{display:"flex",gap:10,width:"100%",maxWidth:360,margin:"0 auto"}}>
-            {isSR && <button onClick={(e)=>{stop(e);shareCard({emoji:result.collItem?result.collItem.emoji:(isSuper?"👑":"🎁"), title:`${result.label}${result.collItem?(" "+result.collItem.name):""} が出た！`, subtitle:`ガチャで +${result.pts}pt`, color:result.color});}} style={{flex:1,background:"rgba(255,255,255,.14)",border:"1.5px solid rgba(255,255,255,.55)",borderRadius:16,padding:"15px 0",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>シェア 📤</button>}
+            {isSR && <button onClick={(e)=>{stop(e);shareCard({emoji:result.collItem?result.collItem.emoji:(isSuper?"👑":"🎁"), img:result.collItem?`/assets/${result.collItem.id.replace("gi_","gacha_").replace("gm_","gacha_gm_")}.png`:null, rarity:result.label, title:result.collItem?`${result.collItem.name} が出た！`:`${result.label} が出た！`, subtitle:`ガチャで +${result.pts}pt`, color:result.color});}} style={{flex:1,background:"rgba(255,255,255,.14)",border:"1.5px solid rgba(255,255,255,.55)",borderRadius:16,padding:"15px 0",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F}}>シェア 📤</button>}
             <button onClick={(e)=>{stop(e);onClose();}} style={{flex:1.5,background:result.color,border:"none",borderRadius:16,padding:"15px 0",color:"#1a1024",fontWeight:900,fontSize:17,cursor:"pointer",fontFamily:F,boxShadow:`0 6px 24px ${result.color}66`}}>{isSuper?"🎊 やったー！":"やったー🎉"}</button>
           </div>
         </div>
@@ -6927,26 +6927,39 @@ function WeeklyReport({child,data,onClose}){
 }
 
 // ── シェアカード生成（達成の瞬間をSNSへ。canvasで画像化→navigator.share）──
-async function shareCard({ emoji, title, subtitle, color }){
+async function shareCard({ emoji, title, subtitle, color, img, rarity }){
   try{
-    const W=1080,H=1080, c=GP;
+    const W=1080,H=1080; const accent=color||GP;
     const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
     const x=cv.getContext("2d");
-    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#F7F5EF"); g.addColorStop(1,"#E3F3E8");
-    x.fillStyle=g; x.fillRect(0,0,W,H);
-    x.fillStyle=color||c; x.fillRect(0,0,W,18);
+    const rr=(X,Y,w,h,r)=>{x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath();};
+    // 画像があれば先読み(同一オリジン)
+    let im=null;
+    if(img){ im=await new Promise(res=>{const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=img;}); }
+    // 背景グラデ＋アクセント光彩
+    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#F7F5EF"); g.addColorStop(1,"#E3F3E8"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    const rg=x.createRadialGradient(W/2,500,40,W/2,500,460); rg.addColorStop(0,accent+"40"); rg.addColorStop(1,accent+"00"); x.fillStyle=rg; x.fillRect(0,0,W,H);
+    x.fillStyle=accent; x.fillRect(0,0,W,20);
     x.textAlign="center"; x.textBaseline="middle";
-    // バッジ帯
-    x.fillStyle=(color||c); x.font="600 46px sans-serif"; x.fillText("🌱 Tane Money", W/2, 120);
-    // 絵文字
-    x.font="320px sans-serif"; x.fillText(emoji||"🌟", W/2, 420);
+    // ヘッダー
+    x.fillStyle=accent; x.font="700 50px sans-serif"; x.fillText("🌱 Tane Money", W/2, 112);
+    // レア度バッジ
+    if(rarity){ x.font="800 46px sans-serif"; const tw=x.measureText(rarity).width; const pw=tw+76, ph=80, py=158; rr(W/2-pw/2,py,pw,ph,40); x.fillStyle=accent; x.fill(); x.fillStyle="#fff"; x.fillText(rarity, W/2, py+ph/2+2); }
+    // メダリオン
+    const cy=510, cr=280;
+    x.save(); x.shadowColor=accent+"77"; x.shadowBlur=70; x.beginPath(); x.arc(W/2,cy,cr,0,Math.PI*2); x.fillStyle="#ffffff"; x.fill(); x.restore();
+    x.lineWidth=16; x.strokeStyle=accent; x.beginPath(); x.arc(W/2,cy,cr,0,Math.PI*2); x.stroke();
+    // アイテム(画像優先・なければ絵文字)
+    if(im){ const s=390, ratio=Math.min(s/im.width,s/im.height), dw=im.width*ratio, dh=im.height*ratio; x.imageSmoothingEnabled=false; x.drawImage(im, W/2-dw/2, cy-dh/2, dw, dh); }
+    else { x.font="300px sans-serif"; x.fillText(emoji||"🌟", W/2, cy+8); }
+    // キラキラ
+    x.font="62px sans-serif"; x.fillText("✨", W/2-cr-6, cy-cr+70); x.fillText("⭐", W/2+cr+8, cy-cr+120); x.fillText("✨", W/2+cr-6, cy+cr-6);
     // タイトル
-    x.fillStyle="#18231D"; x.font="bold 92px sans-serif";
-    (title||"").toString().slice(0,18).split("\n").forEach((ln,i)=>x.fillText(ln, W/2, 680+i*104));
+    x.fillStyle="#18231D"; x.font="bold 80px sans-serif"; x.fillText((title||"").toString().slice(0,20), W/2, 868);
     // サブ
-    x.fillStyle=color||c; x.font="bold 64px sans-serif"; x.fillText((subtitle||"").toString().slice(0,24), W/2, 830);
+    x.fillStyle=accent; x.font="bold 62px sans-serif"; x.fillText((subtitle||"").toString().slice(0,26), W/2, 956);
     // フッター
-    x.fillStyle="#929B95"; x.font="600 42px sans-serif"; x.fillText("おてつだいで お金を学ぶ · tane-money.vercel.app", W/2, 1000);
+    x.fillStyle="#929B95"; x.font="600 40px sans-serif"; x.fillText("おてつだいで お金を学ぶ · tane-money.vercel.app", W/2, 1018);
     const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
     const file=new File([blob],"tane-money.png",{type:"image/png"});
     const payload={ title:"Tane Money", text:`${title||""} ${subtitle||""}`.trim()+" #タネマネー", url:"https://tane-money.vercel.app" };
