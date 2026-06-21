@@ -614,6 +614,7 @@ function makeSeed() {
     profile: null,      // オンボーディングで収集するプロフィール（未設定=null）
     anniversaries: [],  // ユーザー登録の記念日 [{ id, name, month, day, emoji? }]
     annivSettings: {},  // 年中行事のオン/オフ { [eventId]: true|false }
+    momVoice: true,     // お母さんの声かけ（褒める・心配・休息ケア）オン/オフ。未設定はオン扱い。
     updatedAt: Date.now(),
   };
 }
@@ -2083,6 +2084,163 @@ const PROFILE_ADVICE = {
     整える: () => "整える日。会議・資料・数字の整理を淡々と。今日は仕込みの日です。",
   },
 };
+
+/* ──────────────────────────────────────────────────────────────
+   お母さんレイヤー：褒める・心配・休息ケアのメッセージを既存データから決定論で算出
+   ────────────────────────────────────────────────────────────── */
+
+/**
+ * computeMomMessages(data, alerts, todayEvents, energy)
+ * 既存のデータだけを見て「声かけメッセージ」を返す（AI/サーバー不要）。
+ *
+ * 返り値: { praise: string|null, worries: string[], restCare: string|null }
+ *   praise   … 褒め・労いの一言（1件）
+ *   worries  … 能動的な確認つっこみ（最大2件）
+ *   restCare … 休息ケアの一言（1件）
+ */
+function computeMomMessages(data, alerts, todayEvents, energy) {
+  if (!data) return { praise: null, worries: [], restCare: null };
+
+  const late = (alerts && alerts.late) || [];
+  const soon = (alerts && alerts.soon) || [];
+  const totalAlerts = late.length + soon.length;
+  const h = new Date().getHours();
+  const isEvening = h >= 19;
+  const isNight = h >= 22 || h < 5;
+
+  // ── 1. 褒め・労い ──
+  let praise = null;
+
+  // 今日の要対応が 0 件 → いちばん温かく
+  if (totalAlerts === 0 && (data.tasks || []).filter((x) => !x.done).length === 0) {
+    if (isNight) {
+      praise = "今日もお疲れ様。夜はゆっくり休んでね。";
+    } else if (isEvening) {
+      praise = "今日の仕事、全部やり切ってる。偉いよ。今夜はゆっくりしてね。";
+    } else {
+      praise = "今日やる事は片付いてるよ。よく頑張ったね、ゆっくりしてね。";
+    }
+  }
+
+  // 逆算チェーン(trip)が全完了している → 「準備ぜんぶ完了」
+  if (!praise) {
+    const completedTrips = (data.trips || []).filter((t) => {
+      const items = t.items || [];
+      return items.length > 0 && items.every((it) => it.done);
+    });
+    if (completedTrips.length > 0) {
+      const t = completedTrips[0];
+      praise = `「${t.title}」の準備、ぜんぶ完了！えらい。`;
+    }
+  }
+
+  // ローンチKPIが目標到達（reg>=goalReg または cv>=goalCv）
+  if (!praise) {
+    for (const L of (data.launches || [])) {
+      const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+      const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+      if ((goalReg > 0 && reg >= goalReg) || (goalCv > 0 && cv >= goalCv)) {
+        praise = `「${L.name}」、目標達成おめでとう！よく走り切ったね。`;
+        break;
+      }
+    }
+  }
+
+  // 夜または夕方でまだ褒めていない場合 → 一般的な労い
+  if (!praise && isEvening) {
+    praise = "今日もおつかれさま。無理しすぎてない？";
+  }
+
+  // ── 2. 確認つっこみ（能動的な心配）──
+  const worries = [];
+
+  // 逆算項目に「遅れ・間近」で未着手が続くもの（最大 2 件）
+  for (const t of (data.trips || [])) {
+    if (worries.length >= 2) break;
+    const pendingLate = (t.items || []).filter((it) => {
+      if (it.done) return false;
+      const dl = iso(addDays(new Date(t.date), -(it.daysBefore || 0)));
+      const diff = daysUntil(dl);
+      return diff < 0 || diff <= 3;
+    });
+    if (pendingLate.length > 0) {
+      const item = pendingLate[0];
+      worries.push(`「${t.title}」の${item.label}、まだみたいだけど大丈夫？そろそろ動こ。`);
+    }
+  }
+
+  // 未処理請求が残っている
+  if (worries.length < 2) {
+    const outstanding = (data.money || [])
+      .filter((x) => !x.done && x.kind === "入金")
+      .reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    if (outstanding > 0) {
+      worries.push(`入金の確認、した？ ¥${outstanding.toLocaleString("ja-JP")}がまだだよ。`);
+    }
+  }
+
+  // ── 3. 休息ケア ──
+  let restCare = null;
+
+  // 今日の予定件数が多い（5件以上）
+  const todayCount = (todayEvents || []).length;
+  if (todayCount >= 5) {
+    restCare = `今日は予定が${todayCount}件も詰まってるね。無理しないで、ひとつ減らせない？`;
+  }
+
+  // 運気が「労い」または「守り」の日
+  if (!restCare && energy && (energy.today && (energy.today.stance === "労い" || energy.today.stance === "守り"))) {
+    if (energy.today.stance === "労い") {
+      restCare = "今日は充電の日。頑張りすぎないでね。";
+    } else {
+      restCare = "今日は守りの日。新しいことより、足場を固める日にしてね。";
+    }
+  }
+
+  return { praise, worries, restCare };
+}
+
+/* お母さんの声かけカード */
+function MomVoiceCard({ praise, worries, restCare }) {
+  const hasAny = praise || worries.length > 0 || restCare;
+  if (!hasAny) return null;
+
+  const MOM_COLOR = "#C77B9C"; // FAMILYカラーと同系統の温かみのある色
+
+  return (
+    <div style={{
+      background: MOM_COLOR + "0F",
+      border: `1px solid ${MOM_COLOR}44`,
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 14,
+    }}>
+      <div style={{ fontSize: 12, color: MOM_COLOR, fontWeight: 700, letterSpacing: 0.5, marginBottom: 10 }}>
+        お母さんからひとこと
+      </div>
+      {praise && (
+        <div style={{ fontSize: 14, color: THEMES[THEME_NAME].text, lineHeight: 1.7, marginBottom: worries.length > 0 || restCare ? 10 : 0 }}>
+          {praise}
+        </div>
+      )}
+      {worries.length > 0 && (
+        <div style={{ marginBottom: restCare ? 10 : 0 }}>
+          {worries.map((w, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 13, color: THEMES[THEME_NAME].sub, lineHeight: 1.6, marginBottom: i < worries.length - 1 ? 4 : 0 }}>
+              <span style={{ flex: "0 0 auto", fontSize: 14, marginTop: 1 }}>...</span>
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {restCare && (
+        <div style={{ fontSize: 13, color: MOM_COLOR, lineHeight: 1.6, fontStyle: "italic" }}>
+          {restCare}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // 今朝のまとめ（運気・予定・要対応・売上・ニュースを1枚に束ねる）
 function BriefingCard({ fortune, birth, today, late, soon, outstanding, brief, onTab, remaining, pendingTasks, hideFortune, hideNews, profile, annivSettings, anniversaries }) {
@@ -4074,7 +4232,7 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
       right={notifySupported && !notify ? <button onClick={onEnableNotify} style={chipBtn}>通知オン</button> : (notify ? <span style={{ fontSize: 12, color: C.green }}>通知オン</span> : null)}
     >
       {none ? (
-        <div style={{ fontSize: 14, color: C.green }}>✅ 直近の遅れ・締切間近はありません。</div>
+        <div style={{ fontSize: 14, color: C.green, lineHeight: 1.7 }}>今日の対応はぜんぶ片付いてるよ。よかった。</div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {late.slice(0, 5).map((e, i) => (
@@ -4939,6 +5097,10 @@ export default function App() {
           const usage = (profile && profile.usage) || null;
           // オンボーディングウィザード：profile未完了かつスキップ済みでなければ表示
           const showOnboarding = !(profile && profile.done) && !data.onboardingSkipped;
+          // お母さんの声かけ（momVoice: 未設定はオン扱い）
+          const momVoiceOn = data.momVoice !== false;
+          const homeEnergy = (() => { try { return (data.birth && data.birth.date) ? dayEnergy(data.birth, iso(new Date())) : null; } catch { return null; } })();
+          const momMsgs = momVoiceOn ? computeMomMessages(data, alerts, dayBuckets[0] && dayBuckets[0].items, homeEnergy) : { praise: null, worries: [], restCare: null };
           return (
             <>
               {/* 初回ヒアリング ウィザード */}
@@ -5021,6 +5183,8 @@ export default function App() {
                 />
               )}
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} profile={profile} annivSettings={data.annivSettings} anniversaries={data.anniversaries} />
+              {/* お母さんの声かけ（褒める・心配・休息ケア） */}
+              <MomVoiceCard praise={momMsgs.praise} worries={momMsgs.worries} restCare={momMsgs.restCare} />
               {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
               {(!data.birth || !data.birth.date) && !data.sampleNotice && (
                 <BirthQuickInput
@@ -5069,6 +5233,20 @@ export default function App() {
                       <span style={{ fontSize: 14 }}>「{t.label}」タブを表示する</span>
                     </label>
                   ))}
+                </div>
+                {/* お母さんの声かけ オン/オフ */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>お母さんの声かけ</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "4px 0" }}>
+                    <input
+                      type="checkbox"
+                      checked={data.momVoice !== false}
+                      onChange={(ev) => update({ momVoice: ev.target.checked })}
+                      style={{ width: 18, height: 18, flex: "0 0 auto" }}
+                    />
+                    <span style={{ fontSize: 14 }}>褒める・心配する・休息をすすめる声かけを表示する</span>
+                  </label>
+                  <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>ホームの「今朝のまとめ」付近に、状況に合った一言が出ます。</div>
                 </div>
                 {/* プロフィール設定（ウィザード完了後の変更用） */}
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
