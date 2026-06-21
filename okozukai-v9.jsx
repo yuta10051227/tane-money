@@ -4400,39 +4400,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── 🥚 ヤミノオウのタマゴ(ボス撃破ドロップ・お世話で育てて最終進化) ── */}
-      {effectiveTab==="more" && data.darkEgg?.[child.id] && (()=>{
-        const eg=data.darkEgg[child.id]; const care=eg.care||0; const st=darkEggStage(care);
-        const isFinal=care>=DARK_EGG_MAX; const tISO=todayISO(); const fedToday=eg.last===tISO;
-        const nextMin=DARK_EGG_STAGES.find(s=>s.min>care)?.min ?? DARK_EGG_MAX;
-        const feed=()=>{ if(fedToday||isFinal)return; update(d=>{ const e=d.darkEgg?.[child.id]||{care:0}; return {...d, darkEgg:{...(d.darkEgg||{}),[child.id]:{care:(e.care||0)+1,last:tISO}}}; }); };
-        return (
-          <div style={{padding:"0 16px 8px"}}>
-            <div style={{background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:`1.5px solid ${isFinal?"#e8b83e":"#7b61c9"}`,borderRadius:16,padding:"13px 15px",color:"#fff"}}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{position:"relative",width:56,height:56,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <img src={`/assets/gacha_gs_${st.sprite}_a.png`} alt="" style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}}
-                    onError={e=>{e.target.style.display="none";const s=e.target.nextSibling;if(s)s.style.display="flex";}}/>
-                  <span style={{display:"none",position:"absolute",inset:0,alignItems:"center",justifyContent:"center",fontSize:38}}>{st.emoji}</span>
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontWeight:900,fontSize:15}}>{st.emoji} {st.name}</span>
-                    {isFinal&&<span style={{fontSize:9,fontWeight:900,color:"#2a1f4a",background:"#e8b83e",borderRadius:5,padding:"1px 5px"}}>かんせい</span>}
-                  </div>
-                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2,lineHeight:1.5}}>{st.desc}</div>
-                  <div style={{height:8,borderRadius:999,background:"rgba(255,255,255,0.15)",overflow:"hidden",marginTop:7}}>
-                    <div style={{height:"100%",width:`${Math.min(100,Math.round(care/DARK_EGG_MAX*100))}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .4s"}}/>
-                  </div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginTop:3}}>お世話 {care}/{DARK_EGG_MAX}{!isFinal&&` ・ つぎの すがたまで あと${nextMin-care}`}</div>
-                </div>
-              </div>
-              {isFinal
-                ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
-                : <button onClick={feed} disabled={fedToday} style={{marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
-            </div>
-          </div>
-        );
-      })()}
+      {effectiveTab==="more" && data.darkEgg?.[child.id] && <DarkEggCard child={child} data={data} update={update}/>}
 
       {/* ── ⚔ ドロップ図鑑(モンスターごとの固有レア武器) ── */}
       {effectiveTab==="more" && (()=>{
@@ -6650,6 +6618,98 @@ async function fetchRealStockPrices(data,update){
 }
 
 // ── Seed Monster ──────────────────────────────────────
+// ── 🥚 ヤミノオウのタマゴ 育成カード(待機アニメ＋お世話リアクション＋ハッチ進化演出) ──
+function DarkEggCard({child,data,update}){
+  const eg=data.darkEgg?.[child.id]||{care:0};
+  const care=eg.care||0;
+  const st=darkEggStage(care);
+  const stIdx=DARK_EGG_STAGES.indexOf(st);
+  const isFinal=care>=DARK_EGG_MAX;
+  const tISO=todayISO();
+  const fedToday=eg.last===tISO;
+  const nextMin=DARK_EGG_STAGES.find(s=>s.min>care)?.min ?? DARK_EGG_MAX;
+  const [react,setReact]=useState(false);   // お世話リアクション(揺れ＋キラキラ)
+  const [evo,setEvo]=useState(null);        // 進化演出 {from,to}
+  const vib=p=>{try{navigator.vibrate(p);}catch(e){}};
+  // ステージ別の待機アニメ: たまご=ゆらゆら / ベビー=ぴょこぴょこ / 王=ふわふわ＋発光
+  const idleAnim = react ? "deShake .5s ease-in-out" : isFinal ? "deFloat 3s ease-in-out infinite" : stIdx===0 ? "deWob 2.6s ease-in-out infinite" : "deHop 1.4s ease-in-out infinite";
+  const feed=()=>{
+    if(fedToday||isFinal) return;
+    const newCare=care+1; const newSt=darkEggStage(newCare);
+    setReact(true); vib(20); setTimeout(()=>setReact(false),650);
+    if(DARK_EGG_STAGES.indexOf(newSt)>stIdx){    // ステージ上昇=ハッチ/進化演出
+      setEvo({from:st,to:newSt}); vib([30,50,30,80]); setTimeout(()=>setEvo(null),2600);
+    }
+    update(d=>{ const e=d.darkEgg?.[child.id]||{care:0}; return {...d, darkEgg:{...(d.darkEgg||{}),[child.id]:{care:(e.care||0)+1,last:tISO}}}; });
+  };
+  const Sprite=({sprite,emoji,size:sz=64})=>(
+    <div style={{position:"relative",width:sz,height:sz,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <img src={`/assets/gacha_gs_${sprite}_b.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.visibility="hidden";const fb=e.target.parentNode.querySelector(".de-fb");if(fb)fb.style.display="flex";}}/>
+      <img src={`/assets/gacha_gs_${sprite}_a.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"deBlink .9s steps(1,start) infinite"}} onError={e=>{e.target.style.display="none";}}/>
+      <span className="de-fb" style={{display:"none",position:"absolute",inset:0,alignItems:"center",justifyContent:"center",fontSize:sz*0.6}}>{emoji}</span>
+    </div>
+  );
+  return (
+    <div style={{padding:"0 16px 8px"}}>
+      <div style={{position:"relative",overflow:"hidden",background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:`1.5px solid ${isFinal?"#e8b83e":"#7b61c9"}`,borderRadius:16,padding:"13px 15px",color:"#fff"}}>
+        {/* 背景のうごめく闇/光オーラ */}
+        <div style={{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:isFinal?"radial-gradient(circle,#e8b83e55,transparent 70%)":"radial-gradient(circle,#b07bff44,transparent 70%)",animation:"dePulse 3s ease-in-out infinite",pointerEvents:"none"}}/>
+        <div style={{position:"relative",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{position:"relative",width:64,height:64,flexShrink:0,animation:idleAnim,filter:isFinal?"drop-shadow(0 0 8px #e8b83eaa)":"none"}}>
+            <Sprite sprite={st.sprite} emoji={st.emoji} size={64}/>
+            {react && [0,1,2,3,4].map(i=>(
+              <span key={i} style={{position:"absolute",left:"50%",top:"50%",fontSize:13,"--r":`${i*72}deg`,animation:"deSpark .65s ease-out forwards",transform:`rotate(${i*72}deg) translateY(-28px)`,opacity:0}}>✨</span>
+            ))}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontWeight:900,fontSize:15}}>{st.emoji} {st.name}</span>
+              {isFinal&&<span style={{fontSize:9,fontWeight:900,color:"#2a1f4a",background:"#e8b83e",borderRadius:5,padding:"1px 5px"}}>かんせい</span>}
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2,lineHeight:1.5}}>{st.desc}</div>
+            <div style={{height:8,borderRadius:999,background:"rgba(255,255,255,0.15)",overflow:"hidden",marginTop:7}}>
+              <div style={{height:"100%",width:`${Math.min(100,Math.round(care/DARK_EGG_MAX*100))}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .5s"}}/>
+            </div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginTop:3}}>お世話 {care}/{DARK_EGG_MAX}{!isFinal&&` ・ つぎの すがたまで あと${nextMin-care}`}</div>
+          </div>
+        </div>
+        {isFinal
+          ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
+          : <button onClick={feed} disabled={fedToday} style={{position:"relative",marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
+        {/* ── 進化(ハッチ)演出オーバーレイ ── */}
+        {evo && (
+          <div style={{position:"absolute",inset:0,background:"radial-gradient(circle,#fff 0%,#3d2b66 60%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:"deEvoBg 2.6s ease-out forwards",zIndex:5}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,animation:"deEvoPop .6s ease-out"}}>
+              <div style={{animation:"deEvoOut .9s ease-in forwards"}}><Sprite sprite={evo.from.sprite} emoji={evo.from.emoji} size={50}/></div>
+              <span style={{fontSize:22,color:"#e8b83e"}}>➡</span>
+              <div style={{animation:"deEvoIn .9s .5s ease-out both",filter:"drop-shadow(0 0 10px #e8b83e)"}}><Sprite sprite={evo.to.sprite} emoji={evo.to.emoji} size={62}/></div>
+            </div>
+            <div style={{marginTop:8,fontWeight:900,fontSize:16,color:"#3d2b66",animation:"deEvoText .9s .6s both",textShadow:"0 1px 0 #fff"}}>✨ しんか！ {evo.to.name}！</div>
+            {[...Array(10)].map((_,i)=>(
+              <span key={i} style={{position:"absolute",left:`${10+i*8}%`,top:"50%",fontSize:14,animation:`deBurst 1.1s ${0.4+i*0.04}s ease-out forwards`,opacity:0}}>{i%2?"⭐":"✨"}</span>
+            ))}
+          </div>
+        )}
+        <style>{`
+          @keyframes deWob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+          @keyframes deHop{0%,100%{transform:translateY(0)}40%{transform:translateY(-7px)}60%{transform:translateY(-4px)}}
+          @keyframes deFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.04)}}
+          @keyframes deShake{0%,100%{transform:translate(0,0) rotate(0)}20%{transform:translate(-3px,1px) rotate(-7deg)}40%{transform:translate(3px,-2px) rotate(7deg)}60%{transform:translate(-2px,1px) rotate(-5deg)}80%{transform:translate(2px,0) rotate(4deg)}}
+          @keyframes deBlink{0%,49.9%{opacity:1}50%,99.9%{opacity:0}100%{opacity:1}}
+          @keyframes dePulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.9;transform:scale(1.15)}}
+          @keyframes deSpark{0%{opacity:1}100%{opacity:0;transform:rotate(var(--r)) translateY(-44px) scale(.4)}}
+          @keyframes deEvoBg{0%{opacity:0}12%{opacity:1}80%{opacity:1}100%{opacity:0}}
+          @keyframes deEvoPop{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+          @keyframes deEvoOut{0%{opacity:1}100%{opacity:0;transform:scale(.5) translateX(-8px)}}
+          @keyframes deEvoIn{0%{opacity:0;transform:scale(.4)}60%{transform:scale(1.25)}100%{opacity:1;transform:scale(1)}}
+          @keyframes deEvoText{0%{opacity:0;transform:translateY(8px) scale(.8)}100%{opacity:1;transform:translateY(0) scale(1)}}
+          @keyframes deBurst{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.3)}}
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
 function SeedMonster({ child, data, size=90, update }) {
   const [sparkles, setSparkles] = useState([]);
   const [speech, setSpeech] = useState(null);
