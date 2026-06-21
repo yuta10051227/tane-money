@@ -911,6 +911,7 @@ const INIT = {
     requireApproval: false,
     approvalNotification: false,
     rewardApproval: false,
+    gameMode: "full",   // full=全部 / light=バトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
   },
   pendingApprovals: [],
   pendingRedemptions: [],
@@ -2949,6 +2950,28 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{position:"absolute",top:3,left:(fs.gachaSimple)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
+              {/* ゲームの強さ設定: ガチャ/バトル/旅をどこまで見せるか */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>ゲームの強さ</div>
+                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>遊びの要素をどこまで出すか選べます。お金の管理に集中させたいときは「ひかえめ」へ。</div>
+                {[
+                  {v:"full", t:"ぜんぶ", d:"ガチャ・バトル・とっくんの旅をすべて表示（標準）"},
+                  {v:"light",t:"バトル控えめ",d:"ガチャと育成はOK。バトル・とっくんの旅を非表示に"},
+                  {v:"money",t:"お小遣い帳中心",d:"ガチャ・バトル・旅・ミッションを隠して、お金の記録に集中"},
+                ].map(o=>{
+                  const sel=(fs.gameMode||"full")===o.v;
+                  return (
+                    <button key={o.v} onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),gameMode:o.v}}))}
+                      style={{display:"flex",alignItems:"flex-start",gap:10,width:"100%",textAlign:"left",background:sel?GS:CARD,border:sel?`2px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 12px",marginBottom:7,cursor:"pointer",fontFamily:F}}>
+                      <span style={{marginTop:1,width:18,height:18,borderRadius:"50%",border:sel?`5px solid ${GP}`:`2px solid ${BORDER}`,flexShrink:0,boxSizing:"border-box",background:"#fff"}}/>
+                      <span style={{flex:1}}>
+                        <span style={{display:"block",fontWeight:800,fontSize:13,color:sel?GP:TEXT}}>{o.t}</span>
+                        <span style={{display:"block",fontSize:11,color:MUTED,marginTop:2,lineHeight:1.4}}>{o.d}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
               {/* 承認通知 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -3228,6 +3251,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
   const isJunior = child.displayMode === "junior"; // Junior/Teenモード分岐
+  // 保護者のゲーム強度設定(familySettings.gameMode): full=全部 / light=ガチャ育成はOKだがバトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
+  const gameMode    = (data.familySettings?.gameMode) || "full";
+  const showGacha   = gameMode !== "money";   // デイリーガチャ
+  const showBattleF = gameMode === "full";    // モンスターバトル・ボス
+  const showExpedF  = gameMode === "full";    // とっくんの旅
+  const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
   const myBal    = bal(data.logs, child.id);
@@ -3572,7 +3601,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
         {MAIN_TABS.map(([v,l])=>{
           // 控えめな金色ドット: 「今日まだのおてつだい」と「今日まだのガチャ」だけ(最大2個)。やり終えたら消える。
-          const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && !todayDone && !gachaTest);
+          const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone && !gachaTest);
           return (
           <button key={v} onClick={()=>setTab(v)}
             style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
@@ -3599,7 +3628,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* 🎯 きょうのミッション(毎日リセット) */}
-      {effectiveTab==="daily" && (()=>{
+      {effectiveTab==="daily" && showMissions && (()=>{
         const tISO=todayISO(), tk=todayKey();
         const metrics={
           tasks: myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(tISO)).length,
@@ -3607,8 +3636,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           learn: myLogs.filter(l=>l.type==="tips"&&(l.date||"").startsWith(tISO)).length,
           battle: (data.battleWinDate?.[child.id]===tk)?1:0,
         };
-        // まめちしきはJuniorに無い画面なので、Juniorは達成可能な3つに絞る
-        const dailyMissions=isJunior?MISSIONS.filter(m=>m.metric!=="learn"):MISSIONS;
+        // まめちしきはJuniorに無い画面なので除外。バトルオフ(light/money)ではバトルミッションも除外
+        const dailyMissions=MISSIONS.filter(m=>(isJunior?m.metric!=="learn":true) && (showBattleF?true:m.metric!=="battle"));
         const mcRaw=data.missionClaimed?.[child.id];
         const claimed=(mcRaw&&mcRaw.date===tk)?(mcRaw.ids||[]):[];
         const allClaimed=claimed.length>=dailyMissions.length;
@@ -3646,7 +3675,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       })()}
 
       {/* 🧭 とっくんの旅(旅先を選択・遠いほどEXP大・放置系) */}
-      {effectiveTab==="daily" && (()=>{
+      {effectiveTab==="daily" && showExpedF && (()=>{
         const exp=data.expedition?.[child.id];
         const started=exp&&exp.start;
         const dest=EXPEDITIONS.find(e=>e.id===exp?.dest)||EXPEDITIONS[0];
@@ -3765,7 +3794,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── DAILY ── */}
-      {effectiveTab==="daily" && <>
+      {effectiveTab==="daily" && showGacha && <>
         {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
         {(()=>{ const ft=getMonthTheme(); return (
           <button onClick={()=>{ if(!todayDone||gachaTest||hasTicket) doGacha(); }} disabled={todayDone&&!gachaTest&&!hasTicket} aria-label="デイリーガチャ"
@@ -3869,8 +3898,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
-        {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
-        <div style={{padding:"12px 16px 4px"}}>
+        {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
+        {showGacha && <div style={{padding:"12px 16px 4px"}}>
           {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
@@ -3910,7 +3939,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 {hasTicket&&<span style={{color:darkBG?"#bff0c8":G}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
                 <span style={{color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>🧩 チケットのかけら {(data.battleFragments?.[child.id]||0)}/5</span>
               </div>
-              <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>
+              {showBattleF && <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>}
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                   <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
@@ -3981,7 +4010,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <style>{`@keyframes glow{0%,100%{box-shadow:0 4px 16px #f5c84260,0 0 0 4px #f5c84225}50%{box-shadow:0 4px 24px #f5c84290,0 0 0 8px #f5c84240}}
           @keyframes gsBlink{0%{opacity:1}49.9%{opacity:1}50%{opacity:0}99.9%{opacity:0}100%{opacity:1}}
           @keyframes gsBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}`}</style>
-        </div>
+        </div>}
         {/* Junior: ガチャの後はショートカット＆きろくのみ（タスク本体はガチャの前へ移動済み） */}
         {isJunior && <>
           {/* やることへのショートカット */}
