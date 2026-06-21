@@ -836,7 +836,7 @@ const INIT = {
   pinChanged: {},
   lockEnabled: {},
   interestEnabled: true,
-  interestRate: 0.05,
+  interestRate: 0.01,
   interestLastDate: {},
   holdBonusLastDate: {},
   weeklyReportSeen: {},
@@ -962,7 +962,7 @@ function migrate(d) {
   if(!d.lockEnabled)   d.lockEnabled={};
   if(!d.parents)       d.parents=INIT.parents;
   if(d.parentMultiplier===undefined) d.parentMultiplier=1.0;
-  if(d.interestRate===undefined)     d.interestRate=0.05;
+  if(d.interestRate===undefined)     d.interestRate=0.01;
   if(d.interestEnabled===undefined)  d.interestEnabled=true;
   if(!d.interestLastDate)            d.interestLastDate={};
   if(!d.holdBonusLastDate)           d.holdBonusLastDate={};
@@ -1037,7 +1037,7 @@ const calcMemberOperation = (memberId, data, type="total") => {
     const price=st.price;
     const currency=st.currency;
     const pts=currency==="JPY"?Math.round(price*h.qty):Math.round(price*h.qty*10);
-    return s + Math.floor(pts*0.9); // 売却時10%手数料を考慮
+    return s + Math.floor(pts*0.98); // 売却時2%手数料を考慮
   },0);
   // 為替の損益計算
   const forexBuyCost = logs.filter(l=>l.type==="forex_buy").reduce((s,l)=>s+Math.abs(l.pts),0);
@@ -1047,7 +1047,7 @@ const calcMemberOperation = (memberId, data, type="total") => {
   const forexCurrentValue = Object.entries(forexHeld).reduce((s,[code,amt])=>{
     const fxEntry = Object.values(forexData).find(f=>f.code===code);
     if(!fxEntry||!amt)return s;
-    return s + Math.floor(amt*(fxEntry.price||0)*0.98); // 売却時2%手数料
+    return s + Math.floor(amt*(fxEntry.price||0)*0.995); // 売却時0.5%手数料
   },0);
 
   const stockNetCost = stockBuyCost - stockSellEarn;
@@ -1937,6 +1937,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n18", e:"📈", t:"投資が やさしくなった！", b:"株の手数料を10%→2%、為替を往復4%→1%に下げました。さらに「長く持つほどボーナスUP（7日1%・30日2%・90日3%・週1回）」に。すぐ売ると損、コツコツ長期で持つと増える＝本物の投資の考え方を体験できるよ。損益は『今売ったら戻るpt』で正直に表示。"},
   {id:"n17", e:"🆙", t:"レベルのバランス調整", b:"お手伝いのEXPは「同じタスクを連打すると だんだん減る・1日の上限あり」に調整しました。いろんなお手伝いを1回ずつやるのが いちばん効率よくレベルUP！"},
   {id:"n16", e:"⭐", t:"装備にレア度＆プレミア登場！", b:"そうびに レア度（N〜UR）がついたよ。強さとレア度は別！さらに「⚡いかずちの剣」「🐉りゅうおうの剣」「💎ダイヤのよろい」「🌈にじのオーラ」など プレミア装備が図鑑に追加（近日 手に入るように！）。あと、お手伝いでもらえるEXPが ポイント×1.5に！クリアするほど どんどんレベルUP。"},
   {id:"n15", e:"🎒", t:"そうびが2スロット＆図鑑に！", b:"「⚔ぶき」と「🛡たて」を2つ同時に装備できるように！そうびは図鑑になって、お手伝い・連続・バトル、そして“まれにドロップ”でも集まるよ。バトルで勝つと たまに💊回復アイテムや そうびが見つかる！HPはポイントでも回復できる。"},
@@ -4932,7 +4933,7 @@ function InvestLearnTab({child, data, update, onRanking}){
             <span style={{fontSize:14,fontWeight:700,color:op.pt>=0?G:R}}>{op.pt>=0?"+":""}{op.pt}pt</span>
           </div>
           <div style={{fontSize:11,color:MUTED}}>投資額：{op.cost}pt → 現在評価：{op.net}pt</div>
-          <div style={{fontSize:11,color:MUTED,marginTop:3}}>手数料：{sub==="stocks"?"売買10%":"売買2%"}</div>
+          <div style={{fontSize:11,color:MUTED,marginTop:3}}>手数料：{sub==="stocks"?"売買2%":"売買0.5%"}</div>
           {onRanking&&(
             <button onClick={onRanking} style={{marginTop:10,width:"100%",padding:"8px",background:GS,border:`1px solid ${G}30`,borderRadius:10,color:GP,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>
               🏆 運用ランキングを見る
@@ -6204,28 +6205,29 @@ function applyInterest(data,update,cid){
   }));
 }
 
-// ── Long-term Holding Bonus（30日以上保有で月3%） ─────
+// ── Long-term Holding Bonus（週1回・7日1%/30日2%/90日3%＝長く持つほど報われる） ─────
 function applyHoldingBonus(data,update,cid){
-  const thisMonth=new Date().toISOString().slice(0,7);
-  if((data.holdBonusLastDate||{})[cid]===thisMonth) return;
+  const week=Math.floor(Date.now()/(7*86400000));  // 週単位で支払い
+  if((data.holdBonusLastDate||{})[cid]===week) return;
   const holdings=(data.holdings||{})[cid]||[];
   if(!holdings.length) return;
   const stocks=data.stocks||[];
   const toPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
-  const now=new Date();
+  const now=Date.now();
   let totalBonus=0;
   holdings.forEach(h=>{
     if(!h.firstBuyDate) return;
-    const days=(now-new Date(h.firstBuyDate))/86400000;
-    if(days<30) return;
+    const days=(now-new Date(h.firstBuyDate).getTime())/86400000;
+    const rate = days>=90?0.03 : days>=30?0.02 : days>=7?0.01 : 0;
+    if(rate<=0) return;
     const st=stocks.find(x=>x.id===h.stockId);
     if(!st) return;
-    totalBonus+=Math.floor(toPts(st,st.price)*h.qty*0.03);
+    totalBonus+=Math.floor(toPts(st,st.price)*h.qty*rate);
   });
   if(totalBonus<=0) return;
   update(d=>({...d,
-    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`📦 長期保有ボーナス（30日以上×3%）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
-    holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:thisMonth},
+    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`📦 長期保有ボーナス（長く持つほどUP・週1回）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
+    holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:week},
   }));
 }
 
@@ -7209,8 +7211,8 @@ function ForexSection({data, update, child}){
   const [tradeAmt, setTradeAmt] = useState(""); // 外貨の金額
   const myBal = bal(data.logs, child?.id||"");
 
-  const FOREX_BUY_FEE  = 0.02; // 買い手数料2%
-  const FOREX_SELL_FEE = 0.02; // 売り手数料2%
+  const FOREX_BUY_FEE  = 0.005; // 買い手数料0.5%
+  const FOREX_SELL_FEE = 0.005; // 売り手数料0.5%
 
   // 保有外貨
   const myForex = (data.forexHoldings||{})[child?.id||""]||{};
@@ -7222,7 +7224,7 @@ function ForexSection({data, update, child}){
     const costPts = Math.ceil(amt * rate * (1 + FOREX_BUY_FEE));
     if(myBal < costPts) { alert("残高が足りないよ！"); return; }
     const entry = {id:uid(),cid:child.id,type:"forex_buy",
-      label:`💱 ${fx.flag}${fx.code} ${amt}購入（¥${rate}×${(1+FOREX_BUY_FEE*100).toFixed(0)}%手数料込）`,
+      label:`💱 ${fx.flag}${fx.code} ${amt}購入（¥${rate}・手数料${(FOREX_BUY_FEE*100).toFixed(1)}%込）`,
       pts:-costPts, date:new Date().toISOString()};
     update(d=>({
       ...d,
@@ -7244,7 +7246,7 @@ function ForexSection({data, update, child}){
     const rate = fx.price||0;
     const earnPts = Math.floor(amt * rate * (1 - FOREX_SELL_FEE));
     const entry = {id:uid(),cid:child.id,type:"forex_sell",
-      label:`💱 ${fx.flag}${fx.code} ${amt}売却（手数料2%引後）`,
+      label:`💱 ${fx.flag}${fx.code} ${amt}売却（手数料0.5%引後）`,
       pts:earnPts, date:new Date().toISOString()};
     update(d=>({
       ...d,
@@ -7415,7 +7417,7 @@ function ForexSection({data, update, child}){
                         <span>レート</span><span>{tradeAmtNum}{fx.code} × ¥{(fx.price||0).toFixed(2)}</span>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",color:"#f5c842",marginBottom:2}}>
-                        <span>手数料(2%)</span><span>+{(buyCost-Math.round(tradeAmtNum*(fx.price||0))).toLocaleString()}pt</span>
+                        <span>手数料(0.5%)</span><span>+{(buyCost-Math.round(tradeAmtNum*(fx.price||0))).toLocaleString()}pt</span>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",color:"#fff",fontWeight:700}}>
                         <span>合計</span><span>{buyCost.toLocaleString()}pt</span>
@@ -7426,7 +7428,7 @@ function ForexSection({data, update, child}){
                         <span>保有</span><span>{held}{fx.code}</span>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",color:"#f5c842",marginBottom:2}}>
-                        <span>手数料(2%)</span><span>-{(Math.round(tradeAmtNum*(fx.price||0))-sellEarn).toLocaleString()}pt</span>
+                        <span>手数料(0.5%)</span><span>-{(Math.round(tradeAmtNum*(fx.price||0))-sellEarn).toLocaleString()}pt</span>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",color:"#fff",fontWeight:700}}>
                         <span>受取</span><span>{sellEarn.toLocaleString()}pt</span>
@@ -7462,14 +7464,14 @@ function InvestTab({child,data,update}){
   const toPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
   const portfolioVal=myHoldings.reduce((s,h)=>{const st=stocks.find(x=>x.id===h.stockId);return s+(st?toPts(st,st.price)*h.qty:0);},0);
   const portfolioCost=myHoldings.reduce((s,h)=>s+h.avgPrice*h.qty,0);
-  const portfolioGain=portfolioVal-portfolioCost;
+  const portfolioGain=Math.round(portfolioVal*0.98)-portfolioCost; // 今売ったら戻るpt基準(手数料2%込)
   const selStock=stocks.find(s=>s.id===selected);
   const selHolding=myHoldings.find(h=>h.stockId===selected);
   const qtyN=Math.max(0.1,Math.round((parseFloat(qty)||0.1)*10)/10);
   const basePrice=selStock?Math.round(toPts(selStock,selStock.price)*qtyN):0;
-  const FEE_RATE = 0.10; // 10%手数料
-  const costPts = Math.ceil(basePrice*(1+FEE_RATE)); // 購入時：価格+10%手数料
-  const sellPts = selStock&&selHolding?Math.floor(toPts(selStock,selStock.price)*qtyN*(1-FEE_RATE)):0; // 売却時：価格-10%手数料
+  const FEE_RATE = 0.02; // 手数料2%(子ども向けに現実的なネット証券水準へ)
+  const costPts = Math.ceil(basePrice*(1+FEE_RATE)); // 購入時：価格+2%手数料
+  const sellPts = selStock&&selHolding?Math.floor(toPts(selStock,selStock.price)*qtyN*(1-FEE_RATE)):0; // 売却時：価格-2%手数料
 
   const fmtQty=q=>(q%1===0)?`${q}`:`${q.toFixed(1)}`;
   function doBuy(){
@@ -7487,7 +7489,7 @@ function InvestTab({child,data,update}){
   }
   function doSell(){
     if(!selStock||!selHolding||qtyN<0.1||qtyN>selHolding.qty) return;
-    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料10%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
+    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
 
