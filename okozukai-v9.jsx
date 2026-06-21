@@ -329,6 +329,7 @@ function startRealtimeSync(updateFn){
             if(prev.taskExpDay){merged.taskExpDay={...(merged.taskExpDay||{})};Object.keys(prev.taskExpDay).forEach(cid=>{const p=prev.taskExpDay[cid]||{},m=merged.taskExpDay[cid]||{};merged.taskExpDay[cid]=(p.date===m.date)?{date:p.date,amt:Math.max(p.amt||0,m.amt||0)}:p;});}
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
+            if(prev.monsterHPTs) merged.monsterHPTs={...(merged.monsterHPTs||{}),...prev.monsterHPTs};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
             if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
             // darkEgg(ヤミノオウの卵): お世話度は多い方を採用＝同期巻き戻しで育成が消えない
@@ -1652,6 +1653,14 @@ const EQUIPMENT = [
   {id:"eq_s_crown", slot:"shield", rarity:3, name:"おうじゃのかんむり",e:"👑",atk:0, def:7, hp:26, need:{k:"lv",v:15},    hint:"レベル15で"},
   {id:"eq_s_diamond",slot:"shield",rarity:4, name:"ダイヤのよろい", e:"💎", atk:0, def:17,hp:22, need:{k:"bal",v:1000}, premium:true, hint:"貯金1000ptで"},
   {id:"eq_s_rainbow",slot:"shield",rarity:5, name:"にじのオーラ",   e:"🌈", atk:0, def:13,hp:42, need:{k:"goals",v:5}, premium:true, hint:"目標を5回 達成で"},
+  // ── モンスター固有ドロップ武器(そのモンスターを倒すと低確率で入手・図鑑対応)。need:dropは条件解放されず、ドロップ限定 ──
+  {id:"eq_w_slime", slot:"weapon", rarity:2, name:"スライムソード", e:"🟢", atk:6, def:0, hp:4,  need:{k:"drop",v:1}, dropFrom:"wild_slime",  hint:"スライムンを 倒すと"},
+  {id:"eq_w_bat",   slot:"weapon", rarity:2, name:"ナイトファング", e:"🦇", atk:9, def:0, hp:0,  need:{k:"drop",v:1}, dropFrom:"wild_bat",    hint:"コウモリンを 倒すと"},
+  {id:"eq_w_spike", slot:"weapon", rarity:3, name:"トゲのやり",     e:"📌", atk:12,def:3, hp:0,  need:{k:"drop",v:1}, dropFrom:"wild_spike",  hint:"トゲちゃんを 倒すと"},
+  {id:"eq_w_bone",  slot:"weapon", rarity:3, name:"ボーンブレード", e:"🦴", atk:15,def:0, hp:0,  need:{k:"drop",v:1}, dropFrom:"wild_bone",   hint:"ガイコツンを 倒すと"},
+  {id:"eq_w_flame", slot:"weapon", rarity:4, name:"フレイムランス", e:"🔥", atk:18,def:0, hp:6,  need:{k:"drop",v:1}, dropFrom:"wild_fire",   hint:"オニビを 倒すと"},
+  {id:"eq_w_drago", slot:"weapon", rarity:4, name:"ドラゴンクロー", e:"🐲", atk:22,def:0, hp:8,  need:{k:"drop",v:1}, dropFrom:"wild_dragon", hint:"ヌシ・ドラゴを 倒すと"},
+  {id:"eq_w_yami",  slot:"weapon", rarity:5, name:"ヤミノツルギ",   e:"🌑", atk:28,def:0, hp:14, need:{k:"drop",v:1}, dropFrom:"wild_boss",   hint:"ヤミノオウを 倒すと"},
 ];
 const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
 const EQ_RAR=(r)=>({1:{n:"N",c:"#7c8a82"},2:{n:"R",c:"#3478D4"},3:{n:"SR",c:"#7B61C9"},4:{n:"SR+",c:"#E8B83E"},5:{n:"UR",c:"#D95C55"}}[r]||{n:"N",c:"#7c8a82"});
@@ -1693,20 +1702,27 @@ function battleStats(data, child){
     move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
   };
 }
-// 現在HP(日替わりで全回復・バトルで減ったら持ち越し)
+// HP自然回復: 1分で1回復(時間経過ぶんを保存値に加算)
+const HP_REGEN_MS=60000;
+function regenHP(stored, ts, max){
+  const regen = ts ? Math.floor((Date.now()-ts)/HP_REGEN_MS) : 0;
+  return Math.max(0, Math.min(max, stored + Math.max(0,regen)));
+}
+// 現在HP(日替わりで全回復・バトルで減ったら持ち越し・1分1回復で自然回復)
 function curMonHP(data, child){
   const max=battleStats(data,child).hp;
   const stored=(data.monsterHP||{})[child.id];
   const sameDay=(data.monsterHPDate||{})[child.id]===todayKey();
-  return (sameDay && stored!==undefined) ? Math.max(0,Math.min(max,stored)) : max;
+  if(!(sameDay && stored!==undefined)) return max;
+  return regenHP(stored,(data.monsterHPTs||{})[child.id]||0,max);
 }
 // お世話で回復(ratio=最大HPの割合ぶん回復)。満タンなら何もしない
 function healMon(d, cid, ratio){
   const max=battleStats(d,{id:cid}).hp;
   const sameDay=(d.monsterHPDate||{})[cid]===todayKey();
-  const cur=(sameDay && (d.monsterHP||{})[cid]!==undefined)?(d.monsterHP||{})[cid]:max;
+  const cur=(sameDay && (d.monsterHP||{})[cid]!==undefined)?regenHP((d.monsterHP||{})[cid],(d.monsterHPTs||{})[cid]||0,max):max;
   if(cur>=max) return d;
-  return {...d, monsterHP:{...(d.monsterHP||{}),[cid]:Math.min(max,Math.round(cur+max*ratio))}, monsterHPDate:{...(d.monsterHPDate||{}),[cid]:todayKey()}};
+  return {...d, monsterHP:{...(d.monsterHP||{}),[cid]:Math.min(max,Math.round(cur+max*ratio))}, monsterHPDate:{...(d.monsterHPDate||{}),[cid]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[cid]:Date.now()}};
 }
 // お世話/勝利で HP回復 ＋ EXP付与(ratio=0なら回復なし)
 function careMon(d, cid, ratio, exp){
@@ -1797,10 +1813,12 @@ function BattleModal({child,data,update,onClose}){
   const healByPoints = ()=>{
     if(curHP>=pMaxHP || myBalB<healCost) return;
     update(d=>{ const e={id:uid(),cid:child.id,type:"reward",label:"💊 げんきドリンク（バトル回復）",pts:-healCost,date:new Date().toISOString()}; addLogToFirestore(e);
-      return {...d, logs:[e,...d.logs], monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}}; });
+      return {...d, logs:[e,...d.logs], monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}}; });
   };
   const potions=(data.healPotions||{})[child.id]||0;
-  const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}})); };
+  const [,setHpTick]=useState(0);  // 1分1回復を画面に反映するための再描画タイマー
+  useEffect(()=>{const id=setInterval(()=>setHpTick(t=>t+1),20000);return()=>clearInterval(id);},[]);
+  const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}})); };
   const [oppIdx,setOppIdx]=useState(0);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
@@ -1845,21 +1863,27 @@ function BattleModal({child,data,update,onClose}){
     const curFrag=(data.battleFragments||{})[child.id]||0;
     const converted=canFrag && (curFrag+1>=5);  // 表示用(WIN演出)。実際の書き込みはupdate内でdから再計算
     if(r==="win") setReward(canFrag?(converted?"ticket":"fragment"):"none");
-    // たまのドロップ(勝利時): ヤミノオウ撃破で稀に「ヤミノタマゴ」/ それ以外は回復アイテムor装備
+    // ドロップ(勝利時): ①ヤミノオウは稀に卵 ②そのモンスター固有のレア武器(未所持なら優先) ③回復アイテム
     let dropInfo=null;
     if(r==="win"){
+      const drp=(data.equipUnlock?.[child.id])||[];
+      const sigItem=EQUIPMENT.find(it=>it.dropFrom===opp.img);          // このモンスター固有の武器
+      const sigOwned=sigItem && drp.includes(sigItem.id);
       if(opp.boss && !(data.darkEgg?.[child.id]) && Math.random()<0.15){
         dropInfo={kind:"egg"};   // ヤミノオウの卵(育てると自分だけのヤミノオウに)
+      } else if(sigItem && !sigOwned && Math.random()<0.32){
+        dropInfo={kind:"equip",id:sigItem.id,name:sigItem.name,e:sigItem.e};   // 固有レア武器ドロップ
       } else {
         const roll=Math.random();
-        if(roll<0.12) dropInfo={kind:"potion"};
-        else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.premium && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+        if(roll<0.14) dropInfo={kind:"potion"};
+        else if(roll<0.22){ const locked=EQUIPMENT.filter(it=>!it.premium && !it.dropFrom && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
       }
     }
     if(dropInfo) setDrop(dropInfo);
     update(d=>{ const nd={...d};
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
+      nd.monsterHPTs={...(d.monsterHPTs||{}),[child.id]:Date.now()}; // 1分1回復の起点
       nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
       if(r==="win"){
         nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
@@ -4404,6 +4428,52 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
                 : <button onClick={feed} disabled={fedToday} style={{marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ── ⚔ ドロップ図鑑(モンスターごとの固有レア武器) ── */}
+      {effectiveTab==="more" && (()=>{
+        const owned=(data.equipUnlock||{})[child.id]||[];
+        const rows=[...WILD_MONSTERS,BOSS_MONSTER].map(m=>({m,w:EQUIPMENT.find(it=>it.dropFrom===m.img)})).filter(r=>r.w);
+        const gotCount=rows.filter(r=>owned.includes(r.w.id)).length;
+        return (
+          <div style={{padding:"0 16px 8px"}}>
+            <div onClick={()=>setMoreOpen(o=>o==="drops"?null:"drops")}
+              style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>⚔</span>
+                <span style={{fontSize:13,fontWeight:700,color:TEXT}}>ドロップ図鑑（レア武器）</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{gotCount}/{rows.length}</span>
+                <span style={{fontSize:11,color:MUTED}}>{moreOpen==="drops"?"▲":"▼"}</span>
+              </div>
+            </div>
+            {moreOpen==="drops" && (
+              <div>
+                <div style={{fontSize:11,color:MUTED,marginBottom:8,lineHeight:1.5}}>モンスターを倒すと、それぞれ固有のレア武器を低確率でドロップ！周回してコンプを目指そう。</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8}}>
+                  {rows.map(({m,w})=>{
+                    const got=owned.includes(w.id); const rar=EQ_RAR(w.rarity);
+                    return (
+                      <div key={w.id} style={{borderRadius:12,padding:"10px",background:got?GS:CARD,border:got?`2px solid ${rar.c}`:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:40,height:40,borderRadius:10,background:got?"#fff":CARDS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0,filter:got?"none":"grayscale(1) opacity(.5)"}}>{got?w.e:"❓"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:5}}>
+                            <span style={{fontSize:9,fontWeight:900,color:"#fff",background:rar.c,borderRadius:5,padding:"1px 5px"}}>{rar.n}</span>
+                            <span style={{fontWeight:800,fontSize:12.5,color:got?TEXT:MUTED,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{got?w.name:"？？？"}</span>
+                          </div>
+                          {got
+                            ? <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[w.atk?`⚔+${w.atk}`:"",w.def?`🛡+${w.def}`:"",w.hp?`HP+${w.hp}`:""].filter(Boolean).join(" ")}</div>
+                            : <div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {m.emoji}{m.name}を 倒すと</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
