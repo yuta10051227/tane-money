@@ -24,6 +24,16 @@ const FIREBASE_CONFIG = {
   appId: "1:168102674534:web:691b66d776ed0d60b5ada7"
 };
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
+// ── データ消失の防止ガード ──
+// クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。
+// 実際の書き込み成否とドキュメントサイズを1か所に集約し、UIに通知する。
+// near=サイズが上限(1MB)に接近 / fail=連続して書き込み失敗(変更は端末ローカルには残る)
+const SAVE_BYTE_WARN = 820000;          // 約820KBで警告(900KBの安全弁の手前)
+let _saveHealth = {ok:true, near:false, bytes:0, failStreak:0};
+let _saveHealthCb = null;
+function setSaveHealthCb(cb){ _saveHealthCb=cb; if(cb) cb(_saveHealth); }
+function reportSaveHealth(patch){ _saveHealth={..._saveHealth,...patch}; if(_saveHealthCb) _saveHealthCb(_saveHealth); }
+function byteLen(str){ try{ return (typeof Blob!=="undefined")?new Blob([str]).size:Math.round((str||"").length*1.4); }catch(e){ return (str||"").length; } }
 const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
 let _familyCode=null; // ファミリーコードのキャッシュ
 
@@ -143,16 +153,24 @@ async function cloudSave(d) {
     docJson = JSON.stringify({...d, logs:[...keep, ...carry]});
   }
   _pendingSave = docJson;
+  // ドキュメントサイズを監視（1MB上限の手前で親に警告を出す）
+  const near = byteLen(docJson) > SAVE_BYTE_WARN;
+  reportSaveHealth({near, bytes:byteLen(docJson)});
   if(_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async()=>{
-    if(!code||code==="default")return;
+    if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); return; }
     const db = getDB();
-    if(!db)return;
+    if(!db){ reportSaveHealth({ok:true, failStreak:0}); return; }
     try{
       const ts = new Date().toISOString();
       _lastSyncTime = ts;
       await db.collection("families").doc(code).set({data:_pendingSave,updatedAt:ts});
-    }catch(e){console.warn("Firestore save failed:",e);}
+      reportSaveHealth({ok:true, failStreak:0});
+    }catch(e){
+      console.warn("Firestore save failed:",e);
+      // 2回連続で失敗したら警告（一時的なネット瞬断で過剰に出さない）
+      reportSaveHealth({failStreak:_saveHealth.failStreak+1, ok:_saveHealth.failStreak+1<2});
+    }
   },1000); // 1秒デバウンス（目標・設定変更が素早く保存される）
   // 3. Claude.ai内ならwindow.storageにも保存
   if (hasCloudStorage()) {
@@ -1160,6 +1178,30 @@ const SyncBadge = ({status}) => {
   );
 };
 
+// データ消失の防止ガード：保存失敗 or サイズ上限接近を画面上部に警告（保護者に気づかせる）
+const SaveGuardBanner = () => {
+  const [h,setH]=useState(null);
+  const [closed,setClosed]=useState(false);
+  useEffect(()=>{ setSaveHealthCb(setH); return ()=>setSaveHealthCb(null); },[]);
+  if(!h) return null;
+  const fail=!h.ok, near=h.near;
+  if(!fail && !near) return null;
+  if(closed && !fail) return null; // 失敗時は閉じても出し続ける（重要）
+  const kb=Math.round((h.bytes||0)/1024);
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9500,background:fail?R:GOLD,color:fail?"#fff":TEXT,
+      padding:"9px 14px",fontFamily:F,fontSize:12.5,fontWeight:800,textAlign:"center",
+      boxShadow:"0 2px 10px rgba(0,0,0,.18)",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
+      <span style={{flex:1}}>
+        {fail
+          ? "⚠ クラウド保存に失敗中。変更はこの端末に残っています。通信環境を確認してください。"
+          : `⚠ データ量が上限に近づいています（約${kb}KB）。古い記録は自動でまとめられます。`}
+      </span>
+      {!fail && <button onClick={()=>setClosed(true)} style={{background:"rgba(0,0,0,.12)",border:"none",borderRadius:8,padding:"3px 9px",fontWeight:800,fontSize:12,color:TEXT,cursor:"pointer",fontFamily:F,flexShrink:0}}>×</button>}
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════
 // PIN PAD
 // ═══════════════════════════════════════════════════════
@@ -1562,31 +1604,33 @@ const WILD_MONSTERS = [
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
 const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
-// そうび(アイテム): ぶき＋たての2スロット。レア度(rarity)と強さは別。soon=プレミア(近日・まだ入手不可)
+// そうび(アイテム): ぶき＋たての2スロット。レア度(rarity)と強さは別。premium=貯金/目標達成で解放する最強クラス
 const EQUIPMENT = [
   // ── ぶき(weapon)＝こうげき系 ──
   {id:"eq_w_basic", slot:"weapon", rarity:1, name:"きほんのつるぎ", e:"🗡", atk:4, def:0, hp:0,  need:{k:"lv",v:1},     hint:"さいしょから"},
   {id:"eq_w_fire",  slot:"weapon", rarity:2, name:"ほのおのつるぎ", e:"🔥", atk:7, def:0, hp:0,  need:{k:"streak",v:7}, hint:"7日れんぞくで"},
   {id:"eq_w_brave", slot:"weapon", rarity:3, name:"ゆうきのつるぎ", e:"⚔", atk:11,def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で"},
   {id:"eq_w_star",  slot:"weapon", rarity:3, name:"スターロッド",   e:"🌟", atk:8, def:0, hp:12, need:{k:"lv",v:12},    hint:"レベル12で"},
-  {id:"eq_w_thunder",slot:"weapon",rarity:4, name:"いかずちの剣",   e:"⚡", atk:17,def:0, hp:0,  need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
-  {id:"eq_w_dragon", slot:"weapon",rarity:5, name:"りゅうおうの剣", e:"🐉", atk:23,def:0, hp:12, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
+  {id:"eq_w_thunder",slot:"weapon",rarity:4, name:"いかずちの剣",   e:"⚡", atk:17,def:0, hp:0,  need:{k:"bal",v:500},  premium:true, hint:"貯金500ptで"},
+  {id:"eq_w_dragon", slot:"weapon",rarity:5, name:"りゅうおうの剣", e:"🐉", atk:23,def:0, hp:12, need:{k:"goals",v:3}, premium:true, hint:"目標を3回 達成で"},
   // ── たて(shield)＝ぼうぎょ系 ──
   {id:"eq_s_basic", slot:"shield", rarity:1, name:"きほんのたて",   e:"🔰", atk:0, def:4, hp:0,  need:{k:"tasks",v:10}, hint:"おてつだい10回で"},
   {id:"eq_s_guard", slot:"shield", rarity:2, name:"まもりのたて",   e:"🛡", atk:0, def:9, hp:0,  need:{k:"tasks",v:40}, hint:"おてつだい40回で"},
   {id:"eq_s_ribbon",slot:"shield", rarity:2, name:"げんきリボン",   e:"🎀", atk:0, def:2, hp:32, need:{k:"care",v:5},   hint:"なでなで5日で"},
   {id:"eq_s_crown", slot:"shield", rarity:3, name:"おうじゃのかんむり",e:"👑",atk:0, def:7, hp:26, need:{k:"lv",v:15},    hint:"レベル15で"},
-  {id:"eq_s_diamond",slot:"shield",rarity:4, name:"ダイヤのよろい", e:"💎", atk:0, def:17,hp:22, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
-  {id:"eq_s_rainbow",slot:"shield",rarity:5, name:"にじのオーラ",   e:"🌈", atk:0, def:13,hp:42, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
+  {id:"eq_s_diamond",slot:"shield",rarity:4, name:"ダイヤのよろい", e:"💎", atk:0, def:17,hp:22, need:{k:"bal",v:1000}, premium:true, hint:"貯金1000ptで"},
+  {id:"eq_s_rainbow",slot:"shield",rarity:5, name:"にじのオーラ",   e:"🌈", atk:0, def:13,hp:42, need:{k:"goals",v:5}, premium:true, hint:"目標を5回 達成で"},
 ];
 const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
 const EQ_RAR=(r)=>({1:{n:"N",c:"#7c8a82"},2:{n:"R",c:"#3478D4"},3:{n:"SR",c:"#7B61C9"},4:{n:"SR+",c:"#E8B83E"},5:{n:"UR",c:"#D95C55"}}[r]||{n:"N",c:"#7c8a82"});
 function equipMeta(data, child){
   const m=getMonState(data,child);
   return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
-           wins:(data.battleWins||{})[child.id]||0, streak:(data.streak||{})[child.id]?.max||0 };
+           wins:(data.battleWins||{})[child.id]||0, streak:(data.streak||{})[child.id]?.max||0,
+           bal:(data.logs||[]).filter(l=>l.cid===child.id).reduce((a,l)=>a+l.pts,0),
+           goals:(data.goals||[]).filter(g=>g.cid===child.id&&g.done).length };
 }
-const equipUnlocked = (item, meta, dropped)=> !item.soon && (((meta[item.need.k]||0) >= item.need.v) || (Array.isArray(dropped) && dropped.includes(item.id)));
+const equipUnlocked = (item, meta, dropped)=> ((meta[item.need.k]||0) >= item.need.v) || (Array.isArray(dropped) && dropped.includes(item.id));
 // 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
 const PLAYER_MOVES = [
   {n:"エナジーボール", e:"🔆", c:"#34C77B"},
@@ -1661,7 +1705,7 @@ function EquipModal({child,data,update,onClose}){
   const eqRaw=(data.monsterEquip||{})[child.id];
   const cur=(eqRaw&&typeof eqRaw==="object")?eqRaw:{};
   const stats=battleStats(data,child);
-  const obtainable=EQUIPMENT.filter(it=>!it.soon);
+  const obtainable=EQUIPMENT;
   const collected=obtainable.filter(it=>equipUnlocked(it,meta,dropped)).length;
   const setEq=(slot,id)=>update(d=>{ const r=(d.monsterEquip||{})[child.id]; const obj=(r&&typeof r==="object")?r:{}; return {...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:{...obj,[slot]:id}}}; });
   return (
@@ -1678,20 +1722,19 @@ function EquipModal({child,data,update,onClose}){
               <div style={{fontWeight:900,fontSize:13,color:TEXT,margin:"8px 2px 6px"}}>{sl.t}</div>
               {EQUIPMENT.filter(it=>it.slot===sl.k).map(it=>{
                 const unlocked=equipUnlocked(it,meta,dropped); const on=cur[sl.k]===it.id; const rar=EQ_RAR(it.rarity);
-                return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:(it.soon?rar.c+"66":BORDER)}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:(it.soon?0.85:0.6)}}>
+                return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:(it.premium?rar.c+"66":BORDER)}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:(it.premium?0.92:0.6)}}>
                   <div style={{fontSize:28,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontSize:9,fontWeight:900,color:"#fff",background:rar.c,borderRadius:5,padding:"1px 5px"}}>{rar.n}</span>
-                      <span style={{fontWeight:800,fontSize:14,color:TEXT}}>{(unlocked||it.soon)?it.name:"？？？"}</span>
+                      <span style={{fontWeight:800,fontSize:14,color:TEXT}}>{(unlocked||it.premium)?it.name:"？？？"}</span>
+                      {it.premium&&<span style={{fontSize:9,fontWeight:900,color:"#fff",background:GOLD,borderRadius:5,padding:"1px 5px"}}>✨プレミア</span>}
                     </div>
                     <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[it.hp?`HP+${it.hp}`:"",it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:""].filter(Boolean).join("  ")}</div>
-                    {it.soon
-                      ? <div style={{fontSize:11,color:rar.c,fontWeight:800,marginTop:2}}>✨ プレミア・近日登場</div>
-                      : !unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
+                    {!unlocked&&<div style={{fontSize:11,color:it.premium?rar.c:MUTED,fontWeight:it.premium?800:400,marginTop:2}}>🔒 {it.hint}</div>}
                   </div>
                   {unlocked&&<button onClick={()=>setEq(sl.k,on?null:it.id)} style={{background:on?MUTED:GP,border:"none",borderRadius:10,padding:"8px 13px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>{on?"はずす":"そうび"}</button>}
-                  {it.soon&&<span style={{fontSize:18,flexShrink:0}}>🔒</span>}
+                  {!unlocked&&it.premium&&<span style={{fontSize:18,flexShrink:0}}>🔒</span>}
                 </div>;
               })}
             </div>
@@ -1769,7 +1812,7 @@ function BattleModal({child,data,update,onClose}){
     if(r==="win"){
       const roll=Math.random();
       if(roll<0.12) dropInfo={kind:"potion"};
-      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.soon && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.premium && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
     }
     if(dropInfo) setDrop(dropInfo);
     update(d=>{ const nd={...d};
@@ -1937,6 +1980,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n19", e:"💎", t:"プレミア装備が貯金で手に入る！", b:"これまで「近日登場」だったプレミア装備が、貯金や目標達成で解放できるようになったよ！「⚡いかずちの剣」=貯金500pt、「🐉りゅうおうの剣」=目標3回達成、「💎ダイヤのよろい」=貯金1000pt、「🌈にじのオーラ」=目標5回達成。コツコツ貯めるほど 最強そうびに近づくよ。あと、毎日ミッションの「ガチャ」が「まめちしき」に変わって、お金の勉強でEXPがもらえるようになりました。"},
   {id:"n18", e:"📈", t:"投資が やさしくなった！", b:"株の手数料を10%→2%、為替を往復4%→1%に下げました。さらに「長く持つほどボーナスUP（7日1%・30日2%・90日3%・週1回）」に。すぐ売ると損、コツコツ長期で持つと増える＝本物の投資の考え方を体験できるよ。損益は『今売ったら戻るpt』で正直に表示。"},
   {id:"n17", e:"🆙", t:"レベルのバランス調整", b:"お手伝いのEXPは「同じタスクを連打すると だんだん減る・1日の上限あり」に調整しました。いろんなお手伝いを1回ずつやるのが いちばん効率よくレベルUP！"},
   {id:"n16", e:"⭐", t:"装備にレア度＆プレミア登場！", b:"そうびに レア度（N〜UR）がついたよ。強さとレア度は別！さらに「⚡いかずちの剣」「🐉りゅうおうの剣」「💎ダイヤのよろい」「🌈にじのオーラ」など プレミア装備が図鑑に追加（近日 手に入るように！）。あと、お手伝いでもらえるEXPが ポイント×1.5に！クリアするほど どんどんレベルUP。"},
@@ -1960,7 +2004,7 @@ const NEWS = [
 const MISSIONS = [
   {id:"m_task",   e:"✅", label:"お手伝いを 3かい", goal:3, metric:"tasks",  exp:10},
   {id:"m_care",   e:"🤚", label:"モンスターを なでなで", goal:1, metric:"care", exp:8},
-  {id:"m_gacha",  e:"🎰", label:"ガチャを ひく", goal:1, metric:"gacha", exp:8},
+  {id:"m_learn",  e:"💡", label:"まめちしきを 読む", goal:1, metric:"learn", exp:8},
   {id:"m_battle", e:"⚔", label:"バトルに 1かい かつ", goal:1, metric:"battle", exp:12},
 ];
 // とっくんの旅先(レベルで解放・遠いほど時間とEXP大)
@@ -3484,18 +3528,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const metrics={
           tasks: myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(tISO)).length,
           care: (data.monsterCare?.[child.id]?.last===tk)?1:0,
-          gacha: (data.gachaDate?.[child.id]===tk)?1:0,
+          learn: myLogs.filter(l=>l.type==="tips"&&(l.date||"").startsWith(tISO)).length,
           battle: (data.battleFragDate?.[child.id]===tk)?1:0,
         };
+        // まめちしきはJuniorに無い画面なので、Juniorは達成可能な3つに絞る
+        const dailyMissions=isJunior?MISSIONS.filter(m=>m.metric!=="learn"):MISSIONS;
         const mcRaw=data.missionClaimed?.[child.id];
         const claimed=(mcRaw&&mcRaw.date===tk)?(mcRaw.ids||[]):[];
-        const allClaimed=claimed.length>=MISSIONS.length;
-        const doneCount=MISSIONS.filter(m=>metrics[m.metric]>=m.goal).length;
+        const allClaimed=claimed.length>=dailyMissions.length;
+        const doneCount=dailyMissions.filter(m=>metrics[m.metric]>=m.goal).length;
         const claim=(id,exp)=>update(d=>{
           const mc=d.missionClaimed?.[child.id]; const ids=(mc&&mc.date===tk)?(mc.ids||[]):[];
           if(ids.includes(id))return d; const nids=[...ids,id];
           let nd={...d, missionClaimed:{...(d.missionClaimed||{}),[child.id]:{date:tk,ids:nids}}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+exp}};
-          if(nids.length>=MISSIONS.length){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
+          if(nids.length>=dailyMissions.length){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
           return nd;
         });
         return (
@@ -3503,9 +3549,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div style={{background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:16,padding:"12px 14px"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                 <span style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>🎯 きょうのミッション</span>
-                <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{doneCount}/{MISSIONS.length}{allClaimed?" ✓":""}</span>
+                <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{doneCount}/{dailyMissions.length}{allClaimed?" ✓":""}</span>
               </div>
-              {MISSIONS.map(m=>{
+              {dailyMissions.map(m=>{
                 const prog=Math.min(metrics[m.metric],m.goal); const done=prog>=m.goal; const isClaimed=claimed.includes(m.id);
                 return <div key={m.id} style={{display:"flex",alignItems:"center",gap:9,padding:"5px 0"}}>
                   <span style={{fontSize:17,width:22,textAlign:"center"}}>{m.e}</span>
@@ -7773,7 +7819,7 @@ const ALL_BADGES = [
   {id:"b09",emoji:"🎊",name:"目標達成マスター",desc:"目標貯金を3回達成した",type:"achieve",check:s=>s.goalsDone>=3},
   // 行動系
   {id:"b10",emoji:"🎰",name:"ガチャデビュー",desc:"初めてガチャを引いた",type:"action",check:s=>s.gachaCount>=1},
-  {id:"b11",emoji:"🎲",name:"ガチャ中毒",desc:"ガチャを30回引いた",type:"action",check:s=>s.gachaCount>=30},
+  {id:"b11",emoji:"🎲",name:"ガチャはかせ",desc:"ガチャを30回引いて確率を体験した",type:"action",check:s=>s.gachaCount>=30},
   {id:"b12",emoji:"🛍",name:"こうかんデビュー",desc:"初めてこうかんした",type:"action",check:s=>s.rewardCount>=1},
   {id:"b13",emoji:"🛒",name:"こうかん上手",desc:"こうかんを10回した",type:"action",check:s=>s.rewardCount>=10},
   {id:"b14",emoji:"📈",name:"投資デビュー",desc:"初めて株を買った",type:"action",check:s=>s.investBuy>=1},
@@ -7881,7 +7927,7 @@ const ALL_TIPS=[
   {id:"t27",cat:"働くこと",emoji:"📚",title:"勉強がお金につながる理由",body:"知識・スキルは「人的資本」。勉強に使うお金は投資と同じ。学べば学ぶほど将来稼げる可能性が上がるよ。"},
   {id:"t28",cat:"Tane Money",emoji:"🌱",title:"Tane Moneyのコンセプト",body:"「お金は種」。種を蒔いて育てるように、小さなお手伝いの積み重ねが大きな力になる。毎日コツコツが一番！"},
   {id:"t29",cat:"Tane Money",emoji:"🏆",title:"ランキングで成長できる理由",body:"家族でランキングを競うことで「やる気」が生まれる。競争ではなく「昨日の自分より成長する」ことが大切。"},
-  {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャから学べること",body:"ガチャは「確率」の練習。毎日引き続けると結果が安定してくる。これが長期投資と同じ考え方だよ！"},
+  {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャと上手につきあう",body:"ガチャは「確率」の体験。レアが出るかはランダムで、たくさん引いても必ず当たるわけじゃない。お金は計画的に使い、貯金やコツコツの積み重ねが一番たしかな力になるよ。"},
 ];
 
 function TipsSection({ageMode,child,data,update}){
@@ -8455,31 +8501,23 @@ function SetupWizard({ data, update, onComplete }) {
 }
 
 // ── Tutorial ──────────────────────────────────────────
+// 15秒オンボーディング：お金の基本ループ「お手伝い→ポイント→ためる」だけを3枚で伝える。
+// （ガチャ・投資はアプリ内で自然に出会う。最初は核だけ教えて迷わせない）
 const CHILD_TUTORIAL = [
   {
-    emoji:"🌱", title:"Tane Moneyへようこそ！",
-    body:"お手伝いをするとポイントがもらえるよ。ポイントを貯めて、好きなものと交換しよう！",
-    hint:"種（tane）を蒔くように、毎日コツコツ続けることが大切だよ🌟"
+    emoji:"🌱", title:"3ステップだけ おぼえよう",
+    body:"① お手伝いをする → ② ポイントがたまる → ③ ためて 好きなものと交換！ これがTaneMoneyだよ。",
+    hint:"むずかしくないよ。15秒で読めるよ🌟"
   },
   {
-    emoji:"🏆", title:"お手伝いでポイントをゲット",
-    body:"「活動」タブを開いて、やったお手伝いをタップしよう。ポイントがどんどん貯まるよ！",
-    hint:"プラスのお手伝いもマイナスもあるよ。正直に記録しよう💪"
+    emoji:"🏆", title:"① お手伝いでポイント",
+    body:"「活動」タブを開いて、やったお手伝いをタップ。ポイントがどんどん貯まるよ！",
+    hint:"正直に記録するのが いちばん大事💪"
   },
   {
-    emoji:"🎰", title:"毎日ガチャを引こう！",
-    body:"「ガチャ」タブで毎日ガチャが引けるよ。毎日続けるとストリーク（連続日数）が増えるよ！",
-    hint:"連続3日以上続けると🔥マークがつくよ"
-  },
-  {
-    emoji:"💰", title:"ポイントを使ってみよう",
-    body:"「お金」タブの「こうかん」で、貯めたポイントをご褒美と交換できるよ！",
-    hint:"目標を作って計画的に貯めると達成感が大きいよ🎯"
-  },
-  {
-    emoji:"📈", title:"投資にも挑戦してみよう",
-    body:"「活動」→「投資」タブで、本物の会社の株をポイントで買えるよ。世界の経済を体感しよう！",
-    hint:"分散投資・長期投資がポイント。まめちしきで勉強しよう💡"
+    emoji:"🐷", title:"② ためて ③ 交換しよう",
+    body:"すぐ使わず コツコツ貯めるのがコツ。「お金」タブで目標を決めて、貯まったら「こうかん」でご褒美と交換！",
+    hint:"目標を決めて貯めると達成感が大きいよ🎯"
   },
 ];
 
@@ -8844,6 +8882,8 @@ export default function App() {
   return (
     <ErrorBoundary>
     <>
+      {/* データ消失の防止ガード（保存失敗・サイズ上限接近を上部に警告） */}
+      <SaveGuardBanner/>
       {/* Sync indicator - 左下に移動して設定ボタンと重ならないようにする */}
       <div style={{position:"fixed",bottom:12,left:12,zIndex:9000,pointerEvents:"none"}}>
         <SyncBadge status={syncSt}/>
