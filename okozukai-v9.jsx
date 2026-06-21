@@ -311,6 +311,8 @@ function startRealtimeSync(updateFn){
             // つけた名前(ニックネーム)・スキン装備も保護（巻き戻り防止）
             if(prev.monsterNickname) merged.monsterNickname={...(merged.monsterNickname||{}),...prev.monsterNickname};
             if(prev.monsterSkin) merged.monsterSkin={...(merged.monsterSkin||{}),...prev.monsterSkin};
+            // まめちしきクイズの正解履歴は端末間でユニオン(消えない)
+            if(prev.tipsQuiz){merged.tipsQuiz={...(merged.tipsQuiz||{})};Object.keys(prev.tipsQuiz).forEach(cid=>{merged.tipsQuiz[cid]=Array.from(new Set([...(merged.tipsQuiz[cid]||[]),...(prev.tipsQuiz[cid]||[])]));});}
             // バトル/育成の進行(EXP・チケットは多い方、HP/ボス解放はローカル優先)
             if(prev.monsterExp){merged.monsterExp={...(merged.monsterExp||{})};Object.keys(prev.monsterExp).forEach(cid=>{merged.monsterExp[cid]=Math.max(prev.monsterExp[cid]||0,merged.monsterExp[cid]||0);});}
             if(prev.battleTickets){merged.battleTickets={...(merged.battleTickets||{})};Object.keys(prev.battleTickets).forEach(cid=>{merged.battleTickets[cid]=Math.max(prev.battleTickets[cid]||0,merged.battleTickets[cid]||0);});}
@@ -897,6 +899,7 @@ const INIT = {
   stockFetchStatus: "idle",
   myTaskIds: {},
   tipsRead: {},
+  tipsQuiz: {},
   childDailyBonus: {},
   parentMultiplier: 1.0,
   forexHoldings: {},  // {memberId: {USD:10, EUR:5, ...}}
@@ -1027,6 +1030,7 @@ function migrate(d) {
   if(!d.stockFetchStatus) d.stockFetchStatus="idle";
   if(!d.myTaskIds)     d.myTaskIds={};
   if(!d.tipsRead)      d.tipsRead={};
+  if(!d.tipsQuiz)      d.tipsQuiz={};
   if(!d.childDailyBonus) d.childDailyBonus={};
   if(Array.isArray(d.parentLogs)){
     const obj={};
@@ -8029,36 +8033,36 @@ function BadgesSection({child,data,update}){
 
 // ── Tips ──────────────────────────────────────────────
 const ALL_TIPS=[
-  {id:"t01",cat:"お金のきほん",emoji:"💴",title:"お金ってなに？",body:"お金は「ものやサービスと交換できる券」だよ。昔は貝殻や石が使われていたんだ！"},
-  {id:"t02",cat:"お金のきほん",emoji:"🏦",title:"銀行の仕組み",body:"銀行にお金を預けると、銀行はそのお金を別の人に貸して利息をとる。その一部をあなたに「利子」として払ってくれるよ。"},
-  {id:"t03",cat:"お金のきほん",emoji:"💳",title:"クレジットカードの仕組み",body:"クレジットカードは「後払い」の仕組み。使った分は翌月に口座から引き落とされるよ。使いすぎに注意！"},
-  {id:"t04",cat:"お金のきほん",emoji:"📊",title:"物価ってなに？",body:"物の値段のことを「物価」という。お金が世の中に増えすぎると物価が上がる「インフレ」が起きるよ。"},
-  {id:"t05",cat:"お金のきほん",emoji:"🌐",title:"為替ってなに？",body:"1ドル=150円のように、国によってお金の価値が違う。この交換レートを「為替」という。円安になると輸入品が高くなるよ。"},
-  {id:"t06",cat:"お金のきほん",emoji:"🧾",title:"税金の種類",body:"消費税・所得税・住民税など税金は種類がたくさん。集まった税金は学校・道路・病院などに使われるよ。"},
-  {id:"t07",cat:"お金のきほん",emoji:"💰",title:"お金を稼ぐ3つの方法",body:"①労働（働く）②投資（お金を増やす）③事業（商売をする）。この3つを組み合わせると豊かになりやすいよ！"},
-  {id:"t08",cat:"貯金・節約",emoji:"🐷",title:"貯金のコツ",body:"もらったら先に貯金する「先取り貯金」が効果的。使った残りを貯めようとすると、つい使い切ってしまうよ。"},
-  {id:"t09",cat:"貯金・節約",emoji:"📝",title:"家計簿をつけよう",body:"何にいくら使ったか記録するだけで、無駄遣いに気づける。1週間試すだけで節約できる金額がわかるよ！"},
-  {id:"t10",cat:"貯金・節約",emoji:"🎯",title:"目標を決めると貯まりやすい",body:"「3000ptでゲームを買う」など具体的な目標があると、貯金が続きやすい。目的のない貯金は途中でやめがちだよ。"},
-  {id:"t11",cat:"貯金・節約",emoji:"⚖",title:"欲しいvs必要",body:"ものを買う前に「欲しいもの？必要なもの？」と考えよう。欲しいものは後回しにすると、本当に必要かわかるよ。"},
-  {id:"t12",cat:"貯金・節約",emoji:"🔄",title:"複利の魔法",body:"利子にさらに利子がつく「複利」はとても強力。100ptを年5%で運用すると20年後には約265ptになるよ！"},
-  {id:"t13",cat:"投資",emoji:"📈",title:"株ってなに？",body:"株は会社の「一部オーナー権」。会社が成長すると株価が上がり、持っているだけで「配当金」ももらえることがあるよ。"},
-  {id:"t14",cat:"投資",emoji:"🎲",title:"リスクとリターン",body:"大きく儲かるものほどリスクも大きい。株より預金は安全だけど増えにくい。自分のリスク許容度を知ることが大切。"},
-  {id:"t15",cat:"投資",emoji:"🧺",title:"卵は1つのカゴに盛るな",body:"投資の有名な格言。1つの銘柄だけに全部つぎ込むのは危険。複数に分けて投資することを「分散投資」というよ。"},
-  {id:"t16",cat:"投資",emoji:"⏳",title:"長期投資が強い理由",body:"短期の株価は予測できないが、長期的に見ると良い会社の株は成長する傾向がある。焦らずじっくり持つのが基本。"},
-  {id:"t17",cat:"投資",emoji:"🤔",title:"なぜ企業は株を発行するの？",body:"会社は成長するためのお金が必要。株を売ってお金を集める代わりに、投資家に利益を分けることを約束するよ。"},
-  {id:"t18",cat:"投資",emoji:"📉",title:"株が下がるのはなぜ？",body:"業績悪化・経済不安・金利上昇・戦争などが原因。みんなが「将来不安だ」と思うと株を売るので価格が下がるよ。"},
-  {id:"t19",cat:"社会・経済",emoji:"🌍",title:"世界の経済はつながっている",body:"アメリカで不景気が起きると日本の株も下がる。世界の経済はインターネット同様つながっているんだよ。"},
-  {id:"t20",cat:"社会・経済",emoji:"🏭",title:"モノの値段が決まる仕組み",body:"「需要（欲しい人）」と「供給（売りたい量）」のバランスで価格が決まる。欲しい人が多いほど高くなるよ。"},
-  {id:"t21",cat:"社会・経済",emoji:"🤖",title:"AIと仕事の未来",body:"AIの発展で一部の仕事はなくなる。でも新しい仕事も生まれる。大切なのは「考える力」と「学び続ける力」だよ。"},
-  {id:"t22",cat:"社会・経済",emoji:"♻",title:"ESG投資ってなに？",body:"環境(E)・社会(S)・企業統治(G)に配慮した企業に投資すること。地球にいい企業を応援しながら増やせるよ。"},
-  {id:"t23",cat:"社会・経済",emoji:"📱",title:"デジタルマネーの時代",body:"PayPayやクレカで現金を使わない人が増えている。便利な反面、使いすぎに気づきにくいので注意が必要だよ。"},
-  {id:"t24",cat:"働くこと",emoji:"💼",title:"給料ってどう決まる？",body:"スキル・経験・業界・会社の規模などで変わる。同じ仕事でも会社によって全然違うことも。副業も増えているよ。"},
-  {id:"t25",cat:"働くこと",emoji:"🌱",title:"お手伝いは社会の練習",body:"お手伝いは実はすごく大事。責任感・計画性・達成感を学べる。これが将来の仕事への基礎になるよ！"},
-  {id:"t26",cat:"働くこと",emoji:"🤝",title:"価値を作るとお金になる",body:"人が「欲しい・助かる」と思うものを作ったり、サービスを提供したりすることで対価（お金）がもらえるよ。"},
-  {id:"t27",cat:"働くこと",emoji:"📚",title:"勉強がお金につながる理由",body:"知識・スキルは「人的資本」。勉強に使うお金は投資と同じ。学べば学ぶほど将来稼げる可能性が上がるよ。"},
-  {id:"t28",cat:"Tane Money",emoji:"🌱",title:"Tane Moneyのコンセプト",body:"「お金は種」。種を蒔いて育てるように、小さなお手伝いの積み重ねが大きな力になる。毎日コツコツが一番！"},
-  {id:"t29",cat:"Tane Money",emoji:"🏆",title:"ランキングで成長できる理由",body:"家族でランキングを競うことで「やる気」が生まれる。競争ではなく「昨日の自分より成長する」ことが大切。"},
-  {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャと上手につきあう",body:"ガチャは「確率」の体験。レアが出るかはランダムで、たくさん引いても必ず当たるわけじゃない。お金は計画的に使い、貯金やコツコツの積み重ねが一番たしかな力になるよ。"},
+  {id:"t01",cat:"お金のきほん",emoji:"💴",title:"お金ってなに？",body:"お金は「ものやサービスと交換できる券」だよ。昔は貝殻や石が使われていたんだ！",q:"むかし、お金のかわりに 使われていたものは？",o:["貝殻や石","プラスチック","紙のシール"],a:0},
+  {id:"t02",cat:"お金のきほん",emoji:"🏦",title:"銀行の仕組み",body:"銀行にお金を預けると、銀行はそのお金を別の人に貸して利息をとる。その一部をあなたに「利子」として払ってくれるよ。",q:"銀行に お金を あずけると もらえるのは？",o:["罰金","利子(りし)","税金"],a:1},
+  {id:"t03",cat:"お金のきほん",emoji:"💳",title:"クレジットカードの仕組み",body:"クレジットカードは「後払い」の仕組み。使った分は翌月に口座から引き落とされるよ。使いすぎに注意！",q:"クレジットカードは どんな しくみ？",o:["先払い","後払い","ただ"],a:1},
+  {id:"t04",cat:"お金のきほん",emoji:"📊",title:"物価ってなに？",body:"物の値段のことを「物価」という。お金が世の中に増えすぎると物価が上がる「インフレ」が起きるよ。",q:"物の値段が 全体的に 上がることを なんという？",o:["デフレ","インフレ","セール"],a:1},
+  {id:"t05",cat:"お金のきほん",emoji:"🌐",title:"為替ってなに？",body:"1ドル=150円のように、国によってお金の価値が違う。この交換レートを「為替」という。円安になると輸入品が高くなるよ。",q:"円安に なると 輸入品の ねだんは？",o:["高くなる","安くなる","変わらない"],a:0},
+  {id:"t06",cat:"お金のきほん",emoji:"🧾",title:"税金の種類",body:"消費税・所得税・住民税など税金は種類がたくさん。集まった税金は学校・道路・病院などに使われるよ。",q:"集めた税金は 何に 使われる？",o:["一部の人の おこづかい","学校や道路など みんなのため","会社の もうけ"],a:1},
+  {id:"t07",cat:"お金のきほん",emoji:"💰",title:"お金を稼ぐ3つの方法",body:"①労働（働く）②投資（お金を増やす）③事業（商売をする）。この3つを組み合わせると豊かになりやすいよ！",q:"お金を かせぐ 方法に ふくまれないのは？",o:["働く","投資する","ねがいごとする"],a:2},
+  {id:"t08",cat:"貯金・節約",emoji:"🐷",title:"貯金のコツ",body:"もらったら先に貯金する「先取り貯金」が効果的。使った残りを貯めようとすると、つい使い切ってしまうよ。",q:"貯金が じょうずに できる コツは？",o:["先に 貯金する","余ったら 貯金","ぜんぶ 使う"],a:0},
+  {id:"t09",cat:"貯金・節約",emoji:"📝",title:"家計簿をつけよう",body:"何にいくら使ったか記録するだけで、無駄遣いに気づける。1週間試すだけで節約できる金額がわかるよ！",q:"家計簿を つけると 何が いいの？",o:["お金が 勝手に 増える","むだづかいに 気づける","税金が 0になる"],a:1},
+  {id:"t10",cat:"貯金・節約",emoji:"🎯",title:"目標を決めると貯まりやすい",body:"「3000ptでゲームを買う」など具体的な目標があると、貯金が続きやすい。目的のない貯金は途中でやめがちだよ。",q:"貯金が つづきやすいのは どんな とき？",o:["目標を 決めたとき","なんとなく の とき","だれにも 言わない とき"],a:0},
+  {id:"t11",cat:"貯金・節約",emoji:"⚖",title:"欲しいvs必要",body:"ものを買う前に「欲しいもの？必要なもの？」と考えよう。欲しいものは後回しにすると、本当に必要かわかるよ。",q:"買う前に 考えると いいことは？",o:["欲しい？ 必要？","だれが 見てる？","何色 かな？"],a:0},
+  {id:"t12",cat:"貯金・節約",emoji:"🔄",title:"複利の魔法",body:"利子にさらに利子がつく「複利」はとても強力。100ptを年5%で運用すると20年後には約265ptになるよ！",q:"利子に さらに 利子が つくことを なんという？",o:["単利","複利","金利ゼロ"],a:1},
+  {id:"t13",cat:"投資",emoji:"📈",title:"株ってなに？",body:"株は会社の「一部オーナー権」。会社が成長すると株価が上がり、持っているだけで「配当金」ももらえることがあるよ。",q:"株を もつと どうなる？",o:["会社の 一部オーナーに なる","すぐ 社長に なる","タダで 商品が もらえる"],a:0},
+  {id:"t14",cat:"投資",emoji:"🎲",title:"リスクとリターン",body:"大きく儲かるものほどリスクも大きい。株より預金は安全だけど増えにくい。自分のリスク許容度を知ることが大切。",q:"大きく もうかる ものは ふつう？",o:["リスクも 大きい","ぜったい 安全","必ず 儲かる"],a:0},
+  {id:"t15",cat:"投資",emoji:"🧺",title:"卵は1つのカゴに盛るな",body:"投資の有名な格言。1つの銘柄だけに全部つぎ込むのは危険。複数に分けて投資することを「分散投資」というよ。",q:"「卵は1つの カゴに もるな」の 意味は？",o:["1つに 全部 入れない","卵を 大切に する","カゴを たくさん 買う"],a:0},
+  {id:"t16",cat:"投資",emoji:"⏳",title:"長期投資が強い理由",body:"短期の株価は予測できないが、長期的に見ると良い会社の株は成長する傾向がある。焦らずじっくり持つのが基本。",q:"投資の 基本的な 持ち方は？",o:["すぐ 売る","じっくり 長く 持つ","毎日 売り買い する"],a:1},
+  {id:"t17",cat:"投資",emoji:"🤔",title:"なぜ企業は株を発行するの？",body:"会社は成長するためのお金が必要。株を売ってお金を集める代わりに、投資家に利益を分けることを約束するよ。",q:"会社が 株を 売る 理由は？",o:["成長の お金を 集めるため","あそぶ ため","税金の ため"],a:0},
+  {id:"t18",cat:"投資",emoji:"📉",title:"株が下がるのはなぜ？",body:"業績悪化・経済不安・金利上昇・戦争などが原因。みんなが「将来不安だ」と思うと株を売るので価格が下がるよ。",q:"みんなが 将来 不安だと 思うと 株は？",o:["上がる","下がる","変わらない"],a:1},
+  {id:"t19",cat:"社会・経済",emoji:"🌍",title:"世界の経済はつながっている",body:"アメリカで不景気が起きると日本の株も下がる。世界の経済はインターネット同様つながっているんだよ。",q:"アメリカの 不景気は 日本の株に？",o:["関係 ない","えいきょう する","良く する"],a:1},
+  {id:"t20",cat:"社会・経済",emoji:"🏭",title:"モノの値段が決まる仕組み",body:"「需要（欲しい人）」と「供給（売りたい量）」のバランスで価格が決まる。欲しい人が多いほど高くなるよ。",q:"ものの ねだんは 何で 決まる？",o:["需要と 供給","じゃんけん","お店の 気分"],a:0},
+  {id:"t21",cat:"社会・経済",emoji:"🤖",title:"AIと仕事の未来",body:"AIの発展で一部の仕事はなくなる。でも新しい仕事も生まれる。大切なのは「考える力」と「学び続ける力」だよ。",q:"AI時代に 大切なのは？",o:["考える力・学び続ける力","何も しない こと","暗記 だけ"],a:0},
+  {id:"t22",cat:"社会・経済",emoji:"♻",title:"ESG投資ってなに？",body:"環境(E)・社会(S)・企業統治(G)に配慮した企業に投資すること。地球にいい企業を応援しながら増やせるよ。",q:"ESG投資が 大切に するのは？",o:["環境や 社会","スピード だけ","見た目 だけ"],a:0},
+  {id:"t23",cat:"社会・経済",emoji:"📱",title:"デジタルマネーの時代",body:"PayPayやクレカで現金を使わない人が増えている。便利な反面、使いすぎに気づきにくいので注意が必要だよ。",q:"キャッシュレスの 注意点は？",o:["使いすぎに 気づきにくい","重くて 持てない","すぐ さびる"],a:0},
+  {id:"t24",cat:"働くこと",emoji:"💼",title:"給料ってどう決まる？",body:"スキル・経験・業界・会社の規模などで変わる。同じ仕事でも会社によって全然違うことも。副業も増えているよ。",q:"給料は 同じ仕事でも？",o:["会社で ちがう","ぜんぶ 同じ","くじで 決まる"],a:0},
+  {id:"t25",cat:"働くこと",emoji:"🌱",title:"お手伝いは社会の練習",body:"お手伝いは実はすごく大事。責任感・計画性・達成感を学べる。これが将来の仕事への基礎になるよ！",q:"お手伝いで 学べる ことは？",o:["責任感や 計画性","運の よさ だけ","なにも ない"],a:0},
+  {id:"t26",cat:"働くこと",emoji:"🤝",title:"価値を作るとお金になる",body:"人が「欲しい・助かる」と思うものを作ったり、サービスを提供したりすることで対価（お金）がもらえるよ。",q:"お金が もらえるのは どんな とき？",o:["人の 役に 立つものを 作る","ただ ねがう","じっと まつ"],a:0},
+  {id:"t27",cat:"働くこと",emoji:"📚",title:"勉強がお金につながる理由",body:"知識・スキルは「人的資本」。勉強に使うお金は投資と同じ。学べば学ぶほど将来稼げる可能性が上がるよ。",q:"勉強は 何に つながる？",o:["将来 かせぐ 力","むだ づかい","ただの 運"],a:0},
+  {id:"t28",cat:"Tane Money",emoji:"🌱",title:"Tane Moneyのコンセプト",body:"「お金は種」。種を蒔いて育てるように、小さなお手伝いの積み重ねが大きな力になる。毎日コツコツが一番！",q:"Tane Moneyの 考えは？",o:["お金は 種、コツコツ 育てる","一発 大もうけ","運 だめし"],a:0},
+  {id:"t29",cat:"Tane Money",emoji:"🏆",title:"ランキングで成長できる理由",body:"家族でランキングを競うことで「やる気」が生まれる。競争ではなく「昨日の自分より成長する」ことが大切。",q:"ランキングで 大切なのは？",o:["昨日の 自分より 成長","1位 いがいは だめ","人を ばかに する"],a:0},
+  {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャと上手につきあう",body:"ガチャは「確率」の体験。レアが出るかはランダムで、たくさん引いても必ず当たるわけじゃない。お金は計画的に使い、貯金やコツコツの積み重ねが一番たしかな力になるよ。",q:"ガチャと 上手に つきあうには？",o:["お金は 計画的に、コツコツが 一番","全部 つぎこむ","借金して 引く"],a:0},
 ];
 
 function TipsSection({ageMode,child,data,update}){
@@ -8066,6 +8070,19 @@ function TipsSection({ageMode,child,data,update}){
   const [openId,setOpenId]=useState(null);
   const readIds=(data.tipsRead||{})[child.id]||[];
   const TIP_PTS=5;
+  const QUIZ_EXP=5;
+  const quizDone=(data.tipsQuiz||{})[child.id]||[];   // クイズ正解済みのtip id
+  const [quizPick,setQuizPick]=useState({});          // tipId -> えらんだ選択肢index(セッション中)
+  // クイズに正解(初回のみ): モンスターにEXP=お金の知識→ゲームの成長を直結
+  const answerQuiz=(tip,idx)=>{
+    setQuizPick(p=>({...p,[tip.id]:idx}));
+    if(idx===tip.a && !quizDone.includes(tip.id)){
+      update(d=>({...d,
+        tipsQuiz:{...(d.tipsQuiz||{}),[child.id]:[...((d.tipsQuiz?.[child.id])||[]),tip.id]},
+        monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+QUIZ_EXP}
+      }));
+    }
+  };
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
   const cats=["すべて",...Array.from(new Set(ALL_TIPS.map(t=>t.cat)))];
   const filtered=ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
@@ -8084,6 +8101,10 @@ function TipsSection({ageMode,child,data,update}){
       <div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
         <div style={{fontWeight:900,fontSize:14,color:GP}}>{totalRead}<span style={{fontSize:11,color:TEXTS}}>/{ALL_TIPS.length}</span></div>
         <div style={{fontSize:11,color:TEXTS}}>読了</div>
+      </div>
+      <div style={{background:PS,border:`1.5px solid ${P}`,borderRadius:12,padding:"4px 10px",textAlign:"center"}}>
+        <div style={{fontWeight:900,fontSize:14,color:P}}>{quizDone.filter(id=>ALL_TIPS.find(t=>t.id===id)).length}<span style={{fontSize:11,color:TEXTS}}>/{ALL_TIPS.length}</span></div>
+        <div style={{fontSize:11,color:TEXTS}}>クイズ正解</div>
       </div>
     </div>
     <div style={{background:GOLDS,border:`1.5px solid ${Y}`,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -8111,6 +8132,40 @@ function TipsSection({ageMode,child,data,update}){
         {isOpen&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${B}30`,fontSize:13,color:TEXT,lineHeight:1.8,fontWeight:500}}>
           {tip.body}
           {!isRead&&<div style={{marginTop:8,background:`${G}15`,border:`1px solid ${G}`,borderRadius:8,padding:"6px 10px",display:"inline-block",fontSize:12,color:G,fontWeight:700}}>🎉 +{TIP_PTS}pt ゲット！</div>}
+          {/* 💡→🎮 再接続: 読んだあとのミニクイズ。正解でモンスターにEXP */}
+          {tip.q&&(()=>{
+            const mastered=quizDone.includes(tip.id);
+            const picked=quizPick[tip.id];
+            const reveal=mastered||picked!=null;
+            return (
+              <div onClick={e=>e.stopPropagation()} style={{marginTop:12,background:CARDS,border:`1px solid ${BORDER}`,borderRadius:12,padding:"11px 12px"}}>
+                <div style={{fontSize:12.5,fontWeight:800,color:TEXT,marginBottom:9}}>🧠 クイズ：{tip.q}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {tip.o.map((opt,i)=>{
+                    const isCorrect=i===tip.a, isPicked=picked===i;
+                    let bg=CARD,bd=BORDER,col=TEXT;
+                    if(reveal&&isCorrect){bg=GS;bd=G;col=GP;}
+                    else if(reveal&&isPicked&&!isCorrect){bg=RS;bd=R;col=R;}
+                    return (
+                      <div key={i} role="button" onClick={e=>{e.stopPropagation(); if(!mastered) answerQuiz(tip,i);}}
+                        style={{display:"flex",alignItems:"center",gap:8,background:bg,border:`1.5px solid ${bd}`,borderRadius:10,padding:"9px 11px",cursor:mastered?"default":"pointer",fontFamily:F}}>
+                        <span style={{flex:1,fontSize:12.5,fontWeight:700,color:col}}>{opt}</span>
+                        {reveal&&isCorrect&&<span style={{fontSize:14}}>⭕</span>}
+                        {reveal&&isPicked&&!isCorrect&&<span style={{fontSize:14}}>❌</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {mastered
+                  ? <div style={{marginTop:9,fontSize:12,color:GP,fontWeight:800}}>✓ せいかい！ モンスターに +{QUIZ_EXP}EXP（かくとくずみ）</div>
+                  : picked!=null
+                  ? (picked===tip.a
+                      ? <div style={{marginTop:9,fontSize:12,color:GP,fontWeight:800}}>✨ せいかい！ モンスターに +{QUIZ_EXP}EXP！</div>
+                      : <div style={{marginTop:9,fontSize:12,color:R,fontWeight:700}}>ざんねん！ もう一度 本文を 読んで えらんでみよう</div>)
+                  : <div style={{marginTop:9,fontSize:11,color:MUTED,fontWeight:600}}>正解すると モンスターに EXPが もらえるよ</div>}
+              </div>
+            );
+          })()}
         </div>}
       </button>);
     })}
