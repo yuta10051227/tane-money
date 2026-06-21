@@ -4116,6 +4116,42 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── 図鑑セクション ── */}
+      {/* 📊 今週のまとめ(稼ぐ/使う/貯める＝お金の学びの振り返り) */}
+      {effectiveTab==="more" && (()=>{
+        const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
+        const wl=myLogs.filter(l=>(l.date||"")>=wkAgo);
+        const earned=wl.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
+        const spent=wl.filter(l=>l.pts<0).reduce((s,l)=>s-l.pts,0);
+        const choreCount=wl.filter(l=>l.type==="good"||l.type==="daily").length;
+        const net=earned-spent;
+        return (
+          <div style={{padding:"4px 16px 0"}}>
+            <div style={{background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:16,padding:"13px 15px",marginBottom:8}}>
+              <div style={{fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.85)":TEXT,marginBottom:10}}>📊 今週のまとめ（7日間）</div>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <div style={{flex:1,textAlign:"center",background:darkBG?"rgba(52,199,123,0.12)":GS,borderRadius:12,padding:"8px 4px"}}>
+                  <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":TEXTS,fontWeight:700}}>かせいだ</div>
+                  <div style={{fontSize:17,fontWeight:900,color:G}}>+{earned.toLocaleString()}</div>
+                </div>
+                <div style={{flex:1,textAlign:"center",background:darkBG?"rgba(217,92,85,0.12)":RS,borderRadius:12,padding:"8px 4px"}}>
+                  <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":TEXTS,fontWeight:700}}>つかった</div>
+                  <div style={{fontSize:17,fontWeight:900,color:R}}>-{spent.toLocaleString()}</div>
+                </div>
+                <div style={{flex:1,textAlign:"center",background:darkBG?"rgba(74,158,255,0.12)":BS,borderRadius:12,padding:"8px 4px"}}>
+                  <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":TEXTS,fontWeight:700}}>のこり残高</div>
+                  <div style={{fontSize:17,fontWeight:900,color:B}}>{myBal.toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-around",fontSize:11,color:darkBG?"rgba(255,255,255,0.6)":TEXTS,fontWeight:700}}>
+                <span>🧹 お手伝い {choreCount}回</span>
+                <span>💰 今週ためた {net>=0?"+":""}{net.toLocaleString()}pt</span>
+              </div>
+              {earned>0 && <div style={{marginTop:8,fontSize:11,color:darkBG?"rgba(255,255,255,0.5)":MUTED,textAlign:"center"}}>{spent<=earned*0.3?"よく がまんして ためたね！🌱":spent>=earned*0.8?"つかいすぎ かも？ためる練習もしよう🐷":"いいバランス！👍"}</div>}
+            </div>
+          </div>
+        );
+      })()}
+
       {effectiveTab==="more" && (
         <div style={{padding:"0 16px 0"}}>
           <div onClick={()=>setMoreOpen(o=>o==="zukan"?null:"zukan")}
