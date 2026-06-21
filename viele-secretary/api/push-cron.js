@@ -16,26 +16,32 @@
 import webpush from "web-push";
 import { initAdmin } from "./_admin.js";
 import { FieldValue } from "firebase-admin/firestore";
+import { dayEnergy, koyomi } from "../src/natal.js";
 
 // ── JST 基準の「今日0時」を返すユーティリティ ──────────────────────────
-// cron は UTC で走るため、JST(UTC+9) の当日0時を明示的に計算する。
-// これにより日付判定がサーバーのタイムゾーン設定に依存しない。
 function todayJST() {
   const nowUTC = Date.now();
   const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-  // JST での「今日0時」の UTC ミリ秒
   const jstNowMs = nowUTC + JST_OFFSET_MS;
   const jstTodayMs = jstNowMs - (jstNowMs % (24 * 60 * 60 * 1000));
-  return new Date(jstTodayMs - JST_OFFSET_MS); // UTC に戻す
+  return new Date(jstTodayMs - JST_OFFSET_MS);
 }
 
-// "YYYY-MM-DD" → JST 当日0時の Date（文字列比較用）
+// 今日の "YYYY-MM-DD"（JST）
+function todayJSTiso() {
+  const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const y = jstNow.getUTCFullYear();
+  const m = String(jstNow.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(jstNow.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// "YYYY-MM-DD" → JST 当日0時の Date
 function parseISOasJST(dateISO) {
-  // "2025-06-10" のような文字列は JST 0時として扱う
   const [y, m, d] = (dateISO || "").split("-").map(Number);
   if (!y || !m || !d) return null;
   const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-  return new Date(Date.UTC(y, m - 1, d) - JST_OFFSET_MS); // JST 0:00 を UTC に変換
+  return new Date(Date.UTC(y, m - 1, d) - JST_OFFSET_MS);
 }
 
 // JST 基準の経過日数（正=未来、負=過去）
@@ -50,57 +56,130 @@ function daysUntilJST(dateISO) {
 function addDaysISO(dateISO, n) {
   const d = parseISOasJST(dateISO);
   if (!d) return dateISO;
-  d.setUTCDate(d.getUTCDate() + n + 9); // UTC+9 補正
-  // JST 日付として取り出す
-  const jstMs = d.getTime() + 9 * 60 * 60 * 1000;
+  const jstMs = d.getTime() + (n + 9) * 60 * 60 * 1000;
   const jstDate = new Date(jstMs);
   const y = jstDate.getUTCFullYear();
-  const m = String(jstDate.getUTCMonth() + 1).padStart(2, "0");
+  const mo = String(jstDate.getUTCMonth() + 1).padStart(2, "0");
   const day = String(jstDate.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${y}-${mo}-${day}`;
 }
 
 // ── computeAlerts 相当（サーバーサイド版・JST 基準）─────────────────────
 function computeServerAlerts(data) {
   let late = 0;
   let soon = 0;
+  let tomorrow = []; // 明日締切のタイトル
 
-  // trips[].items[] の締切チェック（手配チェックリスト）
   (data.trips || []).forEach((t) => {
     (t.items || []).forEach((it) => {
       if (it.done) return;
       const deadlineISO = addDaysISO(t.date, -(it.daysBefore || 0));
       const diff = daysUntilJST(deadlineISO);
-      if (diff < 0) {
-        late += 1;
-      } else if (diff <= 3) {
-        soon += 1;
-      }
+      if (diff < 0) late += 1;
+      else if (diff <= 3) soon += 1;
+      if (diff === 1) tomorrow.push(it.label || t.title || "手配");
     });
   });
 
-  // deadlines[] の締切チェック
   (data.deadlines || []).forEach((d) => {
     const diff = daysUntilJST(d.date);
-    // late: 過去、soon: 0〜7日以内
-    if (diff < 0) {
-      late += 1;
-    } else if (diff <= 7) {
-      soon += 1;
-    }
+    if (diff < 0) late += 1;
+    else if (diff <= 7) soon += 1;
+    if (diff === 1) tomorrow.push(d.title || "締切");
   });
 
-  // tasks[] の未完了件数
   const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
 
-  return { late, soon, pendingTasks };
+  return { late, soon, pendingTasks, tomorrow };
 }
 
-// ── web-push 初期化（リクエストごとに idempotent に設定）──────────────
+// ── スタンス絵文字 ────────────────────────────────────────────────────
+const STANCE_EMOJI = { 攻め: "⚔️", 守り: "🛡️", 整える: "🌿", 労い: "💛" };
+
+// ── ユーザー1件分のプッシュペイロードを組み立てる ─────────────────────
+function buildPayload(data, todayISO) {
+  const lastSeen = data.lastSeen || 0;
+  const msSinceLastSeen = Date.now() - lastSeen;
+  const daysSinceSeen = msSinceLastSeen / 86400000;
+
+  // ── 再エンゲージ（3日以上アクセスなし）───────────────────────────────
+  if (lastSeen > 0 && daysSinceSeen >= 3) {
+    const days = Math.floor(daysSinceSeen);
+    return {
+      title: "ひとり秘書｜最近どう？",
+      body: `${days}日ぶりだね。今日の予定、一緒に確認しよ。`,
+      url: "/",
+      tag: "viele-reengagement",
+    };
+  }
+
+  // ── 今日のスタンスを計算 ─────────────────────────────────────────────
+  let stanceLabel = "";
+  let focusText = "";
+  let koyomiEmoji = "";
+  const birth = data.birth;
+  if (birth && birth.date) {
+    try {
+      const energy = dayEnergy(birth, todayISO);
+      stanceLabel = energy.today.stance;
+      focusText = energy.today.focus;
+    } catch { /* birth データが不正な場合は無視 */ }
+    try {
+      const k = koyomi(todayISO);
+      const good = (k.labels || []).filter((l) => l.good);
+      if (good.length > 0) koyomiEmoji = good.map((l) => l.emoji).join("");
+    } catch { /* 暦計算エラーは無視 */ }
+  }
+
+  const { late, soon, pendingTasks, tomorrow } = computeServerAlerts(data);
+  const totalAlerts = late + soon + pendingTasks;
+
+  // ── 明日締切の専用メッセージ（最優先）───────────────────────────────
+  if (tomorrow.length > 0) {
+    const names = tomorrow.slice(0, 2).join("・");
+    const suffix = tomorrow.length > 2 ? `ほか${tomorrow.length - 2}件` : "";
+    return {
+      title: "ひとり秘書｜明日締切だよ",
+      body: `「${names}${suffix}」の締切が明日。今日中に確認しておこ。`,
+      url: "/",
+      tag: "viele-tomorrow",
+    };
+  }
+
+  // ── アラートあり ──────────────────────────────────────────────────────
+  if (totalAlerts > 0) {
+    const emoji = STANCE_EMOJI[stanceLabel] || "📋";
+    const stancePart = stanceLabel ? `${emoji}今日は${stanceLabel}の日。` : "";
+    const alertPart = `遅れ${late}・もうすぐ${soon}・タスク${pendingTasks}件ある。`;
+    return {
+      title: `ひとり秘書｜おはよう${koyomiEmoji}`,
+      body: stancePart + alertPart,
+      url: "/",
+      tag: "viele-push",
+      renotify: true,
+    };
+  }
+
+  // ── アラートなし・スタンスのみ ────────────────────────────────────────
+  if (stanceLabel) {
+    const emoji = STANCE_EMOJI[stanceLabel] || "🌅";
+    return {
+      title: `ひとり秘書｜おはよう${koyomiEmoji}`,
+      body: `${emoji}今日は${stanceLabel}の日。${focusText}`,
+      url: "/",
+      tag: "viele-push",
+    };
+  }
+
+  // 生年月日未設定かつアラートなし → 送信しない
+  return null;
+}
+
+// ── web-push 初期化 ──────────────────────────────────────────────────
 function setupWebPush() {
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT; // "mailto:you@example.com"
+  const subject = process.env.VAPID_SUBJECT;
 
   if (!publicKey || !privateKey || !subject) {
     throw new Error(
@@ -113,7 +192,6 @@ function setupWebPush() {
 
 // ── メインハンドラ ───────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // ── 認証チェック（CRON_SECRET は必須。未設定なら誰でも全ユーザーへ送信できてしまうため停止）──
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return res.status(500).json({ error: "CRON_SECRET 未設定（Vercel環境変数に設定してください）" });
@@ -123,7 +201,6 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  // GET / POST 以外は弾く
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
@@ -131,8 +208,8 @@ export default async function handler(req, res) {
   try {
     setupWebPush();
     const db = initAdmin();
+    const todayISO = todayJSTiso();
 
-    // users コレクション全件取得
     const snapshot = await db.collection("users").get();
 
     let sent = 0;
@@ -145,34 +222,23 @@ export default async function handler(req, res) {
         const data = docSnap.data();
         const pushSub = data.pushSub;
 
-        // pushSub が無いユーザーはスキップ
         if (!pushSub || !pushSub.endpoint) {
           skipped += 1;
           return;
         }
 
-        const { late, soon, pendingTasks } = computeServerAlerts(data);
-        const remaining = late + soon + pendingTasks;
-
-        // 要対応がゼロなら通知しない
-        if (remaining === 0) {
+        const payload = buildPayload(data, todayISO);
+        if (!payload) {
           skipped += 1;
           return;
         }
 
-        const payload = JSON.stringify({
-          title: `ひとり秘書｜今日の残り ${remaining}件`,
-          body: `遅れ${late}・もうすぐ${soon}・タスク${pendingTasks}`,
-          url: "/",
-        });
-
         try {
-          await webpush.sendNotification(pushSub, payload);
+          await webpush.sendNotification(pushSub, JSON.stringify(payload));
           sent += 1;
         } catch (err) {
           const statusCode = err && err.statusCode;
           if (statusCode === 404 || statusCode === 410) {
-            // 購読が失効 → Firestore から pushSub を削除
             expired += 1;
             try {
               await db
@@ -197,6 +263,7 @@ export default async function handler(req, res) {
       skipped,
       expired,
       errors,
+      todayISO,
       runAt: new Date().toISOString(),
     });
   } catch (err) {

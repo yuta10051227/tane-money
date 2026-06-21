@@ -4772,16 +4772,24 @@ export default function App() {
     if (notifiedRef.current || !notify || !data) return;
     if (!notifySupported || Notification.permission !== "granted") return;
     const { late, soon } = computeAlerts(data);
-    if (late.length + soon.length > 0) {
-      try {
-        new Notification("ひとり秘書｜今日の確認です", {
-          body: `遅れ ${late.length}件・もうすぐ ${soon.length}件`,
-          icon: "/icon-512.png",
-        });
-      } catch { /* iOS等はnew Notification不可。無視 */ }
-    }
+    try {
+      const alertBody = late.length + soon.length > 0 ? `遅れ${late.length}件・もうすぐ${soon.length}件` : "今日も一緒に確認しよ";
+      new Notification("ひとり秘書｜おはよう", {
+        body: alertBody,
+        icon: "/icon-512.png",
+      });
+    } catch { /* iOS等はnew Notification不可。無視 */ }
     notifiedRef.current = true;
   }, [notify, data, notifySupported]);
+
+  // lastSeen を Firestore に記録（バックグラウンド通知の再エンゲージ判定用）
+  const lastSeenSavedRef = useRef(false);
+  useEffect(() => {
+    if (!data || !update || !firebaseEnabled || lastSeenSavedRef.current) return;
+    lastSeenSavedRef.current = true;
+    const prev = data.lastSeen || 0;
+    if (Date.now() - prev > 60 * 60 * 1000) update({ lastSeen: Date.now() });
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 今日のまとめ（ニュース）取得 ──
   const newsCats = data ? (data.newsCats || DEFAULT_NEWS_CATS) : DEFAULT_NEWS_CATS;
