@@ -5948,6 +5948,36 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
         );
       })()}
 
+      {/* 📊 家族の今週まとめ：子ごとに 稼ぐ/使う/お手伝い回数 */}
+      {data.children&&data.children.length>0 && (()=>{
+        const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
+        return (
+          <div style={{padding:"0 20px",marginBottom:18}}>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+                <span style={{fontSize:11,fontWeight:800,color:MUTED,letterSpacing:.5}}>📊 今週のまとめ（7日間）</span>
+                <span style={{fontSize:10,color:MUTED}}>かせいだ・つかった・🧹回数</span>
+              </div>
+              {data.children.map((c,idx)=>{
+                const wl=(data.logs||[]).filter(l=>l.cid===c.id&&(l.date||"")>=wkAgo);
+                const earned=wl.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
+                const spent=wl.filter(l=>l.pts<0).reduce((s,l)=>s-l.pts,0);
+                const chores=wl.filter(l=>l.type==="good"||l.type==="daily").length;
+                return (
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:idx===0?"none":`1px solid ${BORDER}`}}>
+                    <ChildAvatar child={c} size={30}/>
+                    <span style={{flex:1,fontSize:13,fontWeight:700,color:TEXT,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
+                    <span style={{fontSize:12,color:G,fontWeight:900,minWidth:54,textAlign:"right"}}>+{earned.toLocaleString()}</span>
+                    <span style={{fontSize:12,color:R,fontWeight:900,minWidth:48,textAlign:"right"}}>-{spent.toLocaleString()}</span>
+                    <span style={{fontSize:12,color:MUTED,fontWeight:800,minWidth:30,textAlign:"right"}}>🧹{chores}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{padding:"0 20px"}}>
         {/* 子ども */}
         <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>おこさま</div>
