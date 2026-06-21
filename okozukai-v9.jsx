@@ -329,6 +329,8 @@ function startRealtimeSync(updateFn){
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
             if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
+            // darkEgg(ヤミノオウの卵): お世話度は多い方を採用＝同期巻き戻しで育成が消えない
+            if(prev.darkEgg){merged.darkEgg={...(merged.darkEgg||{})};Object.keys(prev.darkEgg).forEach(cid=>{const p=prev.darkEgg[cid]||{},m=merged.darkEgg[cid]||{};merged.darkEgg[cid]=((p.care||0)>=(m.care||0))?p:m;});}
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
             if(_processedApprovalIds.size>0){
               merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
@@ -658,7 +660,31 @@ const HIDDEN_MONSTERS = [
   { id:"ogon",   name:"オウゴンリュウ", rarity:5, need:280,
     desc:"全身が黄金にかがやく伝説の竜。富をもたらす王者。",
     edu:"金は世界中で大むかしから、価値が変わりにくい『お金』として使われた。さびず輝きが続くので、宝物や硬貨になった。" },
+  // ── 特別: ヤミノオウの卵から育てる(ボス撃破で稀にドロップ)。task数では解放されない(special) ──
+  { id:"gs_yami", name:"ヤミノオウ", rarity:5, need:99999, special:"darkEgg", sprite:"yami",
+    desc:"お世話で 闇の力を 光に変え、王として めざめた すがた。じぶんだけの ヤミノオウ。",
+    edu:"つづける力が いちばん つよい。毎日の 小さな お世話の つみ重ねが、伝説の王を 育てあげた。" },
 ];
+
+// ── ヤミノオウの卵: ボス撃破で稀にドロップ→お世話で育て、ヤミノオウに最終進化する特別モンスター ──
+const DARK_EGG_MAX = 8;  // お世話この回数でヤミノオウに最終進化(=スキン解放)
+const DARK_EGG_STAGES = [
+  { min:0, name:"ヤミノタマゴ", emoji:"🥚", sprite:"yamiegg",
+    desc:"ヤミノオウが のこした なぞの たまご。あたたかく お世話して 育てよう。",
+    edu:"小さな たまごも、毎日 お世話を つみ重ねると 大きく育つ。お金も おなじで、コツコツが力になる。" },
+  { min:3, name:"ヤミノコ", emoji:"🐲", sprite:"yamibaby",
+    desc:"たまごから かえった 闇の子竜。まだ 力は よわいけど、すくすく 育っている。",
+    edu:"育てはじめは ゆっくり。あせらず 続けることが、大きな成長への 近道だよ。" },
+  { min:DARK_EGG_MAX, name:"ヤミノオウ", emoji:"👑", sprite:"yami",
+    desc:"お世話で 闇の力を 光に変え、王として めざめた すがた！",
+    edu:"つづける力が いちばん つよい。毎日の 小さな お世話が、伝説の王を 育てあげた。" },
+];
+const darkEggStage = (care)=>{ let s=DARK_EGG_STAGES[0]; for(const st of DARK_EGG_STAGES){ if((care||0)>=st.min) s=st; } return s; };
+// 隠しモンスターの解放判定(special=darkEggは卵の育成度、それ以外はタスク累計)
+function hiddenUnlocked(h, data, child, totalDone){
+  if(h.special==="darkEgg") return ((data.darkEgg?.[child.id]?.care||0) >= DARK_EGG_MAX);
+  return totalDone >= h.need;
+}
 
 // ═══════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════
@@ -1814,12 +1840,16 @@ function BattleModal({child,data,update,onClose}){
     const curFrag=(data.battleFragments||{})[child.id]||0;
     const converted=canFrag && (curFrag+1>=5);  // 表示用(WIN演出)。実際の書き込みはupdate内でdから再計算
     if(r==="win") setReward(canFrag?(converted?"ticket":"fragment"):"none");
-    // たまのドロップ(勝利時): 回復アイテム or まだ持ってない装備
+    // たまのドロップ(勝利時): ヤミノオウ撃破で稀に「ヤミノタマゴ」/ それ以外は回復アイテムor装備
     let dropInfo=null;
     if(r==="win"){
-      const roll=Math.random();
-      if(roll<0.12) dropInfo={kind:"potion"};
-      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.premium && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+      if(opp.boss && !(data.darkEgg?.[child.id]) && Math.random()<0.15){
+        dropInfo={kind:"egg"};   // ヤミノオウの卵(育てると自分だけのヤミノオウに)
+      } else {
+        const roll=Math.random();
+        if(roll<0.12) dropInfo={kind:"potion"};
+        else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.premium && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+      }
     }
     if(dropInfo) setDrop(dropInfo);
     update(d=>{ const nd={...d};
@@ -1832,6 +1862,7 @@ function BattleModal({child,data,update,onClose}){
       }
       if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
+      if(dropInfo?.kind==="egg" && !(d.darkEgg?.[child.id])){ nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}}; }
       // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
       if(r==="win"){
         const dFragDateOk=(d.battleFragDate||{})[child.id]===today;
@@ -1947,6 +1978,7 @@ function BattleModal({child,data,update,onClose}){
               {reward==="none"&&<div style={{marginTop:8,fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",zIndex:2,textShadow:"0 2px 8px #000"}}>このモンスターの かけらは きょうGET済み（EXPはGET！）</div>}
               {drop?.kind==="potion"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#bff0c8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>💊 かいふくアイテムを 見つけた！</div>}
               {drop?.kind==="equip"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#ffd9a8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🎁 そうび「{drop.e}{drop.name}」を 見つけた！</div>}
+              {drop?.kind==="egg"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#e0c7ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🥚 ヤミノオウの タマゴを 見つけた！お世話で 育てよう</div>}
             </div>
           )}
           {result==="lose"&&(
@@ -1997,6 +2029,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n21", e:"🥚", t:"ヤミノオウのタマゴ 登場！", b:"バトルで「ヤミノオウ」を倒すと、まれに🥚タマゴをドロップ！「記録」タブからお世話して育てると、ヤミノタマゴ→ヤミノコ→じぶんだけの👑ヤミノオウに最終進化するよ。育てきると「ひみつのなかま」で すがたにできる。毎日コツコツお世話するのが ポイント！"},
   {id:"n20", e:"✨", t:"こまかい使いやすさ改善！", b:"・ガチャの近くに「きょうのお手伝い数」を表示＝先にお手伝いするとタネがもっと元気に🌱 ・暗い画面の文字を見やすく（コントラスト改善）・記録の「取り消し」はまちがい防止で2タップ確認に・プレミア装備は一度 解放したら、貯金を使っても外れません・バトルのかけら計算など こまかいバグを修正しました。"},
   {id:"n19", e:"💎", t:"プレミア装備が貯金で手に入る！", b:"これまで「近日登場」だったプレミア装備が、貯金や目標達成で解放できるようになったよ！「⚡いかずちの剣」=貯金500pt、「🐉りゅうおうの剣」=目標3回達成、「💎ダイヤのよろい」=貯金1000pt、「🌈にじのオーラ」=目標5回達成。コツコツ貯めるほど 最強そうびに近づくよ。あと、毎日ミッションの「ガチャ」が「まめちしき」に変わって、お金の勉強でEXPがもらえるようになりました。"},
   {id:"n18", e:"📈", t:"投資が やさしくなった！", b:"株の手数料を10%→2%、為替を往復4%→1%に下げました。さらに「長く持つほどボーナスUP（7日1%・30日2%・90日3%・週1回）」に。すぐ売ると損、コツコツ長期で持つと増える＝本物の投資の考え方を体験できるよ。損益は『今売ったら戻るpt』で正直に表示。"},
@@ -4307,6 +4340,41 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
+      {/* ── 🥚 ヤミノオウのタマゴ(ボス撃破ドロップ・お世話で育てて最終進化) ── */}
+      {effectiveTab==="more" && data.darkEgg?.[child.id] && (()=>{
+        const eg=data.darkEgg[child.id]; const care=eg.care||0; const st=darkEggStage(care);
+        const isFinal=care>=DARK_EGG_MAX; const tISO=todayISO(); const fedToday=eg.last===tISO;
+        const nextMin=DARK_EGG_STAGES.find(s=>s.min>care)?.min ?? DARK_EGG_MAX;
+        const feed=()=>{ if(fedToday||isFinal)return; update(d=>{ const e=d.darkEgg?.[child.id]||{care:0}; return {...d, darkEgg:{...(d.darkEgg||{}),[child.id]:{care:(e.care||0)+1,last:tISO}}}; }); };
+        return (
+          <div style={{padding:"0 16px 8px"}}>
+            <div style={{background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:`1.5px solid ${isFinal?"#e8b83e":"#7b61c9"}`,borderRadius:16,padding:"13px 15px",color:"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{position:"relative",width:56,height:56,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <img src={`/assets/gacha_gs_${st.sprite}_a.png`} alt="" style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}}
+                    onError={e=>{e.target.style.display="none";const s=e.target.nextSibling;if(s)s.style.display="flex";}}/>
+                  <span style={{display:"none",position:"absolute",inset:0,alignItems:"center",justifyContent:"center",fontSize:38}}>{st.emoji}</span>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontWeight:900,fontSize:15}}>{st.emoji} {st.name}</span>
+                    {isFinal&&<span style={{fontSize:9,fontWeight:900,color:"#2a1f4a",background:"#e8b83e",borderRadius:5,padding:"1px 5px"}}>かんせい</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2,lineHeight:1.5}}>{st.desc}</div>
+                  <div style={{height:8,borderRadius:999,background:"rgba(255,255,255,0.15)",overflow:"hidden",marginTop:7}}>
+                    <div style={{height:"100%",width:`${Math.min(100,Math.round(care/DARK_EGG_MAX*100))}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .4s"}}/>
+                  </div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginTop:3}}>お世話 {care}/{DARK_EGG_MAX}{!isFinal&&` ・ つぎの すがたまで あと${nextMin-care}`}</div>
+                </div>
+              </div>
+              {isFinal
+                ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
+                : <button onClick={feed} disabled={fedToday} style={{marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── ひみつのなかま(隠しモンスター) ── */}
       {effectiveTab==="more" && (
         <div style={{padding:"0 16px 8px"}}>
@@ -4318,7 +4386,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:11,color:MUTED,fontWeight:700}}>
-                {HIDDEN_MONSTERS.filter(h=>h.need<=totalDoneMon).length}/{HIDDEN_MONSTERS.length}
+                {HIDDEN_MONSTERS.filter(h=>hiddenUnlocked(h,data,child,totalDoneMon)).length}/{HIDDEN_MONSTERS.length}
               </span>
               <span style={{fontSize:11,color:MUTED}}>{moreOpen==="hidden"?"▲":"▼"}</span>
             </div>
@@ -4328,7 +4396,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{fontSize:11,color:MUTED,marginBottom:8,lineHeight:1.5}}>たくさんクリアすると解放！タップで「すがた」を変えられるよ。</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
                 {HIDDEN_MONSTERS.map(h=>{
-                  const unlocked=h.need<=totalDoneMon;
+                  const unlocked=hiddenUnlocked(h,data,child,totalDoneMon);
                   const equipped=(data.monsterSkin||{})[child.id]===h.id;
                   return (
                     <div key={h.id}
@@ -4347,7 +4415,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       </div>
                       <div style={{fontSize:11,color:GOLD,fontWeight:700}}>{"★".repeat(h.rarity)}</div>
                       {!unlocked
-                        ? <div style={{fontSize:11,color:MUTED,fontWeight:700}}>🔒 あと{h.need-totalDoneMon}回</div>
+                        ? <div style={{fontSize:11,color:MUTED,fontWeight:700}}>{h.special==="darkEgg"?"🔒 たまごを育てて":`🔒 あと${h.need-totalDoneMon}回`}</div>
                         : equipped
                         ? <div style={{fontSize:11,color:GP,fontWeight:800}}>すがた中(タップで戻す)</div>
                         : <div style={{fontSize:11,color:MUTED}}>タップですがた変更</div>}
@@ -4356,7 +4424,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 })}
               </div>
               <style>{`@keyframes gsBlink{0%{opacity:1}49.9%{opacity:1}50%{opacity:0}99.9%{opacity:0}100%{opacity:1}}`}</style>
-              {(()=>{const eq=HIDDEN_MONSTERS.find(h=>h.need<=totalDoneMon && (data.monsterSkin||{})[child.id]===h.id);return eq?(
+              {(()=>{const eq=HIDDEN_MONSTERS.find(h=>hiddenUnlocked(h,data,child,totalDoneMon) && (data.monsterSkin||{})[child.id]===h.id);return eq?(
                 <div style={{marginTop:8,fontSize:11,color:TEXTS,lineHeight:1.6,background:CARDS,borderRadius:10,padding:"8px 10px"}}>
                   <div style={{fontWeight:800,color:TEXT,marginBottom:2}}>{eq.name}</div>
                   <div>{eq.desc}</div>
@@ -6533,7 +6601,7 @@ function SeedMonster({ child, data, size=90, update }) {
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
-  const skinActive     = !!(skinDef && totalTasksDone >= skinDef.need && child.displayMode !== "junior");
+  const skinActive     = !!(skinDef && hiddenUnlocked(skinDef,data,child,totalTasksDone) && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
   // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
   const isCat          = /^(cpurin|cku|cshi)_/.test(String(dispId));
