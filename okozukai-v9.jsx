@@ -305,6 +305,7 @@ function startRealtimeSync(updateFn){
             if(prev.equipUnlock){merged.equipUnlock={...(merged.equipUnlock||{})};Object.keys(prev.equipUnlock).forEach(cid=>{merged.equipUnlock[cid]=[...new Set([...(merged.equipUnlock[cid]||[]),...(prev.equipUnlock[cid]||[])])];});}
             if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
             if(prev.expedition) merged.expedition={...(merged.expedition||{}),...prev.expedition};
+            if(prev.taskExpDay) merged.taskExpDay={...(merged.taskExpDay||{}),...prev.taskExpDay};
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1637,6 +1638,16 @@ function careMon(d, cid, ratio, exp){
   if(exp){ nd={...nd, monsterExp:{...(nd.monsterExp||{}),[cid]:((nd.monsterExp||{})[cid]||0)+exp}}; }
   return nd;
 }
+const TASK_EXP_CAP = 300; // タスク由来EXPの1日上限(連打青天井の防止)
+// タスクEXP: HP回復＋EXP。ただし1日の上限あり(超過分は付与しない)
+function careCap(d, cid, ratio, rawExp){
+  let nd = ratio?healMon(d,cid,ratio):d;
+  const today=todayKey(); const te=(nd.taskExpDay||{})[cid];
+  const used=(te&&te.date===today)?(te.amt||0):0;
+  const grant=Math.max(0, Math.min(Math.round(rawExp), TASK_EXP_CAP-used));
+  if(grant>0){ nd={...nd, monsterExp:{...(nd.monsterExp||{}),[cid]:((nd.monsterExp||{})[cid]||0)+grant}, taskExpDay:{...(nd.taskExpDay||{}),[cid]:{date:today,amt:used+grant}}}; }
+  return nd;
+}
 function HPBar({label,hp,max,color}){
   const pct=Math.max(0,Math.round(hp/max*100));
   return (<div>
@@ -1926,6 +1937,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n17", e:"🆙", t:"レベルのバランス調整", b:"お手伝いのEXPは「同じタスクを連打すると だんだん減る・1日の上限あり」に調整しました。いろんなお手伝いを1回ずつやるのが いちばん効率よくレベルUP！"},
   {id:"n16", e:"⭐", t:"装備にレア度＆プレミア登場！", b:"そうびに レア度（N〜UR）がついたよ。強さとレア度は別！さらに「⚡いかずちの剣」「🐉りゅうおうの剣」「💎ダイヤのよろい」「🌈にじのオーラ」など プレミア装備が図鑑に追加（近日 手に入るように！）。あと、お手伝いでもらえるEXPが ポイント×1.5に！クリアするほど どんどんレベルUP。"},
   {id:"n15", e:"🎒", t:"そうびが2スロット＆図鑑に！", b:"「⚔ぶき」と「🛡たて」を2つ同時に装備できるように！そうびは図鑑になって、お手伝い・連続・バトル、そして“まれにドロップ”でも集まるよ。バトルで勝つと たまに💊回復アイテムや そうびが見つかる！HPはポイントでも回復できる。"},
   {id:"n14", e:"🗺", t:"旅先がえらべるように！", b:"とっくんの旅は「近くの森・海辺・山・遺跡・天空の島・まおうの城」から選べるよ。遠い旅先ほど 時間はかかるけどEXPがたくさん！レベルが上がると新しい旅先が解放。バトルも、強い敵ほど もらえるEXPが多い（選ぶ画面に表示）。"},
@@ -2126,7 +2138,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => careMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,Math.round(t.pts*1.5))));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts*1.5)));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -2138,7 +2150,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => careMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1,Math.round(t.pts*1.5))));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts*(nxt===1?1.5:nxt===2?0.6:0.2))));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -3139,7 +3151,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     } else {
       showFlash(pts, task.emoji);
       addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
-      if(pts>0) update(d=>careMon(d,child.id,0.25,Math.max(1,Math.round(pts*1.5))));  // お手伝いでHP回復＋EXP(pt×1.5)
+      if(pts>0){ const doneToday=(data.logs||[]).filter(l=>l.rid===task.id&&(l.date||"").startsWith(todayISO())).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; update(d=>careCap(d,child.id,0.25,Math.max(1,pts*factor))); }  // お手伝いEXP(初回pt×1.5・連打は逓減・日次上限)
     }
   };
 
