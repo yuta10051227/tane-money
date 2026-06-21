@@ -1561,26 +1561,31 @@ const WILD_MONSTERS = [
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
 const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
-// そうび(アイテム): ぶき＋たての2スロット。遊ぶ条件orドロップで解放→装備でステUP。お金は使わない
+// そうび(アイテム): ぶき＋たての2スロット。レア度(rarity)と強さは別。soon=プレミア(近日・まだ入手不可)
 const EQUIPMENT = [
   // ── ぶき(weapon)＝こうげき系 ──
-  {id:"eq_w_basic", slot:"weapon", name:"きほんのつるぎ", e:"🗡", atk:4, def:0, hp:0,  need:{k:"lv",v:1},     hint:"さいしょから"},
-  {id:"eq_w_fire",  slot:"weapon", name:"ほのおのつるぎ", e:"🔥", atk:7, def:0, hp:0,  need:{k:"streak",v:7}, hint:"7日れんぞくで"},
-  {id:"eq_w_brave", slot:"weapon", name:"ゆうきのつるぎ", e:"⚔", atk:11,def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で"},
-  {id:"eq_w_star",  slot:"weapon", name:"スターロッド",   e:"🌟", atk:8, def:0, hp:12, need:{k:"lv",v:12},    hint:"レベル12で"},
+  {id:"eq_w_basic", slot:"weapon", rarity:1, name:"きほんのつるぎ", e:"🗡", atk:4, def:0, hp:0,  need:{k:"lv",v:1},     hint:"さいしょから"},
+  {id:"eq_w_fire",  slot:"weapon", rarity:2, name:"ほのおのつるぎ", e:"🔥", atk:7, def:0, hp:0,  need:{k:"streak",v:7}, hint:"7日れんぞくで"},
+  {id:"eq_w_brave", slot:"weapon", rarity:3, name:"ゆうきのつるぎ", e:"⚔", atk:11,def:0, hp:0,  need:{k:"wins",v:5},   hint:"バトル5勝で"},
+  {id:"eq_w_star",  slot:"weapon", rarity:3, name:"スターロッド",   e:"🌟", atk:8, def:0, hp:12, need:{k:"lv",v:12},    hint:"レベル12で"},
+  {id:"eq_w_thunder",slot:"weapon",rarity:4, name:"いかずちの剣",   e:"⚡", atk:17,def:0, hp:0,  need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
+  {id:"eq_w_dragon", slot:"weapon",rarity:5, name:"りゅうおうの剣", e:"🐉", atk:23,def:0, hp:12, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
   // ── たて(shield)＝ぼうぎょ系 ──
-  {id:"eq_s_basic", slot:"shield", name:"きほんのたて",   e:"🔰", atk:0, def:4, hp:0,  need:{k:"tasks",v:10}, hint:"おてつだい10回で"},
-  {id:"eq_s_guard", slot:"shield", name:"まもりのたて",   e:"🛡", atk:0, def:9, hp:0,  need:{k:"tasks",v:40}, hint:"おてつだい40回で"},
-  {id:"eq_s_ribbon",slot:"shield", name:"げんきリボン",   e:"🎀", atk:0, def:2, hp:32, need:{k:"care",v:5},   hint:"なでなで5日で"},
-  {id:"eq_s_crown", slot:"shield", name:"おうじゃのかんむり",e:"👑",atk:0, def:7, hp:26, need:{k:"lv",v:15},    hint:"レベル15で"},
+  {id:"eq_s_basic", slot:"shield", rarity:1, name:"きほんのたて",   e:"🔰", atk:0, def:4, hp:0,  need:{k:"tasks",v:10}, hint:"おてつだい10回で"},
+  {id:"eq_s_guard", slot:"shield", rarity:2, name:"まもりのたて",   e:"🛡", atk:0, def:9, hp:0,  need:{k:"tasks",v:40}, hint:"おてつだい40回で"},
+  {id:"eq_s_ribbon",slot:"shield", rarity:2, name:"げんきリボン",   e:"🎀", atk:0, def:2, hp:32, need:{k:"care",v:5},   hint:"なでなで5日で"},
+  {id:"eq_s_crown", slot:"shield", rarity:3, name:"おうじゃのかんむり",e:"👑",atk:0, def:7, hp:26, need:{k:"lv",v:15},    hint:"レベル15で"},
+  {id:"eq_s_diamond",slot:"shield",rarity:4, name:"ダイヤのよろい", e:"💎", atk:0, def:17,hp:22, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
+  {id:"eq_s_rainbow",slot:"shield",rarity:5, name:"にじのオーラ",   e:"🌈", atk:0, def:13,hp:42, need:{k:"lv",v:999}, soon:true, hint:"近日登場"},
 ];
 const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
+const EQ_RAR=(r)=>({1:{n:"N",c:"#7c8a82"},2:{n:"R",c:"#3478D4"},3:{n:"SR",c:"#7B61C9"},4:{n:"SR+",c:"#E8B83E"},5:{n:"UR",c:"#D95C55"}}[r]||{n:"N",c:"#7c8a82"});
 function equipMeta(data, child){
   const m=getMonState(data,child);
   return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
            wins:(data.battleWins||{})[child.id]||0, streak:(data.streak||{})[child.id]?.max||0 };
 }
-const equipUnlocked = (item, meta, dropped)=> ((meta[item.need.k]||0) >= item.need.v) || (Array.isArray(dropped) && dropped.includes(item.id));
+const equipUnlocked = (item, meta, dropped)=> !item.soon && (((meta[item.need.k]||0) >= item.need.v) || (Array.isArray(dropped) && dropped.includes(item.id)));
 // 自分のモンスターの技(進化先=curIdごとに固定で割り当て→姿が変わると技も変わる)
 const PLAYER_MOVES = [
   {n:"エナジーボール", e:"🔆", c:"#34C77B"},
@@ -1645,13 +1650,14 @@ function EquipModal({child,data,update,onClose}){
   const eqRaw=(data.monsterEquip||{})[child.id];
   const cur=(eqRaw&&typeof eqRaw==="object")?eqRaw:{};
   const stats=battleStats(data,child);
-  const collected=EQUIPMENT.filter(it=>equipUnlocked(it,meta,dropped)).length;
+  const obtainable=EQUIPMENT.filter(it=>!it.soon);
+  const collected=obtainable.filter(it=>equipUnlocked(it,meta,dropped)).length;
   const setEq=(slot,id)=>update(d=>{ const r=(d.monsterEquip||{})[child.id]; const obj=(r&&typeof r==="object")?r:{}; return {...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:{...obj,[slot]:id}}}; });
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(8,6,18,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
       <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"86vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden"}}>
         <div style={{padding:"16px 18px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${BORDER}`}}>
-          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🎒 そうび図鑑 <span style={{fontSize:12,color:MUTED,fontWeight:700}}>{collected}/{EQUIPMENT.length}</span></span>
+          <span style={{fontWeight:900,fontSize:17,color:TEXT}}>🎒 そうび図鑑 <span style={{fontSize:12,color:MUTED,fontWeight:700}}>{collected}/{obtainable.length}</span></span>
           <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
         </div>
         <div style={{padding:"10px 16px 4px",fontSize:12,color:TEXTS,fontWeight:700}}>いまの強さ：HP {stats.hp} ・ ⚔{stats.atk} ・ 🛡{stats.def}</div>
@@ -1660,15 +1666,21 @@ function EquipModal({child,data,update,onClose}){
             <div key={sl.k}>
               <div style={{fontWeight:900,fontSize:13,color:TEXT,margin:"8px 2px 6px"}}>{sl.t}</div>
               {EQUIPMENT.filter(it=>it.slot===sl.k).map(it=>{
-                const unlocked=equipUnlocked(it,meta,dropped); const on=cur[sl.k]===it.id;
-                return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:BORDER}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:0.6}}>
+                const unlocked=equipUnlocked(it,meta,dropped); const on=cur[sl.k]===it.id; const rar=EQ_RAR(it.rarity);
+                return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:(it.soon?rar.c+"66":BORDER)}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:(it.soon?0.85:0.6)}}>
                   <div style={{fontSize:28,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{unlocked?it.name:"？？？"}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:9,fontWeight:900,color:"#fff",background:rar.c,borderRadius:5,padding:"1px 5px"}}>{rar.n}</span>
+                      <span style={{fontWeight:800,fontSize:14,color:TEXT}}>{(unlocked||it.soon)?it.name:"？？？"}</span>
+                    </div>
                     <div style={{fontSize:11,color:B,fontWeight:700,marginTop:2}}>{[it.hp?`HP+${it.hp}`:"",it.atk?`⚔+${it.atk}`:"",it.def?`🛡+${it.def}`:""].filter(Boolean).join("  ")}</div>
-                    {!unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
+                    {it.soon
+                      ? <div style={{fontSize:11,color:rar.c,fontWeight:800,marginTop:2}}>✨ プレミア・近日登場</div>
+                      : !unlocked&&<div style={{fontSize:11,color:MUTED,marginTop:2}}>🔒 {it.hint}</div>}
                   </div>
                   {unlocked&&<button onClick={()=>setEq(sl.k,on?null:it.id)} style={{background:on?MUTED:GP,border:"none",borderRadius:10,padding:"8px 13px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>{on?"はずす":"そうび"}</button>}
+                  {it.soon&&<span style={{fontSize:18,flexShrink:0}}>🔒</span>}
                 </div>;
               })}
             </div>
@@ -1746,7 +1758,7 @@ function BattleModal({child,data,update,onClose}){
     if(r==="win"){
       const roll=Math.random();
       if(roll<0.12) dropInfo={kind:"potion"};
-      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
+      else if(roll<0.22){ const drp=(data.equipUnlock?.[child.id])||[]; const locked=EQUIPMENT.filter(it=>!it.soon && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
     }
     if(dropInfo) setDrop(dropInfo);
     update(d=>{ const nd={...d};
@@ -1914,6 +1926,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n16", e:"⭐", t:"装備にレア度＆プレミア登場！", b:"そうびに レア度（N〜UR）がついたよ。強さとレア度は別！さらに「⚡いかずちの剣」「🐉りゅうおうの剣」「💎ダイヤのよろい」「🌈にじのオーラ」など プレミア装備が図鑑に追加（近日 手に入るように！）。あと、お手伝いでもらえるEXPが ポイント×1.5に！クリアするほど どんどんレベルUP。"},
   {id:"n15", e:"🎒", t:"そうびが2スロット＆図鑑に！", b:"「⚔ぶき」と「🛡たて」を2つ同時に装備できるように！そうびは図鑑になって、お手伝い・連続・バトル、そして“まれにドロップ”でも集まるよ。バトルで勝つと たまに💊回復アイテムや そうびが見つかる！HPはポイントでも回復できる。"},
   {id:"n14", e:"🗺", t:"旅先がえらべるように！", b:"とっくんの旅は「近くの森・海辺・山・遺跡・天空の島・まおうの城」から選べるよ。遠い旅先ほど 時間はかかるけどEXPがたくさん！レベルが上がると新しい旅先が解放。バトルも、強い敵ほど もらえるEXPが多い（選ぶ画面に表示）。"},
   {id:"n13", e:"🧭", t:"とっくんの旅 登場！", b:"ホームの「🧭とっくんの旅」からモンスターを旅に出すと、時間が経つとEXP（ときどき🧩かけらも）がもらえるよ。放置でコツコツ育てよう！"},
@@ -2113,7 +2126,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => careMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, 6));
+    update(d => careMon({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,Math.round(t.pts*1.5))));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -2125,7 +2138,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => careMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, 4));
+    update(d => careMon({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1,Math.round(t.pts*1.5))));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -3126,7 +3139,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     } else {
       showFlash(pts, task.emoji);
       addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
-      if(pts>0) update(d=>careMon(d,child.id,0.25,8));  // お手伝いでHP回復＋EXP
+      if(pts>0) update(d=>careMon(d,child.id,0.25,Math.max(1,Math.round(pts*1.5))));  // お手伝いでHP回復＋EXP(pt×1.5)
     }
   };
 
