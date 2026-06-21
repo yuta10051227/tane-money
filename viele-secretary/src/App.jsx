@@ -2093,68 +2093,102 @@ const PROFILE_ADVICE = {
  * computeMomMessages(data, alerts, todayEvents, energy)
  * 既存のデータだけを見て「声かけメッセージ」を返す（AI/サーバー不要）。
  *
- * 返り値: { praise: string|null, worries: string[], restCare: string|null }
- *   praise   … 褒め・労いの一言（1件）
- *   worries  … 能動的な確認つっこみ（最大2件）
- *   restCare … 休息ケアの一言（1件）
+ * 返り値: { praise: string|null, worries: Array<{text:string, tab:string|null}>, restCare: string|null, restCareTab: string|null, guide: string|null }
+ *   praise       … 褒め・労いの一言（1件）。空状態では出さない
+ *   worries      … 能動的な確認つっこみ（最大2件）。遷移先タブ(tab)付き
+ *   restCare     … 休息ケアの一言（1件）
+ *   restCareTab  … restCareのタップ遷移先タブ（null=遷移なし）
+ *   guide        … 空状態のガイド一言（praise と排他。空のときだけ出る）
  */
 function computeMomMessages(data, alerts, todayEvents, energy) {
-  if (!data) return { praise: null, worries: [], restCare: null };
+  if (!data) return { praise: null, worries: [], restCare: null, restCareTab: null, guide: null };
 
   const late = (alerts && alerts.late) || [];
   const soon = (alerts && alerts.soon) || [];
   const totalAlerts = late.length + soon.length;
   const h = new Date().getHours();
-  const isEvening = h >= 19;
+  // 時間帯3区分: 朝(〜10:59) / 昼(11〜15:59) / 夕夜(16〜)
+  const isMorning = h < 11;
+  const isNoon = h >= 11 && h < 16;
+  const isEvening = h >= 16;
   const isNight = h >= 22 || h < 5;
+
+  // ── 空状態判定：データが実質ゼロかどうか ──
+  // sampleNotice=true またはすべてのデータ配列が空のとき「空状態」と見なす。
+  // 空状態では「やり切った」系の褒めは出さない（実績が無いのに褒めるのは的外れ）。
+  const isEmpty = data.sampleNotice || (
+    (data.trips || []).length === 0 &&
+    (data.deadlines || []).length === 0 &&
+    (data.tasks || []).length === 0 &&
+    (data.launches || []).length === 0 &&
+    (data.money || []).length === 0
+  );
 
   // ── 1. 褒め・労い ──
   let praise = null;
+  let guide = null;
 
-  // 今日の要対応が 0 件 → いちばん温かく
-  if (totalAlerts === 0 && (data.tasks || []).filter((x) => !x.done).length === 0) {
-    if (isNight) {
-      praise = "今日もお疲れ様。夜はゆっくり休んでね。";
-    } else if (isEvening) {
-      praise = "今日の仕事、全部やり切ってる。偉いよ。今夜はゆっくりしてね。";
-    } else {
-      praise = "今日やる事は片付いてるよ。よく頑張ったね、ゆっくりしてね。";
-    }
-  }
-
-  // 逆算チェーン(trip)が全完了している → 「準備ぜんぶ完了」
-  if (!praise) {
-    const completedTrips = (data.trips || []).filter((t) => {
-      const items = t.items || [];
-      return items.length > 0 && items.every((it) => it.done);
-    });
-    if (completedTrips.length > 0) {
-      const t = completedTrips[0];
-      praise = `「${t.title}」の準備、ぜんぶ完了！えらい。`;
-    }
-  }
-
-  // ローンチKPIが目標到達（reg>=goalReg または cv>=goalCv）
-  if (!praise) {
-    for (const L of (data.launches || [])) {
-      const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
-      const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
-      if ((goalReg > 0 && reg >= goalReg) || (goalCv > 0 && cv >= goalCv)) {
-        praise = `「${L.name}」、目標達成おめでとう！よく走り切ったね。`;
-        break;
+  if (isEmpty) {
+    // 空状態 → 初回ガイド一言のみ、褒めなし
+    guide = "まずは逆算か締め切りをひとつ入れてみてね。";
+  } else {
+    // 今日の要対応が 0 件 → いちばん温かく（時間帯3区分）
+    const pendingTasks = (data.tasks || []).filter((x) => !x.done).length;
+    if (totalAlerts === 0 && pendingTasks === 0) {
+      if (isNight) {
+        praise = "今日もお疲れ様。夜はゆっくり休んでね。";
+      } else if (isEvening) {
+        praise = "今日の仕事、全部やり切ってる。えらい。今夜はゆっくりしてね。";
+      } else if (isNoon) {
+        praise = "ここまで全部終わってる、えらい！午後もいいペースで行こ。";
+      } else {
+        // 朝
+        praise = "今日の準備、バッチリだね。いいスタートだよ。";
       }
     }
+
+    // 逆算チェーン(trip)が全完了している → 「準備ぜんぶ完了」
+    if (!praise) {
+      const completedTrips = (data.trips || []).filter((t) => {
+        const items = t.items || [];
+        return items.length > 0 && items.every((it) => it.done);
+      });
+      if (completedTrips.length > 0) {
+        const t = completedTrips[0];
+        praise = `「${t.title}」の準備、ぜんぶ完了！えらい。`;
+      }
+    }
+
+    // ローンチKPIが目標到達（reg>=goalReg または cv>=goalCv）
+    if (!praise) {
+      for (const L of (data.launches || [])) {
+        const reg = Number(L.reg) || 0, goalReg = Number(L.goalReg) || 0;
+        const cv = Number(L.cv) || 0, goalCv = Number(L.goalCv) || 0;
+        if ((goalReg > 0 && reg >= goalReg) || (goalCv > 0 && cv >= goalCv)) {
+          praise = `「${L.name}」、目標達成おめでとう！よく走り切ったね。`;
+          break;
+        }
+      }
+    }
+
+    // 夕夜でまだ褒めていない場合 → 時間帯に合った一般的な労い
+    if (!praise && isEvening) {
+      praise = isNight ? "今日もおつかれさま。もう休んでいいよ。" : "今日もおつかれさま。無理しすぎてない？";
+    }
+
+    // 朝・昼の一般労い（対応件数があっても前向きな一言）
+    if (!praise && isMorning) {
+      praise = "おはよう。今日も一緒に乗り越えようね。";
+    }
+    if (!praise && isNoon) {
+      praise = "お昼だよ。少し休んで、午後も頑張ろ。";
+    }
   }
 
-  // 夜または夕方でまだ褒めていない場合 → 一般的な労い
-  if (!praise && isEvening) {
-    praise = "今日もおつかれさま。無理しすぎてない？";
-  }
-
-  // ── 2. 確認つっこみ（能動的な心配）──
+  // ── 2. 確認つっこみ（能動的な心配）── worries は { text, tab } オブジェクトの配列
   const worries = [];
 
-  // 逆算項目に「遅れ・間近」で未着手が続くもの（最大 2 件）
+  // 逆算項目に「遅れ・間近」で未着手が続くもの（最大 2 件）→ 仕事タブへ
   for (const t of (data.trips || [])) {
     if (worries.length >= 2) break;
     const pendingLate = (t.items || []).filter((it) => {
@@ -2165,47 +2199,53 @@ function computeMomMessages(data, alerts, todayEvents, energy) {
     });
     if (pendingLate.length > 0) {
       const item = pendingLate[0];
-      worries.push(`「${t.title}」の${item.label}、まだみたいだけど大丈夫？そろそろ動こ。`);
+      worries.push({ text: `「${t.title}」の${item.label}、まだみたいだけど大丈夫？そろそろ動こ。`, tab: "work" });
     }
   }
 
-  // 未処理請求が残っている
+  // 未処理請求が残っている → 売上タブへ
   if (worries.length < 2) {
     const outstanding = (data.money || [])
       .filter((x) => !x.done && x.kind === "入金")
       .reduce((s, x) => s + (Number(x.amount) || 0), 0);
     if (outstanding > 0) {
-      worries.push(`入金の確認、した？ ¥${outstanding.toLocaleString("ja-JP")}がまだだよ。`);
+      worries.push({ text: `入金の確認、した？ ¥${outstanding.toLocaleString("ja-JP")}がまだだよ。`, tab: "money" });
     }
   }
 
   // ── 3. 休息ケア ──
   let restCare = null;
+  let restCareTab = null;
 
   // 今日の予定件数が多い（5件以上）
   const todayCount = (todayEvents || []).length;
   if (todayCount >= 5) {
     restCare = `今日は予定が${todayCount}件も詰まってるね。無理しないで、ひとつ減らせない？`;
+    restCareTab = null; // カレンダーはホーム内なので遷移なし
   }
 
-  // 運気が「労い」または「守り」の日
+  // 運気が「労い」または「守り」の日 → 運気タブへ
   if (!restCare && energy && (energy.today && (energy.today.stance === "労い" || energy.today.stance === "守り"))) {
     if (energy.today.stance === "労い") {
       restCare = "今日は充電の日。頑張りすぎないでね。";
     } else {
       restCare = "今日は守りの日。新しいことより、足場を固める日にしてね。";
     }
+    restCareTab = "fortune";
   }
 
-  return { praise, worries, restCare };
+  return { praise, worries, restCare, restCareTab, guide };
 }
 
 /* お母さんの声かけカード */
-function MomVoiceCard({ praise, worries, restCare }) {
-  const hasAny = praise || worries.length > 0 || restCare;
+function MomVoiceCard({ praise, worries, restCare, restCareTab, guide, onTab }) {
+  const hasAny = praise || guide || worries.length > 0 || restCare;
   if (!hasAny) return null;
 
   const MOM_COLOR = "#C77B9C"; // FAMILYカラーと同系統の温かみのある色
+
+  // 遷移先ラベルマップ
+  const TAB_LABELS = { work: "仕事を見る", money: "売上を見る", fortune: "運気を見る" };
 
   return (
     <div style={{
@@ -2218,24 +2258,72 @@ function MomVoiceCard({ praise, worries, restCare }) {
       <div style={{ fontSize: 12, color: MOM_COLOR, fontWeight: 700, letterSpacing: 0.5, marginBottom: 10 }}>
         お母さんからひとこと
       </div>
+      {/* 褒め・労い（タップなし） */}
       {praise && (
-        <div style={{ fontSize: 14, color: THEMES[THEME_NAME].text, lineHeight: 1.7, marginBottom: worries.length > 0 || restCare ? 10 : 0 }}>
+        <div style={{ fontSize: 16, color: THEMES[THEME_NAME].text, lineHeight: 1.7, marginBottom: worries.length > 0 || restCare ? 10 : 0 }}>
           {praise}
         </div>
       )}
-      {worries.length > 0 && (
-        <div style={{ marginBottom: restCare ? 10 : 0 }}>
-          {worries.map((w, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 13, color: THEMES[THEME_NAME].sub, lineHeight: 1.6, marginBottom: i < worries.length - 1 ? 4 : 0 }}>
-              <span style={{ flex: "0 0 auto", fontSize: 14, marginTop: 1 }}>...</span>
-              <span>{w}</span>
-            </div>
-          ))}
+      {/* 空状態ガイド（タップなし） */}
+      {guide && (
+        <div style={{ fontSize: 16, color: THEMES[THEME_NAME].sub, lineHeight: 1.7, marginBottom: worries.length > 0 || restCare ? 10 : 0 }}>
+          {guide}
         </div>
       )}
+      {/* 確認つっこみ（遷移先があればタップ可能） */}
+      {worries.length > 0 && (
+        <div style={{ marginBottom: restCare ? 10 : 0 }}>
+          {worries.map((w, i) => {
+            const hasLink = w.tab && onTab;
+            return (
+              <div
+                key={i}
+                onClick={hasLink ? () => onTab(w.tab) : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 6,
+                  lineHeight: 1.6,
+                  marginBottom: i < worries.length - 1 ? 6 : 0,
+                  cursor: hasLink ? "pointer" : "default",
+                  borderRadius: 8,
+                  padding: "4px 0",
+                }}
+              >
+                <span style={{ flex: "0 0 auto", fontSize: 15, marginTop: 2, color: MOM_COLOR }}>...</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, color: THEMES[THEME_NAME].sub }}>{w.text}</div>
+                  {hasLink && (
+                    <div style={{ fontSize: 12, color: MOM_COLOR, marginTop: 2, fontWeight: 600 }}>
+                      → {TAB_LABELS[w.tab] || w.tab}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {/* 休息ケア（運気系はタップ可能） */}
       {restCare && (
-        <div style={{ fontSize: 13, color: MOM_COLOR, lineHeight: 1.6, fontStyle: "italic" }}>
+        <div
+          onClick={restCareTab && onTab ? () => onTab(restCareTab) : undefined}
+          style={{
+            fontSize: 16,
+            color: MOM_COLOR,
+            lineHeight: 1.6,
+            fontStyle: "italic",
+            cursor: restCareTab && onTab ? "pointer" : "default",
+            borderRadius: 8,
+            padding: "4px 0",
+          }}
+        >
           {restCare}
+          {restCareTab && onTab && (
+            <div style={{ fontSize: 12, fontStyle: "normal", fontWeight: 600, marginTop: 2 }}>
+              → {TAB_LABELS[restCareTab] || restCareTab}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -5184,7 +5272,7 @@ export default function App() {
               )}
               <BriefingCard fortune={data.fortune} birth={data.birth} today={dayBuckets[0].items} late={alerts.late.length} soon={alerts.soon.length} outstanding={moneyOutstanding} brief={briefFirst} onTab={setTab} remaining={remaining} pendingTasks={pendingTasks} hideFortune={!!hiddenTabs.fortune} hideNews={!!hiddenTabs.news} profile={profile} annivSettings={data.annivSettings} anniversaries={data.anniversaries} />
               {/* お母さんの声かけ（褒める・心配・休息ケア） */}
-              <MomVoiceCard praise={momMsgs.praise} worries={momMsgs.worries} restCare={momMsgs.restCare} />
+              <MomVoiceCard praise={momMsgs.praise} worries={momMsgs.worries} restCare={momMsgs.restCare} restCareTab={momMsgs.restCareTab} guide={momMsgs.guide} onTab={setTab} />
               {/* 出生情報未登録時のクイック入力バナー（サンプル削除後・一般利用の「空状態」に表示） */}
               {(!data.birth || !data.birth.date) && !data.sampleNotice && (
                 <BirthQuickInput
