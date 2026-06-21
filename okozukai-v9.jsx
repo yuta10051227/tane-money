@@ -323,7 +323,8 @@ function startRealtimeSync(updateFn){
             if(prev.equipUnlock){merged.equipUnlock={...(merged.equipUnlock||{})};Object.keys(prev.equipUnlock).forEach(cid=>{merged.equipUnlock[cid]=[...new Set([...(merged.equipUnlock[cid]||[]),...(prev.equipUnlock[cid]||[])])];});}
             if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
             if(prev.expedition) merged.expedition={...(merged.expedition||{}),...prev.expedition};
-            if(prev.taskExpDay) merged.taskExpDay={...(merged.taskExpDay||{}),...prev.taskExpDay};
+            // taskExpDay: 同じ日なら使用量(amt)は多い方＝同期巻き戻しでEXP日次上限がリセットされるのを防ぐ
+            if(prev.taskExpDay){merged.taskExpDay={...(merged.taskExpDay||{})};Object.keys(prev.taskExpDay).forEach(cid=>{const p=prev.taskExpDay[cid]||{},m=merged.taskExpDay[cid]||{};merged.taskExpDay[cid]=(p.date===m.date)?{date:p.date,amt:Math.max(p.amt||0,m.amt||0)}:p;});}
             if(prev.monsterHP) merged.monsterHP={...(merged.monsterHP||{}),...prev.monsterHP};
             if(prev.monsterHPDate) merged.monsterHPDate={...(merged.monsterHPDate||{}),...prev.monsterHPDate};
             if(prev.battleWinDate) merged.battleWinDate={...(merged.battleWinDate||{}),...prev.battleWinDate};
@@ -1707,6 +1708,13 @@ function EquipModal({child,data,update,onClose}){
   const stats=battleStats(data,child);
   const obtainable=EQUIPMENT;
   const collected=obtainable.filter(it=>equipUnlocked(it,meta,dropped)).length;
+  // プレミア装備は「条件を満たした瞬間」に永続解放(equipUnlockへ記録)＝
+  // あとで貯金を使って残高が条件未満に戻っても再ロックされない(once-unlock)。
+  useEffect(()=>{
+    const newly=EQUIPMENT.filter(it=>it.premium && !dropped.includes(it.id) && (meta[it.need.k]||0)>=it.need.v);
+    if(newly.length){ update(d=>{ const drp=(d.equipUnlock?.[child.id])||[]; const add=newly.map(it=>it.id).filter(id=>!drp.includes(id)); if(!add.length)return d; return {...d, equipUnlock:{...(d.equipUnlock||{}),[child.id]:[...drp,...add]}}; }); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const setEq=(slot,id)=>update(d=>{ const r=(d.monsterEquip||{})[child.id]; const obj=(r&&typeof r==="object")?r:{}; return {...d,monsterEquip:{...(d.monsterEquip||{}),[child.id]:{...obj,[slot]:id}}}; });
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(8,6,18,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
@@ -1804,8 +1812,7 @@ function BattleModal({child,data,update,onClose}){
     const wonOpps=fragDateOk?((data.battleFragOpps||{})[child.id]||[]):[];
     const canFrag=(r==="win") && !wonOpps.includes(oppKey);
     const curFrag=(data.battleFragments||{})[child.id]||0;
-    const converted=canFrag && (curFrag+1>=5);
-    const newFrag=canFrag ? (converted?(curFrag+1-5):(curFrag+1)) : curFrag;
+    const converted=canFrag && (curFrag+1>=5);  // 表示用(WIN演出)。実際の書き込みはupdate内でdから再計算
     if(r==="win") setReward(canFrag?(converted?"ticket":"fragment"):"none");
     // たまのドロップ(勝利時): 回復アイテム or まだ持ってない装備
     let dropInfo=null;
@@ -1819,14 +1826,24 @@ function BattleModal({child,data,update,onClose}){
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
       nd.monsterExp={...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+expGain};  // バトルEXP
-      if(r==="win") nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
+      if(r==="win"){
+        nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
+        nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today};  // 「今日1勝したか」=ミッション判定用
+      }
       if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
-      if(canFrag){
-        nd.battleFragments={...(d.battleFragments||{}),[child.id]:newFrag};
-        if(converted) nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1};
-        nd.battleFragDate={...(d.battleFragDate||{}),[child.id]:today};
-        nd.battleFragOpps={...(d.battleFragOpps||{}),[child.id]:[...wonOpps,oppKey]};
+      // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
+      if(r==="win"){
+        const dFragDateOk=(d.battleFragDate||{})[child.id]===today;
+        const dWonOpps=dFragDateOk?((d.battleFragOpps||{})[child.id]||[]):[];
+        if(!dWonOpps.includes(oppKey)){
+          const dCur=(d.battleFragments||{})[child.id]||0;
+          const dConv=dCur+1>=5;
+          nd.battleFragments={...(d.battleFragments||{}),[child.id]:dConv?(dCur+1-5):(dCur+1)};
+          if(dConv) nd.battleTickets={...(d.battleTickets||{}),[child.id]:((d.battleTickets?.[child.id])||0)+1};
+          nd.battleFragDate={...(d.battleFragDate||{}),[child.id]:today};
+          nd.battleFragOpps={...(d.battleFragOpps||{}),[child.id]:[...dWonOpps,oppKey]};
+        }
       }
       if(unlockBoss){ nd.battleBossUnlocked={...(d.battleBossUnlocked||{}),[child.id]:true}; }
       return nd; });
@@ -1980,6 +1997,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n20", e:"✨", t:"こまかい使いやすさ改善！", b:"・ガチャの近くに「きょうのお手伝い数」を表示＝先にお手伝いするとタネがもっと元気に🌱 ・暗い画面の文字を見やすく（コントラスト改善）・記録の「取り消し」はまちがい防止で2タップ確認に・プレミア装備は一度 解放したら、貯金を使っても外れません・バトルのかけら計算など こまかいバグを修正しました。"},
   {id:"n19", e:"💎", t:"プレミア装備が貯金で手に入る！", b:"これまで「近日登場」だったプレミア装備が、貯金や目標達成で解放できるようになったよ！「⚡いかずちの剣」=貯金500pt、「🐉りゅうおうの剣」=目標3回達成、「💎ダイヤのよろい」=貯金1000pt、「🌈にじのオーラ」=目標5回達成。コツコツ貯めるほど 最強そうびに近づくよ。あと、毎日ミッションの「ガチャ」が「まめちしき」に変わって、お金の勉強でEXPがもらえるようになりました。"},
   {id:"n18", e:"📈", t:"投資が やさしくなった！", b:"株の手数料を10%→2%、為替を往復4%→1%に下げました。さらに「長く持つほどボーナスUP（7日1%・30日2%・90日3%・週1回）」に。すぐ売ると損、コツコツ長期で持つと増える＝本物の投資の考え方を体験できるよ。損益は『今売ったら戻るpt』で正直に表示。"},
   {id:"n17", e:"🆙", t:"レベルのバランス調整", b:"お手伝いのEXPは「同じタスクを連打すると だんだん減る・1日の上限あり」に調整しました。いろんなお手伝いを1回ずつやるのが いちばん効率よくレベルUP！"},
@@ -3113,6 +3131,31 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
 }
 
 
+// 履歴の1行。取り消しは誤タップ防止のため2タップ確認制(ポイントの増減操作なので慎重に)
+function LogRow({ l, emoji, canDelete, child, update, showFlash }){
+  const [confirm,setConfirm]=useState(false);
+  const deleteLog=()=>{
+    const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
+    addLogToFirestore(rev);
+    update(d=>({...d,logs:[rev,...d.logs]}));
+    showFlash(-l.pts,"🗑");
+    setConfirm(false);
+  };
+  return(
+    <div style={{background:CARD,border:`1.5px solid ${confirm?R:BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:20}}>{emoji}</span>
+      <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
+      <Pt v={l.pts}/>
+      {canDelete&&(confirm
+        ? <div style={{display:"flex",gap:5,flexShrink:0}}>
+            <button onClick={deleteLog} style={{background:R,border:"none",borderRadius:9,minWidth:60,height:38,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>取り消す</button>
+            <button onClick={()=>setConfirm(false)} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:9,minWidth:44,height:38,color:TEXTS,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>やめる</button>
+          </div>
+        : <button onClick={()=>setConfirm(true)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="取り消し">🗑</button>)}
+    </div>
+  );
+}
+
 function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
   // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
@@ -3445,13 +3488,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 残高表示 */}
         <div style={{padding:"20px 20px 18px",position:"relative",zIndex:2,display:"flex",alignItems:"center",gap:12}}>
           <div style={{flex:1}}>
-            <div style={{color:"rgba(255,255,255,0.38)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
+            <div style={{color:"rgba(255,255,255,0.62)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
             <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{color:"rgba(255,255,255,0.3)",fontSize:11}}>今月</span>
+              <span style={{color:"rgba(255,255,255,0.58)",fontSize:11}}>今月</span>
               <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
               <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
@@ -3480,7 +3523,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
               style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
               <div style={{marginBottom:3}}><Ico name={ic} fb={e} size={24}/></div>
-              <div style={{color:"rgba(255,255,255,0.35)",fontSize:11,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
+              <div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
               {v ? (
                 <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
               ) : (
@@ -3529,7 +3572,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           tasks: myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(tISO)).length,
           care: (data.monsterCare?.[child.id]?.last===tk)?1:0,
           learn: myLogs.filter(l=>l.type==="tips"&&(l.date||"").startsWith(tISO)).length,
-          battle: (data.battleFragDate?.[child.id]===tk)?1:0,
+          battle: (data.battleWinDate?.[child.id]===tk)?1:0,
         };
         // まめちしきはJuniorに無い画面なので、Juniorは達成可能な3つに絞る
         const dailyMissions=isJunior?MISSIONS.filter(m=>m.metric!=="learn"):MISSIONS;
@@ -3785,7 +3828,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })()}
         {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
-          <div style={{color:"rgba(255,255,255,0.25)",fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
@@ -3795,11 +3838,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </>}
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通） ── */}
         <div style={{padding:"12px 16px 4px"}}>
-          {!isJunior&&<div style={{color:"rgba(255,255,255,0.3)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
+            const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
@@ -3827,7 +3871,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
               </div>
               <div style={{marginTop:6,display:"flex",gap:10,flexWrap:"wrap",fontSize:11,fontWeight:800}}>
-                {hasTicket&&<span style={{color:"#bff0c8"}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
+                {!todayDone&&(todayChores>0
+                  ? <span style={{color:darkBG?"#bff0c8":G}}>🌱 きょうのお手伝い {todayChores}こ・タネが げんき！</span>
+                  : <span style={{color:darkBG?"#ffd9a8":"#9a7000"}}>💪 さきに お手伝いすると タネが もっと げんきに！</span>)}
+                {hasTicket&&<span style={{color:darkBG?"#bff0c8":G}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
                 <span style={{color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>🧩 チケットのかけら {(data.battleFragments?.[child.id]||0)}/5</span>
               </div>
               <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>
@@ -4443,20 +4490,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
             const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
             const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
-            const deleteLog=()=>{
-              const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
-              addLogToFirestore(rev);
-              update(d=>({...d,logs:[rev,...d.logs]}));
-              showFlash(-l.pts,"🗑");
-            };
-            return(
-              <div key={l.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:20}}>{emoji}</span>
-                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
-                <Pt v={l.pts}/>
-                {canDelete&&<button onClick={deleteLog} style={{background:"none",border:"none",fontSize:14,cursor:"pointer",color:MUTED,padding:"2px 4px",lineHeight:1}} title="取り消し">🗑</button>}
-              </div>
-            );
+            return <LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>;
           })}
           </div>
           )}
@@ -7562,7 +7596,7 @@ function InvestTab({child,data,update}){
           <div style={{height:1,background:"rgba(255,255,255,0.07)",margin:"0 0 16px"}}/>
           {myHoldings.length>0?(
             <div style={{marginBottom:16}}>
-              <div style={{color:"rgba(255,255,255,0.3)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:10}}>HOLDINGS</div>
+              <div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:10}}>HOLDINGS</div>
               {myHoldings.map(h=>{
                 const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;
                 const val=toPts(st,st.price)*h.qty;
@@ -7574,7 +7608,7 @@ function InvestTab({child,data,update}){
                     <span style={{fontSize:22}}>{st.emoji}</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:13}}>{st.name}</div>
-                      <div style={{color:"rgba(255,255,255,0.35)",fontSize:11}}>{fq}株 · {pct}%</div>
+                      <div style={{color:"rgba(255,255,255,0.58)",fontSize:11}}>{fq}株 · {pct}%</div>
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontWeight:700,fontSize:12}}>{val.toLocaleString()}pt</div>
@@ -7587,7 +7621,7 @@ function InvestTab({child,data,update}){
           ):(
             <div style={{background:"rgba(74,158,255,0.06)",border:"1px solid rgba(74,158,255,0.12)",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
               <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,fontWeight:700,marginBottom:6}}>📈 株ってなに？</div>
-              <div style={{color:"rgba(255,255,255,0.3)",fontSize:11,lineHeight:1.6}}>会社の一部を買うこと。価格が上がれば利益が出て、下がれば損になる。下のリストから気になる株をタップして買ってみよう。</div>
+              <div style={{color:"rgba(255,255,255,0.58)",fontSize:11,lineHeight:1.6}}>会社の一部を買うこと。価格が上がれば利益が出て、下がれば損になる。下のリストから気になる株をタップして買ってみよう。</div>
             </div>
           )}
           {(()=>{const bc=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="badge").length;return bc>0&&(
