@@ -4,18 +4,21 @@ service cloud.firestore {
 
     // ── Tane Money: 家族データ ──
     // 前提: アプリは匿名認証(signInAnonymously)でサインインする。
-    // ファミリーコード(TANE-XXXX-XXXX, 暗号乱数8文字)を知っていることが参加証明。
-    // 認証必須にすることで、未認証のREST直叩き・スクレイパーを遮断し、
-    // App Check併用でアプリ外クライアントからの総当たりを抑止する。
+    // ファミリーコード(TANE-XXXX-XXXX, 暗号乱数8文字)を知っていることが参加証明＝ドキュメントID。
+    // 重要: read を get に限定し list(コレクション列挙)は禁止。
+    //   → コードを知らない者が families コレクションを一覧ダンプできないようにする。
+    // delete は不可(アプリに家族ドキュメント削除フローは無い。任意家族の消去攻撃を防ぐ)。
+    // ※App Check は未実装。導入したら総当たり耐性が上がる(認可の代替ではない)。
     match /families/{code} {
-      allow read: if request.auth != null;
+      allow get:  if request.auth != null;   // コード(ID)を知っている時だけ1件取得
+      allow list: if false;                  // コレクション列挙・全家族ダンプを禁止
       allow write: if request.auth != null
                    && request.resource.data.keys().hasOnly(['data','updatedAt'])
                    && request.resource.data.data is string
                    && request.resource.data.data.size() < 900000; // 1MB制限の手前で停止
-      allow delete: if request.auth != null;
+      allow delete: if false;
 
-      // ログ（追記専用コレクション）
+      // ログ（追記専用コレクション。同一家族配下なのでコードを知る前提・queryのためread許可）
       match /logs/{logId} {
         allow read: if request.auth != null;
         allow create: if request.auth != null
