@@ -2506,7 +2506,19 @@ function BestDaysPanel({ birth, occupation, onPlan }) {
                 <span style={{ flex: 1 }} />
                 {d.dayStar && <span style={{ fontSize: 12, color: C.sub }}>{d.dayStar}</span>}
               </div>
-              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: onPlan ? 8 : 0 }}>{d.reason}</div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{d.reason}</div>
+              <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginTop: 3, marginBottom: onPlan ? 8 : 0 }}>
+                {(() => {
+                  const isTensha = d.koyomi && d.koyomi.some((k) => k.name === "天赦日");
+                  const isAttack = d.stance === "攻め";
+                  const isKoyomi = d.koyomi && d.koyomi.length > 0;
+                  if (isTensha && isAttack) return "→ 何を始めても良い最強日。大事な申し込み・契約・発表・決断に最適です。";
+                  if (isTensha) return "→ 何をしても良いとされる最強の開運日。大事なことは迷わずこの日に。";
+                  if (isAttack && isKoyomi) return "→ あなたの「攻め」と暦の開運が重なる日。大事な連絡・申し込み・契約・発信に好機です。";
+                  if (isAttack) return "→ あなたの命式が「攻め」に向く日。新しいことを動かす・重要な判断をするのに向いています。";
+                  return "→ 暦の開運日。商談・ご縁をつなぐ連絡・新しい取り組みのスタートに良い日です。";
+                })()}
+              </div>
               {onPlan && (
                 <button
                   onClick={() => onPlan(d.date)}
@@ -3354,6 +3366,9 @@ function FortunePanel({ fortune, loading, error, aiOff, onRefresh, birth, onSave
             <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{s.label}<span style={{ fontSize: 13, color: C.faint, fontWeight: 400 }}>　{s.sub ? `（副：${s.subLabel}）` : ""}</span></div>
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginTop: 4 }}>{s.meaning}</div>
             <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginTop: 4 }}>{s.summary}</div>
+            <div style={{ fontSize: 13, color: C.accent, fontWeight: 600, lineHeight: 1.6, marginTop: 6 }}>
+              今日のひと工夫 — 会食・商談・大事な場には開運色（{s.color}）を身につけると守護神の力が引き出せます。
+            </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <span style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "3px 10px" }}>開運色 <b style={{ color: C.text }}>{s.color}</b></span>
               <span style={{ fontSize: 12, color: C.sub, background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 8, padding: "3px 10px" }}>吉方位 <b style={{ color: C.text }}>{s.direction}</b></span>
@@ -4148,8 +4163,11 @@ function LoginGate({ onLogin, error }) {
           ))}
         </div>
 
-        <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 8 }}>
+        <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
           ✓ 今は無料・クレジットカード登録なし
+        </div>
+        <div style={{ textAlign: "center", fontSize: 12, color: C.sub, marginBottom: 8 }}>
+          正式版は買い切り ¥10,000 / サブスクなし・更新手続きも不要
         </div>
         <button
           onClick={onLogin}
@@ -4948,8 +4966,8 @@ export default function App() {
                     <button
                       style={{ height: 44, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.red}`, background: "transparent", color: C.red, fontWeight: 700, fontSize: 14, cursor: "pointer" }}
                       onClick={() => {
-                        if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。")) {
-                          update({ trips: [], deadlines: [], launches: [], content: [], money: [], tasks: [], manualEvents: [], birth: null, sampleNotice: false });
+                        if (window.confirm("サンプルデータをすべて削除しますか？この操作は取り消せません。\n※ 生年月日・プロフィール・記念日はそのまま残ります。")) {
+                          update({ trips: [], deadlines: [], launches: [], content: [], money: [], tasks: [], manualEvents: [], sampleNotice: false });
                           track("sample_cleared"); // アクティベーション（自分のデータで使い始めた合図）
                         }
                       }}
@@ -5097,6 +5115,14 @@ export default function App() {
                     }}
                   >データをJSONで書き出す</button>
                   <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>全データを viele-backup-YYYY-MM-DD.json としてダウンロードします。</div>
+                </div>
+                {/* 価格・プラン */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>料金プラン</div>
+                  <div style={{ background: C.accent + "18", border: `1px solid ${C.accent}`, borderRadius: 10, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginBottom: 3 }}>買い切り ¥10,000（サブスクではありません）</div>
+                    <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.7 }}>秘書の手間と鑑定費用をこれ1つに。一度きりのお支払いでずっと使えます。<br />月額なし・更新なし・解約手続き不要です。</div>
+                  </div>
                 </div>
               </Acc>
             </>
