@@ -2112,7 +2112,7 @@ function BattleModal({child,data,update,onClose}){
               </div>
             </div>
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 フル回復 ×{potions}</button>}
+              {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"6px 12px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:4}}><img src="/assets/heal_potion.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="💊";e.target.replaceWith(s);}}/>フル回復 ×{potions}</button>}
               {HEAL_CAPS.map(cap=>((caps[cap.k]||0)>0)&&(
                 <button key={cap.k} onClick={()=>useCap(cap)} style={{background:cap.c,border:"none",borderRadius:999,padding:"6px 12px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:4}}><img src={`/assets/${cap.img}.png`} alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=cap.e;e.target.replaceWith(s);}}/>+{cap.heal} ×{caps[cap.k]}</button>
               ))}
