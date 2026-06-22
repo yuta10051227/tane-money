@@ -313,6 +313,7 @@ function startRealtimeSync(updateFn){
             if(prev.monsterSkin) merged.monsterSkin={...(merged.monsterSkin||{}),...prev.monsterSkin};
             // まめちしきクイズの正解履歴は端末間でユニオン(消えない)
             if(prev.tipsQuiz){merged.tipsQuiz={...(merged.tipsQuiz||{})};Object.keys(prev.tipsQuiz).forEach(cid=>{merged.tipsQuiz[cid]=Array.from(new Set([...(merged.tipsQuiz[cid]||[]),...(prev.tipsQuiz[cid]||[])]));});}
+            if(prev.enemyDex){merged.enemyDex={...(merged.enemyDex||{})};Object.keys(prev.enemyDex).forEach(cid=>{merged.enemyDex[cid]=Array.from(new Set([...(merged.enemyDex[cid]||[]),...(prev.enemyDex[cid]||[])]));});}
             // バトル/育成の進行(EXP・チケットは多い方、HP/ボス解放はローカル優先)
             if(prev.monsterExp){merged.monsterExp={...(merged.monsterExp||{})};Object.keys(prev.monsterExp).forEach(cid=>{merged.monsterExp[cid]=Math.max(prev.monsterExp[cid]||0,merged.monsterExp[cid]||0);});}
             if(prev.battleTickets){merged.battleTickets={...(merged.battleTickets||{})};Object.keys(prev.battleTickets).forEach(cid=>{merged.battleTickets[cid]=Math.max(prev.battleTickets[cid]||0,merged.battleTickets[cid]||0);});}
@@ -1645,16 +1646,31 @@ function GachaAnim({ result, onClose }) {
 // ═══════════════════════════════════════════════════════
 // BATTLE MODE (野生CPUと対戦・育てた度で強くなる・勝利でガチャチケット)
 // ═══════════════════════════════════════════════════════
+// 敵＝「なまけの闇」の手下＝悪いお金の習慣の化身。倒す＝その習慣に打ち勝つ(story/lessonで物語化)
 const WILD_MONSTERS = [
-  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f", img:"wild_slime",  move:{n:"ねばねばショット", e:"🫧", c:"#7bd88f"}},
-  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff", img:"wild_bat",    move:{n:"ソニックウェーブ", e:"🌀", c:"#9b8cff"}},
-  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e", img:"wild_spike",  move:{n:"トゲミサイル", e:"📌", c:"#f0a35e"}},
-  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0", img:"wild_bone",   move:{n:"ホネつぶて", e:"🦴", c:"#cfd6e0"}},
-  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59", img:"wild_fire",   move:{n:"ひのたま", e:"🔥", c:"#ff7a59"}},
-  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", img:"wild_dragon", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"}},
+  {name:"スライムン",  emoji:"🟢", lv:1, color:"#7bd88f", img:"wild_slime",  move:{n:"ねばねばショット", e:"🫧", c:"#7bd88f"},
+    title:"さきのばしの精", story:"「あとでやろう」が口ぐせの さきのばしの精。ベタッと固まって 動けない。",
+    lesson:"やることは 小さいうちに 片付けると ラク。先のばしは どんどん 重くなるよ。"},
+  {name:"コウモリン",  emoji:"🦇", lv:2, color:"#9b8cff", img:"wild_bat",    move:{n:"ソニックウェーブ", e:"🌀", c:"#9b8cff"},
+    title:"よくばりの使い", story:"光るものを見ると 全部ほしくなる よくばりの使い。",
+    lesson:"「欲しい」と「必要」は ちがう。本当に いるか 考えてから 決めよう。"},
+  {name:"トゲちゃん",  emoji:"🦔", lv:3, color:"#f0a35e", img:"wild_spike",  move:{n:"トゲミサイル", e:"📌", c:"#f0a35e"},
+    title:"ムダづかいのトゲ", story:"衝動で チクチク 散財する ムダづかいのトゲ。",
+    lesson:"買う前に ひと呼吸。「これ、本当に いる？」と 考えるクセを つけよう。"},
+  {name:"ガイコツン",  emoji:"💀", lv:4, color:"#cfd6e0", img:"wild_bone",   move:{n:"ホネつぶて", e:"🦴", c:"#cfd6e0"},
+    title:"からっぽガイコツ", story:"お金を 全部 使い切って 骨だけに なった ガイコツ。",
+    lesson:"全部 使わず「とっておく分」を 残すと、いざという時 安心だよ。"},
+  {name:"オニビ",      emoji:"🔥", lv:5, color:"#ff7a59", img:"wild_fire",   move:{n:"ひのたま", e:"🔥", c:"#ff7a59"},
+    title:"しょうどうの炎", story:"「今すぐ買え！」と 燃え上がる しょうどうの炎。",
+    lesson:"熱が冷めるまで 一晩 待とう。朝には いらなく なってるかも。"},
+  {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", img:"wild_dragon", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"},
+    title:"ためこみの主", story:"宝を ためこみすぎて 動けなくなった 森の主。",
+    lesson:"ためるだけ じゃなく、使う・増やすで お金は 生きてくる。"},
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
-const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"}};
+const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"},
+  title:"なまけの王", story:"なまけの闇で 世界を 覆った王。でも 心の奥には 眠った光が ある。",
+  lesson:"なまけ(闇)も、毎日の お世話(努力)で 光に 変わる。倒した卵を 育ててみよう。"};
 // そうび(アイテム): ぶき＋たての2スロット。レア度(rarity)と強さは別。premium=貯金/目標達成で解放する最強クラス
 const EQUIPMENT = [
   // ── ぶき(weapon)＝こうげき系 ──
@@ -1879,6 +1895,7 @@ function BattleModal({child,data,update,onClose}){
   const useCap=(cap)=>{ if(curHP>=pMaxHP||((caps[cap.k]||0)<=0))return; const newHP=Math.min(curMonHP(data,child)+cap.heal,pMaxHP); update(d=>{ const cc={...(d.healCaps?.[child.id]||{})}; cc[cap.k]=Math.max(0,(cc[cap.k]||0)-1); return {...d, healCaps:{...(d.healCaps||{}),[child.id]:cc}, monsterHP:{...(d.monsterHP||{}),[child.id]:newHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}}; }); };
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
+  const [enemyInfo,setEnemyInfo]=useState(null);  // 敵の物語ポップ
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
   const oMaxHP = 50 + opp.lv*28;
@@ -1949,6 +1966,7 @@ function BattleModal({child,data,update,onClose}){
       if(r==="win"){
         nd.battleWins={...(d.battleWins||{}),[child.id]:((d.battleWins?.[child.id])||0)+1};
         nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today};  // 「今日1勝したか」=ミッション判定用
+        nd.enemyDex={...(d.enemyDex||{}),[child.id]:Array.from(new Set([...((d.enemyDex?.[child.id])||[]),opp.img]))};  // 図鑑: 倒した敵を登録
       }
       if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
       if(dropInfo?.kind==="cap"){ const cc={...(d.healCaps?.[child.id]||{})}; cc[dropInfo.cap]=(cc[dropInfo.cap]||0)+1; nd.healCaps={...(d.healCaps||{}),[child.id]:cc}; }
@@ -2055,7 +2073,8 @@ function BattleModal({child,data,update,onClose}){
             {WILD_MONSTERS.map((w,i)=>{
               const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
               const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
-              return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
+              return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
+                <span onClick={e=>{e.stopPropagation();setEnemyInfo(w);}} style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.14)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2}}>?</span>
                 <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
                 <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥":""}</div>
@@ -2064,7 +2083,8 @@ function BattleModal({child,data,update,onClose}){
               </button>;
             })}
             {bossUnlocked ? (
-              <button onClick={lowHP?undefined:()=>start(WILD_MONSTERS.length)} style={{background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
+              <button onClick={lowHP?undefined:()=>start(WILD_MONSTERS.length)} style={{position:"relative",background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
+                <span onClick={e=>{e.stopPropagation();setEnemyInfo(BOSS_MONSTER);}} style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.18)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2}}>?</span>
                 <img src={`/assets/${BOSS_MONSTER.img}.png`} style={{width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=BOSS_MONSTER.emoji;s.style.fontSize="40px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:900,fontSize:13,marginTop:4}}>{BOSS_MONSTER.name}</div>
                 <div style={{fontSize:11,color:BOSS_MONSTER.color,fontWeight:900,marginTop:2}}>Lv.{BOSS_MONSTER.lv} 👑ボス</div>
@@ -2153,6 +2173,19 @@ function BattleModal({child,data,update,onClose}){
       `}</style>
       {showEquip && <EquipModal child={child} data={data} update={update} onClose={()=>setShowEquip(false)}/>}
       {showSeason && <FamilyBattleSeason child={child} data={data} update={update} onClose={()=>setShowSeason(false)}/>}
+      {/* 敵の物語ポップ */}
+      {enemyInfo && (
+        <div onClick={()=>setEnemyInfo(null)} style={{position:"fixed",inset:0,background:"#000a",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:F}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#141226",border:`2px solid ${enemyInfo.color}`,borderRadius:20,padding:"22px 20px",maxWidth:340,width:"100%",textAlign:"center",boxShadow:`0 0 30px ${enemyInfo.color}80`}}>
+            <img src={`/assets/${enemyInfo.img}.png`} style={{width:84,height:84,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=enemyInfo.emoji;s.style.fontSize="64px";e.target.replaceWith(s);}}/>
+            <div style={{fontWeight:900,fontSize:18,color:"#fff",marginTop:6}}>{enemyInfo.name}</div>
+            <div style={{fontSize:12,fontWeight:800,color:enemyInfo.color,marginTop:2}}>{enemyInfo.title}・Lv.{enemyInfo.lv}</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.82)",lineHeight:1.7,margin:"12px 0",textAlign:"left"}}>{enemyInfo.story}</div>
+            <div style={{background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.35)",borderRadius:12,padding:"10px 12px",fontSize:12.5,color:"#bfe0ff",lineHeight:1.6,textAlign:"left"}}>💡 おかねの まなび<br/>{enemyInfo.lesson}</div>
+            <button onClick={()=>setEnemyInfo(null)} style={{marginTop:16,width:"100%",background:enemyInfo.color,border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>とじる</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7400,6 +7433,40 @@ function MonsterZukan({ data, child }) {
                 );
               })}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ── 👾 てきの図鑑(なまけの闇の手下・倒すと解放＝お金の学び) ── */}
+      {(()=>{
+        const dex = data.enemyDex?.[child.id] || [];
+        const enemies = [...WILD_MONSTERS, BOSS_MONSTER];
+        const got = enemies.filter(e=>dex.includes(e.img)).length;
+        return (
+          <div style={{marginTop:6,background:CARDS,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"10px 8px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+              <span style={{fontSize:12}}>👾</span>
+              <span style={{fontSize:11,fontWeight:900,color:TEXT}}>てきの図鑑（なまけの闇）</span>
+              <span style={{fontSize:10,color:MUTED,marginLeft:"auto"}}>{got}/{enemies.length}</span>
+            </div>
+            <div style={{fontSize:10,color:MUTED,marginBottom:8,lineHeight:1.5}}>倒すと 物語と「お金の学び」が 解放されるよ。</div>
+            {enemies.map(e=>{
+              const ok=dex.includes(e.img);
+              return (
+                <div key={e.img} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"7px 4px",borderTop:`1px solid ${BORDER}`}}>
+                  <div style={{width:36,height:36,flexShrink:0,filter:ok?"none":"brightness(0)",opacity:ok?1:0.5}}>
+                    <img src={`/assets/${e.img}.png`} alt="" style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={ev=>{ev.target.style.display="none";const sp=ev.target.nextSibling;if(sp)sp.style.display="block";}}/>
+                    <span style={{display:"none",fontSize:26}}>{ok?e.emoji:"❓"}</span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:800,color:ok?TEXT:MUTED}}>{ok?`${e.name}（${e.title}）`:"？？？"}<span style={{fontSize:10,color:GOLD,fontWeight:700,marginLeft:4}}>Lv.{e.lv}</span></div>
+                    {ok
+                      ? <div style={{fontSize:10.5,color:B,marginTop:2,lineHeight:1.5}}>💡 {e.lesson}</div>
+                      : <div style={{fontSize:10.5,color:MUTED,marginTop:2}}>🔒 倒すと わかる</div>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}
