@@ -4003,15 +4003,22 @@ function taskDueSig(d) {
 const taskPriColor = (p) => (p === "高" ? C.red : p === "低" ? C.faint : C.accent);
 
 // 繰り返しタスクの次回締切を計算（過去日なら未来まで送る）
+// monthly は「元の日」を保持し、月末日が無い月は末日に丸める（1/31→2/28 など。2/31バグ防止）
 function nextTaskDue(dueISO, repeat) {
   if (!dueISO || !repeat || repeat === "none") return "";
   const d = new Date(dueISO + "T00:00:00");
   if (isNaN(d.getTime())) return "";
   const today = startOfDay(new Date());
+  const targetDay = d.getDate();
   const step = () => {
     if (repeat === "daily") d.setDate(d.getDate() + 1);
     else if (repeat === "weekly") d.setDate(d.getDate() + 7);
-    else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
+    else if (repeat === "monthly") {
+      d.setDate(1); // 翌月への繰り越し溢れを防ぐ
+      d.setMonth(d.getMonth() + 1);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(targetDay, lastDay));
+    }
   };
   step();
   let guard = 0;
@@ -4201,6 +4208,7 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const [rep, setRep] = useState("none");
   const [editId, setEditId] = useState(null);
   const [view, setView] = useState("list"); // list | matrix
+  const [showDone, setShowDone] = useState(false); // 完了セクションは既定で折りたたみ
   const [e, setE] = useState({ title: "", due: "", time: "", priority: "中", repeat: "none" });
 
   const sortIn = (arr) => [...arr].sort((a, b) =>
@@ -4293,9 +4301,22 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
       {view === "list" && (
       <div style={{ display: "grid", gap: 6 }}>
         {list.length === 0 && <Empty>タスクはありません。</Empty>}
+        {list.length > 0 && <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5 }}>💡 左スワイプで完了・右スワイプで締切+1日（完了はもう一度タップで戻せます）</div>}
         {TASK_SECTIONS.map((sec) => {
           const arr = grouped[sec.k];
           if (!arr || !arr.length) return null;
+          // 完了セクションは折りたたみ式（既定で閉じる）
+          if (sec.k === "done") {
+            return (
+              <div key={sec.k} style={{ display: "grid", gap: 6 }}>
+                <button onClick={() => setShowDone((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: sec.color() }}>{showDone ? "▾" : "▸"} {sec.label}</span>
+                  <span style={{ fontSize: 11, color: C.faint }}>{arr.length}</span>
+                </button>
+                {showDone && arr.map(renderItem)}
+              </div>
+            );
+          }
           return (
             <div key={sec.k} style={{ display: "grid", gap: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
@@ -4314,8 +4335,8 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
           const arr = quad[q.k];
           return (
             <div key={q.k} style={{ background: C.panel2, border: `1px solid ${q.color()}55`, borderRadius: 12, padding: "10px 10px", minHeight: 96 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: q.color() }}>{q.label}</div>
-              <div style={{ fontSize: 10, color: C.faint, marginBottom: 6 }}>{q.sub}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: q.color() }}>{q.label}</div>
+              <div style={{ fontSize: 11, color: C.sub, marginBottom: 6 }}>{q.sub}</div>
               <div style={{ display: "grid", gap: 6 }}>
                 {arr.length === 0 ? <span style={{ fontSize: 11, color: C.faint }}>なし</span> : arr.map(matrixItem)}
               </div>
@@ -4350,9 +4371,10 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
 
 /* 習慣トラッカー（毎日チェック・連続日数・直近7日）。占術スタンスと連動した一言つき。 */
 const HABIT_PRESETS = [
+  { emoji: "📣", name: "発信1つ" }, { emoji: "📒", name: "カルテ更新" }, { emoji: "💰", name: "売上記録" },
+  { emoji: "🙆", name: "施術前ストレッチ" }, { emoji: "📨", name: "お礼メッセージ" },
   { emoji: "📖", name: "読書" }, { emoji: "🏃", name: "運動" }, { emoji: "🧘", name: "瞑想" },
-  { emoji: "💧", name: "水を飲む" }, { emoji: "📣", name: "発信1つ" }, { emoji: "😴", name: "早く寝る" },
-  { emoji: "📓", name: "日記" }, { emoji: "🥗", name: "野菜を食べる" },
+  { emoji: "💧", name: "水を飲む" }, { emoji: "😴", name: "早く寝る" }, { emoji: "📓", name: "日記" },
 ];
 function HabitPanel({ habits, birth, onToggleToday, onAdd, onRemove }) {
   const list = habits || [];
@@ -4776,9 +4798,12 @@ function AlertSummary({ alerts, notify, notifySupported, onEnableNotify }) {
     <Panel
       title="今日の要対応"
       accent={accent}
-      help="締切が過ぎた『遅れ』と、3日以内に迫った『もうすぐ』を自動でまとめます。取りこぼし防止用です。"
+      help="締切が過ぎた『遅れ』と、3日以内に迫った『もうすぐ』を自動でまとめます。取りこぼし防止用です。「通知オン」を押すと、明日締切などをお知らせします（iPhoneはホーム画面に追加すると届きます）。"
       right={notifySupported && !notify ? <button onClick={onEnableNotify} style={chipBtn}>通知オン</button> : (notify ? <span style={{ fontSize: 12, color: C.green }}>通知オン</span> : null)}
     >
+      {notifySupported && !notify && (
+        <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.5, marginBottom: 8 }}>🔔「通知オン」で明日締切・毎朝のまとめが届きます。iPhoneはホーム画面に追加が必要です。</div>
+      )}
       {none ? (
         <div style={{ fontSize: 14, color: C.green, lineHeight: 1.7 }}>今日の対応はぜんぶ片付いてるよ。よかった。</div>
       ) : (
@@ -4841,16 +4866,16 @@ function LoginGate({ onLogin, error }) {
   // ログイン前に「売り」を順に見せる価値訴求カルーセル（スワイプ／自動送り／ドット）
   const SLIDES = [
     { icon: "⏳", title: "締切を、勝手に逆算", desc: "本番の申込締切を1つ入れるだけで、予告・先行案内・リマインド・締切まで自動で並びます。", bg: "#3478D4" },
-    { icon: "🗓️", title: "運気カレンダー", desc: "あなたの命式から「攻め/守りの日」を計算。一粒万倍日・天赦日などの開運日と重ねて“いつ動くか”が決まります。", bg: "#187A4E" },
     { icon: "✅", title: "今日やる事だけ、1画面に", desc: "「明日15時 打合せ」と書くだけで自動登録。今日・明日で整理され、左スワイプで完了。", bg: "#7B61C9" },
     { icon: "💛", title: "お母さんみたいに面倒見る", desc: "朝は「今日はこれだけ」、前日は「明日締切だよ」、開かない日が続くと「最近どう？」が届きます。", bg: "#E8B83E" },
+    { icon: "🗓️", title: "運気カレンダー", desc: "その日のコンディションの傾向（攻め/守りの日）を計算。開運日と重ねて“いつ動くか”の目安になります。※占いではありません。", bg: "#187A4E" },
     { icon: "💰", title: "買い切り ¥10,000", desc: "サブスクなし・更新手続き不要。一度の購入で、ぜんぶの機能をずっと使えます。", bg: "#D95C55" },
   ];
   const [slide, setSlide] = useState(0);
   const slideTouch = useRef(null);
   const pausedRef = useRef(false);
   useEffect(() => {
-    const id = setInterval(() => { if (!pausedRef.current) setSlide((s) => (s + 1) % SLIDES.length); }, 4500);
+    const id = setInterval(() => { if (!pausedRef.current) setSlide((s) => (s + 1) % SLIDES.length); }, 6500);
     return () => clearInterval(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const onSlideStart = (ev) => { pausedRef.current = true; slideTouch.current = ev.touches[0].clientX; };
@@ -4890,11 +4915,11 @@ function LoginGate({ onLogin, error }) {
               ))}
             </div>
           </div>
-          {/* ドット */}
-          <div style={{ display: "flex", gap: 7, justifyContent: "center", marginTop: 12 }}>
+          {/* ドット（タップでめくれる・指で押しやすいサイズ） */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
             {SLIDES.map((f, i) => (
               <button key={f.title} onClick={() => { pausedRef.current = true; setSlide(i); }} aria-label={`スライド${i + 1}`}
-                style={{ width: i === slide ? 22 : 8, height: 8, borderRadius: 999, border: "none", background: i === slide ? C.accent : C.line, cursor: "pointer", transition: "width .25s ease", padding: 0 }} />
+                style={{ width: i === slide ? 28 : 10, height: 10, borderRadius: 999, border: "none", background: i === slide ? C.accent : C.line, cursor: "pointer", transition: "width .25s ease", padding: 0 }} />
             ))}
           </div>
         </div>
