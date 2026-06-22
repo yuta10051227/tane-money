@@ -687,7 +687,7 @@ const DARK_EGG_STAGES = [
   { min:9,  stage:"成長期",  name:"ヤミドラゴ",    emoji:"🐲", sprite:"yami3",
     desc:"子竜らしく なってきた。小さな ツノと 牙が 生えた。",
     edu:"ここまで 続けられたのが すごい。やめずに 続ける力が、いちばんの 才能だよ。" },
-  { min:13, stage:"成熟期",  name:"ヤミウィング",  emoji:"🦇", sprite:"yami4",
+  { min:13, stage:"成熟期",  name:"ヤミノツバサ",  emoji:"🦇", sprite:"yami4",
     desc:"大きな 翼が 生えた 闇の竜。空を かけるように なった。",
     edu:"コツコツの つみ重ねが、目に見える 大きな力に なってきた。投資の 複利と おなじだね。" },
   { min:17, stage:"完全体",  name:"ヤミノリュウ",emoji:"🐉", sprite:"yami5",
