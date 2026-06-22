@@ -2213,7 +2213,7 @@ const NEWS = [
   {id:"n09", e:"🆙", t:"モンスターに レベル登場！", b:"お手伝い・なでなで・バトル勝利で EXP が貯まって レベルアップ！レベルが上がると HP・こうげき・ぼうぎょ が強くなるよ。個体値(才能)が高い子ほど ぐんぐん伸びる！"},
   {id:"n08", e:"⚔", t:"モンスターバトル＆ボス登場！", b:"育てたモンスターで野生モンスターとバトル！「⚔モンスターバトル」ボタンから。3ターン勝負で、勝つと🎟ガチャチケットがもらえてガチャをもう1回引けるよ。ヌシ・ドラゴに勝つと秘密のボスも出現！"},
   {id:"n07", e:"❤", t:"バトルはHPを持ち越し", b:"バトルで減ったHPは、お手伝い・なでなで で回復するよ。つかれてると戦えないので、お世話してあげよう（あさになると元気に！）。"},
-  {id:"n06", e:"💩", t:"サボりモンに気をつけて", b:"1日タップもタスクもしないと、モンスターが一時的に「サボりモン」に変身…！タップかタスク1つで すぐ元に戻るよ（進化は消えません）。"},
+  {id:"n06", e:"💩", t:"怠けもんに気をつけて", b:"24時間 なでなでも タスクもしないと、モンスターが一時的に「怠けもん」に変身…！なでなでか タスク1つで すぐ元に戻るよ（進化や 育てた度は 消えません）。毎日 かまってあげてね。"},
   {id:"n05", e:"🐾", t:"ひみつのなかま 8体追加", b:"記録タブの「ひみつのなかま」に、コインリス・ブタコ・まねきネコ など8体を追加。たくさんクリアすると解放され、タップで“すがた”を変えられるよ。"},
   {id:"n04", e:"🎨", t:"アプリのアイコンがドット絵に", b:"ホームの統計や見出しのアイコンを、オリジナルのドット絵に変更中。メンバー編集から“ドット絵アバター”も選べます。"},
   {id:"n03", e:"📅", t:"おてつだいが 平日/休日タブに", b:"毎日のおてつだいを、平日／休日のタブで切り替えられるようになりました。今日に合うタブが自動で開きます。"},
@@ -6975,10 +6975,13 @@ function SeedMonster({ child, data, size=90, update }) {
                        : Math.floor(frame / 5) % 2;
   // どうぶつ仲間スキン(gacha_gs_*)は2コマ(a/b)でぴょこぴょこ
   const gsSkin         = skinActive && skinDef && skinDef.sprite ? skinDef.sprite : null;
-  // ── サボり退化(一時的): 今日タップもタスクも無いと"サボりモン"に一時変身。タップ/タスクで即もとに戻る・進化や育てた度は失わない ──
-  const _caredTap  = ((data.monsterCare||{})[child.id]||{}).last === todayKey();
-  const _caredTask = myLogs.some(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO()));
-  const neglected  = !evolving && !hatching && monsterId!=="egg" && !_caredTap && !_caredTask;
+  // ── 怠けもん退化(一時的): 最後の接触(なでなで or タスク)から24時間で"怠けもん"に変身。なでなで/タスクで即もとに戻る・進化や育てた度は失わない ──
+  const _careRec    = (data.monsterCare||{})[child.id]||{};
+  const _caredToday = _careRec.last === todayKey();
+  const _careTs     = _careRec.ts || 0;
+  const _taskTs     = myLogs.reduce((mx,l)=>((l.type==="good"||l.type==="daily")?Math.max(mx,new Date(l.date).getTime()||0):mx),0);
+  const _lastTouch  = Math.max(_careTs,_taskTs);
+  const neglected   = !evolving && !hatching && monsterId!=="egg" && !_caredToday && _lastTouch>0 && (Date.now()-_lastTouch >= 86400000);
   const imgSrc         = neglected
     ? `/assets/monster_neglect_${(Math.floor(frame/6)%2)?"b":"a"}.png`
     : gsSkin
@@ -7040,7 +7043,7 @@ function SeedMonster({ child, data, size=90, update }) {
           const c = (d.monsterCare||{})[child.id] || {};
           if (c.last === today) return d;
           // なでなで(1日1回)でHPも回復
-          return careMon({...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today}}}, child.id, 0.3, 5);
+          return careMon({...d, monsterCare: {...(d.monsterCare||{}), [child.id]: {days:(c.days||0)+1, last:today, ts:Date.now()}}}, child.id, 0.3, 5);
         });
       }
     }
