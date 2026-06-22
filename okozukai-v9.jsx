@@ -3538,8 +3538,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   // 5-tab grouped nav
   const MAIN_TABS = isJunior
-    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"],["rpg","🐣 そだてる"]]
-    : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["rpg","そだてる"],["more","記録"]];
+    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"]]
+    : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
     tasks:"activity", invest:"activity", kakeibo:"money",
@@ -3749,6 +3749,19 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })}
       </div>
 
+      {/* 🐣 そだてる フローティングボタン(ガチャと同様・rpg以外の画面で左下に常駐) */}
+      {effectiveTab!=="rpg" && (
+        <button onClick={()=>setTab("rpg")} aria-label="そだてる"
+          style={{position:"fixed",left:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
+            background:"radial-gradient(circle at 35% 35%,#b07bff,#7b61c9)",boxShadow:"0 6px 22px rgba(123,97,201,.6)",
+            cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
+            animation:"sodateFab 1.8s ease-in-out infinite"}}>
+          <span style={{fontSize:26,lineHeight:1}}>🐣</span>
+          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>そだてる</span>
+          <style>{`@keyframes sodateFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
+        </button>
+      )}
+
       {/* 📢 おしらせ(新機能の告知) */}
       {effectiveTab==="daily" && (
         <div style={{padding:"10px 16px 0"}}>
@@ -3811,6 +3824,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── 🐣 そだてる(rpg)タブ: モンスターのハブ ── */}
       {effectiveTab==="rpg" && (
         <div style={{padding:"14px 16px 4px"}}>
+          <button onClick={()=>setTab("daily")} style={{display:"flex",alignItems:"center",gap:6,background:darkBG?"rgba(255,255,255,0.08)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.15)":BORDER}`,borderRadius:999,padding:"7px 14px",color:darkBG?"#fff":TEXT,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F,marginBottom:10}}>← もどる</button>
           <div style={{textAlign:"center",marginBottom:6}}>
             <SeedMonster child={child} data={data} size={120} update={update}/>
           </div>
