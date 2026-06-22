@@ -2513,7 +2513,7 @@ const STANCE_UI = dyn(() => { const t = THEMES[THEME_NAME]; return {
   整える: { color: t.accent, mark: "整", tip: "淡々と整える日" },
   守り: { color: t.red, mark: "守", tip: "守りを固める・背伸びしない" },
 }; });
-function BizCalendar({ birth, trips, deadlines, launches, events, onPlan, profile }) {
+function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan, profile }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
   const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
@@ -2538,8 +2538,9 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan, profil
     for (const d of deadlines || []) add(d.date, d.title);
     for (const L of launches || []) { add(L.deadlineReg, `${L.name} 先行締切`); add(L.deadlineCv, `${L.name} 本申込締切`); }
     for (const e of events || []) add(e.date, e.title); // 同期(Googleカレンダー)・取り込み予定
+    for (const tk of tasks || []) { if (!tk.done && tk.due) add(tk.due, `✓${tk.title}`); } // 締切つき未完タスク
     return m;
-  }, [trips, deadlines, launches, events]);
+  }, [trips, deadlines, launches, events, tasks]);
 
   if (!birth || !birth.date) return null; // 出生情報が無いときは出さない（FortunePanel側で入力導線を出す）
 
@@ -2648,7 +2649,7 @@ function BizCalendar({ birth, trips, deadlines, launches, events, onPlan, profil
             <span style={{ width: 16, height: 16, borderRadius: 4, background: v.color + "33", border: `1px solid ${v.color}`, color: v.color, fontSize: 12, fontWeight: 700, display: "grid", placeItems: "center" }}>{v.mark}</span>{k}
           </span>
         ))}
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定あり</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ width: 5, height: 5, borderRadius: "50%", background: C.purple }} />予定・締切・タスク</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>✨開運日（タップで詳細）</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><span style={{ fontSize: 12, color: C.green }}>■</span>攻め×開運日</span>
       </div>
@@ -3919,80 +3920,238 @@ function CheckList({ title, accent, items, onToggle, onAdd, onEdit, onRemove, re
   );
 }
 
-/* タスク（締切・優先度つき。並び＝未完了→優先度→締切） */
+/* タスク（締切・優先度・繰り返しつき。並び＝未完了→優先度→締切） */
 const TASK_PRI = ["高", "中", "低"];
 const PRI_W = { 高: 0, 中: 1, 低: 2 };
+const TASK_REPEAT = [
+  { v: "none", label: "繰り返しなし" },
+  { v: "daily", label: "毎日" },
+  { v: "weekly", label: "毎週" },
+  { v: "monthly", label: "毎月" },
+];
+const REPEAT_BADGE = { daily: "🔁毎日", weekly: "🔁毎週", monthly: "🔁毎月" };
+
+// 締切の残り表示シグナル
+function taskDueSig(d) {
+  if (!d) return null;
+  const diff = daysUntil(d);
+  if (diff < 0) return { c: C.red, t: `${-diff}日超過` };
+  if (diff === 0) return { c: C.red, t: "今日まで" };
+  if (diff <= 3) return { c: C.orange, t: `あと${diff}日` };
+  return { c: C.sub, t: `あと${diff}日` };
+}
+const taskPriColor = (p) => (p === "高" ? C.red : p === "低" ? C.faint : C.accent);
+
+// 繰り返しタスクの次回締切を計算（過去日なら未来まで送る）
+function nextTaskDue(dueISO, repeat) {
+  if (!dueISO || !repeat || repeat === "none") return "";
+  const d = new Date(dueISO + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  const today = startOfDay(new Date());
+  const step = () => {
+    if (repeat === "daily") d.setDate(d.getDate() + 1);
+    else if (repeat === "weekly") d.setDate(d.getDate() + 7);
+    else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
+  };
+  step();
+  let guard = 0;
+  while (startOfDay(d) < today && guard < 500) { step(); guard++; }
+  return iso(d);
+}
+
+/* 自然言語パース：タスク文字列から締切・優先度・繰り返しを推定し、本文から該当語を除く。
+   例: "金曜 振込" → {title:"振込", due:<次の金曜>} / "急ぎ 見積もり" → priority:高
+       "毎月25日 家賃" → {title:"家賃", due:<次の25日>, repeat:"monthly"} */
+function parseQuickTask(raw) {
+  let s = String(raw || "").trim();
+  let due = "", priority = null, repeat = "none";
+  const today = startOfDay(new Date());
+
+  // 繰り返し語（先に拾う）
+  if (/毎日/.test(s)) { repeat = "daily"; s = s.replace(/毎日/g, "").trim(); }
+  else if (/毎週/.test(s)) { repeat = "weekly"; s = s.replace(/毎週/g, "").trim(); }
+  else if (/毎月/.test(s)) { repeat = "monthly"; s = s.replace(/毎月/g, "").trim(); }
+
+  // 優先度語
+  if (/(！！|!!|至急|大至急)/.test(s)) { priority = "高"; s = s.replace(/(！！|!!|至急|大至急)/g, "").trim(); }
+  else if (/(！|!|急ぎ|急|重要|最優先)/.test(s)) { priority = "高"; s = s.replace(/(！|!|急ぎ|急|重要|最優先)/g, "").trim(); }
+  else if (/(いつでも|あとで|後で|余裕)/.test(s)) { priority = "低"; s = s.replace(/(いつでも|あとで|後で|余裕)/g, "").trim(); }
+
+  // 相対日
+  let matched = false;
+  for (const [re, n] of [[/明々後日|しあさって/, 3], [/明後日|あさって/, 2], [/明日|あした|あす/, 1], [/今日|本日|きょう/, 0]]) {
+    if (re.test(s)) { due = iso(addDays(today, n)); s = s.replace(re, "").trim(); matched = true; break; }
+  }
+  // N日後 / N週間後
+  if (!matched) {
+    let m = s.match(/(\d+)\s*日後/);
+    if (m) { due = iso(addDays(today, +m[1])); s = s.replace(m[0], "").trim(); matched = true; }
+    else if ((m = s.match(/(\d+)\s*週間?後/))) { due = iso(addDays(today, +m[1] * 7)); s = s.replace(m[0], "").trim(); matched = true; }
+  }
+  // 曜日（来週/今週/次の + 曜日、または単独曜日＝次に来るその曜日）
+  if (!matched) {
+    const WDMAP = { 日: 0, 月: 1, 火: 2, 水: 3, 木: 4, 金: 5, 土: 6 };
+    const m = s.match(/(来週|今週|次の)?\s*([日月火水木金土])曜(日)?/);
+    if (m) {
+      let add = (WDMAP[m[2]] - today.getDay() + 7) % 7;
+      if (add === 0) add = 7;            // 同じ曜日は次週扱い
+      if (m[1] === "来週") add += 7;
+      due = iso(addDays(today, add)); s = s.replace(m[0], "").trim(); matched = true;
+    }
+  }
+  // 月末
+  if (!matched) {
+    if (/来月末/.test(s)) { due = iso(new Date(today.getFullYear(), today.getMonth() + 2, 0)); s = s.replace(/来月末/, "").trim(); matched = true; }
+    else if (/(今月末|月末)/.test(s)) { due = iso(new Date(today.getFullYear(), today.getMonth() + 1, 0)); s = s.replace(/(今月末|月末)/, "").trim(); matched = true; }
+  }
+  // M/D・M月D日・D日
+  if (!matched) {
+    let m = s.match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?/);
+    if (m) {
+      let d = new Date(today.getFullYear(), +m[1] - 1, +m[2]);
+      if (startOfDay(d) < today) d = new Date(today.getFullYear() + 1, +m[1] - 1, +m[2]);
+      due = iso(d); s = s.replace(m[0], "").trim(); matched = true;
+    } else if ((m = s.match(/(\d{1,2})\s*日/))) {
+      let d = new Date(today.getFullYear(), today.getMonth(), +m[1]);
+      if (startOfDay(d) < today) d = new Date(today.getFullYear(), today.getMonth() + 1, +m[1]);
+      due = iso(d); s = s.replace(m[0], "").trim(); matched = true;
+    }
+  }
+
+  s = s.replace(/\s{2,}/g, " ").trim();
+  return { title: s, due, priority, repeat };
+}
+
+/* 1タスク行（左スワイプで完了 / 右スワイプで締切+1日）。タッチ非対応でもボタンで操作可。 */
+function TaskRow({ it, onToggle, onEdit, onRemove, onStartEdit }) {
+  const [dx, setDx] = useState(0);
+  const start = useRef(null);
+  const sig = taskDueSig(it.due);
+  const isSample = String(it.title || "").startsWith("（例）");
+  const canSnooze = !!it.due && !it.done;
+
+  const onTouchStart = (ev) => { const t = ev.touches[0]; start.current = { x: t.clientX, y: t.clientY, dir: null }; };
+  const onTouchMove = (ev) => {
+    if (!start.current) return;
+    const t = ev.touches[0];
+    const mx = t.clientX - start.current.x, my = t.clientY - start.current.y;
+    if (start.current.dir === null && (Math.abs(mx) > 8 || Math.abs(my) > 8)) start.current.dir = Math.abs(mx) > Math.abs(my) ? "h" : "v";
+    if (start.current.dir === "h") setDx(Math.max(-120, Math.min(120, mx)));
+  };
+  const onTouchEnd = () => {
+    if (start.current && start.current.dir === "h") {
+      if (dx <= -60) onToggle(it.id);
+      else if (dx >= 60 && canSnooze) onEdit(it.id, { due: iso(addDays(new Date(it.due), 1)) });
+    }
+    setDx(0); start.current = null;
+  };
+
+  // スワイプ中に背面に出すヒント
+  const leftHint = dx < -20;   // 完了
+  const rightHint = dx > 20 && canSnooze; // +1日
+  return (
+    <div style={{ position: "relative", overflow: "hidden", borderRadius: 10 }}>
+      {/* 背面ヒント */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", borderRadius: 10, background: leftHint ? C.green + "22" : rightHint ? C.orange + "22" : "transparent" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.orange, opacity: rightHint ? 1 : 0 }}>📅 +1日</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.green, opacity: leftHint ? 1 : 0 }}>✓ 完了</span>
+      </div>
+      {/* 前面（スワイプで動く） */}
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 10, background: C.panel, borderRadius: 10, transform: `translateX(${dx}px)`, transition: dx === 0 ? "transform .18s ease" : "none", padding: "2px 0" }}
+      >
+        <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
+          <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: taskPriColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
+            {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
+            {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
+            {it.repeat && it.repeat !== "none" && <span style={{ fontSize: 12, color: C.purple, fontWeight: 600 }}>{REPEAT_BADGE[it.repeat]}</span>}
+          </div>
+          {isSample && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>削除して自分のタスクを追加してください</div>}
+        </div>
+        <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+          <button onClick={onStartEdit} style={iconBtn} title="編集">✏️</button>
+          <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const list = items || [];
   const [text, setText] = useState("");
   const [due, setDue] = useState("");
   const [pri, setPri] = useState("中");
+  const [rep, setRep] = useState("none");
   const [editId, setEditId] = useState(null);
-  const [e, setE] = useState({ title: "", due: "", priority: "中" });
-  const dueSig = (d) => {
-    if (!d) return null;
-    const diff = Math.ceil((new Date(d) - new Date()) / 86400000);
-    if (diff < 0) return { c: C.red, t: `${-diff}日超過` };
-    if (diff === 0) return { c: C.red, t: "今日まで" };
-    if (diff <= 3) return { c: C.orange, t: `あと${diff}日` };
-    return { c: C.sub, t: `あと${diff}日` };
-  };
-  const priColor = (p) => (p === "高" ? C.red : p === "低" ? C.faint : C.accent);
+  const [e, setE] = useState({ title: "", due: "", priority: "中", repeat: "none" });
   const sorted = [...list].sort((a, b) =>
     (a.done ? 1 : 0) - (b.done ? 1 : 0)
     || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
     || (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
   );
-  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, due: it.due || "", priority: it.priority || "中" }); };
-  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), due: e.due || "", priority: e.priority }); setEditId(null); };
+  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, due: it.due || "", priority: it.priority || "中", repeat: it.repeat || "none" }); };
+  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), due: e.due || "", priority: e.priority, repeat: e.repeat || "none" }); setEditId(null); };
+
+  // 入力中の自然言語プレビュー（締切・優先度・繰り返しを検出）
+  const preview = useMemo(() => (text.trim() ? parseQuickTask(text) : null), [text]);
+  const submit = (ev) => {
+    ev.preventDefault();
+    if (!text.trim()) return;
+    const p = parseQuickTask(text);
+    if (!p.title) return;
+    onAdd({
+      title: p.title,
+      due: p.due || due || "",
+      priority: p.priority || pri,
+      repeat: p.repeat !== "none" ? p.repeat : rep,
+    });
+    setText(""); setDue(""); setPri("中"); setRep("none");
+  };
+
   return (
-    <Panel title="追加タスク" accent={C.purple} help="締切と優先度をつけて管理できます。締切が近い・過ぎたタスクは色で警告。並びは『未完了 → 優先度（高→低）→ 締切が近い順』です。">
-      <div style={{ display: "grid", gap: 8 }}>
+    <Panel title="追加タスク" accent={C.purple} help="「金曜 振込」「毎月25日 家賃」「急ぎ 見積り」のように書くと、締切・優先度・繰り返しを自動で読み取ります。タスクは左スワイプで完了、右スワイプで締切を1日延ばせます。並びは『未完了 → 優先度（高→低）→ 締切が近い順』です。">
+      <div style={{ display: "grid", gap: 6 }}>
         {sorted.length === 0 && <Empty>タスクはありません。</Empty>}
-        {sorted.map((it) => {
-          const sig = dueSig(it.due);
-          const isTaskSample = String(it.title || "").startsWith("（例）");
-          return (
-            <div key={it.id}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
-                {editId === it.id ? (
-                  <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
-                    <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
-                      <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
-                      <button onClick={saveEdit} style={chipBtn}>保存</button>
-                      <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
-                    <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: priColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
-                      {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
-                      {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
-                    </div>
-                  </div>
-                )}
-                {editId !== it.id && (
-                  <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
-                    <button onClick={() => startEdit(it)} style={iconBtn} title="編集">✏️</button>
-                    <button onClick={() => onRemove(it.id)} style={iconBtn} title="削除">✕</button>
-                  </div>
-                )}
+        {sorted.map((it) => (
+          editId === it.id ? (
+            <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+              <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+                <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+                  <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+                  <select value={e.repeat} onChange={(ev) => setE({ ...e, repeat: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 120 }}>{TASK_REPEAT.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}</select>
+                  <button onClick={saveEdit} style={chipBtn}>保存</button>
+                  <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+                </div>
               </div>
-              {isTaskSample && <div style={{ fontSize: 12, color: C.faint, paddingLeft: 50, marginTop: 2 }}>削除して自分のタスクを追加してください</div>}
             </div>
-          );
-        })}
+          ) : (
+            <TaskRow key={it.id} it={it} onToggle={onToggle} onEdit={onEdit} onRemove={onRemove} onStartEdit={() => startEdit(it)} />
+          )
+        ))}
       </div>
-      <form onSubmit={(ev) => { ev.preventDefault(); if (!text.trim()) return; onAdd({ title: text.trim(), due: due || "", priority: pri }); setText(""); setDue(""); setPri("中"); }} style={{ display: "grid", gap: 6, marginTop: 12 }}>
-        <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="タスクを追加…" style={{ ...inp, marginBottom: 0 }} />
+      <form onSubmit={submit} style={{ display: "grid", gap: 6, marginTop: 12 }}>
+        <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="例）金曜 振込／毎月25日 家賃／急ぎ 見積り" style={{ ...inp, marginBottom: 0 }} />
+        {preview && (preview.due || preview.priority || preview.repeat !== "none") && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
+            <span style={{ color: C.sub }}>自動検出：</span>
+            {preview.due && <span style={{ background: C.green + "22", color: C.green, borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>📅 {fmt(preview.due)}</span>}
+            {preview.priority && <span style={{ background: taskPriColor(preview.priority) + "22", color: taskPriColor(preview.priority), borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>優先{preview.priority}</span>}
+            {preview.repeat !== "none" && <span style={{ background: C.purple + "22", color: C.purple, borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>{REPEAT_BADGE[preview.repeat]}</span>}
+            {preview.title && <span style={{ color: C.faint }}>→「{preview.title}」</span>}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} title="締切（任意）" style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
+          <input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} title="締切（任意・文章でも指定可）" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
           <select value={pri} onChange={(ev) => setPri(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+          <select value={rep} onChange={(ev) => setRep(ev.target.value)} title="繰り返し（任意）" style={{ ...inp, marginBottom: 0, width: 120 }}>{TASK_REPEAT.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}</select>
           <button type="submit" style={{ ...chipBtn, background: C.purple, color: C.invText, borderColor: C.purple }}>追加</button>
         </div>
       </form>
@@ -5008,6 +5167,20 @@ export default function App() {
   const tasks = makeListOps("tasks");
   const feedsOps = makeListOps("feeds");
 
+  // タスク完了トグル：繰り返し設定があれば、完了時に次回ぶんを自動生成する
+  const toggleTask = (id) => {
+    const list = data.tasks || [];
+    const t = list.find((x) => x.id === id);
+    if (!t) { tasks.toggle(id); return; }
+    if (!t.done && t.repeat && t.repeat !== "none" && t.due) {
+      const next = nextTaskDue(t.due, t.repeat);
+      const clone = { ...t, id: "t" + Date.now(), done: false, due: next };
+      update({ tasks: [...list.map((x) => (x.id === id ? { ...x, done: true } : x)), clone] });
+    } else {
+      tasks.toggle(id);
+    }
+  };
+
   const today = new Date();
   const dateLabel = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${WD[today.getDay()]})`;
 
@@ -5453,7 +5626,7 @@ export default function App() {
         {activeTab === "tasks" && (
           <TaskList
             items={data.tasks}
-            onToggle={tasks.toggle}
+            onToggle={toggleTask}
             onAdd={tasks.add}
             onEdit={tasks.edit}
             onRemove={tasks.remove}
@@ -5485,6 +5658,7 @@ export default function App() {
                 trips={data.trips}
                 deadlines={data.deadlines}
                 launches={data.launches}
+                tasks={data.tasks}
                 events={pool.map((e) => ({ date: `${e.start.getFullYear()}-${pad2(e.start.getMonth() + 1)}-${pad2(e.start.getDate())}`, title: e.title }))}
                 onPlan={(d) => addDeadline({ title: fortuneProfile && fortuneProfile.occupation === "president" ? "重要決断・商談" : "発信・告知", stage: "告知", date: d })}
                 profile={fortuneProfile}
