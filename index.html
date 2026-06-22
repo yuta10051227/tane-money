@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="31d6948">
+<meta name="tane-version" content="4294222">
 </head>
 <body>
   <div id="root"></div>
@@ -63,7 +63,8 @@ try{localStorage.setItem(LOCAL_KEY+"_"+code,json);}catch(e){}try{localStorage.se
 // ログが溜まりすぎたらドキュメント側は古い分を「くりこし」1行に集約（1MB上限で保存が
 // 静かに失敗するのを防ぐ）。全ログはlogsサブコレクションに恒久保存されている。
 let docJson=json;if((d.logs||[]).length>4000){const keep=d.logs.slice(0,3600);const old=d.logs.slice(3600).filter(l=>!String(l.id||"").startsWith("carry_"));const sums={};d.logs.slice(3600).forEach(l=>{sums[l.cid]=(sums[l.cid]||0)+(l.pts||0);});const oldestDate=d.logs[d.logs.length-1]?.date||new Date().toISOString();const carry=Object.entries(sums).map(([cid,pts])=>({id:"carry_"+cid,cid,type:"grant",label:"くりこし（これより前の合計）",pts,date:oldestDate}));docJson=JSON.stringify({...d,logs:[...keep,...carry]});}_pendingSave=docJson;// ドキュメントサイズを監視（1MB上限の手前で親に警告を出す）
-const near=byteLen(docJson)>SAVE_BYTE_WARN;reportSaveHealth({near,bytes:byteLen(docJson)});if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(async()=>{if(!code||code==="default"){reportSaveHealth({ok:true,failStreak:0});return;}const db=getDB();if(!db){reportSaveHealth({ok:true,failStreak:0});return;}try{const ts=new Date().toISOString();_lastSyncTime=ts;await db.collection("families").doc(code).set({data:_pendingSave,updatedAt:ts});reportSaveHealth({ok:true,failStreak:0});}catch(e){console.warn("Firestore save failed:",e);// 2回連続で失敗したら警告（一時的なネット瞬断で過剰に出さない）
+const near=byteLen(docJson)>SAVE_BYTE_WARN;reportSaveHealth({near,bytes:byteLen(docJson)});if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(async()=>{if(!code||code==="default"){reportSaveHealth({ok:true,failStreak:0});return;}const db=getDB();if(!db){reportSaveHealth({ok:true,failStreak:0});return;}try{const ts=new Date().toISOString();await db.collection("families").doc(code).set({data:_pendingSave,updatedAt:ts});_lastSyncTime=ts;// 書き込み成功後にセット＝失敗時に自己スナップショット除外が誤動作しない
+reportSaveHealth({ok:true,failStreak:0});}catch(e){console.warn("Firestore save failed:",e);// 2回連続で失敗したら警告（一時的なネット瞬断で過剰に出さない）
 reportSaveHealth({failStreak:_saveHealth.failStreak+1,ok:_saveHealth.failStreak+1<2});}},1000);// 1秒デバウンス（目標・設定変更が素早く保存される）
 // 3. Claude.ai内ならwindow.storageにも保存
 if(hasCloudStorage()){try{await window.storage.set(CLOUD_KEY,json);}catch(e){}}}async function cloudLoad(){const code=getFamilyCode();// 1. Firestoreから読む（最優先・他デバイスと同期）

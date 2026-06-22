@@ -163,8 +163,8 @@ async function cloudSave(d) {
     if(!db){ reportSaveHealth({ok:true, failStreak:0}); return; }
     try{
       const ts = new Date().toISOString();
-      _lastSyncTime = ts;
       await db.collection("families").doc(code).set({data:_pendingSave,updatedAt:ts});
+      _lastSyncTime = ts;  // 書き込み成功後にセット＝失敗時に自己スナップショット除外が誤動作しない
       reportSaveHealth({ok:true, failStreak:0});
     }catch(e){
       console.warn("Firestore save failed:",e);
