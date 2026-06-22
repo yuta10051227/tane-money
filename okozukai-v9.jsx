@@ -1918,6 +1918,7 @@ function BattleModal({child,data,update,onClose}){
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
   const [enemyInfo,setEnemyInfo]=useState(null);  // 敵の物語ポップ
+  const [supFlash,setSupFlash]=useState(false);   // サポート精霊が手伝った時のフラッシュ
   const [auto,setAuto]=useState(()=>{try{return localStorage.getItem("tane_autobattle")==="1";}catch(e){return false;}});  // オートバトル
   const toggleAuto=()=>setAuto(a=>{const n=!a;try{localStorage.setItem("tane_autobattle",n?"1":"0");}catch(e){} return n;});
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
@@ -1996,12 +1997,8 @@ function BattleModal({child,data,update,onClose}){
       if(dropInfo?.kind==="cap"){ const cc={...(d.healCaps?.[child.id]||{})}; cc[dropInfo.cap]=(cc[dropInfo.cap]||0)+1; nd.healCaps={...(d.healCaps||{}),[child.id]:cc}; }
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(dropInfo?.kind==="egg"){
-        nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積・永続)＝倒した本人の個別報酬
-        // 家族の誰か1人がドロップすれば、まだ卵を持っていない家族 全員に育成卵を配布
-        const _members=[...(d.children||[]),...(d.parents||[])];
-        const _de={...(d.darkEgg||{})};
-        _members.forEach(m=>{ if(m&&!_de[m.id]) _de[m.id]={care:0,last:""}; });
-        nd.darkEgg=_de;
+        nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積)
+        if(!(d.darkEgg?.[child.id])) nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}};  // 倒した本人だけが入手
       }
       // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
       if(r==="win"){
@@ -2036,7 +2033,7 @@ function BattleModal({child,data,update,onClose}){
       let bd=0,bh=0;
       sup.list.forEach(b=>{ if(Math.random()>=supChance) return; if(b.k==="atk") bd+=SUP_ATK; else if(b.k==="heal") bh+=SUP_HEAL; else { const r=Math.random(); if(r<0.5) bd+=SUP_ATK; else if(r<0.85) bh+=SUP_HEAL; } });
       const fO=Math.max(0,newO-bd), fP=Math.min(pMaxHP,newP+bh);
-      if(bd||bh){ setLog(`🤝 サポートなかま！${bd?` ⚔-${bd}`:""}${bh?` 💚+${bh}`:""}`); if(bd){setOHP(fO);setHit({who:"opp",dmg:bd});t(()=>setHit(null),450);} if(bh) setPHP(fP); buzz([25]); }
+      if(bd||bh){ setLog(`🤝 サポートなかま！${bd?` ⚔-${bd}`:""}${bh?` 💚+${bh}`:""}`); setSupFlash(true); t(()=>setSupFlash(false),800); if(bd){setOHP(fO);setHit({who:"opp",dmg:bd});t(()=>setHit(null),450);} if(bh) setPHP(fP); buzz([25]); }
       t(()=>{
         if(bd && fO<=0){ finish("win",fP); return; }
         if(round>=MAXR){ finishByHP(fO,fP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); }
@@ -2167,6 +2164,14 @@ function BattleModal({child,data,update,onClose}){
             <img src={pImg} style={{width:104,height:104,objectFit:"contain",imageRendering:"pixelated",filter:hit?.who==="player"?"brightness(3) drop-shadow(0 0 10px #fff)":"none",animation:hit?.who==="player"?"btShake .4s":"btIdle 2.4s ease-in-out infinite"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             {hit?.who==="player"&&<div style={{position:"absolute",top:-8,left:"50%",fontSize:30,fontWeight:900,color:"#ff6a6a",textShadow:"0 2px 6px #000",animation:"btDmg .6s ease-out"}}>-{hit.dmg}</div>}
           </div>
+          {/* 🤝 サポート精霊: プレイヤー側に並ぶ。手伝った時に光ってジャンプ */}
+          {sup.count>0 && (
+            <div style={{position:"absolute",left:"5%",bottom:"6%",display:"flex",gap:3,zIndex:3}}>
+              {sup.list.map((b,i)=>(
+                <img key={i} src={`/assets/${b.sprite}_a.png`} title={b.name} style={{width:36,height:36,objectFit:"contain",imageRendering:"pixelated",filter:supFlash?"brightness(1.5) drop-shadow(0 0 8px #fff)":"drop-shadow(0 1px 2px #000)",animation:supFlash?`btSupJump .7s ease-out ${i*0.1}s`:`btIdle 2.8s ease-in-out infinite ${i*0.2}s`}} onError={e=>{const s=document.createElement("span");s.textContent=b.e;s.style.fontSize="28px";e.target.replaceWith(s);}}/>
+              ))}
+            </div>
+          )}
           {proj==="p"&&<div style={{position:"absolute",left:"24%",bottom:"42%",fontSize:30,filter:`drop-shadow(0 0 10px ${pMove.c})`,animation:"btProjP .45s linear forwards",zIndex:4}}>{pMove.e}</div>}
           {proj==="o"&&<div style={{position:"absolute",right:"24%",top:"32%",fontSize:30,filter:`drop-shadow(0 0 10px ${opp.move.c})`,animation:"btProjO .45s linear forwards",zIndex:4}}>{opp.move.e}</div>}
           {vs&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:6}}><div style={{fontSize:64,fontWeight:900,color:"#fff",textShadow:"0 0 22px #ff3b6b,0 0 8px #fff",animation:"btVs 1.1s ease-out"}}>VS</div></div>}
@@ -2221,6 +2226,7 @@ function BattleModal({child,data,update,onClose}){
         @keyframes btShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px)}60%{transform:translateX(9px)}}
         @keyframes btDmg{0%{transform:translateX(-50%) translateY(0) scale(.6);opacity:0}30%{opacity:1;transform:translateX(-50%) scale(1.25)}100%{transform:translateX(-50%) translateY(-34px);opacity:0}}
         @keyframes btIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes btSupJump{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.25)}60%{transform:translateY(-4px) scale(1.1)}100%{transform:translateY(0) scale(1)}}
         @keyframes btProjP{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(56vw,-26vh) scale(1.15);opacity:1}}
         @keyframes btProjO{0%{transform:translate(0,0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translate(-56vw,24vh) scale(1.15);opacity:1}}
         @keyframes btVs{0%{transform:scale(2.6);opacity:0}25%{transform:scale(1);opacity:1}75%{opacity:1}100%{transform:scale(1.15);opacity:0}}
