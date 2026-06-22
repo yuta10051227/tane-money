@@ -269,6 +269,17 @@ function startRealtimeSync(updateFn){
             if(prev.expenses&&prev.expenses.length>0) merged.expenses=prev.expenses;
             if(prev.claimedBadges) merged.claimedBadges=prev.claimedBadges;
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
+            // お手伝い項目(タスク定義)は端末間ユニオン＝追加した項目が消えない(id衝突はローカル編集優先)。
+            // ※以前はマージ対象外でサーバ値に上書きされ、別端末/遅延スナップショットで新規項目が消えるバグがあった
+            {
+              const _uni=(a,b)=>{const m={};[...(a||[]),...(b||[])].forEach(t=>{if(t&&t.id!=null)m[t.id]=t;});return Object.values(m);};
+              if(prev.goodTasks) merged.goodTasks=_uni(merged.goodTasks, prev.goodTasks);
+              if(prev.badTasks)  merged.badTasks =_uni(merged.badTasks,  prev.badTasks);
+            }
+            if(prev.myTaskIds) merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};
+            if(prev.dailyTaskSets&&prev.dailyTaskSets.length>0) merged.dailyTaskSets=prev.dailyTaskSets;
+            if(prev.dailyTasks&&prev.dailyTasks.length>0) merged.dailyTasks=prev.dailyTasks;
+            if(prev.activeSetId!==undefined) merged.activeSetId=prev.activeSetId;
             merged.logs=prev.logs; // logsはlogsリアルタイム同期で別管理
             // リアルタイム取得系（ローカル優先）
             if(prev.stocks&&prev.stocks.length>0) merged.stocks=prev.stocks;
