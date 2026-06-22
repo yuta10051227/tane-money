@@ -334,6 +334,8 @@ function startRealtimeSync(updateFn){
             if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
             // darkEgg(ヤミノオウの卵): お世話度は多い方を採用＝同期巻き戻しで育成が消えない
             if(prev.darkEgg){merged.darkEgg={...(merged.darkEgg||{})};Object.keys(prev.darkEgg).forEach(cid=>{const p=prev.darkEgg[cid]||{},m=merged.darkEgg[cid]||{};merged.darkEgg[cid]=((p.care||0)>=(m.care||0))?p:m;});}
+            // eggDrops(ヤミノタマゴ累積ドロップ=基礎ステ+1%/個): 多い方を採用
+            if(prev.eggDrops){merged.eggDrops={...(merged.eggDrops||{})};Object.keys(prev.eggDrops).forEach(cid=>{merged.eggDrops[cid]=Math.max(prev.eggDrops[cid]||0,merged.eggDrops[cid]||0);});}
             // 家族バトル・シーズン: 新しい週(シーズン)を優先、同週はbaseをマージ
             if(prev.battleSeason){ if(!merged.battleSeason || (prev.battleSeason.week||0)>(merged.battleSeason.week||0)) merged.battleSeason=prev.battleSeason; else if((prev.battleSeason.week||0)===(merged.battleSeason.week||0)) merged.battleSeason={...merged.battleSeason, base:{...(prev.battleSeason.base||{}),...(merged.battleSeason.base||{})}, champ:merged.battleSeason.champ||prev.battleSeason.champ}; }
             // pendingApprovals: 承認/却下済みentryをリモートから復活させない
@@ -1702,17 +1704,21 @@ const pickMove = (id)=> PLAYER_MOVES[[...String(id||"")].reduce((a,c)=>a+c.charC
 function monLevel(exp){ let lv=1,need=60,e=exp||0; while(e>=need&&lv<50){e-=need;lv++;need=Math.round(need*1.16);} return {lv,into:Math.round(e),need}; }
 // バトルのステータス(進化段階 × レベル(努力) × IV(才能))を一元化
 function battleStats(data, child){
-  const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5};
+  const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5,spd:5};
   const L=monLevel((data.monsterExp||{})[child.id]||0); const lv=L.lv;
   const eqRaw=(data.monsterEquip||{})[child.id];
   const eqIds=(eqRaw&&typeof eqRaw==="object")?[eqRaw.weapon,eqRaw.shield]:(eqRaw?[eqRaw]:[]);
   const eqItems=eqIds.map(id=>EQUIPMENT.find(e=>e.id===id)).filter(Boolean);
   const eb=(k)=>eqItems.reduce((s,e)=>s+(e[k]||0),0);
+  // 基礎倍率: B=全体+5%底上げ / A=ヤミノタマゴのドロップ毎+1%(累積・永続)。装備ぶん(eb)は倍率外で加算
+  const eggDrops=(data.eggDrops||{})[child.id]||0;
+  const baseMul=1.05*(1+0.01*eggDrops);
   return {
-    hp: 50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2+eb("hp"),
-    atk:10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6)+eb("atk"),
-    def: 5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14))+eb("def"),
-    lv, exp:L, iv, equip:eqItems,
+    hp: Math.round((50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2)*baseMul)+eb("hp"),
+    atk:Math.round((10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6))*baseMul)+eb("atk"),
+    def:Math.round((5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14)))*baseMul)+eb("def"),
+    spd:Math.round((6+(m.stage||0)*2+Math.round(lv*(0.6+(iv.spd||5)*0.12)))*baseMul)+eb("spd"),
+    lv, exp:L, iv, equip:eqItems, eggDrops,
     curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう",
     move:pickMove(m.curId), img:`/assets/monster_${m.curId}_f0.png`,
   };
@@ -1720,7 +1726,7 @@ function battleStats(data, child){
 // HP自然回復: 1分で1回復(時間経過ぶんを保存値に加算)
 const HP_REGEN_MS=60000;
 // ── 家族バトル: 戦闘力(BP)とハンデ ──
-function battlePower(data, member){ const s=battleStats(data,member); return Math.round(s.atk*3 + s.def*3 + s.hp); }
+function battlePower(data, member){ const s=battleStats(data,member); return Math.round(s.atk*3 + s.def*3 + s.hp + (s.spd||0)*2); }
 // 年齢ハンデ(年下ほど有利・親はひかえめ)＝総合戦闘力ランキングを公平に
 function bpHandicap(member){
   if(member.isParent || member.role==="parent" || member.displayMode==="adult") return 0.85;
@@ -1826,7 +1832,7 @@ function EquipModal({child,data,update,onClose}){
 }
 function BattleModal({child,data,update,onClose}){
   const stats  = battleStats(data,child);
-  const pMaxHP = stats.hp, pATK = stats.atk, pDEF = stats.def, pImg = stats.img, pName = stats.name, pMove = stats.move;
+  const pMaxHP = stats.hp, pATK = stats.atk, pDEF = stats.def, pSPD = stats.spd, pImg = stats.img, pName = stats.name, pMove = stats.move;
   const curHP  = curMonHP(data,child);
   const lowHP  = curHP < Math.max(20, Math.round(pMaxHP*0.2));
   const fragNow = (data.battleFragments||{})[child.id]||0;
@@ -1850,6 +1856,7 @@ function BattleModal({child,data,update,onClose}){
   const oMaxHP = 50 + opp.lv*28;
   const oATK   = 9 + opp.lv*5;
   const oDEF   = 4 + opp.lv*3;
+  const oSPD   = 5 + opp.lv*2 + (opp.boss?6:0);   // 敵の素早さ(ボスは速い)
   const MAXR=3;
   const [phase,setPhase]=useState("select");
   const [pHP,setPHP]=useState(curHP);
@@ -1894,8 +1901,8 @@ function BattleModal({child,data,update,onClose}){
       const drp=(data.equipUnlock?.[child.id])||[];
       const sigItem=EQUIPMENT.find(it=>it.dropFrom===opp.img);          // このモンスター固有の武器
       const sigOwned=sigItem && drp.includes(sigItem.id);
-      if(opp.boss && !(data.darkEgg?.[child.id]) && Math.random()<0.15){
-        dropInfo={kind:"egg"};   // ヤミノオウの卵(育てると自分だけのヤミノオウに)
+      if(opp.boss && Math.random()<0.15){
+        dropInfo={kind:"egg"};   // ヤミノタマゴ: 初回は育成卵、毎回 基礎ステ+1%(累積)
       } else if(sigItem && !sigOwned && Math.random()<0.32){
         dropInfo={kind:"equip",id:sigItem.id,name:sigItem.name,e:sigItem.e};   // 固有レア武器ドロップ
       } else {
@@ -1916,7 +1923,10 @@ function BattleModal({child,data,update,onClose}){
       }
       if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
-      if(dropInfo?.kind==="egg" && !(d.darkEgg?.[child.id])){ nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}}; }
+      if(dropInfo?.kind==="egg"){
+        nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積・永続)
+        if(!(d.darkEgg?.[child.id])) nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}};  // 初回のみ育成卵
+      }
       // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
       if(r==="win"){
         const dFragDateOk=(d.battleFragDate||{})[child.id]===today;
@@ -1934,22 +1944,26 @@ function BattleModal({child,data,update,onClose}){
       return nd; });
   };
   const finishByHP=(o,p)=> finish((p/pMaxHP) >= (o/oMaxHP) ? "win" : "lose", p);
-  // 1ターン=自分の攻撃→相手の攻撃。3ターンで決着(KOが無ければHP割合で判定)
+  // 1ターン=素早い方から攻撃→相手の攻撃。3ターンで決着(KOが無ければHP割合で判定)
   const doRound=()=>{
     if(busy||result||phase!=="fight") return;
     setBusy(true);
     const dp=dmgCalc(pATK,oDEF); const newO=Math.max(0,oHP-dp);
     const de=dmgCalc(oATK,pDEF); const newP=Math.max(0,pHP-de);
-    setLog(`${pName}の ${pMove.n}！`); setProj("p");
-    t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450);
-      if(newO<=0){ t(()=>finish("win",pHP),720); return; }
-      t(()=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
-        t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450);
-          if(newP<=0){ t(()=>finish("lose",0),720); return; }
-          t(()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } },520);
-        },470);
-      },560);
-    },470);
+    const pFirst = pSPD>=oSPD;   // 素早さが高い方が先攻(同値は自分)
+    const pHit=(cb)=>{ setLog(`${pName}の ${pMove.n}！`); setProj("p");
+      t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450); cb(); },470); };
+    const oHit=(cb)=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
+      t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450); cb(); },470); };
+    const endTurn=()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } };
+    if(pFirst){
+      pHit(()=>{ if(newO<=0){ t(()=>finish("win",pHP),720); return; }
+        t(()=> oHit(()=>{ if(newP<=0){ t(()=>finish("lose",0),720); return; } t(endTurn,520); }), 560); });
+    } else {
+      setLog(`${opp.name}は すばやい！`);
+      t(()=> oHit(()=>{ if(newP<=0){ t(()=>finish("lose",0),720); return; }
+        t(()=> pHit(()=>{ if(newO<=0){ t(()=>finish("win",newP),720); return; } t(endTurn,520); }), 560); }), 360);
+    }
   };
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"#070611",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -1962,7 +1976,7 @@ function BattleModal({child,data,update,onClose}){
           <div style={{textAlign:"center",color:"#fff",marginBottom:14}}>
             <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
-            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>Lv.{stats.lv} · ⚔{pATK} · 🛡{pDEF}</div>
+            <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>Lv.{stats.lv} · ⚔{pATK} · 🛡{pDEF} · ⚡{pSPD}{stats.eggDrops>0?` · 🥚+${stats.eggDrops}%`:""}</div>
             <div style={{width:190,maxWidth:"82%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
             <div style={{width:190,maxWidth:"82%",margin:"5px auto 0"}}><HPBar label="EXP" hp={stats.exp.into} max={stats.exp.need} color="#ffd24a"/></div>
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
@@ -1986,6 +2000,7 @@ function BattleModal({child,data,update,onClose}){
                 <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
                 <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥":""}</div>
+                {(()=>{const os=5+w.lv*2;const f=pSPD>=os;return <div style={{fontSize:10.5,color:f?"#7fe0a0":"#ff9a8a",fontWeight:800,marginTop:1}}>⚡{os} {f?"先制できる":"敵が先制"}</div>;})()}
                 <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(w)}</div>
               </button>;
             })}
@@ -1994,6 +2009,7 @@ function BattleModal({child,data,update,onClose}){
                 <img src={`/assets/${BOSS_MONSTER.img}.png`} style={{width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=BOSS_MONSTER.emoji;s.style.fontSize="40px";e.target.replaceWith(s);}}/>
                 <div style={{color:"#fff",fontWeight:900,fontSize:13,marginTop:4}}>{BOSS_MONSTER.name}</div>
                 <div style={{fontSize:11,color:BOSS_MONSTER.color,fontWeight:900,marginTop:2}}>Lv.{BOSS_MONSTER.lv} 👑ボス</div>
+                {(()=>{const os=5+BOSS_MONSTER.lv*2+6;const f=pSPD>=os;return <div style={{fontSize:10.5,color:f?"#7fe0a0":"#ff9a8a",fontWeight:800,marginTop:1}}>⚡{os} {f?"先制できる":"敵が先制"}</div>;})()}
                 <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(BOSS_MONSTER)}</div>
               </button>
             ) : (
@@ -2033,7 +2049,7 @@ function BattleModal({child,data,update,onClose}){
               {reward==="none"&&<div style={{marginTop:8,fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",zIndex:2,textShadow:"0 2px 8px #000"}}>このモンスターの かけらは きょうGET済み（EXPはGET！）</div>}
               {drop?.kind==="potion"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#bff0c8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>💊 かいふくアイテムを 見つけた！</div>}
               {drop?.kind==="equip"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#ffd9a8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🎁 そうび「{drop.e}{drop.name}」を 見つけた！</div>}
-              {drop?.kind==="egg"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#e0c7ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🥚 ヤミノオウの タマゴを 見つけた！お世話で 育てよう</div>}
+              {drop?.kind==="egg"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#e0c7ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🥚 ヤミノタマゴ 獲得！基礎ステータス +1%（お世話で育つ）</div>}
             </div>
           )}
           {result==="lose"&&(
@@ -2085,6 +2101,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n24", e:"⚡", t:"素早さ＆ヤミノタマゴ強化が登場！", b:"モンスターに「素早さ(⚡)」ステータスが加わったよ。バトルは素早い方が先に攻撃できる＝先制の有利不利が生まれる！相手選びの画面に「先制できる/敵が先制」も表示。さらに、ヤミノオウを倒して🥚ヤミノタマゴを手に入れるたびに、基礎ステータスが永続+1%アップ（倒すほど強くなる）。みんなの基礎ステータスも少し底上げしたよ。"},
   {id:"n23", e:"⚔", t:"モンスター固有のレア武器＆ドロップ図鑑！", b:"モンスターを倒すと、それぞれ固有のレア武器を低確率でドロップするようになったよ（スライムソード〜ヤミノツルギ）。『記録』タブの「ドロップ図鑑」で、どのモンスターが何を落とすか・集めたかを確認できる。周回してコンプを目指そう！さらにバトルのHPは1分で1回復するようになったよ。"},
   {id:"n22", e:"💰", t:"投資の「配当」がもらえるように！", b:"株を持っているだけで、毎週「配当」がもらえるようになったよ（持つだけで1%、7日2%・30日3.5%・90日5%と長く持つほどUP）。本物の株とおなじで、すぐ売らずにコツコツ長く持つほど増える！短期で売り買いすると手数料で損しやすいので、長期でじっくりがコツだよ。"},
   {id:"n21", e:"🥚", t:"ヤミノオウのタマゴ 登場！", b:"バトルで「ヤミノオウ」を倒すと、まれに🥚タマゴをドロップ！「記録」タブからお世話すると、たまご→幼年期1→幼年期2→成長期→成熟期→完全体→究極体（じぶんだけの👑ヤミノオウ）と進化するよ。段階が上がるたびに しんか演出！育てきると「ひみつのなかま」で すがたにできる。毎日コツコツお世話するのがポイント！"},
@@ -7481,11 +7498,13 @@ function FamilyBattleSeason({child, data, update, onClose}){
         </div>
         {/* お金行動で強くなる：自分の強さの内訳 */}
         <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"13px 14px",marginBottom:12}}>
-          <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>💪 あなたの強さの内訳（戦闘力 {myBP}）</div>
+          <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>💪 あなたの強さの内訳（戦闘力 {myBP}・⚡{ms.spd}）</div>
           {[
             ["📊","レベル",`Lv.${ms.lv}`,"クイズ正解・お手伝いで EXP→レベルUP"],
             ["⚔","そうび",eqNames,"武器をドロップして『そうび』すると強くなる"],
+            ["⚡","すばやさ",`${ms.spd}`,"素早い方が バトルで先に こうげきできる"],
             ["🌱","育成",`${(getMonState(data,child).careDays||0)}日 なでなで`,"進化と なでなでで ステータスUP"],
+            ...((ms.eggDrops||0)>0?[["🥚","卵ボーナス",`基礎+${ms.eggDrops}%`,"ヤミノオウを倒して タマゴを集めるほど基礎UP"]]:[]),
           ].map(([e,l,v,hint],i)=>(
             <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"5px 0",borderTop:i?`1px solid ${BORDER}`:"none"}}>
               <span style={{fontSize:16,width:20,textAlign:"center"}}>{e}</span>
