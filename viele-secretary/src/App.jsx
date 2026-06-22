@@ -614,6 +614,7 @@ function makeSeed() {
     profile: null,      // オンボーディングで収集するプロフィール（未設定=null）
     anniversaries: [],  // ユーザー登録の記念日 [{ id, name, month, day, emoji? }]
     annivSettings: {},  // 年中行事のオン/オフ { [eventId]: true|false }
+    habits: [],         // 習慣トラッカー [{ id, name, emoji, log: { "YYYY-MM-DD": true } }]
     momVoice: true,     // お母さんの声かけ（褒める・心配・休息ケア）オン/オフ。未設定はオン扱い。
     updatedAt: Date.now(),
   };
@@ -845,7 +846,7 @@ function AnniversaryPanel({ annivSettings, anniversaries, onUpdateSettings, onUp
         <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>登録した記念日</div>
           <div style={{ display: "grid", gap: 6 }}>
-            {annivs.map((a) => {
+            {[...annivs].sort((a, b) => daysUntil(fixedDate(a.month, a.day)) - daysUntil(fixedDate(b.month, b.day))).map((a) => {
               const dateISO = fixedDate(a.month, a.day);
               const days = daysUntil(dateISO);
               return (
@@ -3977,6 +3978,19 @@ function parseQuickTask(raw) {
   else if (/(！|!|急ぎ|急|重要|最優先)/.test(s)) { priority = "高"; s = s.replace(/(！|!|急ぎ|急|重要|最優先)/g, "").trim(); }
   else if (/(いつでも|あとで|後で|余裕)/.test(s)) { priority = "低"; s = s.replace(/(いつでも|あとで|後で|余裕)/g, "").trim(); }
 
+  // 時刻（HH:MM ／ X時(半/X分) ／ 午前午後・朝昼夜）
+  let time = "";
+  let tm = s.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
+  if (tm) { time = pad2(+tm[1]) + ":" + tm[2]; s = s.replace(tm[0], "").trim(); }
+  else if ((tm = s.match(/(午前|午後|朝|昼|夜|夕方|晩)?\s*(\d{1,2})\s*時\s*(半|(\d{1,2})\s*分)?/))) {
+    let h = +tm[2]; const ap = tm[1];
+    if ((ap === "午後" || ap === "夜" || ap === "夕方" || ap === "晩") && h < 12) h += 12;
+    if (ap === "昼" && h < 12) h = 12;
+    let mi = 0;
+    if (tm[3] === "半") mi = 30; else if (tm[4]) mi = +tm[4];
+    if (h <= 23 && mi <= 59) { time = pad2(h) + ":" + pad2(mi); s = s.replace(tm[0], "").trim(); }
+  }
+
   // 相対日
   let matched = false;
   for (const [re, n] of [[/明々後日|しあさって/, 3], [/明後日|あさって/, 2], [/明日|あした|あす/, 1], [/今日|本日|きょう/, 0]]) {
@@ -4019,7 +4033,7 @@ function parseQuickTask(raw) {
   }
 
   s = s.replace(/\s{2,}/g, " ").trim();
-  return { title: s, due, priority, repeat };
+  return { title: s, due, time, priority, repeat };
 }
 
 /* 1タスク行（左スワイプで完了 / 右スワイプで締切+1日）。タッチ非対応でもボタンで操作可。 */
@@ -4066,8 +4080,9 @@ function TaskRow({ it, onToggle, onEdit, onRemove, onStartEdit }) {
           <div style={{ fontSize: 14, lineHeight: 1.35, textDecoration: it.done ? "line-through" : "none", color: it.done ? C.faint : C.text }}>{it.title}</div>
           <div style={{ marginTop: 3, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: taskPriColor(it.priority || "中") }}>優先{it.priority || "中"}</span>
+            {it.time && !it.done && <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>🕐 {it.time}</span>}
             {sig && !it.done && <span style={{ fontSize: 12, color: sig.c, fontWeight: 600 }}>📅 {sig.t}</span>}
-            {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}</span>}
+            {it.due && it.done && <span style={{ fontSize: 12, color: C.faint }}>📅 {fmt(it.due)}{it.time ? ` ${it.time}` : ""}</span>}
             {it.repeat && it.repeat !== "none" && <span style={{ fontSize: 12, color: C.purple, fontWeight: 600 }}>{REPEAT_BADGE[it.repeat]}</span>}
           </div>
           {isSample && <div style={{ fontSize: 12, color: C.faint, marginTop: 2 }}>削除して自分のタスクを追加してください</div>}
@@ -4081,23 +4096,54 @@ function TaskRow({ it, onToggle, onEdit, onRemove, onStartEdit }) {
   );
 }
 
+// タスクの締切から表示セクションを決める（今日/明日/今週…でグループ化）
+const TASK_SECTIONS = [
+  { k: "late", label: "遅れている", color: () => C.red },
+  { k: "today", label: "今日", color: () => C.orange },
+  { k: "tomorrow", label: "明日", color: () => C.accent },
+  { k: "week", label: "今週", color: () => C.sub },
+  { k: "later", label: "それ以降", color: () => C.sub },
+  { k: "nodue", label: "締切なし", color: () => C.faint },
+  { k: "done", label: "完了", color: () => C.faint },
+];
+function taskSection(it) {
+  if (it.done) return "done";
+  if (!it.due) return "nodue";
+  const d = daysUntil(it.due);
+  if (d < 0) return "late";
+  if (d === 0) return "today";
+  if (d === 1) return "tomorrow";
+  if (d <= 7) return "week";
+  return "later";
+}
+
 function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const list = items || [];
   const [text, setText] = useState("");
   const [due, setDue] = useState("");
+  const [time, setTime] = useState("");
   const [pri, setPri] = useState("中");
   const [rep, setRep] = useState("none");
   const [editId, setEditId] = useState(null);
-  const [e, setE] = useState({ title: "", due: "", priority: "中", repeat: "none" });
-  const sorted = [...list].sort((a, b) =>
-    (a.done ? 1 : 0) - (b.done ? 1 : 0)
-    || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
-    || (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
-  );
-  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, due: it.due || "", priority: it.priority || "中", repeat: it.repeat || "none" }); };
-  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), due: e.due || "", priority: e.priority, repeat: e.repeat || "none" }); setEditId(null); };
+  const [e, setE] = useState({ title: "", due: "", time: "", priority: "中", repeat: "none" });
 
-  // 入力中の自然言語プレビュー（締切・優先度・繰り返しを検出）
+  // セクションごとにまとめ、各セクション内は 締切→時刻→優先度 の順
+  const grouped = useMemo(() => {
+    const g = {};
+    for (const it of list) (g[taskSection(it)] = g[taskSection(it)] || []).push(it);
+    const sortIn = (arr) => [...arr].sort((a, b) =>
+      (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
+      || String(a.time || "99:99").localeCompare(String(b.time || "99:99"))
+      || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
+    );
+    Object.keys(g).forEach((k) => { g[k] = sortIn(g[k]); });
+    return g;
+  }, [list]);
+
+  const startEdit = (it) => { setEditId(it.id); setE({ title: it.title, due: it.due || "", time: it.time || "", priority: it.priority || "中", repeat: it.repeat || "none" }); };
+  const saveEdit = () => { if (e.title.trim()) onEdit(editId, { title: e.title.trim(), due: e.due || "", time: e.time || "", priority: e.priority, repeat: e.repeat || "none" }); setEditId(null); };
+
+  // 入力中の自然言語プレビュー（締切・時刻・優先度・繰り返しを検出）
   const preview = useMemo(() => (text.trim() ? parseQuickTask(text) : null), [text]);
   const submit = (ev) => {
     ev.preventDefault();
@@ -4107,54 +4153,184 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
     onAdd({
       title: p.title,
       due: p.due || due || "",
+      time: p.time || time || "",
       priority: p.priority || pri,
       repeat: p.repeat !== "none" ? p.repeat : rep,
     });
-    setText(""); setDue(""); setPri("中"); setRep("none");
+    setText(""); setDue(""); setTime(""); setPri("中"); setRep("none");
   };
 
+  const renderItem = (it) => (
+    editId === it.id ? (
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+        <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+          <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
+            <input type="time" value={e.time} onChange={(ev) => setE({ ...e, time: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 110 }} />
+            <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
+            <select value={e.repeat} onChange={(ev) => setE({ ...e, repeat: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 120 }}>{TASK_REPEAT.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}</select>
+            <button onClick={saveEdit} style={chipBtn}>保存</button>
+            <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <TaskRow key={it.id} it={it} onToggle={onToggle} onEdit={onEdit} onRemove={onRemove} onStartEdit={() => startEdit(it)} />
+    )
+  );
+
   return (
-    <Panel title="追加タスク" accent={C.purple} help="「金曜 振込」「毎月25日 家賃」「急ぎ 見積り」のように書くと、締切・優先度・繰り返しを自動で読み取ります。タスクは左スワイプで完了、右スワイプで締切を1日延ばせます。並びは『未完了 → 優先度（高→低）→ 締切が近い順』です。">
+    <Panel title="追加タスク" accent={C.purple} help="「明日15時 打合せ」「毎月25日 家賃」「急ぎ 見積り」のように書くと、締切・時刻・優先度・繰り返しを自動で読み取ります。一覧は今日・明日・今週…で自動グループ化。左スワイプで完了、右スワイプで締切を1日延ばせます。">
       <div style={{ display: "grid", gap: 6 }}>
-        {sorted.length === 0 && <Empty>タスクはありません。</Empty>}
-        {sorted.map((it) => (
-          editId === it.id ? (
-            <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-              <div style={{ marginTop: 2, flex: "0 0 auto" }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
-              <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
-                <input autoFocus value={e.title} onChange={(ev) => setE({ ...e, title: ev.target.value })} style={{ ...inp, marginBottom: 0 }} />
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <input type="date" value={e.due} onChange={(ev) => setE({ ...e, due: ev.target.value })} style={{ ...inp, marginBottom: 0, flex: "1 1 130px" }} />
-                  <select value={e.priority} onChange={(ev) => setE({ ...e, priority: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
-                  <select value={e.repeat} onChange={(ev) => setE({ ...e, repeat: ev.target.value })} style={{ ...inp, marginBottom: 0, width: 120 }}>{TASK_REPEAT.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}</select>
-                  <button onClick={saveEdit} style={chipBtn}>保存</button>
-                  <button onClick={() => setEditId(null)} style={iconBtn} title="取消">✕</button>
-                </div>
+        {list.length === 0 && <Empty>タスクはありません。</Empty>}
+        {TASK_SECTIONS.map((sec) => {
+          const arr = grouped[sec.k];
+          if (!arr || !arr.length) return null;
+          return (
+            <div key={sec.k} style={{ display: "grid", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: sec.color() }}>{sec.label}</span>
+                <span style={{ fontSize: 11, color: C.faint }}>{arr.length}</span>
               </div>
+              {arr.map(renderItem)}
             </div>
-          ) : (
-            <TaskRow key={it.id} it={it} onToggle={onToggle} onEdit={onEdit} onRemove={onRemove} onStartEdit={() => startEdit(it)} />
-          )
-        ))}
+          );
+        })}
       </div>
       <form onSubmit={submit} style={{ display: "grid", gap: 6, marginTop: 12 }}>
-        <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="例）金曜 振込／毎月25日 家賃／急ぎ 見積り" style={{ ...inp, marginBottom: 0 }} />
-        {preview && (preview.due || preview.priority || preview.repeat !== "none") && (
+        <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="例）明日15時 打合せ／毎月25日 家賃／急ぎ 見積り" style={{ ...inp, marginBottom: 0 }} />
+        {preview && (preview.due || preview.time || preview.priority || preview.repeat !== "none") && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
             <span style={{ color: C.sub }}>自動検出：</span>
             {preview.due && <span style={{ background: C.green + "22", color: C.green, borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>📅 {fmt(preview.due)}</span>}
+            {preview.time && <span style={{ background: C.sub + "22", color: C.sub, borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>🕐 {preview.time}</span>}
             {preview.priority && <span style={{ background: taskPriColor(preview.priority) + "22", color: taskPriColor(preview.priority), borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>優先{preview.priority}</span>}
             {preview.repeat !== "none" && <span style={{ background: C.purple + "22", color: C.purple, borderRadius: 999, padding: "1px 9px", fontWeight: 700 }}>{REPEAT_BADGE[preview.repeat]}</span>}
             {preview.title && <span style={{ color: C.faint }}>→「{preview.title}」</span>}
           </div>
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} title="締切（任意・文章でも指定可）" style={{ ...inp, marginBottom: 0, flex: "1 1 120px" }} />
+          <input type="date" value={due} onChange={(ev) => setDue(ev.target.value)} title="締切（任意・文章でも指定可）" style={{ ...inp, marginBottom: 0, flex: "1 1 110px" }} />
+          <input type="time" value={time} onChange={(ev) => setTime(ev.target.value)} title="時刻（任意）" style={{ ...inp, marginBottom: 0, width: 104 }} />
           <select value={pri} onChange={(ev) => setPri(ev.target.value)} style={{ ...inp, marginBottom: 0, width: 84 }}>{TASK_PRI.map((p) => <option key={p} value={p}>優先{p}</option>)}</select>
           <select value={rep} onChange={(ev) => setRep(ev.target.value)} title="繰り返し（任意）" style={{ ...inp, marginBottom: 0, width: 120 }}>{TASK_REPEAT.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}</select>
           <button type="submit" style={{ ...chipBtn, background: C.purple, color: C.invText, borderColor: C.purple }}>追加</button>
         </div>
       </form>
+    </Panel>
+  );
+}
+
+/* 習慣トラッカー（毎日チェック・連続日数・直近7日）。占術スタンスと連動した一言つき。 */
+const HABIT_PRESETS = [
+  { emoji: "📖", name: "読書" }, { emoji: "🏃", name: "運動" }, { emoji: "🧘", name: "瞑想" },
+  { emoji: "💧", name: "水を飲む" }, { emoji: "📣", name: "発信1つ" }, { emoji: "😴", name: "早く寝る" },
+  { emoji: "📓", name: "日記" }, { emoji: "🥗", name: "野菜を食べる" },
+];
+function HabitPanel({ habits, birth, onToggleToday, onAdd, onRemove }) {
+  const list = habits || [];
+  const [showAdd, setShowAdd] = useState(false);
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState("✅");
+  const todayISO = iso(new Date());
+  const last7 = Array.from({ length: 7 }, (_, i) => iso(addDays(new Date(), i - 6)));
+  const streakOf = (h) => {
+    const log = h.log || {};
+    let n = 0, d = new Date();
+    // 今日が未チェックでも、昨日までの連続は数える
+    if (!log[iso(d)]) d = addDays(d, -1);
+    while (log[iso(d)]) { n++; d = addDays(d, -1); }
+    return n;
+  };
+
+  // 今日のスタンスに応じた一言（占術連動。VIELE独自）
+  let hint = null;
+  try {
+    if (birth && birth.date) {
+      const st = dayEnergy(birth, todayISO).today.stance;
+      hint = st === "労い" ? "💛 今日は労いの日。できる習慣だけでOK、休むのも大事。"
+        : st === "整える" ? "🌿 今日は整える日。淡々と積むのに向いています。"
+        : st === "攻め" ? "⚔️ 今日は攻めの日。発信や運動の習慣を一気に進めて。"
+        : "🛡️ 今日は守りの日。小さく確実に、ひとつだけでも。";
+    }
+  } catch { /* 命式エラーは無視 */ }
+
+  const addHabit = () => {
+    if (!name.trim()) return;
+    onAdd({ name: name.trim(), emoji: emoji.trim() || "✅", log: {} });
+    setName(""); setEmoji("✅"); setShowAdd(false);
+  };
+
+  return (
+    <Panel
+      title="習慣"
+      accent={C.green}
+      help="毎日の小さな習慣をチェックして続けます。連続日数（ストリーク）と直近7日の記録が見えるので、続けるほど手放したくなくなります。今日のスタンス（攻め/守り/整える/労い）に合わせた一言も出ます。"
+      right={<button onClick={() => setShowAdd((v) => !v)} style={chipBtn}>＋習慣を追加</button>}
+    >
+      {hint && <div style={{ fontSize: 13, color: C.text, background: C.panel2, borderRadius: 10, padding: "8px 12px", marginBottom: 10, lineHeight: 1.5 }}>{hint}</div>}
+
+      {showAdd && (
+        <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {HABIT_PRESETS.map((p) => (
+              <button key={p.name} onClick={() => { setName(p.name); setEmoji(p.emoji); }} style={{ ...chipBtn, fontSize: 12 }}>{p.emoji} {p.name}</button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={emoji} onChange={(ev) => setEmoji(ev.target.value)} placeholder="絵文字" style={{ ...inp, width: 70, flex: "0 0 auto", marginBottom: 0, textAlign: "center" }} />
+            <input value={name} onChange={(ev) => setName(ev.target.value)} placeholder="習慣の名前（例：朝の発信）" style={{ ...inp, flex: 1, marginBottom: 0 }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button onClick={addHabit} style={{ ...chipBtn, background: C.green, color: "#0B0D11", borderColor: C.green }}>追加</button>
+            <button onClick={() => setShowAdd(false)} style={chipBtn}>閉じる</button>
+          </div>
+        </div>
+      )}
+
+      {list.length === 0 && !showAdd && <Empty>習慣はまだありません。「＋習慣を追加」から登録できます。</Empty>}
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {list.map((h) => {
+          const log = h.log || {};
+          const doneToday = !!log[todayISO];
+          const streak = streakOf(h);
+          return (
+            <div key={h.id} style={{ background: C.panel2, borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() => onToggleToday(h.id)}
+                  title="今日の達成を記録"
+                  style={{ flex: "0 0 auto", width: 40, height: 40, borderRadius: "50%", border: `2px solid ${doneToday ? C.green : C.line}`, background: doneToday ? C.green : "transparent", color: doneToday ? "#0B0D11" : C.sub, fontSize: 18, cursor: "pointer", display: "grid", placeItems: "center" }}
+                >{doneToday ? "✓" : h.emoji}</button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{h.emoji} {h.name}</div>
+                  <div style={{ fontSize: 12, color: streak > 0 ? C.green : C.faint, fontWeight: 600, marginTop: 2 }}>
+                    {streak > 0 ? `🔥 ${streak}日連続` : "今日からはじめよう"}
+                  </div>
+                </div>
+                <button onClick={() => onRemove(h.id)} style={iconBtn} title="削除">✕</button>
+              </div>
+              {/* 直近7日 */}
+              <div style={{ display: "flex", gap: 4, marginTop: 8, justifyContent: "space-between" }}>
+                {last7.map((d) => {
+                  const on = !!log[d];
+                  const wd = WD[new Date(d + "T00:00:00").getDay()];
+                  const isToday = d === todayISO;
+                  return (
+                    <div key={d} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                      <span style={{ fontSize: 10, color: isToday ? C.green : C.faint }}>{wd}</span>
+                      <span style={{ width: 18, height: 18, borderRadius: 5, background: on ? C.green : C.panel, border: `1px solid ${on ? C.green : C.line}`, display: "grid", placeItems: "center", fontSize: 11, color: "#0B0D11" }}>{on ? "✓" : ""}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </Panel>
   );
 }
@@ -4537,11 +4713,29 @@ function CalStatusNote({ source, status, error, count, onConnect, connecting, on
    ログインゲート
    ────────────────────────────────────────────────────────────── */
 function LoginGate({ onLogin, error }) {
-  const FEATURES = [
-    { icon: "⏳", title: "締切を、勝手に逆算", desc: "本番の申込締切を1つ入れるだけで、予告・先行案内・リマインド・締切まで自動で並びます。" },
-    { icon: "📣", title: "告知から締切まで、抜け漏れゼロ", desc: "先行案内→申込→売上の流れを見える化。遅れていると朝に教えてくれます。" },
-    { icon: "✅", title: "今日やる事だけ、1画面に", desc: "遅れ・締切間近を毎朝まとめて表示。送り忘れ・公開遅れをなくします。" },
+  // ログイン前に「売り」を順に見せる価値訴求カルーセル（スワイプ／自動送り／ドット）
+  const SLIDES = [
+    { icon: "⏳", title: "締切を、勝手に逆算", desc: "本番の申込締切を1つ入れるだけで、予告・先行案内・リマインド・締切まで自動で並びます。", bg: "#3478D4" },
+    { icon: "🗓️", title: "運気カレンダー", desc: "あなたの命式から「攻め/守りの日」を計算。一粒万倍日・天赦日などの開運日と重ねて“いつ動くか”が決まります。", bg: "#187A4E" },
+    { icon: "✅", title: "今日やる事だけ、1画面に", desc: "「明日15時 打合せ」と書くだけで自動登録。今日・明日で整理され、左スワイプで完了。", bg: "#7B61C9" },
+    { icon: "💛", title: "お母さんみたいに面倒見る", desc: "朝は「今日はこれだけ」、前日は「明日締切だよ」、開かない日が続くと「最近どう？」が届きます。", bg: "#E8B83E" },
+    { icon: "💰", title: "買い切り ¥10,000", desc: "サブスクなし・更新手続き不要。一度の購入で、ぜんぶの機能をずっと使えます。", bg: "#D95C55" },
   ];
+  const [slide, setSlide] = useState(0);
+  const slideTouch = useRef(null);
+  const pausedRef = useRef(false);
+  useEffect(() => {
+    const id = setInterval(() => { if (!pausedRef.current) setSlide((s) => (s + 1) % SLIDES.length); }, 4500);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const onSlideStart = (ev) => { pausedRef.current = true; slideTouch.current = ev.touches[0].clientX; };
+  const onSlideEnd = (ev) => {
+    if (slideTouch.current == null) return;
+    const dx = ev.changedTouches[0].clientX - slideTouch.current;
+    if (dx <= -40) setSlide((s) => (s + 1) % SLIDES.length);
+    else if (dx >= 40) setSlide((s) => (s - 1 + SLIDES.length) % SLIDES.length);
+    slideTouch.current = null;
+  };
   return (
     <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: C.bg, color: C.text, overflowY: "auto" }}>
       <div style={{ width: "100%", maxWidth: 420, padding: "40px 24px 48px", boxSizing: "border-box" }}>
@@ -4556,16 +4750,28 @@ function LoginGate({ onLogin, error }) {
           </p>
         </div>
 
-        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
-          {FEATURES.map((f) => (
-            <div key={f.title} style={{ display: "flex", gap: 12, alignItems: "flex-start", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
-              <span style={{ fontSize: 22, flex: "0 0 auto", lineHeight: 1.2 }}>{f.icon}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{f.title}</div>
-                <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>{f.desc}</div>
-              </div>
+        {/* 価値訴求カルーセル（スワイプ／自動送り） */}
+        <div style={{ marginBottom: 16 }} onTouchStart={onSlideStart} onTouchEnd={onSlideEnd}>
+          <div style={{ position: "relative", overflow: "hidden", borderRadius: 18 }}>
+            <div style={{ display: "flex", transition: "transform .35s ease", transform: `translateX(-${slide * 100}%)` }}>
+              {SLIDES.map((f) => (
+                <div key={f.title} style={{ flex: "0 0 100%", boxSizing: "border-box", padding: "4px" }}>
+                  <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16, padding: "28px 20px", minHeight: 188, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", justifyContent: "center" }}>
+                    <div style={{ width: 64, height: 64, borderRadius: "50%", background: f.bg + "22", display: "grid", placeItems: "center", fontSize: 32, marginBottom: 14 }}>{f.icon}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: f.bg }}>{f.title}</div>
+                    <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, maxWidth: 300 }}>{f.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          {/* ドット */}
+          <div style={{ display: "flex", gap: 7, justifyContent: "center", marginTop: 12 }}>
+            {SLIDES.map((f, i) => (
+              <button key={f.title} onClick={() => { pausedRef.current = true; setSlide(i); }} aria-label={`スライド${i + 1}`}
+                style={{ width: i === slide ? 22 : 8, height: 8, borderRadius: 999, border: "none", background: i === slide ? C.accent : C.line, cursor: "pointer", transition: "width .25s ease", padding: 0 }} />
+            ))}
+          </div>
         </div>
 
         <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
@@ -5165,7 +5371,15 @@ export default function App() {
   const launches = makeListOps("launches");
   const money = makeListOps("money");
   const tasks = makeListOps("tasks");
+  const habits = makeListOps("habits");
   const feedsOps = makeListOps("feeds");
+
+  // 習慣：今日の達成を記録/解除（log にその日のISOを true/false で持つ）
+  const toggleHabitToday = (id) => {
+    const today = iso(new Date());
+    const listH = data.habits || [];
+    update({ habits: listH.map((h) => (h.id === id ? { ...h, log: { ...(h.log || {}), [today]: !(h.log || {})[today] } } : h)) });
+  };
 
   // タスク完了トグル：繰り返し設定があれば、完了時に次回ぶんを自動生成する
   const toggleTask = (id) => {
@@ -5624,13 +5838,22 @@ export default function App() {
         )}
 
         {activeTab === "tasks" && (
-          <TaskList
-            items={data.tasks}
-            onToggle={toggleTask}
-            onAdd={tasks.add}
-            onEdit={tasks.edit}
-            onRemove={tasks.remove}
-          />
+          <>
+            <TaskList
+              items={data.tasks}
+              onToggle={toggleTask}
+              onAdd={tasks.add}
+              onEdit={tasks.edit}
+              onRemove={tasks.remove}
+            />
+            <HabitPanel
+              habits={data.habits}
+              birth={data.birth}
+              onToggleToday={toggleHabitToday}
+              onAdd={habits.add}
+              onRemove={habits.remove}
+            />
+          </>
         )}
 
         {activeTab === "news" && (
