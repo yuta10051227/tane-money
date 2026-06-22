@@ -6187,6 +6187,7 @@ function ParentScreen({ data, update, onBack }) {
 function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showOnboardGuide, setShowOnboardGuide] = useState(false);
+  const [showDash, setShowDash] = useState(false);   // 親ダッシュボード(今日/今週)の折りたたみ
   const allMembers = [
     ...data.children.map(c=>({...c, isChild:true})),
     ...(data.parents||[]).map(p=>({...p, isChild:false})),
@@ -6219,12 +6220,13 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
   };
   const onboardRemaining = Object.values(onboardChecks).filter(v=>!v).length;
   const showOnboard = data.setupComplete === true && onboardRemaining > 0;
+  const pendCount = (data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
 
   return (
     <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:32}}>
       {/* ヘッダー */}
-      <div style={{padding:"52px 20px 28px"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28}}>
+      <div style={{padding:"52px 20px 12px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:40,height:40,borderRadius:12,background:GP,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,boxShadow:`0 4px 12px ${GP}40`}}>🌱</div>
             <div>
@@ -6238,75 +6240,21 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
             {parentPinIsDefault(data)&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
           </button>
         </div>
-        <div style={{fontSize:13,fontWeight:700,color:TEXT}}>メンバーを選択</div>
       </div>
 
-      {/* 親の「今日ダッシュボード」：未承認・今日おてつだい・ガチャ残りを一目で */}
-      {data.children&&data.children.length>0 && (()=>{
-        const td=todayKey();
-        const pend=(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
-        const kids=data.children||[];
-        const didToday=kids.filter(c=>(data.logs||[]).some(l=>l.cid===c.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(td)));
-        const gachaLeft=kids.filter(c=>(data.gachaDate?.[c.id])!==td);
-        return (
-          <div style={{padding:"0 20px",marginBottom:18}}>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW}}>
-              <div style={{fontSize:11,fontWeight:800,color:MUTED,marginBottom:10,letterSpacing:.5}}>📋 きょうの ようす</div>
-              <div style={{display:"flex",alignItems:"stretch",gap:8}}>
-                <div onClick={()=>pend>0&&setShowSettings(true)} style={{flex:1,textAlign:"center",cursor:pend>0?"pointer":"default"}}>
-                  <div style={{fontSize:24,fontWeight:900,color:pend>0?R:TEXT,lineHeight:1.1}}>{pend}</div>
-                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>みしょうにん{pend>0?" 👆":""}</div>
-                </div>
-                <div style={{width:1,background:BORDER}}/>
-                <div style={{flex:1,textAlign:"center"}}>
-                  <div style={{fontSize:24,fontWeight:900,color:G,lineHeight:1.1}}>{didToday.length}<span style={{fontSize:13,color:MUTED,fontWeight:700}}>/{kids.length}</span></div>
-                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>きょう おてつだい</div>
-                </div>
-                <div style={{width:1,background:BORDER}}/>
-                <div style={{flex:1,textAlign:"center"}}>
-                  <div style={{fontSize:24,fontWeight:900,color:gachaLeft.length>0?GOLD:MUTED,lineHeight:1.1}}>{gachaLeft.length}</div>
-                  <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>ガチャ まだ</div>
-                </div>
-              </div>
-              {gachaLeft.length>0 && <div style={{fontSize:11,color:MUTED,marginTop:10,paddingTop:8,borderTop:`1px solid ${BORDER}`,lineHeight:1.5}}>🎰 まだの子：<b style={{color:"#9a7000"}}>{gachaLeft.map(c=>c.name).join("、")}</b></div>}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* 📊 家族の今週まとめ：子ごとに 稼ぐ/使う/お手伝い回数 */}
-      {data.children&&data.children.length>0 && (()=>{
-        const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
-        return (
-          <div style={{padding:"0 20px",marginBottom:18}}>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
-                <span style={{fontSize:11,fontWeight:800,color:MUTED,letterSpacing:.5}}>📊 今週のまとめ（7日間）</span>
-                <span style={{fontSize:10,color:MUTED}}>かせいだ・つかった・🧹回数</span>
-              </div>
-              {data.children.map((c,idx)=>{
-                const wl=(data.logs||[]).filter(l=>l.cid===c.id&&(l.date||"")>=wkAgo);
-                const earned=wl.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
-                const spent=wl.filter(l=>l.pts<0).reduce((s,l)=>s-l.pts,0);
-                const chores=wl.filter(l=>l.type==="good"||l.type==="daily").length;
-                return (
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:idx===0?"none":`1px solid ${BORDER}`}}>
-                    <ChildAvatar child={c} size={30}/>
-                    <span style={{flex:1,fontSize:13,fontWeight:700,color:TEXT,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
-                    <span style={{fontSize:12,color:G,fontWeight:900,minWidth:54,textAlign:"right"}}>+{earned.toLocaleString()}</span>
-                    <span style={{fontSize:12,color:R,fontWeight:900,minWidth:48,textAlign:"right"}}>-{spent.toLocaleString()}</span>
-                    <span style={{fontSize:12,color:MUTED,fontWeight:800,minWidth:30,textAlign:"right"}}>🧹{chores}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      {/* 未承認だけは緊急性が高いので 上部に細いアラートで残す */}
+      {pendCount>0 && (
+        <div onClick={()=>setShowSettings(true)} style={{margin:"0 20px 12px",background:RS,border:`1.5px solid ${R}`,borderRadius:12,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+          <span style={{fontSize:16}}>🔔</span>
+          <span style={{flex:1,fontSize:13,fontWeight:800,color:R}}>みしょうにんが {pendCount}けん あります</span>
+          <span style={{fontSize:12,color:R,fontWeight:700}}>かくにん ›</span>
+        </div>
+      )}
 
       <div style={{padding:"0 20px"}}>
+        <div style={{fontSize:15,fontWeight:800,color:TEXT,marginBottom:12}}>だれの ページを ひらく？</div>
         {/* 子ども */}
-        <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>おこさま</div>
+        <div style={{fontSize:13,fontWeight:800,color:MUTED,letterSpacing:.5,marginBottom:10}}>おこさま</div>
         {allMembers.filter(m=>m.isChild).map(member=>{
           const goal=topGoal(member.id);
           return (
@@ -6344,7 +6292,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 
         {/* 親 */}
         {allMembers.filter(m=>!m.isChild).length>0&&(
-          <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:1,margin:"16px 0 10px",textTransform:"uppercase"}}>おうちのかた</div>
+          <div style={{fontSize:13,fontWeight:800,color:MUTED,letterSpacing:.5,margin:"16px 0 10px"}}>おうちのかた</div>
         )}
         {allMembers.filter(m=>!m.isChild).map(member=>{
           const childCount = data.children.length;
@@ -6368,8 +6316,68 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
           );
         })}
 
+        {/* 📊 おうちの方へ：今日のようす・今週のまとめ(折りたたみ＝メンバーを優先) */}
+        {data.children&&data.children.length>0 && (()=>{
+          const td=todayKey();
+          const kids=data.children||[];
+          const didToday=kids.filter(c=>(data.logs||[]).some(l=>l.cid===c.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(td)));
+          const gachaLeft=kids.filter(c=>(data.gachaDate?.[c.id])!==td);
+          const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
+          return (
+            <div style={{marginTop:20}}>
+              <button onClick={()=>setShowDash(v=>!v)} style={{width:"100%",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",fontFamily:F}}>
+                <span style={{fontSize:13,fontWeight:800,color:TEXT}}>📊 おうちの方へ（今日・今週のまとめ）</span>
+                <span style={{fontSize:12,color:MUTED}}>{showDash?"▲":"▼"}</span>
+              </button>
+              {showDash && (<>
+                <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW,marginTop:10}}>
+                  <div style={{fontSize:12,fontWeight:800,color:MUTED,marginBottom:10,letterSpacing:.5}}>📋 きょうの ようす</div>
+                  <div style={{display:"flex",alignItems:"stretch",gap:8}}>
+                    <div onClick={()=>pendCount>0&&setShowSettings(true)} style={{flex:1,textAlign:"center",cursor:pendCount>0?"pointer":"default"}}>
+                      <div style={{fontSize:24,fontWeight:900,color:pendCount>0?R:TEXT,lineHeight:1.1}}>{pendCount}</div>
+                      <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>みしょうにん{pendCount>0?" 👆":""}</div>
+                    </div>
+                    <div style={{width:1,background:BORDER}}/>
+                    <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{fontSize:24,fontWeight:900,color:G,lineHeight:1.1}}>{didToday.length}<span style={{fontSize:13,color:MUTED,fontWeight:700}}>/{kids.length}</span></div>
+                      <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>きょう おてつだい</div>
+                    </div>
+                    <div style={{width:1,background:BORDER}}/>
+                    <div style={{flex:1,textAlign:"center"}}>
+                      <div style={{fontSize:24,fontWeight:900,color:gachaLeft.length>0?GOLD:MUTED,lineHeight:1.1}}>{gachaLeft.length}</div>
+                      <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>ガチャ まだ</div>
+                    </div>
+                  </div>
+                  {gachaLeft.length>0 && <div style={{fontSize:11,color:MUTED,marginTop:10,paddingTop:8,borderTop:`1px solid ${BORDER}`,lineHeight:1.5}}>🎰 まだの子：<b style={{color:"#9a7000"}}>{gachaLeft.map(c=>c.name).join("、")}</b></div>}
+                </div>
+                <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW,marginTop:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+                    <span style={{fontSize:12,fontWeight:800,color:MUTED,letterSpacing:.5}}>📊 今週のまとめ（7日間）</span>
+                    <span style={{fontSize:10,color:MUTED}}>かせいだ・つかった・🧹回数</span>
+                  </div>
+                  {data.children.map((c,idx)=>{
+                    const wl=(data.logs||[]).filter(l=>l.cid===c.id&&(l.date||"")>=wkAgo);
+                    const earned=wl.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
+                    const spent=wl.filter(l=>l.pts<0).reduce((s,l)=>s-l.pts,0);
+                    const chores=wl.filter(l=>l.type==="good"||l.type==="daily").length;
+                    return (
+                      <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:idx===0?"none":`1px solid ${BORDER}`}}>
+                        <ChildAvatar child={c} size={30}/>
+                        <span style={{flex:1,fontSize:13,fontWeight:700,color:TEXT,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
+                        <span style={{fontSize:12,color:G,fontWeight:900,minWidth:54,textAlign:"right"}}>+{earned.toLocaleString()}</span>
+                        <span style={{fontSize:12,color:R,fontWeight:900,minWidth:48,textAlign:"right"}}>-{spent.toLocaleString()}</span>
+                        <span style={{fontSize:12,color:MUTED,fontWeight:800,minWidth:30,textAlign:"right"}}>🧹{chores}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>)}
+            </div>
+          );
+        })()}
+
         {/* 同期 */}
-        <div style={{marginTop:24,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:CARD,borderRadius:12,border:`1px solid ${BORDER}`}}>
+        <div style={{marginTop:20,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",background:CARD,borderRadius:12,border:`1px solid ${BORDER}`}}>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:G}}/>
             <span style={{fontSize:11,color:TEXTS}}>同期済み</span>
