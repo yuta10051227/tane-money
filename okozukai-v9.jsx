@@ -1731,8 +1731,8 @@ const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
 const EQ_RAR=(r)=>({1:{n:"N",c:"#7c8a82"},2:{n:"R",c:"#3478D4"},3:{n:"SR",c:"#7B61C9"},4:{n:"SR+",c:"#E8B83E"},5:{n:"UR",c:"#D95C55"}}[r]||{n:"N",c:"#7c8a82"});
 // 回復カプセル(バトルドロップ・低確率)。小=50回復 / 中=100回復
 const HEAL_CAPS=[
-  {k:"hs", name:"回復カプセル小", e:"🟢", heal:50,  rate:0.10, c:"#34C77B"},
-  {k:"hm", name:"回復カプセル中", e:"🔵", heal:100, rate:0.04, c:"#3478D4"},
+  {k:"hs", name:"回復カプセル小", e:"🟢", img:"heal_cap_s", heal:50,  rate:0.10, c:"#34C77B"},
+  {k:"hm", name:"回復カプセル中", e:"🔵", img:"heal_cap_m", heal:100, rate:0.04, c:"#3478D4"},
 ];
 // サポートなかま: お手伝い数で加入(週間・3回ごと最大3体)。タイプは週ごとランダム固定。固定効果=弱い子ほど相対的に効く
 // タネの精霊(がんばりの光): お手伝いの努力で目をさます3体。役割は固定、名前・物語つき
@@ -2114,7 +2114,7 @@ function BattleModal({child,data,update,onClose}){
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
               {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 フル回復 ×{potions}</button>}
               {HEAL_CAPS.map(cap=>((caps[cap.k]||0)>0)&&(
-                <button key={cap.k} onClick={()=>useCap(cap)} style={{background:cap.c,border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{cap.e} +{cap.heal} ×{caps[cap.k]}</button>
+                <button key={cap.k} onClick={()=>useCap(cap)} style={{background:cap.c,border:"none",borderRadius:999,padding:"6px 12px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,display:"inline-flex",alignItems:"center",gap:4}}><img src={`/assets/${cap.img}.png`} alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=cap.e;e.target.replaceWith(s);}}/>+{cap.heal} ×{caps[cap.k]}</button>
               ))}
               <button onClick={healByPoints} disabled={myBalB<healCost} style={{background:myBalB<healCost?"rgba(255,255,255,.12)":"#34C77B",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:myBalB<healCost?"default":"pointer",fontFamily:F}}>💊 ポイントで({healCost}pt){myBalB<healCost?"・たりない":""}</button>
             </div>}
