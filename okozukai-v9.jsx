@@ -1666,20 +1666,20 @@ const WILD_MONSTERS = [
   {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", img:"wild_dragon", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"},
     title:"ためこみの主", story:"宝を ためこみすぎて 動けなくなった 森の主。",
     lesson:"ためるだけ じゃなく、使う・増やすで お金は 生きてくる。"},
-  // ── 第二波: なまけの闇の上位下僕(より進んだ お金の落とし穴。ヒカリノオウへの道) ──
-  {name:"バクチン",   emoji:"🎰", lv:8, color:"#e0564f", img:"wild_bakuchin", move:{n:"ルーレット", e:"🎲", c:"#e0564f"},
+  // ── 第二波: ヤミノオウ(Lv11)より格上の上位下僕。撃破後に出現＝ヒカリノオウへの道 ──
+  {name:"バクチン",   emoji:"🎰", lv:12, color:"#e0564f", img:"wild_bakuchin", move:{n:"ルーレット", e:"🎲", c:"#e0564f"},
     title:"イチかバチかの罠", story:"「当たれば 大もうけ」と ささやく ギャンブルの化身。",
     lesson:"ギャンブルは 胴元(主催者)が 必ず とくする しくみ。確実には もうからないよ。"},
-  {name:"シャッキング",emoji:"⛓", lv:8, color:"#8a6d3b", img:"wild_shakking", move:{n:"とりたて", e:"📜", c:"#8a6d3b"},
+  {name:"シャッキング",emoji:"⛓", lv:13, color:"#8a6d3b", img:"wild_shakking", move:{n:"とりたて", e:"📜", c:"#8a6d3b"},
     title:"あと払いの沼", story:"「あとで 払えばいい」と 鎖を 巻きつける 借金の王。",
     lesson:"借りたお金は 利子をつけて 返す。返せる 範囲で だけ にしよう。"},
-  {name:"ミエール",   emoji:"🎭", lv:9, color:"#c95fa0", img:"wild_mieru", move:{n:"みえばり", e:"💅", c:"#c95fa0"},
+  {name:"ミエール",   emoji:"🎭", lv:14, color:"#c95fa0", img:"wild_mieru", move:{n:"みえばり", e:"💅", c:"#c95fa0"},
     title:"みんな持ってるの精", story:"「みんな 持ってるよ？」と あおる 見栄の仮面。",
     lesson:"人に 合わせて 買うと きりがない。自分にとって 必要かで 決めよう。"},
-  {name:"ウマスギ",   emoji:"🐍", lv:9, color:"#5fbf6f", img:"wild_umasugi", move:{n:"あまいささやき", e:"🍯", c:"#5fbf6f"},
+  {name:"ウマスギ",   emoji:"🐍", lv:15, color:"#5fbf6f", img:"wild_umasugi", move:{n:"あまいささやき", e:"🍯", c:"#5fbf6f"},
     title:"うますぎる話のヘビ", story:"「ぜったい もうかる」と ささやく 詐欺(さぎ)のヘビ。",
     lesson:"「絶対もうかる」は ウソ。うますぎる話は まず 疑おう。"},
-  {name:"ローヒー",   emoji:"🌀", lv:10, color:"#7b61c9", img:"wild_rohi", move:{n:"ろうひの渦", e:"💸", c:"#7b61c9"},
+  {name:"ローヒー",   emoji:"🌀", lv:16, color:"#7b61c9", img:"wild_rohi", move:{n:"ろうひの渦", e:"💸", c:"#7b61c9"},
     title:"つかいすぎの渦", story:"少しずつの ムダづかいを のみこんで ふくらむ 浪費の渦。",
     lesson:"何に 使ったか 記録(家計簿)しないと、お金は いつのまにか 消えるよ。"},
 ];
@@ -2098,8 +2098,13 @@ function BattleModal({child,data,update,onClose}){
           <button onClick={()=>setShowEquip(true)} style={{width:"100%",marginBottom:12,background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.2)",borderRadius:14,padding:"11px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>🎒 そうび図鑑{stats.equip&&stats.equip.length?`（${stats.equip.map(e=>e.e).join("")}）`:""}</button>
           <button onClick={()=>setShowSeason(true)} style={{width:"100%",marginBottom:12,background:"linear-gradient(135deg,#E8B83E,#d99a2b)",border:"none",borderRadius:14,padding:"12px",color:"#3a2a00",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(232,184,62,.4)"}}>🏆 家族バトル・シーズン（順位を見る）</button>
           <div style={{color:"rgba(255,255,255,.7)",fontSize:12,fontWeight:800,margin:"0 0 8px"}}>あいてを えらぶ</div>
+          {(()=>{const bd=(data.enemyDex?.[child.id]||[]).includes("wild_boss");return bd&&(
+            <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginBottom:8}}>⚡ ヤミノオウ撃破！さらに 格上の手下が あらわれた…</div>
+          );})()}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {WILD_MONSTERS.map((w,i)=>{
+              const bossDefeated=(data.enemyDex?.[child.id]||[]).includes("wild_boss");
+              if(w.lv>11 && !bossDefeated) return null;  // 格上の第二波はヤミノオウ撃破後に出現
               const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
               const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
               return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
