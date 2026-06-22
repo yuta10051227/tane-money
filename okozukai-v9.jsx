@@ -316,6 +316,8 @@ function startRealtimeSync(updateFn){
             if(prev.enemyDex){merged.enemyDex={...(merged.enemyDex||{})};Object.keys(prev.enemyDex).forEach(cid=>{merged.enemyDex[cid]=Array.from(new Set([...(merged.enemyDex[cid]||[]),...(prev.enemyDex[cid]||[])]));});}
             // バトル/育成の進行(EXP・チケットは多い方、HP/ボス解放はローカル優先)
             if(prev.monsterExp){merged.monsterExp={...(merged.monsterExp||{})};Object.keys(prev.monsterExp).forEach(cid=>{merged.monsterExp[cid]=Math.max(prev.monsterExp[cid]||0,merged.monsterExp[cid]||0);});}
+            if(prev.reincPower){merged.reincPower={...(merged.reincPower||{})};Object.keys(prev.reincPower).forEach(cid=>{merged.reincPower[cid]=Math.max(prev.reincPower[cid]||0,merged.reincPower[cid]||0);});}
+            if(prev.monsterLevelSeen){merged.monsterLevelSeen={...(merged.monsterLevelSeen||{})};Object.keys(prev.monsterLevelSeen).forEach(cid=>{merged.monsterLevelSeen[cid]=Math.max(prev.monsterLevelSeen[cid]||0,merged.monsterLevelSeen[cid]||0);});}
             if(prev.battleTickets){merged.battleTickets={...(merged.battleTickets||{})};Object.keys(prev.battleTickets).forEach(cid=>{merged.battleTickets[cid]=Math.max(prev.battleTickets[cid]||0,merged.battleTickets[cid]||0);});}
             if(prev.battleFragments){merged.battleFragments={...(merged.battleFragments||{})};Object.keys(prev.battleFragments).forEach(cid=>{merged.battleFragments[cid]=Math.max(prev.battleFragments[cid]||0,merged.battleFragments[cid]||0);});}
             if(prev.battleFragDate) merged.battleFragDate={...(merged.battleFragDate||{}),...prev.battleFragDate};
@@ -972,6 +974,8 @@ function migrate(d) {
   if(!d.monsterEvolvedAt) d.monsterEvolvedAt={};
   if(!d.reincarnationCount) d.reincarnationCount={};
   if(!d.reincarnationBonus) d.reincarnationBonus={};
+  if(!d.reincPower) d.reincPower={};
+  if(!d.monsterLevelSeen) d.monsterLevelSeen={};
   if(!d.monsterStageAt) d.monsterStageAt={};
   if(!d.monsterCare) d.monsterCare={};
   if(!d.collectedMons) d.collectedMons={};   // うちのこ(卒業した猫)コレクション
@@ -1768,6 +1772,8 @@ const PLAYER_MOVES = [
 const pickMove = (id)=> PLAYER_MOVES[[...String(id||"")].reduce((a,c)=>a+c.charCodeAt(0),0) % PLAYER_MOVES.length];
 // レベル(EXP→Lv)。お手伝い・バトルでEXPが貯まる。Lvが上がるとステ上昇(IVは伸び率=才能)
 function monLevel(exp){ let lv=1,need=60,e=exp||0; while(e>=need&&lv<50){e-=need;lv++;need=Math.round(need*1.16);} return {lv,into:Math.round(e),need}; }
+// レベル称号(レベル帯で変わる)
+function monRank(lv){ return lv>=40?"でんせつ":lv>=25?"たつじん":lv>=15?"いっぱし":lv>=7?"みならい":"かけだし"; }
 // バトルのステータス(進化段階 × レベル(努力) × IV(才能))を一元化
 function battleStats(data, child){
   const m=getMonState(data,child); const iv=(data.monsterIV||{})[child.id]||{hp:5,atk:5,def:5,spd:5};
@@ -1778,7 +1784,8 @@ function battleStats(data, child){
   const eb=(k)=>eqItems.reduce((s,e)=>s+(e[k]||0),0);
   // 基礎倍率: B=全体+5%底上げ / A=ヤミノタマゴのドロップ毎+1%(累積・永続)。装備ぶん(eb)は倍率外で加算
   const eggDrops=(data.eggDrops||{})[child.id]||0;
-  const baseMul=1.05*(1+0.01*eggDrops);
+  const reincPower=(data.reincPower||{})[child.id]||0;   // 転生プレステージ(到達Lvの累計)。0.5%/Lv
+  const baseMul=1.05*(1+0.01*eggDrops+0.005*reincPower);
   return {
     hp: Math.round((50+(m.stage||0)*22+Math.round(lv*(3+(iv.hp||5)*0.5))+(m.careDays||0)*2)*baseMul)+eb("hp"),
     atk:Math.round((10+(m.stage||0)*4+Math.round(lv*(1.2+(iv.atk||5)*0.18))+Math.floor((m.gauge||0)/6))*baseMul)+eb("atk"),
@@ -3499,6 +3506,25 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
   const myBal    = bal(data.logs, child.id);
   const myLogs   = (data.logs||[]).filter(l=>l.cid===child.id);
+  // ── レベルアップ検知→演出＆報酬(回復カプセル。ptは配らない) ──
+  const _mLv = monLevel((data.monsterExp||{})[child.id]||0).lv;
+  const [lvPop,setLvPop]=useState(null);
+  useEffect(()=>{
+    const seen = data.monsterLevelSeen?.[child.id];
+    if(seen===undefined){ update(d=> (d.monsterLevelSeen?.[child.id]!==undefined ? d : {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}}) ); return; }
+    if(_mLv>seen){
+      let gainedHs=0, gainedHm=0;
+      update(d=>{
+        const cur=(d.monsterLevelSeen||{})[child.id]; if(cur!==undefined && cur>=_mLv) return d;
+        const from=(cur??seen); const cc={...(d.healCaps?.[child.id]||{})};
+        for(let L=from+1; L<=_mLv; L++){ cc.hs=(cc.hs||0)+1; gainedHs++; if(L%5===0){ cc.hm=(cc.hm||0)+1; gainedHm++; } }
+        return {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}, healCaps:{...(d.healCaps||{}),[child.id]:cc}};
+      });
+      setLvPop({to:_mLv, hs:gainedHs||(_mLv-seen), hm:gainedHm});
+      setTimeout(()=>setLvPop(null),3600);
+    }
+  // eslint-disable-next-line
+  },[_mLv]);
   const todayDone= data.gachaDate?.[child.id] === todayKey();
   const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
@@ -4032,6 +4058,22 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Gacha anim */}
       {gachaRes && <GachaAnim result={gachaRes} onClose={()=>setGachaRes(null)}/>}
+      {/* 🎉 レベルアップ演出(報酬: 回復カプセル) */}
+      {lvPop && (
+        <div onClick={()=>setLvPop(null)} style={{position:"fixed",inset:0,background:"#0007",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,pointerEvents:"auto"}}>
+          <div style={{background:"linear-gradient(135deg,#fff7e0,#ffe9a8)",border:"3px solid #E8B83E",borderRadius:22,padding:"22px 26px",textAlign:"center",boxShadow:"0 0 40px rgba(232,184,62,.8)",animation:"lvPopIn .5s cubic-bezier(.2,1.4,.4,1)"}}>
+            <div style={{fontSize:13,fontWeight:900,color:"#9a7000",letterSpacing:2}}>✨ レベルアップ！ ✨</div>
+            <div style={{fontWeight:900,fontSize:42,color:"#E8B83E",lineHeight:1.1,margin:"4px 0",textShadow:"0 2px 0 #fff"}}>Lv.{lvPop.to}</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#7c5a00"}}>称号：{monRank(lvPop.to)}</div>
+            <div style={{marginTop:10,background:"#fff",borderRadius:12,padding:"8px 12px",fontSize:12.5,fontWeight:800,color:TEXT}}>
+              🎁 ごほうび：🟢回復カプセル小 ×{lvPop.hs}{lvPop.hm>0?` ・ 🔵中 ×${lvPop.hm}`:""}
+            </div>
+            <div style={{fontSize:11,color:MUTED,marginTop:8,lineHeight:1.5}}>つみ重ねた努力が 力に！HP・こうげき・素早さ UP</div>
+            <button onClick={()=>setLvPop(null)} style={{marginTop:12,background:"#E8B83E",border:"none",borderRadius:12,padding:"9px 22px",color:"#3a2a00",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>やったー！</button>
+          </div>
+          <style>{`@keyframes lvPopIn{0%{transform:scale(.3) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}`}</style>
+        </div>
+      )}
       {showBattle && <BattleModal child={child} data={data} update={update} onClose={()=>setShowBattle(false)}/>}
       {showNews && <NewsModal onClose={()=>setShowNews(false)}/>}
       {showExped && <ExpeditionModal child={child} data={data} update={update} onClose={()=>setShowExped(false)}/>}
@@ -7165,16 +7207,22 @@ function SeedMonster({ child, data, size=90, update }) {
   const doReincarnate = () => {
     if (!canReincarnate || evolving) return;
     const until = new Date(Date.now() + 7*24*60*60*1000).toISOString();
-    update(d => ({
-      ...d,
-      monsterEvolved:       {...(d.monsterEvolved||{}),       [child.id]: null},
-      monsterEvolvedAt:     {...(d.monsterEvolvedAt||{}),     [child.id]: null},
-      monsterStageAt:       {...(d.monsterStageAt||{}),       [child.id]: new Date().toISOString()},
-      reincarnationCount:   {...(d.reincarnationCount||{}),   [child.id]: ((d.reincarnationCount||{})[child.id]||0)+1},
-      reincarnationBonus:   {...(d.reincarnationBonus||{}),   [child.id]: {until, rate:0.05}},
-    }));
-    setSpeech("てんせい！また始まるよ✨");
-    setTimeout(()=>setSpeech(null),2500);
+    update(d => {
+      const prevLv = monLevel((d.monsterExp||{})[child.id]||0).lv;   // 今までのレベルを永続パワーに変換
+      return {
+        ...d,
+        monsterEvolved:       {...(d.monsterEvolved||{}),       [child.id]: null},
+        monsterEvolvedAt:     {...(d.monsterEvolvedAt||{}),     [child.id]: null},
+        monsterStageAt:       {...(d.monsterStageAt||{}),       [child.id]: new Date().toISOString()},
+        monsterExp:           {...(d.monsterExp||{}),           [child.id]: 0},   // レベルは1に戻す
+        monsterLevelSeen:     {...(d.monsterLevelSeen||{}),     [child.id]: 1},
+        reincPower:           {...(d.reincPower||{}),           [child.id]: ((d.reincPower||{})[child.id]||0)+prevLv},  // 到達Lvを永続加算(0.5%/Lv)
+        reincarnationCount:   {...(d.reincarnationCount||{}),   [child.id]: ((d.reincarnationCount||{})[child.id]||0)+1},
+        reincarnationBonus:   {...(d.reincarnationBonus||{}),   [child.id]: {until, rate:0.05}},
+      };
+    });
+    setSpeech("てんせい！レベルは1に戻るけど 永続パワーGET✨");
+    setTimeout(()=>setSpeech(null),3000);
   };
 
   // 卒業：猫を育て切ったら「うちのこ」に加え、ランダムで次の猫タマゴをむかえる
@@ -7793,11 +7841,12 @@ function FamilyBattleSeason({child, data, update, onClose}){
         <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"13px 14px",marginBottom:12}}>
           <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>💪 あなたの強さの内訳（戦闘力 {myBP}・⚡{ms.spd}）</div>
           {[
-            ["📊","レベル",`Lv.${ms.lv}`,"クイズ正解・お手伝いで EXP→レベルUP"],
+            ["📊","レベル",`Lv.${ms.lv}（${monRank(ms.lv)}）`,"クイズ正解・お手伝いで EXP→レベルUP。Lvでステ＆称号UP・カプセル報酬"],
             ["⚔","そうび",eqNames,"武器をドロップして『そうび』すると強くなる"],
             ["⚡","すばやさ",`${ms.spd}`,"素早い方が バトルで先に こうげきできる"],
             ["🌱","育成",`${(getMonState(data,child).careDays||0)}日 なでなで`,"進化と なでなでで ステータスUP"],
             ...((ms.eggDrops||0)>0?[["🥚","卵ボーナス",`基礎+${ms.eggDrops}%`,"ヤミノオウを倒して タマゴを集めるほど基礎UP"]]:[]),
+            ...(((data.reincPower||{})[child.id]||0)>0?[["♻","転生パワー",`基礎+${((data.reincPower||{})[child.id]||0)*0.5}%`,"転生でレベルは1に戻るが、到達Lvが永続パワーに(0.5%/Lv)"]]:[]),
           ].map(([e,l,v,hint],i)=>(
             <div key={i} style={{display:"flex",alignItems:"flex-start",gap:9,padding:"5px 0",borderTop:i?`1px solid ${BORDER}`:"none"}}>
               <span style={{fontSize:16,width:20,textAlign:"center"}}>{e}</span>
