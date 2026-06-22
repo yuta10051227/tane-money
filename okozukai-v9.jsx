@@ -322,6 +322,7 @@ function startRealtimeSync(updateFn){
             if(prev.battleWins){merged.battleWins={...(merged.battleWins||{})};Object.keys(prev.battleWins).forEach(cid=>{merged.battleWins[cid]=Math.max(prev.battleWins[cid]||0,merged.battleWins[cid]||0);});}
             if(prev.monsterEquip) merged.monsterEquip={...(merged.monsterEquip||{}),...prev.monsterEquip};
             if(prev.healPotions){merged.healPotions={...(merged.healPotions||{})};Object.keys(prev.healPotions).forEach(cid=>{merged.healPotions[cid]=Math.max(prev.healPotions[cid]||0,merged.healPotions[cid]||0);});}
+            if(prev.healCaps){merged.healCaps={...(merged.healCaps||{})};Object.keys(prev.healCaps).forEach(cid=>{const p=prev.healCaps[cid]||{},m=merged.healCaps[cid]||{};merged.healCaps[cid]={hs:Math.max(p.hs||0,m.hs||0),hm:Math.max(p.hm||0,m.hm||0)};});}
             if(prev.equipUnlock){merged.equipUnlock={...(merged.equipUnlock||{})};Object.keys(prev.equipUnlock).forEach(cid=>{merged.equipUnlock[cid]=[...new Set([...(merged.equipUnlock[cid]||[]),...(prev.equipUnlock[cid]||[])])];});}
             if(prev.missionClaimed) merged.missionClaimed={...(merged.missionClaimed||{}),...prev.missionClaimed};
             if(prev.expedition) merged.expedition={...(merged.expedition||{}),...prev.expedition};
@@ -1681,6 +1682,11 @@ const EQUIPMENT = [
 ];
 const EQ_SLOTS=[{k:"weapon",t:"⚔ ぶき"},{k:"shield",t:"🛡 たて"}];
 const EQ_RAR=(r)=>({1:{n:"N",c:"#7c8a82"},2:{n:"R",c:"#3478D4"},3:{n:"SR",c:"#7B61C9"},4:{n:"SR+",c:"#E8B83E"},5:{n:"UR",c:"#D95C55"}}[r]||{n:"N",c:"#7c8a82"});
+// 回復カプセル(バトルドロップ・低確率)。小=50回復 / 中=100回復
+const HEAL_CAPS=[
+  {k:"hs", name:"回復カプセル小", e:"🟢", heal:50,  rate:0.10, c:"#34C77B"},
+  {k:"hm", name:"回復カプセル中", e:"🔵", heal:100, rate:0.04, c:"#3478D4"},
+];
 function equipMeta(data, child){
   const m=getMonState(data,child);
   return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
@@ -1849,6 +1855,8 @@ function BattleModal({child,data,update,onClose}){
   const [,setHpTick]=useState(0);  // 1分1回復を画面に反映するための再描画タイマー
   useEffect(()=>{const id=setInterval(()=>setHpTick(t=>t+1),20000);return()=>clearInterval(id);},[]);
   const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}})); };
+  const caps=(data.healCaps||{})[child.id]||{};
+  const useCap=(cap)=>{ if(curHP>=pMaxHP||((caps[cap.k]||0)<=0))return; const newHP=Math.min(curMonHP(data,child)+cap.heal,pMaxHP); update(d=>{ const cc={...(d.healCaps?.[child.id]||{})}; cc[cap.k]=Math.max(0,(cc[cap.k]||0)-1); return {...d, healCaps:{...(d.healCaps||{}),[child.id]:cc}, monsterHP:{...(d.monsterHP||{}),[child.id]:newHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}}; }); };
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
@@ -1907,7 +1915,8 @@ function BattleModal({child,data,update,onClose}){
         dropInfo={kind:"equip",id:sigItem.id,name:sigItem.name,e:sigItem.e};   // 固有レア武器ドロップ
       } else {
         const roll=Math.random();
-        if(roll<0.14) dropInfo={kind:"potion"};
+        if(roll<0.10) dropInfo={kind:"cap",cap:"hs"};        // 回復カプセル小(50) 10%
+        else if(roll<0.14) dropInfo={kind:"cap",cap:"hm"};   // 回復カプセル中(100) 4% ※低め
         else if(roll<0.22){ const locked=EQUIPMENT.filter(it=>!it.premium && !it.dropFrom && !equipUnlocked(it,equipMeta(data,child),drp)); if(locked.length){ const pick=locked[Math.floor(Math.random()*locked.length)]; dropInfo={kind:"equip",id:pick.id,name:pick.name,e:pick.e}; } }
       }
     }
@@ -1922,6 +1931,7 @@ function BattleModal({child,data,update,onClose}){
         nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today};  // 「今日1勝したか」=ミッション判定用
       }
       if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
+      if(dropInfo?.kind==="cap"){ const cc={...(d.healCaps?.[child.id]||{})}; cc[dropInfo.cap]=(cc[dropInfo.cap]||0)+1; nd.healCaps={...(d.healCaps||{}),[child.id]:cc}; }
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(dropInfo?.kind==="egg"){
         nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積・永続)
@@ -1980,7 +1990,10 @@ function BattleModal({child,data,update,onClose}){
             <div style={{width:190,maxWidth:"82%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
             <div style={{width:190,maxWidth:"82%",margin:"5px auto 0"}}><HPBar label="EXP" hp={stats.exp.into} max={stats.exp.need} color="#ffd24a"/></div>
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 かいふくアイテム ×{potions}</button>}
+              {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 フル回復 ×{potions}</button>}
+              {HEAL_CAPS.map(cap=>((caps[cap.k]||0)>0)&&(
+                <button key={cap.k} onClick={()=>useCap(cap)} style={{background:cap.c,border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{cap.e} +{cap.heal} ×{caps[cap.k]}</button>
+              ))}
               <button onClick={healByPoints} disabled={myBalB<healCost} style={{background:myBalB<healCost?"rgba(255,255,255,.12)":"#34C77B",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:myBalB<healCost?"default":"pointer",fontFamily:F}}>💊 ポイントで({healCost}pt){myBalB<healCost?"・たりない":""}</button>
             </div>}
             <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginTop:5}}>お手伝い・なでなで・進化で つよくなる！（3ターン勝負）</div>
@@ -2048,6 +2061,7 @@ function BattleModal({child,data,update,onClose}){
               {reward==="fragment"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#cfe6ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText .8s ease-out"}}>🧩 チケットのかけら GET！（{fragNow}/5）</div>}
               {reward==="none"&&<div style={{marginTop:8,fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",zIndex:2,textShadow:"0 2px 8px #000"}}>このモンスターの かけらは きょうGET済み（EXPはGET！）</div>}
               {drop?.kind==="potion"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#bff0c8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>💊 かいふくアイテムを 見つけた！</div>}
+              {drop?.kind==="cap"&&(()=>{const cap=HEAL_CAPS.find(c=>c.k===drop.cap);return <div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#bff0c8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>{cap.e} {cap.name}（HP{cap.heal}回復）を 見つけた！</div>;})()}
               {drop?.kind==="equip"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#ffd9a8",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🎁 そうび「{drop.e}{drop.name}」を 見つけた！</div>}
               {drop?.kind==="egg"&&<div style={{marginTop:8,fontSize:15,fontWeight:900,color:"#e0c7ff",zIndex:2,textShadow:"0 2px 8px #000",animation:"btWinText 1s ease-out"}}>🥚 ヤミノタマゴ 獲得！基礎ステータス +1%（お世話で育つ）</div>}
             </div>
