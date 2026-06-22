@@ -3690,9 +3690,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           const m=getMonState(data, child);
           if(m.isFinal) return null;          // 最終形はヒント非表示
           const ready=m.canEvolve;
-          const label = ready ? "🌟 いまならしんかできるよ！"
-            : !m.growthOk ? `🌟 あと${m.growthRemain}でしんかできるよ！`
-            : `⏳ ${fmtTimeRemain(m.timeRemainMs)}でしんか`;
+          const eggS = m.curId==="egg" || /_egg$/.test(String(m.curId));  // 卵は「うまれる」
+          const label = ready ? (eggS?"🐣 いまなら うまれるよ！":"🌟 いまならしんかできるよ！")
+            : !m.growthOk ? `${eggS?"🐣":"🌟"} あと${m.growthRemain}で${eggS?"うまれる":"しんか"}よ！`
+            : `⏳ ${fmtTimeRemain(m.timeRemainMs)}で${eggS?"うまれる":"しんか"}`;
           return(
             <div style={{margin:"0 20px 6px",position:"relative",zIndex:2}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
@@ -7023,6 +7024,7 @@ function SeedMonster({ child, data, size=90, update }) {
   const monsterId      = mon.curId;
   const curStage       = mon.stage;
   const isFinal        = mon.isFinal;
+  const isEgg          = monsterId==="egg" || /_egg$/.test(String(monsterId));  // 卵は「しんか」でなく「うまれる」
   const canEvolve      = mon.canEvolve && !!update;
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
@@ -7307,7 +7309,7 @@ function SeedMonster({ child, data, size=90, update }) {
           </div>
           {!canEvolve && (
             <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",fontWeight:700,marginTop:3}}>
-              {!mon.growthOk ? `あと${evoRemaining}でしんか✨` : `⏳ ${fmtTimeRemain(mon.timeRemainMs)}でしんか`}
+              {!mon.growthOk ? `あと${evoRemaining}で${isEgg?"うまれる":"しんか"}✨` : `⏳ ${fmtTimeRemain(mon.timeRemainMs)}で${isEgg?"うまれる":"しんか"}`}
             </div>
           )}
         </>
@@ -7321,9 +7323,9 @@ function SeedMonster({ child, data, size=90, update }) {
         return(
           <>
             <button onClick={doEvolve} style={{display:"block",margin:"8px auto 0",background:"linear-gradient(135deg,#fde68a,#f59e0b)",border:"none",borderRadius:999,padding:"6px 16px",color:"#7c2d12",fontWeight:900,fontSize:11,cursor:"pointer",fontFamily:F,animation:"evoPulse 1.2s ease-in-out infinite",boxShadow:"0 0 14px rgba(251,191,36,0.8)"}}>
-              🌟 しんかできるよ！
+              {isEgg?"🐣 うまれるよ！":"🌟 しんかできるよ！"}
             </button>
-            {nextDef&&<div style={{fontSize:11,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}になりそう！</div>}
+            {nextDef&&<div style={{fontSize:11,color:"rgba(253,230,138,0.8)",marginTop:3}}>→ {nextDef.name}{isEgg?"が うまれそう！":"になりそう！"}</div>}
           </>
         );
       })()}
