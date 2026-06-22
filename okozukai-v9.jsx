@@ -7369,6 +7369,39 @@ function MonsterZukan({ data, child }) {
           <Detail ids={br.ids}/>
         </div>
       ))}
+
+      {/* ── 👑 ヤミノオウの道(特別・ボス撃破の卵から育てる7段階) ── */}
+      {(()=>{
+        const care = data.darkEgg?.[child.id]?.care;
+        const hasEgg = care!==undefined;
+        const reached = (s)=> hasEgg && care>=s.min;
+        const reachedCount = hasEgg ? DARK_EGG_STAGES.filter(reached).length : 0;
+        return (
+          <div style={{marginTop:6,background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:"1.5px solid #7b61c9",borderRadius:14,padding:"10px 8px",color:"#fff"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+              <span style={{fontSize:12}}>👑</span>
+              <span style={{fontSize:11,fontWeight:900}}>ヤミノオウの道（特別）</span>
+              <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginLeft:"auto"}}>{reachedCount}/{DARK_EGG_STAGES.length}</span>
+            </div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginBottom:8,lineHeight:1.5}}>{hasEgg?"お世話で育てるほど 進化！🐣そだてる で育てよう":"バトルで ヤミノオウを 倒すと タマゴが手に入る"}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
+              {DARK_EGG_STAGES.map(s=>{
+                const ok=reached(s);
+                return (
+                  <div key={s.sprite} style={{textAlign:"center",background:ok?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.2)",borderRadius:10,padding:"6px 2px"}}>
+                    <div style={{position:"relative",width:34,height:34,margin:"0 auto 2px",filter:ok?"none":"grayscale(1) brightness(.4)"}}>
+                      <img src={`/assets/gacha_gs_${s.sprite}_a.png`} alt="" style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";const sp=e.target.nextSibling;if(sp)sp.style.display="block";}}/>
+                      <span style={{display:"none",fontSize:24}}>{s.emoji}</span>
+                    </div>
+                    <div style={{fontSize:9.5,fontWeight:800,color:ok?"#fff":"rgba(255,255,255,0.4)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{ok?s.name:"???"}</div>
+                    <div style={{fontSize:8.5,color:"rgba(255,255,255,0.45)"}}>{s.stage}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
