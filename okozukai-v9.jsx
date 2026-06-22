@@ -3538,8 +3538,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   // 5-tab grouped nav
   const MAIN_TABS = isJunior
-    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"]]
-    : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
+    ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"],["rpg","🐣 そだてる"]]
+    : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["rpg","そだてる"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
     tasks:"activity", invest:"activity", kakeibo:"money",
@@ -3740,7 +3740,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <button key={v} onClick={()=>setTab(v)}
             style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{position:"relative",display:"inline-flex"}}>
-              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}}/>
+              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent="🐣";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
               {tabDot && <span style={{position:"absolute",top:-3,right:-6,width:9,height:9,borderRadius:"50%",background:GOLD,border:`1.5px solid ${isJunior?CARD:"#0f1a2e"}`}}/>}
             </span>
             {l.replace(/^\S+\s+/,"")}
@@ -3808,8 +3808,19 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         );
       })()}
 
+      {/* ── 🐣 そだてる(rpg)タブ: モンスターのハブ ── */}
+      {effectiveTab==="rpg" && (
+        <div style={{padding:"14px 16px 4px"}}>
+          <div style={{textAlign:"center",marginBottom:6}}>
+            <SeedMonster child={child} data={data} size={120} update={update}/>
+          </div>
+          {showBattleF && <button onClick={()=>setShowBattle(true)} style={{width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"14px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>}
+          {!showBattleF && <div style={{textAlign:"center",fontSize:12,color:darkBG?"rgba(255,255,255,0.5)":MUTED,padding:"8px"}}>バトルは保護者設定でオフになっています</div>}
+        </div>
+      )}
+
       {/* 🧭 とっくんの旅(旅先を選択・遠いほどEXP大・放置系) */}
-      {effectiveTab==="daily" && showExpedF && (()=>{
+      {effectiveTab==="rpg" && showExpedF && (()=>{
         const exp=data.expedition?.[child.id];
         const started=exp&&exp.start;
         const dest=EXPEDITIONS.find(e=>e.id===exp?.dest)||EXPEDITIONS[0];
@@ -4073,7 +4084,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 {hasTicket&&<span style={{color:darkBG?"#bff0c8":G}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
                 <span style={{color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>🧩 チケットのかけら {(data.battleFragments?.[child.id]||0)}/5</span>
               </div>
-              {showBattleF && <button onClick={()=>setShowBattle(true)} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"13px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>}
+              {/* モンスターバトルは「そだてる」タブへ移動 */}
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
                   <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
@@ -4442,7 +4453,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         );
       })()}
 
-      {effectiveTab==="more" && (
+      {effectiveTab==="rpg" && (
         <div style={{padding:"0 16px 0"}}>
           <div onClick={()=>setMoreOpen(o=>o==="zukan"?null:"zukan")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
@@ -4462,7 +4473,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── 背景きせかえ ── */}
-      {effectiveTab==="more" && (
+      {effectiveTab==="rpg" && (
         <div style={{padding:"0 16px 8px"}}>
           <div onClick={()=>setMoreOpen(o=>o==="bg"?null:"bg")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
@@ -4504,10 +4515,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── 🥚 ヤミノオウのタマゴ(ボス撃破ドロップ・お世話で育てて最終進化) ── */}
-      {effectiveTab==="more" && data.darkEgg?.[child.id] && <DarkEggCard child={child} data={data} update={update}/>}
+      {effectiveTab==="rpg" && data.darkEgg?.[child.id] && <DarkEggCard child={child} data={data} update={update}/>}
 
       {/* ── ⚔ ドロップ図鑑(モンスターごとの固有レア武器) ── */}
-      {effectiveTab==="more" && (()=>{
+      {effectiveTab==="rpg" && (()=>{
         const owned=(data.equipUnlock||{})[child.id]||[];
         const rows=[...WILD_MONSTERS,BOSS_MONSTER].map(m=>({m,w:EQUIPMENT.find(it=>it.dropFrom===m.img)})).filter(r=>r.w);
         const gotCount=rows.filter(r=>owned.includes(r.w.id)).length;
@@ -4553,7 +4564,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       })()}
 
       {/* ── ひみつのなかま(隠しモンスター) ── */}
-      {effectiveTab==="more" && (
+      {effectiveTab==="rpg" && (
         <div style={{padding:"0 16px 8px"}}>
           <div onClick={()=>setMoreOpen(o=>o==="hidden"?null:"hidden")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
@@ -4613,7 +4624,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── うちのこ(猫タネもん) ── */}
-      {effectiveTab==="more" && (
+      {effectiveTab==="rpg" && (
         <div style={{padding:"0 16px 8px"}}>
           <div onClick={()=>setMoreOpen(o=>o==="cats"?null:"cats")}
             style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",marginBottom:8}}>
@@ -4721,14 +4732,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             {[["log","📋 履歴"],["badges","🎖 バッジ"],["ranking","🏅 ランキング"]].map(([k,l])=>(
               <button key={k} onClick={()=>setMoreOpen(k==="log"?"log":k==="badges"?"badges":"ranking")}
                 style={{flex:1,padding:"7px 0",border:"none",borderRadius:10,
-                  background:(moreOpen||"log")===k?GP:"transparent",
-                  color:(moreOpen||"log")===k?"#fff":MUTED,
-                  fontWeight:(moreOpen||"log")===k?700:400,fontSize:11,cursor:"pointer",fontFamily:F}}>
+                  background:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?GP:"transparent",
+                  color:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?"#fff":MUTED,
+                  fontWeight:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?700:400,fontSize:11,cursor:"pointer",fontFamily:F}}>
                 {l}
               </button>
             ))}
           </div>
-          {(moreOpen||"log")==="log" && (
+          {(["badges","ranking"].includes(moreOpen)?moreOpen:"log")==="log" && (
           <div>
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
@@ -4743,7 +4754,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── BADGES ── */}
-      {effectiveTab==="more"&&(moreOpen||"log")==="badges"&&<BadgesSection child={child} data={data} update={update}/>}
+      {effectiveTab==="more"&&(["badges","ranking"].includes(moreOpen)?moreOpen:"log")==="badges"&&<BadgesSection child={child} data={data} update={update}/>}
 
       {/* ── 記録タブ: ランキング ── */}
       {effectiveTab==="more"&&moreOpen==="ranking"&&(()=>{
