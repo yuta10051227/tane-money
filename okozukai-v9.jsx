@@ -1688,10 +1688,11 @@ const HEAL_CAPS=[
   {k:"hm", name:"回復カプセル中", e:"🔵", heal:100, rate:0.04, c:"#3478D4"},
 ];
 // サポートなかま: お手伝い数で加入(週間・3回ごと最大3体)。タイプは週ごとランダム固定。固定効果=弱い子ほど相対的に効く
+// タネの精霊(がんばりの光): お手伝いの努力で目をさます3体。役割は固定、名前・物語つき
 const SUP_TYPES=[
-  {k:"atk", e:"⚔", name:"アタッカー", desc:"毎ターン 敵に ついげき"},
-  {k:"heal",e:"💚", name:"ヒーラー",   desc:"毎ターン HPを かいふく"},
-  {k:"rng", e:"🎲", name:"きまぐれ",   desc:"毎ターン 攻撃か回復を ランダム"},
+  {k:"atk", e:"⚔", name:"コツン",  sprite:"sup_kotsun", role:"アタッカー", desc:"毎ターン 敵に ついげき。コツコツ続ける力の精霊", awaken:"コツンが めをさました！"},
+  {k:"heal",e:"💚", name:"メグミ",  sprite:"sup_megumi", role:"ヒーラー",   desc:"毎ターン HPを かいふく。分け合う優しさの精霊", awaken:"メグミが めをさました！"},
+  {k:"rng", e:"🎲", name:"ラッキー",sprite:"sup_lucky",  role:"きまぐれ",   desc:"毎ターン 攻撃か回復を ランダム。運とチャレンジの精霊", awaken:"ラッキーが めをさました！"},
 ];
 const SUP_PER=3, SUP_MAX=3, SUP_ATK=10, SUP_HEAL=20;
 // その子の今週のサポートなかま(お手伝い数から導出・保存不要)
@@ -2027,7 +2028,7 @@ function BattleModal({child,data,update,onClose}){
               <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,flexWrap:"wrap"}}>
                 <span style={{fontSize:12,fontWeight:800,color:"#ffe9a8"}}>🤝 サポートなかま</span>
                 {sup.count>0
-                  ? sup.list.map((b,i)=><span key={i} title={b.desc} style={{fontSize:12,fontWeight:800,color:"#fff",background:"rgba(255,255,255,.1)",borderRadius:8,padding:"2px 7px"}}>{b.e}{b.name}</span>)
+                  ? sup.list.map((b,i)=><span key={i} title={b.role+"："+b.desc} style={{display:"inline-flex",alignItems:"center",gap:3,fontSize:12,fontWeight:800,color:"#fff",background:"rgba(255,255,255,.1)",borderRadius:8,padding:"2px 7px"}}><img src={`/assets/${b.sprite}_a.png`} alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=b.e;e.target.replaceWith(s);}}/>{b.name}<span style={{fontSize:9,color:"rgba(255,255,255,.55)"}}>({b.e})</span></span>)
                   : <span style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>まだ いないよ</span>}
               </div>
               <div style={{fontSize:10,color:"rgba(255,255,255,.5)",textAlign:"center",marginTop:4}}>
