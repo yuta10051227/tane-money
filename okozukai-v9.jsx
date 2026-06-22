@@ -744,7 +744,9 @@ function getMonState(data, child){
   const growthRemain = isFinal ? 0 : Math.max(0, need - gauge);
   const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
   const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
-  const reqMs = evoHoursFor(stage, cid) * 3600000;
+  // ヤミノオウの卵を育成中(究極体前)は、通常モンスターの進化が1.5倍遅くなる(育てる力が分散)
+  const _eggRaising = (data.darkEgg||{})[cid] && ((data.darkEgg[cid].care||0) < DARK_EGG_MAX);
+  const reqMs = evoHoursFor(stage, cid) * 3600000 * (_eggRaising ? 1.5 : 1);
   const timeOk = testEvolve ? true : (elapsedMs >= reqMs);
   const timeRemainMs = Math.max(0, reqMs - elapsedMs);
   const canEvolve = !isFinal && timeOk && growthOk;
@@ -2067,6 +2069,22 @@ function BattleModal({child,data,update,onClose}){
       return ()=>clearTimeout(id);
     }
   },[auto,phase,busy,result,round]);
+  // ワイルド敵カード(レベル順表示で再利用)
+  const renderWildCard=(w,i)=>{
+    const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
+    const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
+    const os=5+w.lv*2; const fst=pSPD>=os;
+    return (
+      <button key={w.img} onClick={lowHP?undefined:()=>start(i)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
+        <span onClick={e=>{e.stopPropagation();setEnemyInfo(w);}} style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.14)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2}}>?</span>
+        <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
+        <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
+        <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥":""}</div>
+        <div style={{fontSize:10.5,color:fst?"#7fe0a0":"#ff9a8a",fontWeight:800,marginTop:1}}>⚡{os} {fst?"先制できる":"敵が先制"}</div>
+        <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(w)}</div>
+      </button>
+    );
+  };
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"#070611",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"calc(12px + env(safe-area-inset-top)) 16px 8px",display:"flex",alignItems:"center",justifyContent:"space-between",zIndex:5}}>
@@ -2113,20 +2131,8 @@ function BattleModal({child,data,update,onClose}){
             <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginBottom:8}}>⚡ ヤミノオウ撃破！さらに 格上の手下が あらわれた…</div>
           );})()}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {WILD_MONSTERS.map((w,i)=>{
-              const bossDefeated=(data.enemyDex?.[child.id]||[]).includes("wild_boss");
-              if(w.lv>11 && !bossDefeated) return null;  // 格上の第二波はヤミノオウ撃破後に出現
-              const opw=(50+w.lv*28)+(9+w.lv*5)+(4+w.lv*3);
-              const tough=opw>(pMaxHP+pATK+pDEF)*0.9;
-              return <button key={i} onClick={lowHP?undefined:()=>start(i)} style={{position:"relative",background:"rgba(255,255,255,.06)",border:`1.5px solid ${w.color}66`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center"}}>
-                <span onClick={e=>{e.stopPropagation();setEnemyInfo(w);}} style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.14)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2}}>?</span>
-                <img src={`/assets/${w.img}.png`} style={{width:48,height:48,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.emoji;s.style.fontSize="38px";e.target.replaceWith(s);}}/>
-                <div style={{color:"#fff",fontWeight:800,fontSize:13,marginTop:4}}>{w.name}</div>
-                <div style={{fontSize:11,color:w.color,fontWeight:800,marginTop:2}}>Lv.{w.lv}{tough?" 🔥":""}</div>
-                {(()=>{const os=5+w.lv*2;const f=pSPD>=os;return <div style={{fontSize:10.5,color:f?"#7fe0a0":"#ff9a8a",fontWeight:800,marginTop:1}}>⚡{os} {f?"先制できる":"敵が先制"}</div>;})()}
-                <div style={{fontSize:11,color:"#ffd24a",fontWeight:800,marginTop:1}}>かつと 🆙+{battleExp(w)}</div>
-              </button>;
-            })}
+            {/* レベル順: Lv11以下のワイルド → ヤミノオウ(11) → 上位下僕(撃破後) */}
+            {WILD_MONSTERS.map((w,i)=>({w,i})).filter(x=>x.w.lv<=11).map(x=>renderWildCard(x.w,x.i))}
             {bossUnlocked ? (
               <button onClick={lowHP?undefined:()=>start(WILD_MONSTERS.length)} style={{position:"relative",background:"linear-gradient(135deg,rgba(176,123,255,.22),rgba(80,40,140,.25))",border:`2px solid ${BOSS_MONSTER.color}`,borderRadius:16,padding:"14px 8px",cursor:lowHP?"default":"pointer",opacity:lowHP?.45:1,fontFamily:F,textAlign:"center",boxShadow:`0 0 16px ${BOSS_MONSTER.color}66`}}>
                 <span onClick={e=>{e.stopPropagation();setEnemyInfo(BOSS_MONSTER);}} style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.18)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2}}>?</span>
@@ -2143,6 +2149,8 @@ function BattleModal({child,data,update,onClose}){
                 <div style={{fontSize:11,color:"rgba(255,255,255,.4)",fontWeight:700,marginTop:2}}>🔒 ヌシをたおすと…</div>
               </div>
             )}
+            {/* 上位下僕(Lv12〜)はヤミノオウの後＝レベル順。撃破後のみ */}
+            {(data.enemyDex?.[child.id]||[]).includes("wild_boss") && WILD_MONSTERS.map((w,i)=>({w,i})).filter(x=>x.w.lv>11).map(x=>renderWildCard(x.w,x.i))}
             {/* 🌟 真の最終ボス ヒカリノオウ(ティザー・近日開放。手下＋ヤミノオウ全撃破で道がひらく) */}
             {(()=>{
               const dex=data.enemyDex?.[child.id]||[];
@@ -6919,7 +6927,7 @@ function DarkEggCard({child,data,update}){
   // ステージ別の待機アニメ: たまご=ゆらゆら / ベビー=ぴょこぴょこ / 王=ふわふわ＋発光
   const idleAnim = react ? "deShake .5s ease-in-out" : isFinal ? "deFloat 3s ease-in-out infinite" : stIdx===0 ? "deWob 2.6s ease-in-out infinite" : "deHop 1.4s ease-in-out infinite";
   const feed=()=>{
-    if(fedToday||isFinal) return;
+    if(isFinal||react) return;   // 日時ゲートなし=何度でもお世話OK(連打はアニメ中だけ抑制)
     const newCare=care+1; const newSt=darkEggStage(newCare);
     setReact(true); vib(20); setTimeout(()=>setReact(false),650);
     if(DARK_EGG_STAGES.indexOf(newSt)>stIdx){    // ステージ上昇=ハッチ/進化演出
@@ -6961,7 +6969,8 @@ function DarkEggCard({child,data,update}){
         </div>
         {isFinal
           ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
-          : <button onClick={feed} disabled={fedToday} style={{position:"relative",marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
+          : <><button onClick={feed} disabled={react} style={{position:"relative",marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,opacity:react?0.7:1}}>🤚 お世話する（なんども育てられる）</button>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",textAlign:"center",marginTop:6,lineHeight:1.5}}>※卵を育てている間は、いつものモンスターの進化が ゆっくり(1.5倍)になるよ</div></>}
         {/* 進化図トグル */}
         <button onClick={()=>setShowTree(v=>!v)} style={{marginTop:8,width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:10,padding:"8px",color:"#d9ccff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>🔍 進化図を{showTree?"とじる":"みる"}</button>
         {showTree && (
