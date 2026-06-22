@@ -1083,8 +1083,9 @@ function migrate(d) {
   d.goodTasks=(d.goodTasks||[]).map(t=>({...t,over:t.over||t.overrides||{}}));
   d.badTasks =(d.badTasks||[]).map(t=>({...t,over:t.over||t.overrides||{}}));
   d.children =(d.children||[]).map(c=>({...c,ageMode:c.ageMode||"middle"}));
-  if(d.goodTasks.length<=4&&d.goodTasks.some(t=>t.id==="g1"||t.id==="g2")) d.goodTasks=INIT.goodTasks;
-  if(d.badTasks.length<=3&&d.badTasks.some(t=>t.id==="b1"||t.id==="b2"))   d.badTasks=INIT.badTasks;
+  // 旧形式(g1/g2)の既定タスクをINITへ移行。ただしユーザー追加分(旧ID以外)は必ず残す
+  if(d.goodTasks.length<=4&&d.goodTasks.some(t=>t.id==="g1"||t.id==="g2")){ const _c=d.goodTasks.filter(t=>!/^g\d$/.test(String(t.id))); d.goodTasks=[...INIT.goodTasks,..._c]; }
+  if(d.badTasks.length<=3&&d.badTasks.some(t=>t.id==="b1"||t.id==="b2")){   const _c=d.badTasks.filter(t=>!/^b\d$/.test(String(t.id)));  d.badTasks =[...INIT.badTasks,..._c]; }
   if(!d.tutorialSeen||Object.keys(d.tutorialSeen).length===0){
     if((d.logs||[]).length>0){
       const seen={"parent":true};
@@ -9654,15 +9655,28 @@ export default function App() {
 
     // ① ローカル即時表示：手元にデータがあればネットを待たずに描画（起動高速化）
     let shownLocal = false;
+    let localData = null;   // 起動時のFirestore上書きから お手伝い項目を守るため保持
     try {
       const local = localLoadSync();
-      if(local){ setData(migrate(local)); setLoading(false); shownLocal = true; }
+      if(local){ localData = local; setData(migrate(local)); setLoading(false); shownLocal = true; }
     } catch(e) {}
 
     // ② Firebase(遅延ロード)の準備ができ次第、Firestoreから最新を取得して上書き＋同期開始
     whenFirebaseReady(()=>{
     cloudLoad().then(async d=>{
       const migrated = migrate(d);
+      // ★ 起動時もローカルのお手伝い項目(タスク定義)を保護＝Firestoreが古くても項目が消えない(ユニオン)
+      if(localData){
+        try{
+          const lm = migrate(localData);
+          const _uni=(a,b)=>{const m={};[...(a||[]),...(b||[])].forEach(t=>{if(t&&t.id!=null)m[t.id]=t;});return Object.values(m);};
+          if(lm.goodTasks) migrated.goodTasks=_uni(migrated.goodTasks, lm.goodTasks);
+          if(lm.badTasks)  migrated.badTasks =_uni(migrated.badTasks,  lm.badTasks);
+          if(lm.myTaskIds) migrated.myTaskIds={...(migrated.myTaskIds||{}),...lm.myTaskIds};
+          if(lm.dailyTaskSets&&lm.dailyTaskSets.length>(migrated.dailyTaskSets||[]).length) migrated.dailyTaskSets=lm.dailyTaskSets;
+          if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
+        }catch(e){}
+      }
       // Firestoreのlogsコレクションからログを追加読み込み
       const firestoreLogs = await loadLogsFromFirestore();
       if(firestoreLogs && firestoreLogs.length > 0) {
@@ -9706,8 +9720,9 @@ export default function App() {
     if(!next.logs||next.logs.length<(prev.logs||[]).length-2) next.logs=prev.logs;
     if(!next.expenses||next.expenses.length<(prev.expenses||[]).length-2) next.expenses=prev.expenses;
     if(!next.rewards||next.rewards.length===0) next.rewards=prev.rewards||next.rewards;
-    if(!next.goodTasks) next.goodTasks=prev.goodTasks;
-    if(!next.badTasks) next.badTasks=prev.badTasks;
+    // お手伝い項目は1回の操作で大きく減らない=急減はバグとみなしてロールバック(意図的な1件削除は許容)
+    if(!next.goodTasks || next.goodTasks.length < (prev.goodTasks||[]).length-1) next.goodTasks=prev.goodTasks;
+    if(!next.badTasks  || next.badTasks.length  < (prev.badTasks||[]).length-1)  next.badTasks=prev.badTasks;
     return next;
   }),[]);
   const [forcePin,setForcePin]=useState(null);
