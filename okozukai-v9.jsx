@@ -711,9 +711,14 @@ function hiddenUnlocked(h, data, child, totalDone){
 // ═══════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════
 // 進化の状態（時間ゲート＋育てた度ゲージの二重条件）
-// EVO_HOURS:  現ステージを「出る」のに必要な最低経過時間(h)。成長期→当日,成熟→24h,完全→72h,究極→72h
+// EVO_HOURS:  現ステージを「出る」のに必要な最低経過時間(h)。幼年期1=2h,幼年期2=2h,成長期=24〜42h(個体差),成熟期=24h,完全体=72h
 // EVO_GROWTH: 現ステージを「出る」のに必要な累計"育てた度"(=お手伝い + バッジ*3 + なでなで日数*2)
-const EVO_HOURS  = { 0:0, 1:0, 2:0, 3:24, 4:72, 5:72 };
+const EVO_HOURS  = { 0:2, 1:2, 2:33, 3:24, 4:72, 5:72 };
+// 成長期(stage2)だけは24〜42hの個体差(子ごとに決まる)
+function evoHoursFor(stage, cid){
+  if(stage===2){ let n=0; for(const c of String(cid)) n=(n*31+c.charCodeAt(0))%19; return 24+n; }
+  return EVO_HOURS[stage] ?? 0;
+}
 const EVO_GROWTH = { 0:2, 1:5, 2:9, 3:16, 4:26, 5:40 };
 const REINC_HOURS = 96;   // 究極体→転生できるまで(4日)
 function getMonState(data, child){
@@ -737,7 +742,7 @@ function getMonState(data, child){
   const growthRemain = isFinal ? 0 : Math.max(0, need - gauge);
   const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
   const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
-  const reqMs = (EVO_HOURS[stage] ?? 0) * 3600000;
+  const reqMs = evoHoursFor(stage, cid) * 3600000;
   const timeOk = testEvolve ? true : (elapsedMs >= reqMs);
   const timeRemainMs = Math.max(0, reqMs - elapsedMs);
   const canEvolve = !isFinal && timeOk && growthOk;
