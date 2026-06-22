@@ -1883,7 +1883,7 @@ function EquipModal({child,data,update,onClose}){
               {EQUIPMENT.filter(it=>it.slot===sl.k).map(it=>{
                 const unlocked=equipUnlocked(it,meta,dropped); const on=cur[sl.k]===it.id; const rar=EQ_RAR(it.rarity);
                 return <div key={it.id} style={{background:on?GS:CARD,border:`2px solid ${on?GP:(it.premium?rar.c+"66":BORDER)}`,borderRadius:14,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:11,opacity:unlocked?1:(it.premium?0.92:0.6)}}>
-                  <div style={{fontSize:28,flexShrink:0,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}>{it.e}</div>
+                  <div style={{width:34,height:34,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,filter:unlocked?"none":"grayscale(1) brightness(.7)"}}><img src={`/assets/${it.id}.png`} alt="" style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=it.e;e.target.replaceWith(s);}}/></div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontSize:9,fontWeight:900,color:"#fff",background:rar.c,borderRadius:5,padding:"1px 5px"}}>{rar.n}</span>
@@ -4712,7 +4712,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                     const got=owned.includes(w.id); const rar=EQ_RAR(w.rarity);
                     return (
                       <div key={w.id} style={{borderRadius:12,padding:"10px",background:got?GS:CARD,border:got?`2px solid ${rar.c}`:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",gap:10}}>
-                        <div style={{width:40,height:40,borderRadius:10,background:got?"#fff":CARDS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0,filter:got?"none":"grayscale(1) opacity(.5)"}}>{got?w.e:"❓"}</div>
+                        <div style={{width:40,height:40,borderRadius:10,background:got?"#fff":CARDS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0,filter:got?"none":"grayscale(1) opacity(.5)"}}>{got?<img src={`/assets/${w.id}.png`} alt="" style={{width:34,height:34,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent=w.e;e.target.replaceWith(s);}}/>:"❓"}</div>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:5}}>
                             <span style={{fontSize:9,fontWeight:900,color:"#fff",background:rar.c,borderRadius:5,padding:"1px 5px"}}>{rar.n}</span>
