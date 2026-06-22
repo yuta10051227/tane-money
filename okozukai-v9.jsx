@@ -1687,6 +1687,24 @@ const HEAL_CAPS=[
   {k:"hs", name:"回復カプセル小", e:"🟢", heal:50,  rate:0.10, c:"#34C77B"},
   {k:"hm", name:"回復カプセル中", e:"🔵", heal:100, rate:0.04, c:"#3478D4"},
 ];
+// サポートなかま: お手伝い数で加入(週間・3回ごと最大3体)。タイプは週ごとランダム固定。固定効果=弱い子ほど相対的に効く
+const SUP_TYPES=[
+  {k:"atk", e:"⚔", name:"アタッカー", desc:"毎ターン 敵に ついげき"},
+  {k:"heal",e:"💚", name:"ヒーラー",   desc:"毎ターン HPを かいふく"},
+  {k:"rng", e:"🎲", name:"きまぐれ",   desc:"毎ターン 攻撃か回復を ランダム"},
+];
+const SUP_PER=3, SUP_MAX=3, SUP_ATK=10, SUP_HEAL=20;
+// その子の今週のサポートなかま(お手伝い数から導出・保存不要)
+function supportBuddies(data, child){
+  const week=Math.floor(Date.now()/(7*86400000));
+  const start=week*7*86400000;
+  const chores=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")&&new Date(l.date).getTime()>=start).length;
+  const count=Math.min(SUP_MAX,Math.floor(chores/SUP_PER));
+  const h=s=>{let n=0;for(const c of String(s))n=(n*31+c.charCodeAt(0))%9973;return n;};
+  const list=Array.from({length:count},(_,i)=>SUP_TYPES[h(child.id+"_"+week+"_"+i)%3]);
+  const next=count<SUP_MAX?(SUP_PER-(chores%SUP_PER)):0;
+  return {list, chores, count, next};
+}
 function equipMeta(data, child){
   const m=getMonState(data,child);
   return { lv:monLevel((data.monsterExp||{})[child.id]||0).lv, tasks:m.tasksDone||0, care:m.careDays||0,
@@ -1856,6 +1874,7 @@ function BattleModal({child,data,update,onClose}){
   useEffect(()=>{const id=setInterval(()=>setHpTick(t=>t+1),20000);return()=>clearInterval(id);},[]);
   const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}})); };
   const caps=(data.healCaps||{})[child.id]||{};
+  const sup=supportBuddies(data,child);   // 今週のサポートなかま
   const useCap=(cap)=>{ if(curHP>=pMaxHP||((caps[cap.k]||0)<=0))return; const newHP=Math.min(curMonHP(data,child)+cap.heal,pMaxHP); update(d=>{ const cc={...(d.healCaps?.[child.id]||{})}; cc[cap.k]=Math.max(0,(cc[cap.k]||0)-1); return {...d, healCaps:{...(d.healCaps||{}),[child.id]:cc}, monsterHP:{...(d.monsterHP||{}),[child.id]:newHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}}; }); };
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
@@ -1969,7 +1988,17 @@ function BattleModal({child,data,update,onClose}){
       t(()=>{ setProj(null); setHit({who:"opp",dmg:dp}); setOHP(newO); buzz([45]); t(()=>setHit(null),450); cb(); },470); };
     const oHit=(cb)=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
       t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450); cb(); },470); };
-    const endTurn=()=>{ if(round>=MAXR){ finishByHP(newO,newP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); } };
+    const endTurn=()=>{
+      // サポートなかまの行動(毎ターン): ⚔追撃 / 💚回復 / 🎲きまぐれ
+      let bd=0,bh=0;
+      sup.list.forEach(b=>{ if(b.k==="atk") bd+=SUP_ATK; else if(b.k==="heal") bh+=SUP_HEAL; else { const r=Math.random(); if(r<0.5) bd+=SUP_ATK; else if(r<0.85) bh+=SUP_HEAL; } });
+      const fO=Math.max(0,newO-bd), fP=Math.min(pMaxHP,newP+bh);
+      if(bd||bh){ setLog(`🤝 サポートなかま！${bd?` ⚔-${bd}`:""}${bh?` 💚+${bh}`:""}`); if(bd){setOHP(fO);setHit({who:"opp",dmg:bd});t(()=>setHit(null),450);} if(bh) setPHP(fP); buzz([25]); }
+      t(()=>{
+        if(bd && fO<=0){ finish("win",fP); return; }
+        if(round>=MAXR){ finishByHP(fO,fP); } else { setRound(r=>r+1); setLog("つぎの ターン！"); setBusy(false); }
+      }, (bd||bh)?760:0);
+    };
     if(pFirst){
       pHit(()=>{ if(newO<=0){ t(()=>finish("win",pHP),720); return; }
         t(()=> oHit(()=>{ if(newP<=0){ t(()=>finish("lose",0),720); return; } t(endTurn,520); }), 560); });
@@ -1993,6 +2022,18 @@ function BattleModal({child,data,update,onClose}){
             <div style={{fontSize:12,color:"#bda7ff",marginTop:2}}>Lv.{stats.lv} · ⚔{pATK} · 🛡{pDEF} · ⚡{pSPD}{stats.eggDrops>0?` · 🥚+${stats.eggDrops}%`:""}</div>
             <div style={{width:190,maxWidth:"82%",margin:"6px auto 0"}}><HPBar label="HP" hp={curHP} max={pMaxHP} color={lowHP?"#e0564f":"#34C77B"}/></div>
             <div style={{width:190,maxWidth:"82%",margin:"5px auto 0"}}><HPBar label="EXP" hp={stats.exp.into} max={stats.exp.need} color="#ffd24a"/></div>
+            {/* 🤝 サポートなかま(お手伝い数で加入・バトルを手伝う) */}
+            <div style={{margin:"9px auto 0",maxWidth:300,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.14)",borderRadius:12,padding:"8px 12px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,flexWrap:"wrap"}}>
+                <span style={{fontSize:12,fontWeight:800,color:"#ffe9a8"}}>🤝 サポートなかま</span>
+                {sup.count>0
+                  ? sup.list.map((b,i)=><span key={i} title={b.desc} style={{fontSize:12,fontWeight:800,color:"#fff",background:"rgba(255,255,255,.1)",borderRadius:8,padding:"2px 7px"}}>{b.e}{b.name}</span>)
+                  : <span style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>まだ いないよ</span>}
+              </div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.5)",textAlign:"center",marginTop:4}}>
+                {sup.count<SUP_MAX?`お手伝い あと${sup.next}回で なかま+1（今週${sup.chores}回）`:`今週は なかま最大の ${SUP_MAX}体！`}・毎ターン手伝うよ
+              </div>
+            </div>
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
               {potions>0 && <button onClick={useHealItem} style={{background:"#7b61c9",border:"none",borderRadius:999,padding:"7px 14px",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>💊 フル回復 ×{potions}</button>}
               {HEAL_CAPS.map(cap=>((caps[cap.k]||0)>0)&&(
@@ -2119,6 +2160,7 @@ function BattleModal({child,data,update,onClose}){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n25", e:"🤝", t:"サポートなかま 登場！お手伝いで仲間が増える", b:"今週のお手伝いを3回するたびに「サポートなかま」が1体仲間に（最大3体）。⚔アタッカー（毎ターン敵に追撃）・💚ヒーラー（毎ターンHP回復）・🎲きまぐれ（攻撃か回復をランダム）の3タイプから、その週はランダムで決まるよ。モンスターのレベルが低くても、お手伝いをがんばればバトルを手伝ってくれる＝小さい子も活躍できる！毎週月曜にリセット。"},
   {id:"n24", e:"⚡", t:"素早さ＆ヤミノタマゴ強化が登場！", b:"モンスターに「素早さ(⚡)」ステータスが加わったよ。バトルは素早い方が先に攻撃できる＝先制の有利不利が生まれる！相手選びの画面に「先制できる/敵が先制」も表示。さらに、ヤミノオウを倒して🥚ヤミノタマゴを手に入れるたびに、基礎ステータスが永続+1%アップ（倒すほど強くなる）。みんなの基礎ステータスも少し底上げしたよ。"},
   {id:"n23", e:"⚔", t:"モンスター固有のレア武器＆ドロップ図鑑！", b:"モンスターを倒すと、それぞれ固有のレア武器を低確率でドロップするようになったよ（スライムソード〜ヤミノツルギ）。『記録』タブの「ドロップ図鑑」で、どのモンスターが何を落とすか・集めたかを確認できる。周回してコンプを目指そう！さらにバトルのHPは1分で1回復するようになったよ。"},
   {id:"n22", e:"💰", t:"投資の「配当」がもらえるように！", b:"株を持っているだけで、毎週「配当」がもらえるようになったよ（持つだけで1%、7日2%・30日3.5%・90日5%と長く持つほどUP）。本物の株とおなじで、すぐ売らずにコツコツ長く持つほど増える！短期で売り買いすると手数料で損しやすいので、長期でじっくりがコツだよ。"},
