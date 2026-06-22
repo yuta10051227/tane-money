@@ -3774,8 +3774,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* 🎯 きょうのミッション(毎日リセット) */}
-      {effectiveTab==="daily" && showMissions && (()=>{
+      {/* 🎯 きょうのミッション(毎日リセット) ※ユーザー要望で非表示(falseで無効化・復活可) */}
+      {false && effectiveTab==="daily" && showMissions && (()=>{
         const tISO=todayISO(), tk=todayKey();
         const metrics={
           tasks: myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(tISO)).length,
