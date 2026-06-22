@@ -1726,9 +1726,9 @@ const HEAL_CAPS=[
 // サポートなかま: お手伝い数で加入(週間・3回ごと最大3体)。タイプは週ごとランダム固定。固定効果=弱い子ほど相対的に効く
 // タネの精霊(がんばりの光): お手伝いの努力で目をさます3体。役割は固定、名前・物語つき
 const SUP_TYPES=[
-  {k:"atk", e:"⚔", name:"コツン",  sprite:"sup_kotsun", role:"アタッカー", desc:"毎ターン 敵に ついげき。コツコツ続ける力の精霊", awaken:"コツンが めをさました！"},
-  {k:"heal",e:"💚", name:"メグミ",  sprite:"sup_megumi", role:"ヒーラー",   desc:"毎ターン HPを かいふく。分け合う優しさの精霊", awaken:"メグミが めをさました！"},
-  {k:"rng", e:"🎲", name:"ラッキー",sprite:"sup_lucky",  role:"きまぐれ",   desc:"毎ターン 攻撃か回復を ランダム。運とチャレンジの精霊", awaken:"ラッキーが めをさました！"},
+  {k:"atk", e:"⚔", name:"コツン",  sprite:"sup_kotsun", role:"アタッカー", desc:"ときどき 敵に ついげき。コツコツ続ける力の精霊", awaken:"コツンが めをさました！"},
+  {k:"heal",e:"💚", name:"メグミ",  sprite:"sup_megumi", role:"ヒーラー",   desc:"ときどき HPを かいふく。分け合う優しさの精霊", awaken:"メグミが めをさました！"},
+  {k:"rng", e:"🎲", name:"ラッキー",sprite:"sup_lucky",  role:"きまぐれ",   desc:"ときどき 攻撃か回復を ランダム。運とチャレンジの精霊", awaken:"ラッキーが めをさました！"},
 ];
 const SUP_PER=3, SUP_MAX=3, SUP_ATK=10, SUP_HEAL=20;
 // その子の今週のサポートなかま(お手伝い数から導出・保存不要)
@@ -1912,6 +1912,8 @@ function BattleModal({child,data,update,onClose}){
   const useHealItem=()=>{ if(curHP>=pMaxHP||potions<=0)return; update(d=>({...d, healPotions:{...(d.healPotions||{}),[child.id]:Math.max(0,((d.healPotions?.[child.id])||0)-1)}, monsterHP:{...(d.monsterHP||{}),[child.id]:pMaxHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}})); };
   const caps=(data.healCaps||{})[child.id]||{};
   const sup=supportBuddies(data,child);   // 今週のサポートなかま
+  // 発動確率: 弱い(低Lv=小さい子)ほど よく手伝い、強い(高Lv=高校生)ほど 稀に。年齢バランス自動調整
+  const supChance=Math.max(0.15, Math.min(0.85, 0.85 - (stats.lv||1)*0.025));
   const useCap=(cap)=>{ if(curHP>=pMaxHP||((caps[cap.k]||0)<=0))return; const newHP=Math.min(curMonHP(data,child)+cap.heal,pMaxHP); update(d=>{ const cc={...(d.healCaps?.[child.id]||{})}; cc[cap.k]=Math.max(0,(cc[cap.k]||0)-1); return {...d, healCaps:{...(d.healCaps||{}),[child.id]:cc}, monsterHP:{...(d.monsterHP||{}),[child.id]:newHP}, monsterHPDate:{...(d.monsterHPDate||{}),[child.id]:todayKey()}, monsterHPTs:{...(d.monsterHPTs||{}),[child.id]:Date.now()}}; }); };
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
@@ -2030,9 +2032,9 @@ function BattleModal({child,data,update,onClose}){
     const oHit=(cb)=>{ setLog(`${opp.name}の ${opp.move.n}！`); setProj("o");
       t(()=>{ setProj(null); setHit({who:"player",dmg:de}); setPHP(newP); buzz([70]); t(()=>setHit(null),450); cb(); },470); };
     const endTurn=()=>{
-      // サポートなかまの行動(毎ターン): ⚔追撃 / 💚回復 / 🎲きまぐれ
+      // サポートなかまの行動(稀に発動・弱い子ほど高確率): ⚔追撃 / 💚回復 / 🎲きまぐれ
       let bd=0,bh=0;
-      sup.list.forEach(b=>{ if(b.k==="atk") bd+=SUP_ATK; else if(b.k==="heal") bh+=SUP_HEAL; else { const r=Math.random(); if(r<0.5) bd+=SUP_ATK; else if(r<0.85) bh+=SUP_HEAL; } });
+      sup.list.forEach(b=>{ if(Math.random()>=supChance) return; if(b.k==="atk") bd+=SUP_ATK; else if(b.k==="heal") bh+=SUP_HEAL; else { const r=Math.random(); if(r<0.5) bd+=SUP_ATK; else if(r<0.85) bh+=SUP_HEAL; } });
       const fO=Math.max(0,newO-bd), fP=Math.min(pMaxHP,newP+bh);
       if(bd||bh){ setLog(`🤝 サポートなかま！${bd?` ⚔-${bd}`:""}${bh?` 💚+${bh}`:""}`); if(bd){setOHP(fO);setHit({who:"opp",dmg:bd});t(()=>setHit(null),450);} if(bh) setPHP(fP); buzz([25]); }
       t(()=>{
@@ -2079,7 +2081,7 @@ function BattleModal({child,data,update,onClose}){
                   : <span style={{fontSize:11,color:"rgba(255,255,255,.5)"}}>まだ いないよ</span>}
               </div>
               <div style={{fontSize:10,color:"rgba(255,255,255,.5)",textAlign:"center",marginTop:4}}>
-                {sup.count<SUP_MAX?`お手伝い あと${sup.next}回で なかま+1（今週${sup.chores}回）`:`今週は なかま最大の ${SUP_MAX}体！`}・毎ターン手伝うよ
+                {sup.count<SUP_MAX?`お手伝い あと${sup.next}回で なかま+1（今週${sup.chores}回）`:`今週は なかま最大の ${SUP_MAX}体！`}・ときどき手伝うよ（よわい子ほど よく手伝う）
               </div>
             </div>
             {curHP<pMaxHP && <div style={{marginTop:8,display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
