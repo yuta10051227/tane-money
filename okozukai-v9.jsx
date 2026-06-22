@@ -1666,11 +1666,31 @@ const WILD_MONSTERS = [
   {name:"ヌシ・ドラゴ",emoji:"🐉", lv:7, color:"#5fbf6f", img:"wild_dragon", move:{n:"りゅうのいぶき", e:"💥", c:"#5fbf6f"},
     title:"ためこみの主", story:"宝を ためこみすぎて 動けなくなった 森の主。",
     lesson:"ためるだけ じゃなく、使う・増やすで お金は 生きてくる。"},
+  // ── 第二波: なまけの闇の上位下僕(より進んだ お金の落とし穴。ヒカリノオウへの道) ──
+  {name:"バクチン",   emoji:"🎰", lv:8, color:"#e0564f", img:"wild_bakuchin", move:{n:"ルーレット", e:"🎲", c:"#e0564f"},
+    title:"イチかバチかの罠", story:"「当たれば 大もうけ」と ささやく ギャンブルの化身。",
+    lesson:"ギャンブルは 胴元(主催者)が 必ず とくする しくみ。確実には もうからないよ。"},
+  {name:"シャッキング",emoji:"⛓", lv:8, color:"#8a6d3b", img:"wild_shakking", move:{n:"とりたて", e:"📜", c:"#8a6d3b"},
+    title:"あと払いの沼", story:"「あとで 払えばいい」と 鎖を 巻きつける 借金の王。",
+    lesson:"借りたお金は 利子をつけて 返す。返せる 範囲で だけ にしよう。"},
+  {name:"ミエール",   emoji:"🎭", lv:9, color:"#c95fa0", img:"wild_mieru", move:{n:"みえばり", e:"💅", c:"#c95fa0"},
+    title:"みんな持ってるの精", story:"「みんな 持ってるよ？」と あおる 見栄の仮面。",
+    lesson:"人に 合わせて 買うと きりがない。自分にとって 必要かで 決めよう。"},
+  {name:"ウマスギ",   emoji:"🐍", lv:9, color:"#5fbf6f", img:"wild_umasugi", move:{n:"あまいささやき", e:"🍯", c:"#5fbf6f"},
+    title:"うますぎる話のヘビ", story:"「ぜったい もうかる」と ささやく 詐欺(さぎ)のヘビ。",
+    lesson:"「絶対もうかる」は ウソ。うますぎる話は まず 疑おう。"},
+  {name:"ローヒー",   emoji:"🌀", lv:10, color:"#7b61c9", img:"wild_rohi", move:{n:"ろうひの渦", e:"💸", c:"#7b61c9"},
+    title:"つかいすぎの渦", story:"少しずつの ムダづかいを のみこんで ふくらむ 浪費の渦。",
+    lesson:"何に 使ったか 記録(家計簿)しないと、お金は いつのまにか 消えるよ。"},
 ];
 // 秘密のボス: ヌシ・ドラゴを倒すと出現
 const BOSS_MONSTER = {name:"ヤミノオウ", emoji:"👑", lv:11, color:"#b07bff", img:"wild_boss", boss:true, move:{n:"ダークネスノヴァ", e:"🌑", c:"#b07bff"},
   title:"なまけの王", story:"なまけの闇で 世界を 覆った王。でも 心の奥には 眠った光が ある。",
   lesson:"なまけ(闇)も、毎日の お世話(努力)で 光に 変わる。倒した卵を 育ててみよう。"};
+// 真の最終ボス(近日開放のティザー): 手下＋ヤミノオウを全て倒すと挑戦への道がひらく…が、今はまだ「？？？」で見えるだけ
+const HIKARI_KING = {name:"ヒカリノオウ", emoji:"🌟", lv:"?", color:"#ffd24a", img:"hikari_king", coming:true,
+  title:"真の 光の王", story:"なまけの闇を 完全に 祓った者だけが 挑める、真の王。すべての手下と ヤミノオウを 倒した先に、道が ひらく。",
+  lesson:"つづける力で 闇を 光に変えた者に、最後の試練が おとずれる。…⚙ ただいま 準備中・近日 開放！"};
 // そうび(アイテム): ぶき＋たての2スロット。レア度(rarity)と強さは別。premium=貯金/目標達成で解放する最強クラス
 const EQUIPMENT = [
   // ── ぶき(weapon)＝こうげき系 ──
@@ -2107,6 +2127,23 @@ function BattleModal({child,data,update,onClose}){
                 <div style={{fontSize:11,color:"rgba(255,255,255,.4)",fontWeight:700,marginTop:2}}>🔒 ヌシをたおすと…</div>
               </div>
             )}
+            {/* 🌟 真の最終ボス ヒカリノオウ(ティザー・近日開放。手下＋ヤミノオウ全撃破で道がひらく) */}
+            {(()=>{
+              const dex=data.enemyDex?.[child.id]||[];
+              const all=[...WILD_MONSTERS,BOSS_MONSTER];
+              const got=all.filter(e=>dex.includes(e.img)).length;
+              const cleared=got>=all.length;
+              return (
+                <div onClick={()=>setEnemyInfo(HIKARI_KING)} style={{gridColumn:"1 / -1",position:"relative",background:cleared?"linear-gradient(135deg,rgba(255,210,74,.18),rgba(255,255,255,.06))":"rgba(255,255,255,.04)",border:cleared?"2px solid #ffd24a":"1.5px dashed rgba(255,255,255,.22)",borderRadius:16,padding:"14px 10px",textAlign:"center",cursor:"pointer",overflow:"hidden",boxShadow:cleared?"0 0 18px rgba(255,210,74,.4)":"none"}}>
+                  <span style={{position:"absolute",top:6,right:8,width:20,height:20,borderRadius:"50%",background:"rgba(255,255,255,.18)",color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",zIndex:2}}>?</span>
+                  <div style={{fontSize:34,filter:cleared?"none":"grayscale(1) brightness(1.4) opacity(.6)",animation:cleared?"btIdle 2.6s ease-in-out infinite":"none"}}>🌟</div>
+                  <div style={{color:cleared?"#ffe9a8":"rgba(255,255,255,.55)",fontWeight:900,fontSize:14,marginTop:2}}>？？？<span style={{fontSize:11,marginLeft:6,color:"#ffd24a"}}>真の王</span></div>
+                  <div style={{fontSize:11,color:cleared?"#ffd24a":"rgba(255,255,255,.45)",fontWeight:800,marginTop:3}}>
+                    {cleared?"✨ 近日 開放！（準備中）":`🔒 手下を ぜんぶ倒すと… ${got}/${all.length}`}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
