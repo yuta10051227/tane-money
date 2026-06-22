@@ -1934,8 +1934,12 @@ function BattleModal({child,data,update,onClose}){
       if(dropInfo?.kind==="cap"){ const cc={...(d.healCaps?.[child.id]||{})}; cc[dropInfo.cap]=(cc[dropInfo.cap]||0)+1; nd.healCaps={...(d.healCaps||{}),[child.id]:cc}; }
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(dropInfo?.kind==="egg"){
-        nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積・永続)
-        if(!(d.darkEgg?.[child.id])) nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}};  // 初回のみ育成卵
+        nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積・永続)＝倒した本人の個別報酬
+        // 家族の誰か1人がドロップすれば、まだ卵を持っていない家族 全員に育成卵を配布
+        const _members=[...(d.children||[]),...(d.parents||[])];
+        const _de={...(d.darkEgg||{})};
+        _members.forEach(m=>{ if(m&&!_de[m.id]) _de[m.id]={care:0,last:""}; });
+        nd.darkEgg=_de;
       }
       // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
       if(r==="win"){
@@ -6688,6 +6692,7 @@ function DarkEggCard({child,data,update}){
   const nextMin=DARK_EGG_STAGES.find(s=>s.min>care)?.min ?? DARK_EGG_MAX;
   const [react,setReact]=useState(false);   // お世話リアクション(揺れ＋キラキラ)
   const [evo,setEvo]=useState(null);        // 進化演出 {from,to}
+  const [showTree,setShowTree]=useState(false);  // 進化図
   const vib=p=>{try{navigator.vibrate(p);}catch(e){}};
   // ステージ別の待機アニメ: たまご=ゆらゆら / ベビー=ぴょこぴょこ / 王=ふわふわ＋発光
   const idleAnim = react ? "deShake .5s ease-in-out" : isFinal ? "deFloat 3s ease-in-out infinite" : stIdx===0 ? "deWob 2.6s ease-in-out infinite" : "deHop 1.4s ease-in-out infinite";
@@ -6735,6 +6740,29 @@ function DarkEggCard({child,data,update}){
         {isFinal
           ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
           : <button onClick={feed} disabled={fedToday} style={{position:"relative",marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F}}>{fedToday?"きょうは お世話したよ（また あした🌙）":"🤚 お世話する（1日1回）"}</button>}
+        {/* 進化図トグル */}
+        <button onClick={()=>setShowTree(v=>!v)} style={{marginTop:8,width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:10,padding:"8px",color:"#d9ccff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>🔍 進化図を{showTree?"とじる":"みる"}</button>
+        {showTree && (
+          <div style={{marginTop:8,background:"rgba(0,0,0,0.22)",borderRadius:12,padding:"10px 8px"}}>
+            {DARK_EGG_STAGES.map((s,i)=>{
+              const reached=care>=s.min, current=s===st;
+              return (
+                <div key={s.sprite} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 6px",borderRadius:10,background:current?"rgba(232,184,62,0.18)":"transparent"}}>
+                  <div style={{width:40,height:40,flexShrink:0,filter:reached?"none":"grayscale(1) brightness(.45)",opacity:reached?1:0.7}}>
+                    <Sprite sprite={s.sprite} emoji={s.emoji} size={40}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:800,color:reached?"#fff":"rgba(255,255,255,0.5)"}}>
+                      {reached?s.name:"？？？"} <span style={{fontSize:9,fontWeight:800,color:"#d9ccff",background:"rgba(255,255,255,0.12)",borderRadius:5,padding:"1px 5px",marginLeft:2}}>{s.stage}</span>
+                    </div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:1}}>お世話 {s.min}回〜{current?"（いまここ）":reached?" ✓":""}</div>
+                  </div>
+                  {i<DARK_EGG_STAGES.length-1 && <span style={{color:"rgba(255,255,255,0.3)",fontSize:12}}>↓</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {/* ── 進化(ハッチ)演出オーバーレイ ── */}
         {evo && (
           <div style={{position:"absolute",inset:0,background:"radial-gradient(circle,#fff 0%,#3d2b66 60%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:"deEvoBg 2.6s ease-out forwards",zIndex:5}}>
