@@ -1896,6 +1896,8 @@ function BattleModal({child,data,update,onClose}){
   const [oppIdx,setOppIdx]=useState(0);
   const [showSeason,setShowSeason]=useState(false);
   const [enemyInfo,setEnemyInfo]=useState(null);  // 敵の物語ポップ
+  const [auto,setAuto]=useState(()=>{try{return localStorage.getItem("tane_autobattle")==="1";}catch(e){return false;}});  // オートバトル
+  const toggleAuto=()=>setAuto(a=>{const n=!a;try{localStorage.setItem("tane_autobattle",n?"1":"0");}catch(e){} return n;});
   const opp = oppIdx>=WILD_MONSTERS.length ? BOSS_MONSTER : WILD_MONSTERS[oppIdx];
   const bossUnlocked = !!(data.battleBossUnlocked||{})[child.id];
   const oMaxHP = 50 + opp.lv*28;
@@ -2027,6 +2029,13 @@ function BattleModal({child,data,update,onClose}){
         t(()=> pHit(()=>{ if(newO<=0){ t(()=>finish("win",newP),720); return; } t(endTurn,520); }), 560); }), 360);
     }
   };
+  // オートバトル: ONなら待機中(攻撃可能)に自動でこうげき
+  useEffect(()=>{
+    if(auto && phase==="fight" && !busy && !result){
+      const id=setTimeout(()=>doRound(), 600);
+      return ()=>clearTimeout(id);
+    }
+  },[auto,phase,busy,result,round]);
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,background:"#070611",fontFamily:F,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"calc(12px + env(safe-area-inset-top)) 16px 8px",display:"flex",alignItems:"center",justifyContent:"space-between",zIndex:5}}>
@@ -2145,7 +2154,13 @@ function BattleModal({child,data,update,onClose}){
         <div style={{padding:"10px 18px calc(18px + env(safe-area-inset-bottom))",background:"rgba(0,0,0,.45)",zIndex:5}}>
           {!result && <>
             <div style={{color:"#cfe6ff",fontSize:12,fontWeight:700,textAlign:"center",minHeight:18,marginBottom:8}}>{log}</div>
-            <button onClick={doRound} disabled={busy} style={{width:"100%",background:busy?"rgba(255,255,255,.15)":"linear-gradient(135deg,#ff7a59,#ff3b6b)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:900,fontSize:17,cursor:busy?"default":"pointer",fontFamily:F}}>{busy?"…":"こうげき！⚔"}</button>
+            <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
+              <button onClick={doRound} disabled={busy||auto} style={{flex:1,background:(busy||auto)?"rgba(255,255,255,.15)":"linear-gradient(135deg,#ff7a59,#ff3b6b)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:900,fontSize:17,cursor:(busy||auto)?"default":"pointer",fontFamily:F}}>{auto?"オート中…⚙":(busy?"…":"こうげき！⚔")}</button>
+              <button onClick={toggleAuto} style={{flexShrink:0,width:78,background:auto?"linear-gradient(135deg,#34C77B,#1f9c5a)":"rgba(255,255,255,.12)",border:auto?"none":"1.5px solid rgba(255,255,255,.25)",borderRadius:14,color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
+                <span style={{fontSize:16}}>{auto?"⏸":"▶"}</span>
+                <span>オート{auto?"ON":"OFF"}</span>
+              </button>
+            </div>
           </>}
           {result && (
             <div style={{textAlign:"center"}}>
