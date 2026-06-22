@@ -2517,6 +2517,8 @@ const STANCE_UI = dyn(() => { const t = THEMES[THEME_NAME]; return {
 function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan, profile }) {
   const [offset, setOffset] = useState(0); // 0=今月, +1=来月 ...
   const [sel, setSel] = useState(null); // 選択中の日(ISO)
+  const [mode, setMode] = useState("month"); // month | week
+  const [weekOffset, setWeekOffset] = useState(0); // 0=今週, +1=来週 ...
   const sm = useMemo(() => sanmei(birth), [birth && birth.date, birth && birth.time]);
   const base = new Date();
   const view = new Date(base.getFullYear(), base.getMonth() + offset, 1);
@@ -2543,6 +2545,16 @@ function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan,
     return m;
   }, [trips, deadlines, launches, events, tasks]);
 
+  // 週ビュー用：今週(月曜始まり)の7日と、その気・暦
+  const weekStart = startOfWeekMonday(addDays(new Date(), weekOffset * 7));
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => iso(addDays(weekStart, i))), [weekStart.getTime()]);
+  const weekStances = useMemo(() => (birth && birth.date ? stancesFor(birth, weekDates) : {}), [birth && birth.date, birth && birth.time, weekDates.join(",")]);
+  const weekKoyomi = useMemo(() => {
+    const o = {};
+    for (const d of weekDates) { try { o[d] = (koyomi(d).labels || []).filter((l) => l.good); } catch { o[d] = []; } }
+    return o;
+  }, [weekDates.join(",")]);
+
   if (!birth || !birth.date) return null; // 出生情報が無いときは出さない（FortunePanel側で入力導線を出す）
 
   const inMonth = (k) => k.startsWith(`${yy}-${pad2(mm + 1)}-`);
@@ -2556,15 +2568,61 @@ function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan,
     <Panel
       title="経営カレンダー"
       accent={C.green}
-      help="あなたの命式から、その月の各日の『気（攻め/守り/整える/労い）』を計算して色分けします。占いではなくコンディションの傾向です。攻めの日に発信・ローンチを寄せ、守りの日に重なった締切は前後にずらすと進めやすくなります。仕事タブの本番日・締切も●印で重ねて表示します。"
+      help="あなたの命式から、各日の『気（攻め/守り/整える/労い）』を計算して色分けします。占いではなくコンディションの傾向です。攻めの日に発信・ローンチを寄せ、守りの日に重なった締切は前後にずらすと進めやすくなります。月ビューは全体像、週ビューは予定・締切・タスクを日別に確認できます。"
       right={
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={() => setOffset((o) => o - 1)} style={iconBtn} title="前の月">‹</button>
-          <span style={{ fontSize: 13, color: C.sub, minWidth: 60, textAlign: "center" }}>{yy}/{mm + 1}</span>
-          <button onClick={() => setOffset((o) => o + 1)} style={iconBtn} title="次の月">›</button>
+          <div style={{ display: "flex", gap: 4, marginRight: 2 }}>
+            <button onClick={() => setMode("month")} style={{ ...chipBtn, fontSize: 12, padding: "4px 9px", ...(mode === "month" ? { background: C.green, color: "#0B0D11", borderColor: C.green } : {}) }}>月</button>
+            <button onClick={() => setMode("week")} style={{ ...chipBtn, fontSize: 12, padding: "4px 9px", ...(mode === "week" ? { background: C.green, color: "#0B0D11", borderColor: C.green } : {}) }}>週</button>
+          </div>
+          {mode === "month" ? (
+            <>
+              <button onClick={() => setOffset((o) => o - 1)} style={iconBtn} title="前の月">‹</button>
+              <span style={{ fontSize: 13, color: C.sub, minWidth: 54, textAlign: "center" }}>{yy}/{mm + 1}</span>
+              <button onClick={() => setOffset((o) => o + 1)} style={iconBtn} title="次の月">›</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setWeekOffset((o) => o - 1)} style={iconBtn} title="前の週">‹</button>
+              <span style={{ fontSize: 12, color: C.sub, minWidth: 54, textAlign: "center" }}>{weekOffset === 0 ? "今週" : `${Number(weekDates[0].slice(5, 7))}/${Number(weekDates[0].slice(8, 10))}〜`}</span>
+              <button onClick={() => setWeekOffset((o) => o + 1)} style={iconBtn} title="次の週">›</button>
+            </>
+          )}
         </div>
       }
     >
+      {mode === "week" && (
+        <div style={{ display: "grid", gap: 6 }}>
+          {weekDates.map((k) => {
+            const st = weekStances[k];
+            const ui = st ? STANCE_UI[st.stance] : null;
+            const dObj = new Date(k + "T00:00:00");
+            const isToday = k === iso(new Date());
+            const kday = weekKoyomi[k] || [];
+            const dayMarks = marks[k] || [];
+            const isDouble = ui && st.stance === "攻め" && kday.length > 0;
+            return (
+              <div key={k} style={{ display: "flex", gap: 10, background: isToday ? C.green + "11" : C.panel2, border: `1px solid ${isToday ? C.green : C.line}`, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ flex: "0 0 44px", textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color: dObj.getDay() === 0 ? C.red : dObj.getDay() === 6 ? C.blue : C.sub }}>{WD[dObj.getDay()]}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: isToday ? C.green : C.text }}>{dObj.getDate()}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: dayMarks.length ? 4 : 0 }}>
+                    {ui && <span style={{ fontSize: 11, fontWeight: 700, color: "#0B0D11", background: isDouble ? C.green : ui.color, borderRadius: 999, padding: "1px 8px" }}>{ui.mark}{st.stance}</span>}
+                    {kday.map((l) => <span key={l.key} style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{l.emoji}{l.name}</span>)}
+                    {!ui && !kday.length && !dayMarks.length && <span style={{ fontSize: 12, color: C.faint }}>予定なし</span>}
+                  </div>
+                  {dayMarks.map((m, i) => (
+                    <div key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>・{m}</div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {mode === "month" && (<>
       {/* 曜日見出し */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
         {["日", "月", "火", "水", "木", "金", "土"].map((w, i) => (
@@ -2600,8 +2658,9 @@ function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan,
           );
         })}
       </div>
-      {/* 選択した日の詳細 */}
-      {sel && (() => {
+      </>)}
+      {/* 選択した日の詳細（月ビューでセルをタップしたとき） */}
+      {mode === "month" && sel && (() => {
         const st = stances[sel];
         const ui = st ? STANCE_UI[st.stance] : null;
         const md = Number(sel.slice(5, 7)), dd = Number(sel.slice(8, 10));
@@ -4117,6 +4176,22 @@ function taskSection(it) {
   return "later";
 }
 
+// アイゼンハワー・マトリクス：重要(優先高)×緊急(締切3日以内/超過)で4象限に分類
+const TASK_QUADRANTS = [
+  { k: "q1", label: "今すぐやる", sub: "重要 × 緊急", color: () => C.red },
+  { k: "q2", label: "計画してやる", sub: "重要 × 緊急でない", color: () => C.green },
+  { k: "q3", label: "サッと片付ける", sub: "緊急 × 重要でない", color: () => C.blue },
+  { k: "q4", label: "あとで・手放す", sub: "緊急でない × 重要でない", color: () => C.faint },
+];
+function taskQuadrant(it) {
+  const important = (it.priority || "中") === "高";
+  const urgent = it.due ? daysUntil(it.due) <= 3 : false;
+  if (important && urgent) return "q1";
+  if (important && !urgent) return "q2";
+  if (!important && urgent) return "q3";
+  return "q4";
+}
+
 function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const list = items || [];
   const [text, setText] = useState("");
@@ -4125,17 +4200,25 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
   const [pri, setPri] = useState("中");
   const [rep, setRep] = useState("none");
   const [editId, setEditId] = useState(null);
+  const [view, setView] = useState("list"); // list | matrix
   const [e, setE] = useState({ title: "", due: "", time: "", priority: "中", repeat: "none" });
 
+  const sortIn = (arr) => [...arr].sort((a, b) =>
+    (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
+    || String(a.time || "99:99").localeCompare(String(b.time || "99:99"))
+    || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
+  );
   // セクションごとにまとめ、各セクション内は 締切→時刻→優先度 の順
   const grouped = useMemo(() => {
     const g = {};
     for (const it of list) (g[taskSection(it)] = g[taskSection(it)] || []).push(it);
-    const sortIn = (arr) => [...arr].sort((a, b) =>
-      (new Date(a.due || "2999-12-31") - new Date(b.due || "2999-12-31"))
-      || String(a.time || "99:99").localeCompare(String(b.time || "99:99"))
-      || (PRI_W[a.priority || "中"] - PRI_W[b.priority || "中"])
-    );
+    Object.keys(g).forEach((k) => { g[k] = sortIn(g[k]); });
+    return g;
+  }, [list]);
+  // マトリクス：未完了タスクのみを4象限に
+  const quad = useMemo(() => {
+    const g = { q1: [], q2: [], q3: [], q4: [] };
+    for (const it of list) { if (!it.done) g[taskQuadrant(it)].push(it); }
     Object.keys(g).forEach((k) => { g[k] = sortIn(g[k]); });
     return g;
   }, [list]);
@@ -4181,8 +4264,33 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
     )
   );
 
+  // マトリクスの1象限カード（コンパクト行・タップで完了）
+  const matrixItem = (it) => {
+    const sig = taskDueSig(it.due);
+    return (
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        <div style={{ flex: "0 0 auto", marginTop: 1 }}><Check done={it.done} onClick={() => onToggle(it.id)} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, lineHeight: 1.3, color: C.text }}>{it.title}</div>
+          {(sig || it.time) && <div style={{ fontSize: 11, color: sig ? sig.c : C.sub, marginTop: 1 }}>{it.time ? `🕐${it.time} ` : ""}{sig ? sig.t : ""}</div>}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <Panel title="追加タスク" accent={C.purple} help="「明日15時 打合せ」「毎月25日 家賃」「急ぎ 見積り」のように書くと、締切・時刻・優先度・繰り返しを自動で読み取ります。一覧は今日・明日・今週…で自動グループ化。左スワイプで完了、右スワイプで締切を1日延ばせます。">
+    <Panel
+      title="追加タスク"
+      accent={C.purple}
+      help="「明日15時 打合せ」「毎月25日 家賃」「急ぎ 見積り」のように書くと、締切・時刻・優先度・繰り返しを自動で読み取ります。一覧は今日・明日・今週…で自動グループ化。左スワイプで完了、右スワイプで締切を1日延ばせます。マトリクスは『重要×緊急』の4象限で“何から手をつけるか”を整理します。"
+      right={
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => setView("list")} style={{ ...chipBtn, fontSize: 12, padding: "4px 10px", ...(view === "list" ? { background: C.purple, color: C.invText, borderColor: C.purple } : {}) }}>リスト</button>
+          <button onClick={() => setView("matrix")} style={{ ...chipBtn, fontSize: 12, padding: "4px 10px", ...(view === "matrix" ? { background: C.purple, color: C.invText, borderColor: C.purple } : {}) }}>マトリクス</button>
+        </div>
+      }
+    >
+      {view === "list" && (
       <div style={{ display: "grid", gap: 6 }}>
         {list.length === 0 && <Empty>タスクはありません。</Empty>}
         {TASK_SECTIONS.map((sec) => {
@@ -4199,6 +4307,23 @@ function TaskList({ items, onToggle, onAdd, onEdit, onRemove }) {
           );
         })}
       </div>
+      )}
+      {view === "matrix" && (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {TASK_QUADRANTS.map((q) => {
+          const arr = quad[q.k];
+          return (
+            <div key={q.k} style={{ background: C.panel2, border: `1px solid ${q.color()}55`, borderRadius: 12, padding: "10px 10px", minHeight: 96 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: q.color() }}>{q.label}</div>
+              <div style={{ fontSize: 10, color: C.faint, marginBottom: 6 }}>{q.sub}</div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {arr.length === 0 ? <span style={{ fontSize: 11, color: C.faint }}>なし</span> : arr.map(matrixItem)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      )}
       <form onSubmit={submit} style={{ display: "grid", gap: 6, marginTop: 12 }}>
         <input value={text} onChange={(ev) => setText(ev.target.value)} placeholder="例）明日15時 打合せ／毎月25日 家賃／急ぎ 見積り" style={{ ...inp, marginBottom: 0 }} />
         {preview && (preview.due || preview.time || preview.priority || preview.repeat !== "none") && (
