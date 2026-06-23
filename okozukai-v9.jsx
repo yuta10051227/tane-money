@@ -287,6 +287,9 @@ function startRealtimeSync(updateFn){
             // ゲーム進行系（ローカル優先）
             // ※ gachaDateをここで守らないとFirestoreの遅延snaphotで1日1回制限が崩れる
             if(prev.gachaDate){merged.gachaDate={...(merged.gachaDate||{})};const _td=todayKey();Object.keys(prev.gachaDate).forEach(cid=>{if(prev.gachaDate[cid]===_td)merged.gachaDate[cid]=_td;});}
+            // 利子/配当の付与記録: 進んでいる方(最新)を採用＝同期巻き戻しによる二重付与を防止
+            if(prev.interestLastDate){merged.interestLastDate={...(merged.interestLastDate||{})};Object.keys(prev.interestLastDate).forEach(cid=>{const p=prev.interestLastDate[cid],m=merged.interestLastDate[cid];const pt=p?new Date(String(p).replace(/-/g,'/')).getTime():0;const mt=m?new Date(String(m).replace(/-/g,'/')).getTime():0;if(pt>mt)merged.interestLastDate[cid]=p;});}
+            if(prev.holdBonusLastDate){merged.holdBonusLastDate={...(merged.holdBonusLastDate||{})};Object.keys(prev.holdBonusLastDate).forEach(cid=>{if((prev.holdBonusLastDate[cid]||0)>(merged.holdBonusLastDate[cid]||0))merged.holdBonusLastDate[cid]=prev.holdBonusLastDate[cid];});}
             if(prev.streak) merged.streak=prev.streak;
             if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
             // モンスター進化/やり直し/転生：最終更新時刻(monsterStageAt)が新しい方を優先＝巻き戻り防止。
@@ -6801,47 +6804,55 @@ function SortBar({options,value,onChange}){
 
 // ── Interest System ───────────────────────────────────
 function applyInterest(data,update,cid){
-  const today=todayKey();
   if(!data.interestEnabled||!data.interestRate) return;
-  if((data.interestLastDate||{})[cid]===today) return;
-  if((data.interestLastDate||{})[cid]){
-    const diff=(new Date(today.replace(/-/g,'/'))-new Date((data.interestLastDate[cid]).replace(/-/g,'/')))/86400000;
-    if(diff<7) return;
-  }
-  const cur=bal(data.logs,cid);
-  if(cur<=0) return;
-  const interest=Math.floor(cur*data.interestRate);
-  if(interest<=0) return;
-  update(d=>({...d,
-    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`💹 週次利子（残高×${Math.round(d.interestRate*100)}%）`,pts:interest,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
-    interestLastDate:{...(d.interestLastDate||{}),[cid]:today},
-  }));
+  const today=todayKey();
+  // 付与判定・残高計算・付与日記録をすべて update の中(最新のd)で原子的に行う＝
+  // 多重呼び出し/再マウント/同期巻き戻しでも二重付与されない
+  update(d=>{
+    if(!d.interestEnabled||!d.interestRate) return d;
+    const last=(d.interestLastDate||{})[cid];
+    if(last===today) return d;                       // 同日は付与済み
+    if(last){
+      const diff=(new Date(today.replace(/-/g,'/'))-new Date(last.replace(/-/g,'/')))/86400000;
+      if(diff<7) return d;                            // 前回から7日未満はスキップ(週次)
+    }
+    const cur=bal(d.logs,cid);
+    if(cur<=0) return d;
+    const interest=Math.floor(cur*d.interestRate);
+    if(interest<=0) return d;
+    const _e={id:uid(),cid,type:"interest",label:`💹 週次利子（残高×${Math.round(d.interestRate*100)}%）`,pts:interest,date:new Date().toISOString()};
+    addLogToFirestore(_e);
+    return {...d, logs:[_e,...d.logs], interestLastDate:{...(d.interestLastDate||{}),[cid]:today}};
+  });
 }
 
 // ── 配当＋長期保有ボーナス（毎週・持つだけで1%、長く持つほどUP最大5%＝「持ち続けると増える」を体験） ─────
 // 実データの株価は短期だと横ばい＋手数料で利益が出にくいので、保有報酬を厚くして"長期で増える"を実感できるように
 function applyHoldingBonus(data,update,cid){
   const week=Math.floor(Date.now()/(7*86400000));  // 週単位で支払い
-  if((data.holdBonusLastDate||{})[cid]===week) return;
-  const holdings=(data.holdings||{})[cid]||[];
-  if(!holdings.length) return;
-  const stocks=data.stocks||[];
+  if((data.holdings||{})[cid]==null || !((data.holdings||{})[cid]||[]).length) return;
   const toPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
   const now=Date.now();
-  let totalBonus=0;
-  holdings.forEach(h=>{
-    const st=stocks.find(x=>x.id===h.stockId);
-    if(!st) return;
-    const days=h.firstBuyDate?(now-new Date(h.firstBuyDate).getTime())/86400000:0;
-    // 配当(基本1%)＋長期ボーナス: 7日2% / 30日3.5% / 90日5%
-    const rate = days>=90?0.05 : days>=30?0.035 : days>=7?0.02 : 0.01;
-    totalBonus+=Math.floor(toPts(st,st.price)*h.qty*rate);
+  // 付与判定・記録を update の中(最新のd)で原子的に＝二重付与しない
+  update(d=>{
+    if((d.holdBonusLastDate||{})[cid]===week) return d;   // 今週は付与済み
+    const holdings=(d.holdings||{})[cid]||[];
+    if(!holdings.length) return d;
+    const stocks=d.stocks||[];
+    let totalBonus=0;
+    holdings.forEach(h=>{
+      const st=stocks.find(x=>x.id===h.stockId);
+      if(!st) return;
+      const days=h.firstBuyDate?(now-new Date(h.firstBuyDate).getTime())/86400000:0;
+      // 配当(基本1%)＋長期ボーナス: 7日2% / 30日3.5% / 90日5%
+      const rate = days>=90?0.05 : days>=30?0.035 : days>=7?0.02 : 0.01;
+      totalBonus+=Math.floor(toPts(st,st.price)*h.qty*rate);
+    });
+    if(totalBonus<=0) return d;
+    const _e={id:uid(),cid,type:"interest",label:`💰 配当＋長期保有ボーナス（毎週・長く持つほどUP）`,pts:totalBonus,date:new Date().toISOString()};
+    addLogToFirestore(_e);
+    return {...d, logs:[_e,...d.logs], holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:week}};
   });
-  if(totalBonus<=0) return;
-  update(d=>({...d,
-    logs:(()=>{const _e={id:uid(),cid,type:"interest",label:`💰 配当＋長期保有ボーナス（毎週・長く持つほどUP）`,pts:totalBonus,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
-    holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:week},
-  }));
 }
 
 // ── Stock News & Fetch ────────────────────────────────
