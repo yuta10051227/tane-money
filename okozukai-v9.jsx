@@ -7126,13 +7126,16 @@ function SeedMonster({ child, data, size=90, update }) {
   const _taskTs     = myLogs.reduce((mx,l)=>((l.type==="good"||l.type==="daily")?Math.max(mx,new Date(l.date).getTime()||0):mx),0);
   const _lastTouch  = Math.max(_careTs,_taskTs);
   const neglected   = !evolving && !hatching && monsterId!=="egg" && !_caredToday && _lastTouch>0 && (Date.now()-_lastTouch >= 86400000);
-  const imgSrc         = neglected
-    ? `/assets/monster_neglect_${(Math.floor(frame/6)%2)?"b":"a"}.png`
+  // 全コマを重ねて常時マウントし、表示コマだけvisibilityで切替(src差し替えのデコード点滅を防止)
+  const _nFront = hatching ? 6 : frontFrames;
+  const frameList = neglected
+    ? [`/assets/monster_neglect_a.png`,`/assets/monster_neglect_b.png`]
     : gsSkin
-    ? `/assets/gacha_gs_${gsSkin}_${(Math.floor(frame/6)%2)?"b":"a"}.png`
+    ? [`/assets/gacha_gs_${gsSkin}_a.png`,`/assets/gacha_gs_${gsSkin}_b.png`]
     : (multiFront || hatching)
-    ? `/assets/monster_${dispId}_f${fIdx}.png`
-    : `/assets/monster_${dispId}_side_f${fIdx}.png`;
+    ? Array.from({length:_nFront},(_,i)=>`/assets/monster_${dispId}_f${i}.png`)
+    : [`/assets/monster_${dispId}_side_f0.png`,`/assets/monster_${dispId}_side_f1.png`];
+  const activeFrameIdx = (neglected || gsSkin) ? (Math.floor(frame/6)%2) : fIdx;
 
   // 進化先を分岐ルールで決定（egg→m01→m02→[系統分岐]→…→究極体）
   // 分岐は乱数なしの固定ルール=「子どもの行動」で決まる(図鑑のbranchHintと必ず一致させること)
@@ -7344,8 +7347,12 @@ function SeedMonster({ child, data, size=90, update }) {
             filter:hatching?"none":evolving?"brightness(2.5) saturate(0.2)":"none",  // ハッチ中はヒビを見せる(白飛びさせない)
             transition:"filter 0.4s",
           }}>
-            <img src={imgSrc} alt={dispName} style={{width:size,height:size,objectFit:"contain",display:"block",imageRendering:"pixelated"}}
-              onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f0.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
+            <div style={{position:"relative",width:size,height:size}}>
+              {frameList.map((src,i)=>(
+                <img key={src} src={src} alt={i===activeFrameIdx?dispName:""} style={{position:"absolute",inset:0,width:size,height:size,objectFit:"contain",imageRendering:"pixelated",visibility:i===activeFrameIdx?"visible":"hidden"}}
+                  onError={e=>{const t=e.target;const s=t.dataset.fb||"0";if(s==="0"){t.dataset.fb="1";t.src=`/assets/monster_${dispId}_f0.png`;}else if(s==="1"){t.dataset.fb="2";t.src="/assets/monster_egg_f0.png";}else{t.style.visibility="hidden";}}}/>
+              ))}
+            </div>
             {accessories.map((acc,i)=>(
               <div key={i} style={{position:"absolute",...acc.pos,background:acc.bg,borderRadius:"50%",width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,boxShadow:"0 2px 6px rgba(0,0,0,0.18)",border:"1.5px solid rgba(255,255,255,0.9)"}}>{acc.emoji}</div>
             ))}
