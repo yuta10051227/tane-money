@@ -972,6 +972,7 @@ const INIT = {
     approvalNotification: false,
     rewardApproval: false,
     gameMode: "full",   // full=全部 / light=バトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
+    dailyBattleLimit: 0,   // 1日のバトル回数上限(0=無制限・周回しすぎ防止)
   },
   pendingApprovals: [],
   pendingRedemptions: [],
@@ -2007,7 +2008,15 @@ function BattleModal({child,data,update,onClose}){
   const [showEquip,setShowEquip]=useState(false);
   const buzz=p=>{try{navigator.vibrate(p);}catch(e){}};
   const dmgCalc=(atk,def)=>Math.max(1, Math.round((atk - def*0.5) * (0.85+Math.random()*0.3)));
-  const start=(i)=>{ if(lowHP) return; const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setDrop(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
+  // 保護者の「1日のバトル回数」制限(familySettings.dailyBattleLimit, 0=無制限)
+  const battleLimit=(data.familySettings?.dailyBattleLimit)||0;
+  const _bcd=(data.battleCountDay||{})[child.id];
+  const battlesToday=(_bcd && _bcd.date===todayKey())?(_bcd.n||0):0;
+  const battleLimitReached=battleLimit>0 && battlesToday>=battleLimit;
+  const start=(i)=>{ if(lowHP) return;
+    if(battleLimitReached){ setLog("きょうの バトルは ここまで！また あした⚔"); return; }
+    update(d=>{ const p=(d.battleCountDay||{})[child.id]; const n=(p&&p.date===todayKey())?(p.n||0):0; return {...d, battleCountDay:{...(d.battleCountDay||{}),[child.id]:{date:todayKey(),n:n+1}}}; });
+    const o=i>=WILD_MONSTERS.length?BOSS_MONSTER:WILD_MONSTERS[i]; setOppIdx(i); setPHP(curHP); setOHP(50+o.lv*28); setRound(1); setResult(null); setReward(null); setDrop(null); setHit(null); setProj(null); setLog(""); setPhase("fight"); setVs(true); setBusy(true); buzz([30,60,30]); t(()=>{setVs(false);setBusy(false);setLog("こうげきして！");},1100); };
   const finish=(r,finalHP)=>{
     setResult(r); setLog(r==="win"?"WIN！":"LOSE…"); buzz(r==="win"?[0,80,40,80,40,200]:[300]);
     const today=todayKey();
@@ -2136,6 +2145,11 @@ function BattleModal({child,data,update,onClose}){
       </div>
       {phase==="select" && (
         <div style={{flex:1,overflowY:"auto",padding:"4px 18px 30px"}}>
+          {battleLimit>0 && (
+            <div style={{margin:"2px auto 10px",maxWidth:320,textAlign:"center",fontSize:12,fontWeight:800,color:battleLimitReached?"#ffb4b4":"#bff0c8",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:"7px 12px"}}>
+              {battleLimitReached?"🌙 きょうの バトルは ここまで！また あした":`⚔ きょうの バトル のこり ${Math.max(0,battleLimit-battlesToday)}回（保護者せってい）`}
+            </div>
+          )}
           <div style={{textAlign:"center",color:"#fff",marginBottom:14}}>
             <img src={pImg} style={{width:90,height:90,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.src="/assets/monster_egg_f0.png";}}/>
             <div style={{fontWeight:900,fontSize:15}}>{pName}</div>
@@ -3267,6 +3281,22 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     </button>
                   );
                 })}
+                {/* 1日のバトル回数(周回しすぎ防止) ※「ぜんぶ」のときだけ有効 */}
+                {(fs.gameMode||"full")==="full" && (
+                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${BORDER}`}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>1日のバトル回数</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:8}}>やりすぎ(周回)が気になるときに上限を設定。とっくんの旅は時間でゆっくり進むので対象外です。</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {[{v:0,t:"なし"},{v:3,t:"3回"},{v:5,t:"5回"},{v:10,t:"10回"}].map(o=>{
+                        const sel=((fs.dailyBattleLimit)||0)===o.v;
+                        return (
+                          <button key={o.v} onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),dailyBattleLimit:o.v}}))}
+                            style={{flex:1,minWidth:60,background:sel?GP:CARD,border:sel?`2px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 4px",color:sel?"#fff":TEXT,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{o.t}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               {/* 承認通知 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
@@ -3522,6 +3552,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [gachaRes, setGachaRes] = useState(null);
+  const gachaBusyRef = useRef(false);   // ガチャ連打ガード(0.1秒更新中の二重発火/多重回しを防止)
   const [rewardPop, setRewardPop] = useState(null);
   const [showWeekly, setShowWeekly] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
@@ -3636,8 +3667,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const hasTicket = (data.battleTickets?.[child.id]||0) > 0;
   const doGacha = () => {
+    if (gachaBusyRef.current) return;   // 連打ガード: 結果表示を閉じるまで二重に回せない
     const useTicket = todayDone && !gachaTest && hasTicket;
     if (todayDone && !gachaTest && !hasTicket) return;
+    gachaBusyRef.current = true;
     let res = rollGacha(data.gacha);
     // 連続日数で「がんばりが報われる」確定演出（7日でSR以上・30日で激レア確定）
     const _gf = (id)=> (data.gacha||[]).find(g=>g.id===id);
@@ -3646,7 +3679,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       else if(curStreak%7===0 && res.rate>12){ const g=_gf("gc3"); if(g) res={...g, pts:Math.floor(Math.random()*(g.max-g.min+1))+g.min}; }
     }
     const theme = getMonthTheme();
-    const bonusPts = curStreak>=30?50:curStreak>=10?20:curStreak>=5?10:0;
+    const bonusPts = 0;   // ストリークボーナスは廃止
     const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
     const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
@@ -4133,7 +4166,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* Gacha anim */}
-      {gachaRes && <GachaAnim result={gachaRes} onClose={()=>setGachaRes(null)}/>}
+      {gachaRes && <GachaAnim result={gachaRes} onClose={()=>{setGachaRes(null); gachaBusyRef.current=false;}}/>}
       {/* 🎉 レベルアップ演出(報酬: 回復カプセル) */}
       {lvPop && (
         <div onClick={()=>setLvPop(null)} style={{position:"fixed",inset:0,background:"#0007",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,pointerEvents:"auto"}}>
