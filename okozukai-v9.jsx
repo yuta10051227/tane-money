@@ -4310,8 +4310,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                             ? (item.id.startsWith("gs_")
                                 ? (()=>{const b=item.id.replace("gs_","gacha_gs_");return(
                                     <div style={{position:"relative",width:42,height:42,margin:"0 auto",animation:"gsBob 1.6s ease-in-out infinite"}}>
-                                      <img src={`/assets/${b}_b.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.cssText="font-size:30px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;";e.target.replaceWith(sp);}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",animation:"gsBlinkB .9s steps(1,start) infinite"}}/>
-                                      <img src={`/assets/${b}_a.png`} alt="" onError={e=>{e.target.style.display="none";}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",animation:"gsBlink .9s steps(1,start) infinite"}}/>
+                                      <img src={`/assets/${b}_b.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.cssText="font-size:30px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;";e.target.replaceWith(sp);}} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain"}}/>
                                     </div>);})()
                                 : <img src={`/assets/${item.id.replace("gi_","gacha_").replace("gm_","gacha_gm_")}.png`} alt={item.name} onError={e=>{const sp=document.createElement("span");sp.textContent=item.emoji;sp.style.fontSize="30px";e.target.replaceWith(sp);}} style={{width:38,height:38,objectFit:"contain",borderRadius:6,display:"block",margin:"0 auto"}}/>)
                             : <div style={{fontSize:22,opacity:0.3}}>❓</div>
@@ -4780,8 +4779,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                       style={{borderRadius:12,padding:"8px 4px",textAlign:"center",background:equipped?GS:CARD,border:equipped?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,cursor:unlocked?"pointer":"default",opacity:unlocked?1:0.85}}>
                       {h.sprite
                         ? <div style={{position:"relative",width:50,height:50,margin:"0 auto 3px",filter:unlocked?"none":"brightness(0)"}}>
-                            <img src={`/assets/gacha_gs_${h.sprite}_b.png`} alt={unlocked?h.name:"???"} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"gsBlinkB .9s steps(1,start) infinite"}} onError={e=>{e.target.style.visibility="hidden"}}/>
-                            <img src={`/assets/gacha_gs_${h.sprite}_a.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"gsBlink .9s steps(1,start) infinite"}} onError={e=>{e.target.style.display="none"}}/>
+                            <img src={`/assets/gacha_gs_${h.sprite}_b.png`} alt={unlocked?h.name:"???"} style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.visibility="hidden"}}/>
                           </div>
                         : <img src={`/assets/monster_${h.id}_f0.png`} alt={unlocked?h.name:"???"}
                             style={{width:50,height:50,objectFit:"contain",display:"block",margin:"0 auto 3px",imageRendering:"pixelated",filter:unlocked?"none":"brightness(0)"}}
@@ -6957,8 +6955,7 @@ function DarkEggCard({child,data,update}){
   };
   const Sprite=({sprite,emoji,size:sz=64})=>(
     <div style={{position:"relative",width:sz,height:sz,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <img src={`/assets/gacha_gs_${sprite}_b.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"deBlinkB .9s steps(1,start) infinite"}} onError={e=>{e.target.style.visibility="hidden";const fb=e.target.parentNode.querySelector(".de-fb");if(fb)fb.style.display="flex";}}/>
-      <img src={`/assets/gacha_gs_${sprite}_a.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",animation:"deBlink .9s steps(1,start) infinite"}} onError={e=>{e.target.style.display="none";}}/>
+      <img src={`/assets/gacha_gs_${sprite}_b.png`} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.visibility="hidden";const fb=e.target.parentNode.querySelector(".de-fb");if(fb)fb.style.display="flex";}}/>
       <span className="de-fb" style={{display:"none",position:"absolute",inset:0,alignItems:"center",justifyContent:"center",fontSize:sz*0.6}}>{emoji}</span>
     </div>
   );
