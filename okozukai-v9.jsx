@@ -131,31 +131,39 @@ function parentPinIsDefault(data){
   return ((data&&data.parentPin)||"0000")==="0000";
 }
 
+let _cloudSaveTimer=null, _cloudSavePending=null;
+// data変更のたびに呼ばれるが、重い同期処理(JSON.stringify＋localStorage＋Firestore準備)を
+// 約300msデバウンスして、タップ直後の再描画をブロックしない(肥大データでのフリーズ防止)。
 async function cloudSave(d) {
+  _cloudSavePending = d;
+  if(_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = setTimeout(()=>{ const dd=_cloudSavePending; _cloudSavePending=null; if(dd) _cloudPersist(dd); }, 300);
+}
+function _cloudPersist(d) {
   const code = getFamilyCode()||"default";
-  const json = JSON.stringify(d);
-  // 1. コード固有のローカルストレージ（即時・他コードと分離）
-  try { localStorage.setItem(LOCAL_KEY+"_"+code, json); } catch(e) {}
-  try { localStorage.setItem(LOCAL_KEY2+"_"+code, json); } catch(e) {}
-  // 2. Firestore（デバウンス・家族間リアルタイム同期）
-  // ログが溜まりすぎたらドキュメント側は古い分を「くりこし」1行に集約（1MB上限で保存が
-  // 静かに失敗するのを防ぐ）。全ログはlogsサブコレクションに恒久保存されている。
-  let docJson = json;
-  if((d.logs||[]).length > 4000){
-    const keep = d.logs.slice(0,3600);
-    const old = d.logs.slice(3600).filter(l=>!String(l.id||"").startsWith("carry_"));
+  // ログ肥大の抑制: 2000件を超えたら古い分を「くりこし」1行(cidごと)に集約して保存する。
+  // 残高は保持(合計を引き継ぐ)。直近1800件は表示用に残し、全ログはlogsサブコレクションに恒久保存。
+  // これで localStorage / Firestoreドキュメント / メモリ(再読込後) のサイズを小さく保てる。
+  let saveD = d;
+  if((d.logs||[]).length > 2000){
+    const keep = d.logs.slice(0,1800);
     const sums = {};
-    d.logs.slice(3600).forEach(l=>{ sums[l.cid]=(sums[l.cid]||0)+(l.pts||0); });
+    d.logs.slice(1800).forEach(l=>{ if(l&&l.cid!=null) sums[l.cid]=(sums[l.cid]||0)+(l.pts||0); });
     const oldestDate = d.logs[d.logs.length-1]?.date || new Date().toISOString();
     const carry = Object.entries(sums).map(([cid,pts])=>({
       id:"carry_"+cid, cid, type:"grant", label:"くりこし（これより前の合計）", pts, date:oldestDate
     }));
-    docJson = JSON.stringify({...d, logs:[...keep, ...carry]});
+    saveD = {...d, logs:[...keep, ...carry]};
   }
-  _pendingSave = docJson;
+  const json = JSON.stringify(saveD);
+  // 1. コード固有のローカルストレージ（他コードと分離）
+  try { localStorage.setItem(LOCAL_KEY+"_"+code, json); } catch(e) {}
+  try { localStorage.setItem(LOCAL_KEY2+"_"+code, json); } catch(e) {}
+  // 2. Firestore（デバウンス・家族間リアルタイム同期）。同じ圧縮済みを保存
+  _pendingSave = json;
   // ドキュメントサイズを監視（1MB上限の手前で親に警告を出す）
-  const near = byteLen(docJson) > SAVE_BYTE_WARN;
-  reportSaveHealth({near, bytes:byteLen(docJson)});
+  const near = byteLen(json) > SAVE_BYTE_WARN;
+  reportSaveHealth({near, bytes:byteLen(json)});
   if(_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async()=>{
     if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); return; }
@@ -174,8 +182,14 @@ async function cloudSave(d) {
   },1000); // 1秒デバウンス（目標・設定変更が素早く保存される）
   // 3. Claude.ai内ならwindow.storageにも保存
   if (hasCloudStorage()) {
-    try { await window.storage.set(CLOUD_KEY, json); } catch(e) {}
+    try { window.storage.set(CLOUD_KEY, json); } catch(e) {}
   }
+}
+// アプリが閉じる/バックグラウンドに入るときは、デバウンス待ちの保存を確実に実行(取りこぼし防止)
+function flushCloudSave(){ if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null;} const dd=_cloudSavePending; _cloudSavePending=null; if(dd) _cloudPersist(dd); }
+if(typeof window!=="undefined"){
+  window.addEventListener("pagehide", flushCloudSave);
+  window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushCloudSave(); });
 }
 
 async function cloudLoad() {
