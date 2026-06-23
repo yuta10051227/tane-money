@@ -3757,6 +3757,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           );
         })()}
+        {/* 🥚 ヤミノオウの卵: いつものモンスターを育てる場所に並べて表示・育成 */}
+        {data.darkEgg?.[child.id] && <div style={{position:"relative",zIndex:2}}><DarkEggCard child={child} data={data} update={update}/></div>}
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
@@ -4695,8 +4697,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* ── 🥚 ヤミノオウのタマゴ(ボス撃破ドロップ・お世話で育てて最終進化) ── */}
-      {effectiveTab==="rpg" && data.darkEgg?.[child.id] && <DarkEggCard child={child} data={data} update={update}/>}
+      {/* ── 🥚 ヤミノオウのタマゴ: モンスター育成エリア(ヘッダー)に移動済み ── */}
 
       {/* ── ⚔ ドロップ図鑑(モンスターごとの固有レア武器) ── */}
       {effectiveTab==="rpg" && (()=>{
