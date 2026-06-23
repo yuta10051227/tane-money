@@ -1763,6 +1763,20 @@ const HEAL_CAPS=[
   {k:"hs", name:"回復カプセル小", e:"🟢", img:"heal_cap_s", heal:50,  rate:0.10, c:"#34C77B"},
   {k:"hm", name:"回復カプセル中", e:"🔵", img:"heal_cap_m", heal:100, rate:0.04, c:"#3478D4"},
 ];
+// 回復アイテムの所持上限(持ちすぎ防止)。上限に達したらそれ以上は増えない(換金などはしない)
+const HEAL_MAX = 9;
+// 回復アイテムを1つ入手。上限未満なら所持+1、満タンなら何もしない(打ち止め)
+function gainHealItem(d, cid, kind){
+  if(kind==="potion"){
+    const cur=(d.healPotions?.[cid])||0;
+    if(cur>=HEAL_MAX) return d;
+    return {...d, healPotions:{...(d.healPotions||{}),[cid]:cur+1}};
+  }
+  const cc={...(d.healCaps?.[cid]||{})}; const cur=cc[kind]||0;
+  if(cur>=HEAL_MAX) return d;
+  cc[kind]=cur+1;
+  return {...d, healCaps:{...(d.healCaps||{}),[cid]:cc}};
+}
 // サポートなかま: お手伝い数で加入(週間・3回ごと最大3体)。タイプは週ごとランダム固定。固定効果=弱い子ほど相対的に効く
 // タネの精霊(がんばりの光): お手伝いの努力で目をさます3体。役割は固定、名前・物語つき
 const SUP_TYPES=[
@@ -2026,7 +2040,7 @@ function BattleModal({child,data,update,onClose}){
       }
     }
     if(dropInfo) setDrop(dropInfo);
-    update(d=>{ const nd={...d};
+    update(d=>{ let nd={...d};
       nd.monsterHP={...(d.monsterHP||{}),[child.id]:hpSave};        // 残りHPを持ち越し
       nd.monsterHPDate={...(d.monsterHPDate||{}),[child.id]:today};
       nd.monsterHPTs={...(d.monsterHPTs||{}),[child.id]:Date.now()}; // 1分1回復の起点
@@ -2036,8 +2050,8 @@ function BattleModal({child,data,update,onClose}){
         nd.battleWinDate={...(d.battleWinDate||{}),[child.id]:today};  // 「今日1勝したか」=ミッション判定用
         nd.enemyDex={...(d.enemyDex||{}),[child.id]:Array.from(new Set([...((d.enemyDex?.[child.id])||[]),opp.img]))};  // 図鑑: 倒した敵を登録
       }
-      if(dropInfo?.kind==="potion") nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};
-      if(dropInfo?.kind==="cap"){ const cc={...(d.healCaps?.[child.id]||{})}; cc[dropInfo.cap]=(cc[dropInfo.cap]||0)+1; nd.healCaps={...(d.healCaps||{}),[child.id]:cc}; }
+      if(dropInfo?.kind==="potion") nd=gainHealItem(nd,child.id,"potion");
+      if(dropInfo?.kind==="cap") nd=gainHealItem(nd,child.id,dropInfo.cap);
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(dropInfo?.kind==="egg"){
         nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積)
@@ -3554,7 +3568,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       update(d=>{
         const cur=(d.monsterLevelSeen||{})[child.id]; if(cur!==undefined && cur>=_mLv) return d;
         const from=(cur??seen); const cc={...(d.healCaps?.[child.id]||{})};
-        for(let L=from+1; L<=_mLv; L++){ cc.hs=(cc.hs||0)+1; gainedHs++; if(L%5===0){ cc.hm=(cc.hm||0)+1; gainedHm++; } }
+        for(let L=from+1; L<=_mLv; L++){ if((cc.hs||0)<HEAL_MAX){cc.hs=(cc.hs||0)+1; gainedHs++;} if(L%5===0 && (cc.hm||0)<HEAL_MAX){ cc.hm=(cc.hm||0)+1; gainedHm++; } }
         return {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}, healCaps:{...(d.healCaps||{}),[child.id]:cc}};
       });
       setLvPop({to:_mLv, hs:gainedHs||(_mLv-seen), hm:gainedHm});
@@ -4038,7 +4052,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           const gotFrag=Math.random()<dest.frag;
           let nd={...d, expedition:{...(d.expedition||{}),[child.id]:null}, monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+dest.exp}};
           if(gotFrag){ let frag=((d.battleFragments?.[child.id])||0)+1; let tic=(d.battleTickets?.[child.id])||0; if(frag>=5){frag-=5;tic+=1;} nd.battleFragments={...(d.battleFragments||{}),[child.id]:frag}; nd.battleTickets={...(d.battleTickets||{}),[child.id]:tic}; }
-          if(Math.random()<0.15) nd.healPotions={...(d.healPotions||{}),[child.id]:((d.healPotions?.[child.id])||0)+1};  // たまに回復アイテム
+          if(Math.random()<0.15) nd=gainHealItem(nd,child.id,"potion");  // たまに回復アイテム(上限あり)
           return nd;
         });
         const pct=started?Math.min(100,Math.round((1-remain/DUR)*100)):0;
@@ -6980,13 +6994,23 @@ function DarkEggCard({child,data,update}){
   // ステージ別の待機アニメ: たまご=ゆらゆら / ベビー=ぴょこぴょこ / 王=ふわふわ＋発光
   const idleAnim = react ? "deShake .5s ease-in-out" : isFinal ? "deFloat 3s ease-in-out infinite" : stIdx===0 ? "deWob 2.6s ease-in-out infinite" : "deHop 1.4s ease-in-out infinite";
   const feed=()=>{
-    if(isFinal||react) return;   // 日時ゲートなし=何度でもお世話OK(連打はアニメ中だけ抑制)
+    if(isFinal||react||fedToday) return;   // 期間ゲート: お世話は1日1回(ほかのタネモンと同様にじっくり育てる)
     const newCare=care+1; const newSt=darkEggStage(newCare);
     setReact(true); vib(20); setTimeout(()=>setReact(false),650);
     if(DARK_EGG_STAGES.indexOf(newSt)>stIdx){    // ステージ上昇=ハッチ/進化演出
       setEvo({from:st,to:newSt}); vib([30,50,30,80]); setTimeout(()=>setEvo(null),2600);
     }
     update(d=>{ const e=d.darkEgg?.[child.id]||{care:0}; return {...d, darkEgg:{...(d.darkEgg||{}),[child.id]:{care:(e.care||0)+1,last:tISO}}}; });
+  };
+  // ── 転生/リセット: 育て切ったヤミノオウをタマゴに戻してもう一度育てられる(基礎ステ+1%が永続) ──
+  const reraise=()=>{
+    if(!isFinal) return;
+    if(typeof window!=="undefined" && !window.confirm("ヤミノオウを 転生させる？\nもう一度タマゴから 育てられるよ。基礎ステータスが +1% 永続アップ！")) return;
+    update(d=>({...d,
+      darkEgg:{...(d.darkEgg||{}),[child.id]:{care:0,last:""}},
+      eggDrops:{...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1},
+    }));
+    vib([30,50,30,80]);
   };
   const Sprite=({sprite,emoji,size:sz=64})=>(
     <div style={{position:"relative",width:sz,height:sz,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -7020,9 +7044,12 @@ function DarkEggCard({child,data,update}){
           </div>
         </div>
         {isFinal
-          ? <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨「ひみつのなかま」で すがたに できるよ！</div>
-          : <><button onClick={feed} disabled={react} style={{position:"relative",marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,opacity:react?0.7:1}}>🤚 お世話する（なんども育てられる）</button>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",textAlign:"center",marginTop:6,lineHeight:1.5}}>※卵を育てている間は、いつものモンスターの進化が ゆっくり(1.5倍)になるよ</div></>}
+          ? <>
+              <div style={{marginTop:10,fontSize:11.5,color:"#ffe9a8",fontWeight:800,textAlign:"center"}}>✨ かんせい！「ひみつのなかま」で すがたに できるよ！</div>
+              <button onClick={reraise} style={{marginTop:8,width:"100%",background:"linear-gradient(135deg,#818cf8,#6366f1)",border:"none",borderRadius:12,padding:"10px",color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F}}>🔄 転生させて もう一度 育てる（基礎+1%）</button>
+            </>
+          : <><button onClick={feed} disabled={react||fedToday} style={{position:"relative",marginTop:10,width:"100%",background:fedToday?"rgba(255,255,255,0.12)":"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:fedToday?"default":"pointer",fontFamily:F,opacity:(react||fedToday)?0.7:1}}>{fedToday?"🌙 きょうは おしまい（またあした）":"🤚 お世話する（1日1回）"}</button>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",textAlign:"center",marginTop:6,lineHeight:1.5}}>毎日 1回 お世話して じっくり育てよう。※育てている間は いつものモンスターの進化が ゆっくり(1.5倍)になるよ</div></>}
         {/* 進化図トグル */}
         <button onClick={()=>setShowTree(v=>!v)} style={{marginTop:8,width:"100%",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:10,padding:"8px",color:"#d9ccff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>🔍 進化図を{showTree?"とじる":"みる"}</button>
         {showTree && (
@@ -7219,17 +7246,17 @@ function SeedMonster({ child, data, size=90, update }) {
     // ヤミノオウを相棒にしているときは、タップで直接お世話して育てられる(タネモンと同じ感覚)
     if (update && isYami) {
       const eg = data.darkEgg?.[child.id];
-      const now = Date.now();
-      if (eg && (eg.care||0) < DARK_EGG_MAX && now - yamiTapRef.current > 600) {
-        yamiTapRef.current = now;
+      const fedT = eg && eg.last===todayISO();
+      if (eg && (eg.care||0) < DARK_EGG_MAX && !fedT) {
+        // 期間ゲート: お世話は1日1回(ほかのタネモンと同様にじっくり)
         update(d => {
           const e = d.darkEgg?.[child.id] || {care:0};
-          if ((e.care||0) >= DARK_EGG_MAX) return d;
+          if ((e.care||0) >= DARK_EGG_MAX || (e.last===todayISO())) return d;
           return {...d, darkEgg:{...(d.darkEgg||{}), [child.id]:{care:(e.care||0)+1, last:todayISO()}}};
         });
-        setSpeech(["おせわ ありがとう！","つよくなる…！","うれしい…！","もっと そだてて！"][Math.floor(Math.random()*4)]);
+        setSpeech(["おせわ ありがとう！","つよくなる…！","うれしい…！","また あした そだててね！"][Math.floor(Math.random()*4)]);
       } else {
-        setSpeech(isFinal ? "さいきょうの ヤミノオウ！✨" : "ちょっと まってね…");
+        setSpeech(isFinal ? "さいきょうの ヤミノオウ！✨" : "きょうは お世話したよ！また あした🌙");
       }
       const id = now;
       setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
@@ -7467,7 +7494,7 @@ function SeedMonster({ child, data, size=90, update }) {
               <div style={{height:"100%",width:`${mon.growthPct}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .5s"}}/>
             </div>
           )}
-          <div style={{fontSize:11,color:"rgba(216,200,255,0.95)",fontWeight:700}}>👑 {isFinal?"ヤミノオウ 完成！":`タップで お世話（あと${Math.max(0,DARK_EGG_MAX-(mon.careDays||0))}）`}</div>
+          <div style={{fontSize:11,color:"rgba(216,200,255,0.95)",fontWeight:700}}>👑 {isFinal?"ヤミノオウ 完成！":(data.darkEgg?.[child.id]?.last===todayISO()?"きょうは おしまい（またあした）":`タップで お世話（あと${Math.max(0,DARK_EGG_MAX-(mon.careDays||0))}）`)}</div>
         </div>
       )}
 
