@@ -7213,8 +7213,30 @@ function SeedMonster({ child, data, size=90, update }) {
     ? ["いっしょにがんばろ！","きょうもよろしく！","タスクやってみよ！"]
     : ["さびしいな…","がんばって！","タッチしてくれた！"];
 
+  const yamiTapRef = useRef(0);
   const handleTap = () => {
     if (evolving) return;
+    // ヤミノオウを相棒にしているときは、タップで直接お世話して育てられる(タネモンと同じ感覚)
+    if (update && isYami) {
+      const eg = data.darkEgg?.[child.id];
+      const now = Date.now();
+      if (eg && (eg.care||0) < DARK_EGG_MAX && now - yamiTapRef.current > 600) {
+        yamiTapRef.current = now;
+        update(d => {
+          const e = d.darkEgg?.[child.id] || {care:0};
+          if ((e.care||0) >= DARK_EGG_MAX) return d;
+          return {...d, darkEgg:{...(d.darkEgg||{}), [child.id]:{care:(e.care||0)+1, last:todayISO()}}};
+        });
+        setSpeech(["おせわ ありがとう！","つよくなる…！","うれしい…！","もっと そだてて！"][Math.floor(Math.random()*4)]);
+      } else {
+        setSpeech(isFinal ? "さいきょうの ヤミノオウ！✨" : "ちょっと まってね…");
+      }
+      const id = now;
+      setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
+      setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
+      setTimeout(()=>setSpeech(null),1800);
+      return;
+    }
     // なでなで(お世話)を1日1回だけ育てた度に加算
     if (update) {
       const today = todayKey();
@@ -7438,7 +7460,16 @@ function SeedMonster({ child, data, size=90, update }) {
         </>
       )}
       {isFinal && !isYami && <div style={{fontSize:11,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
-      {isYami && <div style={{fontSize:11,color:"rgba(216,200,255,0.95)",fontWeight:700,marginTop:3}}>👑 {isFinal?"ヤミノオウ 完成！":"お世話で育つ相棒（育成は🥚カード）"}</div>}
+      {isYami && (
+        <div style={{marginTop:3}}>
+          {!isFinal && (
+            <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"0 auto 3px",overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${mon.growthPct}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .5s"}}/>
+            </div>
+          )}
+          <div style={{fontSize:11,color:"rgba(216,200,255,0.95)",fontWeight:700}}>👑 {isFinal?"ヤミノオウ 完成！":`タップで お世話（あと${Math.max(0,DARK_EGG_MAX-(mon.careDays||0))}）`}</div>
+        </div>
+      )}
 
       {/* 進化ボタン＋進化先ヒント (テスト中は分岐ステージでも必ず表示) */}
       {(canEvolve || (mon.testEvolve && !isFinal)) && !evolving && (()=>{

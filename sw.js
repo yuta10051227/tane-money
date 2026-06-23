@@ -1,4 +1,4 @@
-const CACHE = 'tane-money-v6';
+const CACHE = 'tane-money-v7';
 // バージョン固定のCDN資産(React/Firebase/フォントCSS)はimmutable扱いでprecache。
 // install時に取りに行き、以降のリピート起動はネットワーク無しで即起動できる。
 const CDN_PRECACHE = [
@@ -80,16 +80,15 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // それ以外(HTML/ナビゲーション=アプリ本体)はネットワーク優先: 新しいデプロイを即反映。
+  // オフライン時のみキャッシュにフォールバック(古いHTMLが残って更新が届かない問題を防ぐ)。
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(res => {
-        if (res && res.status === 200 && e.request.method === 'GET') {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        }
-        return res;
-      }).catch(() => cached || new Response('Offline', {status: 503}));
-      // キャッシュ優先（オフライン時は即キャッシュを返す）
-      return cached || fetchPromise;
-    })
+    fetch(e.request).then(res => {
+      if (res && res.status === 200 && e.request.method === 'GET') {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request).then(c => c || new Response('Offline', {status: 503})))
   );
 });
