@@ -141,7 +141,15 @@ export async function checkDuplicate(token, calendarId, title, dateStr) {
   }
   if (!res.ok) return false;
   let j; try { j = await res.json(); } catch { return false; }
-  const norm = (s) => String(s || "").trim();
-  const target = norm(title);
-  return (j.items || []).some((e) => norm(e.summary) === target);
+  const target = normTitle(title);
+  return (j.items || []).some((e) => normTitle(e.summary) === target);
+}
+
+// タイトル比較用の正規化：全角/半角・大文字小文字・空白差を吸収して重複判定を安定させる。
+export function normTitle(s) {
+  return String(s || "")
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .trim();
 }

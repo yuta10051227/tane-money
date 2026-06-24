@@ -7,7 +7,7 @@
 
 import { useState, useMemo } from "react";
 import { getAccessToken } from "./gauth";
-import { fetchCalendarList, createEvent, checkDuplicate, classifyEvent, pad2 } from "./calendar";
+import { fetchCalendarList, createEvent, checkDuplicate, classifyEvent, pad2, normTitle } from "./calendar";
 
 const CATS = ["施術", "制作", "集客", "経営", "その他"];
 
@@ -130,10 +130,10 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
         lastErr = String((err && err.message) || err);
       }
     }
-    // 抽出結果内の重複（同一 date|time|title）を除外
+    // 抽出結果内の重複を除外（タイトルは正規化して全角/半角・空白差も同一視）
     const seen = new Set();
     const uniq = all.filter((e) => {
-      const k = `${e.date}|${e.start_time}|${e.title}`;
+      const k = `${e.date}|${e.start_time}|${normTitle(e.title)}`;
       if (seen.has(k)) return false; seen.add(k); return true;
     });
     setEvents(uniq);
@@ -184,6 +184,11 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
     let success = 0, skipped = 0, failed = 0;
     setProgress({ done: 0, total: targets.length });
 
+    // この実行内で登録した予定を覚えておき、同じ日時・タイトルの二重登録を防ぐ
+    // （Googleカレンダー照会は登録直後だと反映が遅れるため、ローカルでも弾く）
+    const runSeen = new Set();
+    const runKey = (calId, ev) => `${calId}|${ev.date}|${includeTime && !ev.all_day ? ev.start_time : ""}|${normTitle(ev.title)}`;
+
     for (let n = 0; n < targets.length; n++) {
       const { e, i } = targets[n];
       const calId = resolveCal(e.category);
@@ -191,11 +196,16 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
       try {
         if (!calId) throw new Error("登録先カレンダーが未設定");
         if (skipDup) {
-          const dup = await checkDuplicate(t, calId, e.title, e.date);
-          if (dup) { status = "skipped"; skipped += 1; }
+          const key = runKey(calId, e);
+          if (runSeen.has(key)) { status = "skipped"; skipped += 1; }
+          else {
+            const dup = await checkDuplicate(t, calId, e.title, e.date);
+            if (dup) { status = "skipped"; skipped += 1; }
+          }
         }
         if (status !== "skipped") {
           await createEvent(t, calId, toEventBody(e, includeTime));
+          runSeen.add(runKey(calId, e));
           success += 1;
         }
       } catch (err) {
