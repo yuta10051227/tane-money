@@ -4061,6 +4061,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </button>
       )}
 
+      {/* 🌱 はたけ フローティングボタン(そだてるボタンの上に重ねて常駐・株/畑ワールドへ) */}
+      {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young)
+        && !(isJunior?(effectiveTab==="money"&&monTab==="hatake"):(effectiveTab==="activity"&&actTab==="invest")) && (
+        <button onClick={()=>{ if(isJunior){setTab("goals");setMonTab("hatake");} else {setTab("activity");setActTab("invest");} }} aria-label="はたけ"
+          style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
+            background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
+            cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
+            animation:"hatakeFab 2.1s ease-in-out infinite"}}>
+          <span style={{fontSize:26,lineHeight:1}}>🌱</span>
+          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>はたけ</span>
+          <style>{`@keyframes hatakeFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.07) translateY(-3px)}}`}</style>
+        </button>
+      )}
+
       {/* 📢 おしらせ(新機能の告知) */}
       {effectiveTab==="daily" && (
         <div style={{padding:"10px 16px 0"}}>
