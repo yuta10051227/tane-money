@@ -8631,7 +8631,7 @@ function InvestTab({child,data,update}){
   },[]);
   // 🌱 カウシェ型「おみず／お世話で確実に育つ」エンゲージ層（射幸性なし・努力で確実）
   const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};
-  const careDaysOf=(h)=> (farmData.care&&farmData.care[h.stockId])||0;
+  const careDaysOf=(h)=> (h&&farmData.care&&farmData.care[h.stockId])||0;
   const effDaysOf=(h)=> holdDaysOf(h)+careDaysOf(h);              // 実日数＋お世話ぶん＝見た目の成長
   const bucketG = farmData.lastDraw ? Math.min(30, Math.max(0,(Date.now()-new Date(farmData.lastDraw).getTime())/1000*0.01)) : 30;
   const waterReserve=Math.floor(farmData.water||0);

@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="b8e5cde">
+<meta name="tane-version" content="387c257">
 </head>
 <body>
   <div id="root"></div>
@@ -600,7 +600,7 @@ const[showDex,setShowDex]=useState(false);// 収穫シール帳・作物図鑑
 const[shareCopied,setShareCopied]=useState(false);const[showTrade,setShowTrade]=useState(false);// ゲームホーム ⇄ とりひき/くら（数字はここ）
 const myBal=bal(data.logs,child.id);const myHoldings=(data.holdings||{})[child.id]||[];// 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
 const cropDex=(data.cropDex||{})[child.id]||{};useEffect(()=>{const cur={};myHoldings.forEach(h=>{if(CROP_ART[h.stockId]!==undefined){const st=cropStageDays(holdDaysOf(h));cur[h.stockId]=Math.max(cur[h.stockId]??-1,st);}});const prev=(data.cropDex||{})[child.id]||{};let changed=false;const next={...prev};Object.entries(cur).forEach(([k,v])=>{if((next[k]??-1)<v){next[k]=v;changed=true;}});if(changed)update(d=>({...d,cropDex:{...(d.cropDex||{}),[child.id]:next}}));},[]);// 🌱 カウシェ型「おみず／お世話で確実に育つ」エンゲージ層（射幸性なし・努力で確実）
-const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};const careDaysOf=h=>farmData.care&&farmData.care[h.stockId]||0;const effDaysOf=h=>holdDaysOf(h)+careDaysOf(h);// 実日数＋お世話ぶん＝見た目の成長
+const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};const careDaysOf=h=>h&&farmData.care&&farmData.care[h.stockId]||0;const effDaysOf=h=>holdDaysOf(h)+careDaysOf(h);// 実日数＋お世話ぶん＝見た目の成長
 const bucketG=farmData.lastDraw?Math.min(30,Math.max(0,(Date.now()-new Date(farmData.lastDraw).getTime())/1000*0.01)):30;const waterReserve=Math.floor(farmData.water||0);const farmXp=farmData.xp||0;const farmLv=Math.floor(farmXp/12)+1;const lvProg=farmXp%12/12;const flash=(msg,color)=>{setTradeFlash({msg,color});setTimeout(()=>setTradeFlash(null),1600);};const setFarm=mut=>update(d=>{const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})};const nf=mut({...f,care:{...(f.care||{})}});return{...d,farm:{...(d.farm||{}),[child.id]:nf}};});const drawWater=()=>{const g=bucketG;if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;}setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()}));flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4");};const waterCrop=(s,h)=>{if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;}if(careDaysOf(h)>=15){flash(`🌱 ${s.name}は たっぷり！べつの作物にも あげてみよう`,"#34C77B");return;}setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1,care:{...f.care,[s.id]:Math.min(15,((f.care||{})[s.id]||0)+0.5)}}));flash(`💧 ${s.name}に みずやり！ぐんぐん育つ🌱`,"#34C77B");};const loginStreak=farmData.streak||0;// 📅 連続ログインボーナス(マイル型・毎日の理由。FOMOにしすぎない)
 useEffect(()=>{const today=new Date().toDateString();if(farmData.lastLogin===today)return;const y=new Date(Date.now()-86400000).toDateString();const ns=farmData.lastLogin===y?(farmData.streak||0)+1:1;const gain=8+Math.min(7,ns);setFarm(f=>({...f,water:(f.water||0)+gain,lastLogin:today,streak:ns}));flash(`📅 ${ns}日れんぞく ログイン！おみず +${gain}g🎁`,"#34C77B");},[]);// 🐣 なでなで(たまごっち型お世話の入口・1日10回までxp)
 const patMon=()=>{const today=new Date().toDateString();const done=farmData.patDate===today?farmData.patN||0:0;if(done>=10){flash("🌱 タネモン ごきげん！また あした なでようね","#34C77B");return;}setFarm(f=>({...f,xp:(f.xp||0)+1,patDate:today,patN:(f.patDate===today?f.patN||0:0)+1}));flash("🌱 なでなで♪ タネモンが よろこんでる","#34C77B");};// 保護者設定: 為替OFF / 1日の売買回数上限
