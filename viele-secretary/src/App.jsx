@@ -5866,7 +5866,7 @@ export default function App() {
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} catForCal={catForCal} onSetCat={setCalCat} />}
                 <CatLabelSettings labels={data.catLabels || {}} onChange={(l) => update({ catLabels: l })} />
                 <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
-                <TimeTreeImport C={C} onParse={parseTimeTreeImage} calCatMap={data.calCat || {}} />
+                <TimeTreeImport C={C} onParse={parseTimeTreeImage} calCatMap={data.calCat || {}} appToken={calToken} appCalList={calList} />
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
                   <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>

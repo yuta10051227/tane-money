@@ -5,7 +5,7 @@
 //   「カテゴリー別の登録先カレンダー」へ振り分けて登録できる。
 // - 既存の Firebase 認証・占術・カレンダー表示には一切手を入れない。
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getAccessToken } from "./gauth";
 import { fetchCalendarList, createEvent, checkDuplicate, classifyEvent, pad2, normTitle } from "./calendar";
 
@@ -63,13 +63,19 @@ function toEventBody(ev, includeTime) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // calCatMap = { [calendarId]: "施術"|... }（既存のカレンダー区分設定）。プロパティが無ければ {}。
-export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
+export default function TimeTreeImport({ C, onParse, calCatMap = {}, appToken = null, appCalList = [] }) {
   const [files, setFiles] = useState([]);          // {id, file, name}
   const [parsing, setParsing] = useState(false);
   const [parseMsg, setParseMsg] = useState(null);
   const [events, setEvents] = useState([]);        // 正規化イベント配列
-  const [token, setToken] = useState(null);
-  const [calendars, setCalendars] = useState([]);
+  const [token, setToken] = useState(appToken || null);
+  const [calendars, setCalendars] = useState(appCalList || []);
+
+  // 本体アプリのGoogleカレンダー連携（calToken/calList）を使い回す＝取り込みのたびに連携し直さない
+  useEffect(() => {
+    if (appToken) setToken(appToken);
+    if (appCalList && appCalList.length) setCalendars(appCalList);
+  }, [appToken, appCalList]);
   const [catCal, setCatCal] = useState({});        // { [category]: calendarId } 手動マッピング上書き
   const [calMsg, setCalMsg] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -145,14 +151,21 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
     setParsing(false);
   };
 
-  // ② Googleカレンダーに接続してカレンダー一覧を取得
+  // 連携トークンを取得：①本体アプリの連携(appToken)を最優先 ②無音で再取得 ③最後だけ同意画面
+  const acquireToken = async () => {
+    if (appToken) return appToken;
+    try { return await getAccessToken({ interactive: false }); }
+    catch { return await getAccessToken({ interactive: true }); }
+  };
+
+  // ② Googleカレンダーに接続してカレンダー一覧を取得（本体連携済みならボタン不要で即使える）
   const connect = async () => {
     if (connecting) return;
     setConnecting(true); setCalMsg(null);
     try {
-      const t = await getAccessToken({ interactive: true });
+      const t = await acquireToken();
       setToken(t);
-      const list = await fetchCalendarList(t);
+      const list = (appCalList && appCalList.length) ? appCalList : await fetchCalendarList(t);
       setCalendars(list);
       setCalMsg(list.length ? null : "書き込めるカレンダーが見つかりませんでした");
     } catch (e) {
@@ -170,9 +183,9 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
     if (!calendars.length) { setCalMsg("先に「Googleカレンダーに接続」してください"); return; }
     setRegistering(true); setResult(null); setCalMsg(null);
 
-    let t = token;
+    let t = token || appToken;
     try {
-      if (!t) { t = await getAccessToken({ interactive: true }); setToken(t); }
+      if (!t) { t = await acquireToken(); setToken(t); }
     } catch (e) {
       setCalMsg("Googleの認証に失敗しました：" + String((e && e.message) || e));
       setRegistering(false);
