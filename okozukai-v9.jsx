@@ -8572,7 +8572,7 @@ function ForexSection({data, update, child}){
 
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
-const CROP_ART = { s5:"crop_apple", s1:"crop_game" };
+const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
 function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
 function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
 function CropArt({stockId, stage, emoji, size}){
