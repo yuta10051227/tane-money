@@ -8708,8 +8708,8 @@ function InvestTab({child,data,update}){
     {/* 🌾 収穫フラッシュ：長く育てて勝てた時だけの「辛抱ごほうび」演出(射幸性カットのため利確即発火はしない) */}
     {harvestBurst!=null&&(
       <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",background:"radial-gradient(circle at 50% 45%,rgba(232,184,62,.3),rgba(52,199,123,.16) 55%,transparent 75%)"}}>
-        <div style={{fontSize:64,animation:"harvestBurst 1.1s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾</div>
-        <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#8a6a00",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .04s cubic-bezier(.2,.9,.3,1.2) forwards"}}>{harvestBurst.days}日 そだてた ごほうび</div>
+        <img src="/assets/tanemon_harvest.png" alt="" style={{width:96,height:96,objectFit:"contain",imageRendering:"pixelated",animation:"harvestBurst 1.1s cubic-bezier(.2,.9,.3,1.2) forwards"}} onError={e=>{const s=document.createElement("span");s.textContent="🌾";s.style.fontSize="64px";e.target.replaceWith(s);}}/>
+        <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#8a6a00",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .04s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾 {harvestBurst.days}日 そだてた ごほうび</div>
         <div style={{marginTop:2,fontSize:22,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst 1.1s .08s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.pts.toLocaleString()}pt 収穫！</div>
         <div style={{marginTop:2,fontSize:11,fontWeight:700,color:"#59645E",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .12s cubic-bezier(.2,.9,.3,1.2) forwards"}}>本物なら ≈{(harvestBurst.pts*100).toLocaleString()}円</div>
         <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:0}}`}</style>
