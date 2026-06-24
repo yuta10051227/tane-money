@@ -8572,7 +8572,7 @@ function ForexSection({data, update, child}){
 
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
-const CROP_ART = { s5:"crop_apple" };
+const CROP_ART = { s5:"crop_apple", s1:"crop_game" };
 function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
 function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
 function CropArt({stockId, stage, emoji, size}){
@@ -8682,6 +8682,10 @@ function InvestTab({child,data,update}){
   }
 
   return(<div style={{padding:"12px 16px",paddingBottom:32}}>
+    {/* はたけの背景シーン（ヘッダーバナー・雰囲気づくり） */}
+    <div style={{borderRadius:16,overflow:"hidden",marginBottom:12,border:`2px solid ${G}`,lineHeight:0,boxShadow:SHADOW}}>
+      <img src="/assets/bg_hatake.png" alt="" style={{width:"100%",display:"block",imageRendering:"pixelated"}} onError={e=>{e.target.parentElement.style.display="none";}}/>
+    </div>
     {/* 小学生むけ：やさしい はたけの あいさつ（どうぶつの森っぽい ほっこり導入） */}
     {isJr&&(
       <div style={{display:"flex",alignItems:"center",gap:10,background:"linear-gradient(180deg,#eaf7ec,#dff0e4)",border:`2px solid ${G}`,borderRadius:18,padding:"11px 14px",marginBottom:12}}>
