@@ -2624,13 +2624,13 @@ function BizCalendar({ birth, trips, deadlines, launches, events, tasks, onPlan,
       )}
       {mode === "month" && (<>
       {/* 曜日見出し */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 4, marginBottom: 4 }}>
         {["日", "月", "火", "水", "木", "金", "土"].map((w, i) => (
           <div key={w} style={{ textAlign: "center", fontSize: 12, color: i === 0 ? C.red : i === 6 ? C.blue : C.sub }}>{w}</div>
         ))}
       </div>
       {/* 日セル */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 4 }}>
         {cells.map((d, i) => {
           if (d == null) return <div key={`b${i}`} />;
           const k = `${yy}-${pad2(mm + 1)}-${pad2(d)}`;
