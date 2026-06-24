@@ -120,12 +120,14 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
     setParsing(true); setParseMsg(null); setResult(null);
     const all = [];
     let failed = 0;
+    let lastErr = "";
     for (const f of files) {
       try {
         const evs = await onParse(f.file); // [{date, time, title}]
         (evs || []).forEach((e) => { if (e && e.date && e.title) all.push(normalizeEvent(e)); });
-      } catch {
+      } catch (err) {
         failed += 1;
+        lastErr = String((err && err.message) || err);
       }
     }
     // 抽出結果内の重複（同一 date|time|title）を除外
@@ -138,7 +140,7 @@ export default function TimeTreeImport({ C, onParse, calCatMap = {} }) {
     setParseMsg(
       uniq.length
         ? `${uniq.length}件の予定を読み取りました${failed ? `（${failed}枚は解析失敗）` : ""}`
-        : `予定を読み取れませんでした${failed ? `（${failed}枚は解析失敗）` : "。別のスクショで再試行してください"}`
+        : `予定を読み取れませんでした${failed ? `（${failed}枚失敗：${lastErr}）` : "。別のスクショで再試行してください"}`
     );
     setParsing(false);
   };

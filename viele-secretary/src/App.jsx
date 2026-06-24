@@ -5405,10 +5405,10 @@ export default function App() {
     const dataUrl = await downscaleImage(file, 1280, 0.7);
     const r = await authedFetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
     const text = await r.text();
-    let j; try { j = JSON.parse(text); } catch { throw new Error("サーバーとの通信に失敗しました。"); }
+    let j; try { j = JSON.parse(text); } catch { throw new Error(`通信失敗(${r.status}) ${String(text).slice(0, 80)}`); }
     if (j && j.quotaExceeded) throw new Error(j.error || "本日のAI利用上限に達しました。");
-    if (!r.ok || j.error) throw new Error("サーバーとの通信に失敗しました。");
-    if (j.aiEnabled === false) throw new Error("AI機能は現在オフです。");
+    if (!r.ok || j.error) throw new Error(`エラー(${r.status}) ${j.error || j.message || ""}`.trim());
+    if (j.aiEnabled === false) throw new Error("AI機能がオフ（GEMINI_API_KEY未設定）");
     return j.events || [];
   };
 
