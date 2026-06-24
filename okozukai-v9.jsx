@@ -4605,7 +4605,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
           {(isJunior
-            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"]]
+            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🌱 はたけ"]]:[])]
             :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"]]
           ).map(([k,l])=>(
             <button key={k} onClick={()=>setMonTab(k)}
@@ -4618,6 +4618,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           ))}
         </div>
       )}
+      {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
+      {effectiveTab==="money" && monTab==="hatake" && isJunior && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="kakeibo" && (
         <div>
           {/* month nav */}
@@ -8591,7 +8593,8 @@ function InvestTab({child,data,update}){
   const myHoldings=(data.holdings||{})[child.id]||[];
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
-  const forexOff=!!_fs.forexOff;
+  const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
+  const forexOff=!!_fs.forexOff || isJr;
   const tradeLimit=(_fs.dailyTradeLimit)||0;
   const _todayStr=new Date().toDateString();
   const tradesToday=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="invest_buy"||l.type==="invest_sell"||l.type==="forex_buy"||l.type==="forex_sell")&&new Date(l.date).toDateString()===_todayStr).length;
@@ -8654,6 +8657,16 @@ function InvestTab({child,data,update}){
   }
 
   return(<div style={{padding:"12px 16px",paddingBottom:32}}>
+    {/* 小学生むけ：やさしい はたけの あいさつ（どうぶつの森っぽい ほっこり導入） */}
+    {isJr&&(
+      <div style={{display:"flex",alignItems:"center",gap:10,background:"linear-gradient(180deg,#eaf7ec,#dff0e4)",border:`2px solid ${G}`,borderRadius:18,padding:"11px 14px",marginBottom:12}}>
+        <span style={{fontSize:30}}>🌱</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:900,fontSize:14,color:GP}}>ようこそ、きみの はたけへ！</div>
+          <div style={{fontSize:11.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginTop:1}}>たね（株）を まいて、じっくり そだてよう。あわてて うらなくて だいじょうぶ。まいにち ちょっとずつ おおきくなるよ🌾</div>
+        </div>
+      </div>
+    )}
     {/* 売買の気持ちいい完了トースト(上から落ちて消える) */}
     {tradeFlash&&(
       <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1400,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
