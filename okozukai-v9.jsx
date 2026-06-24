@@ -370,6 +370,8 @@ function startRealtimeSync(updateFn){
             if(prev.battleBossUnlocked) merged.battleBossUnlocked={...(merged.battleBossUnlocked||{}),...prev.battleBossUnlocked};
             // darkEgg(ヤミノオウの卵): お世話度は多い方を採用＝同期巻き戻しで育成が消えない
             if(prev.darkEgg){merged.darkEgg={...(merged.darkEgg||{})};Object.keys(prev.darkEgg).forEach(cid=>{const p=prev.darkEgg[cid]||{},m=merged.darkEgg[cid]||{};merged.darkEgg[cid]=((p.care||0)>=(m.care||0))?p:m;});}
+            // ヤミノオウのタマゴ所持フラグ: どちらかがtrueなら保持(同期で消えない)。未育成のみ意味を持つ
+            if(prev.yamiEgg){merged.yamiEgg={...(merged.yamiEgg||{})};Object.keys(prev.yamiEgg).forEach(cid=>{if(prev.yamiEgg[cid]) merged.yamiEgg[cid]=true;});}
             // eggDrops(ヤミノタマゴ累積ドロップ=基礎ステ+1%/個): 多い方を採用
             if(prev.eggDrops){merged.eggDrops={...(merged.eggDrops||{})};Object.keys(prev.eggDrops).forEach(cid=>{merged.eggDrops[cid]=Math.max(prev.eggDrops[cid]||0,merged.eggDrops[cid]||0);});}
             // 家族バトル・シーズン: 新しい週(シーズン)を優先、同週はbaseをマージ
@@ -513,6 +515,28 @@ const MONSTER_TREE = {
   m14:  { id:"m14", name:"ミスミント", rarity:5, line:"c", stage:6, evolveTo:null,
           desc:"伝説をつむぐ賢者・究極体。学びの力で、人々をゆたかにみちびく。",
           edu:"いちばん大切な財産は「学び」。知識は使ってもへらず、一生きみを助けてくれる。" },
+  // ── ヤミノオウ系統(ボス撃破で稀にドロップする卵から育てる。通常タネモンと同じく「育てた度」＋時間で直線進化。gs=gacha_gs_*スプライト) ──
+  yami_egg:{ id:"yami_egg", name:"ヤミノタマゴ", rarity:5, line:"yami", stage:0, evolveTo:"yami1", gs:"yamiegg",
+          desc:"ヤミノオウが のこした なぞの たまご。あたたかく 育てて 孵そう。",
+          edu:"中で 命が 育っている。すぐには かえらない。お金も おなじで、待つ力が 大きく育てる。" },
+  yami1:{ id:"yami1", name:"ヤミの雫", rarity:5, line:"yami", stage:1, evolveTo:"yami2", gs:"yami1",
+          desc:"殻を やぶって 生まれたばかりの 闇の しずく。まだ ぷるぷる。",
+          edu:"どんな 強いものも 始まりは 小さい。お金も コツコツが 力になる。" },
+  yami2:{ id:"yami2", name:"ヤミッコ", rarity:5, line:"yami", stage:2, evolveTo:"yami3", gs:"yami2",
+          desc:"手足が 生えた 小さな 影。よちよち 動きはじめた。",
+          edu:"少しずつ できることが 増えていく。続けるほど 育つのが 育成も 貯金も おなじ。" },
+  yami3:{ id:"yami3", name:"ヤミドラゴ", rarity:5, line:"yami", stage:3, evolveTo:"yami4", gs:"yami3",
+          desc:"子竜らしく なってきた。小さな ツノと 牙が 生えた。",
+          edu:"ここまで 続けられたのが すごい。やめずに 続ける力が、いちばんの 才能だよ。" },
+  yami4:{ id:"yami4", name:"ヤミノツバサ", rarity:5, line:"yami", stage:4, evolveTo:"yami5", gs:"yami4",
+          desc:"大きな 翼が 生えた 闇の竜。空を かけるように なった。",
+          edu:"コツコツの つみ重ねが、目に見える 大きな力に なってきた。投資の 複利と おなじだね。" },
+  yami5:{ id:"yami5", name:"ヤミノリュウ", rarity:5, line:"yami", stage:5, evolveTo:"yami_u", gs:"yami5",
+          desc:"闇の力が 満ちた 龍。頭上には 光の輪が ともり、王の あと一歩。",
+          edu:"あと少し。最後まで やりきる人は そう多くない。ゴールの 目前こそ ふんばりどき。" },
+  yami_u:{ id:"yami_u", name:"ヤミノオウ", rarity:5, line:"yami", stage:6, evolveTo:null, gs:"yami",
+          desc:"育てて 闇の力を 光に変え、王として めざめた すがた！じぶんだけの ヤミノオウ。",
+          edu:"つづける力が いちばん つよい。毎日の 小さな つみ重ねが、伝説の王を 育てあげた。" },
   // ── 猫タネもん：プリン(cpurin) egg→b1→b2→mature→[森の力/星の力]→ult ──
   cpurin_egg:    { id:"cpurin_egg",    name:"プリンのタマゴ", rarity:1, line:"cat", stage:0, evolveTo:"cpurin_b1",
           desc:"鈴のついた、ねこのタマゴ。あたためるとプリンが生まれる。", edu:"いきものを育てるには毎日のお世話が大切。お金も毎日コツコツ育てよう。" },
@@ -738,7 +762,7 @@ const DARK_EGG_STAGES = [
 const darkEggStage = (care)=>{ let s=DARK_EGG_STAGES[0]; for(const st of DARK_EGG_STAGES){ if((care||0)>=st.min) s=st; } return s; };
 // 隠しモンスターの解放判定(special=darkEggは卵の育成度、それ以外はタスク累計)
 function hiddenUnlocked(h, data, child, totalDone){
-  if(h.special==="darkEgg") return ((data.darkEgg?.[child.id]?.care||0) >= DARK_EGG_MAX);
+  if(h.special==="darkEgg") return (data.monsterDiscovered?.[child.id]||[]).includes("yami_u");   // 究極体ヤミノオウまで育てたら「すがた」解放
   return totalDone >= h.need;
 }
 
@@ -757,23 +781,6 @@ const EVO_GROWTH = { 0:2, 1:5, 2:9, 3:16, 4:26, 5:40 };
 const REINC_HOURS = 96;   // 究極体→転生できるまで(4日)
 function getMonState(data, child){
   const cid = child.id;
-  // ── ヤミノオウを相棒に選んでいる場合: 闇の卵の育成度(care)で段階が決まる独立パートナー ──
-  // (junior以外。育成は DarkEggCard の「お世話」で行う＝ここでは通常進化のゲートを使わない)
-  if((data.activePartner||{})[cid]==="yami" && data.darkEgg?.[cid] && child.displayMode!=="junior"){
-    const yCare=(data.darkEgg[cid].care)||0;
-    const ySt=darkEggStage(yCare);
-    const yStIdx=DARK_EGG_STAGES.indexOf(ySt);
-    const yFinal=yCare>=DARK_EGG_MAX;
-    return {
-      curId:"yami_"+ySt.sprite, def:{name:ySt.name,label:ySt.name,rarity:5,stage:yStIdx},
-      stage:yStIdx, isFinal:yFinal,
-      tasksDone:0, badgeCount:0, careDays:yCare, gauge:yCare, need:DARK_EGG_MAX, testEvolve:false,
-      growthOk:true, growthPct:Math.min(100,Math.round(yCare/DARK_EGG_MAX*100)),
-      growthRemain:0, timeOk:true, timeRemainMs:0,
-      canEvolve:false, canReincarnate:false, reincRemainMs:0,
-      isYami:true, yamiSprite:ySt.sprite, yamiStage:ySt,
-    };
-  }
   const logs = (data.logs||[]).filter(l=>l.cid===cid);
   const tasksDone  = logs.filter(l=>l.type==="good"||l.type==="daily").length;
   const badgeCount = logs.filter(l=>l.type==="badge").length;
@@ -794,7 +801,7 @@ function getMonState(data, child){
   const stageAt = (data.monsterStageAt||{})[cid] || (data.monsterEvolvedAt||{})[cid] || null;
   const elapsedMs = stageAt ? (Date.now() - new Date(stageAt).getTime()) : Infinity;
   // ヤミノオウの卵を育成中(究極体前)は、通常モンスターの進化が1.5倍遅くなる(育てる力が分散)
-  const _eggRaising = (data.darkEgg||{})[cid] && ((data.darkEgg[cid].care||0) < DARK_EGG_MAX);
+  const _eggRaising = false;   // (旧)ヤミノオウ卵の育成中に通常進化を1.5倍遅くする仕様は廃止。今は1体ずつ育てる
   const reqMs = evoHoursFor(stage, cid) * 3600000 * (_eggRaising ? 1.5 : 1);
   const timeOk = testEvolve ? true : (elapsedMs >= reqMs);
   const timeRemainMs = Math.max(0, reqMs - elapsedMs);
@@ -1031,6 +1038,9 @@ function migrate(d) {
   if(!d.monsterStageAt) d.monsterStageAt={};
   if(!d.monsterCare) d.monsterCare={};
   if(!d.collectedMons) d.collectedMons={};   // うちのこ(卒業した猫)コレクション
+  if(!d.yamiEgg) d.yamiEgg={};   // ヤミノオウのタマゴ所持フラグ(未育成)
+  // 旧・闇の卵お世話システム(darkEgg)→ ヤミノオウは通常タネモン化。育成度はリセットし、所持者には新タマゴを配る
+  if(d.darkEgg){ Object.keys(d.darkEgg).forEach(cid=>{ if(!String((d.monsterEvolved||{})[cid]||"").startsWith("yami")) d.yamiEgg[cid]=true; }); d.darkEgg={}; }
   // 旧モンスター体系(1a/2a1…)の保存値は新ツリーに無いので卵へリセット
   Object.keys(d.monsterEvolved||{}).forEach(cid=>{ if(d.monsterEvolved[cid] && !MONSTER_TREE[d.monsterEvolved[cid]]) d.monsterEvolved[cid]=null; });
   Object.keys(d.monsterDiscovered||{}).forEach(cid=>{ d.monsterDiscovered[cid]=(d.monsterDiscovered[cid]||[]).filter(id=>MONSTER_TREE[id]); });
@@ -1862,8 +1872,8 @@ function battleStats(data, child){
     def:Math.round((5+(m.stage||0)*3+Math.round(lv*(0.8+(iv.def||5)*0.14)))*baseMul)+eb("def"),
     spd:Math.round((6+(m.stage||0)*2+Math.round(lv*(0.6+(iv.spd||5)*0.12)))*baseMul)+eb("spd"),
     lv, exp:L, iv, equip:eqItems, eggDrops,
-    curId:m.curId, name:m.isYami?(m.def?.label||"ヤミノオウ"):((data.monsterNickname||{})[child.id]||m.def?.label||"あいぼう"),
-    move:pickMove(m.curId), img:m.isYami?`/assets/gacha_gs_${m.yamiSprite}_a.png`:`/assets/monster_${m.curId}_f0.png`,
+    curId:m.curId, name:(data.monsterNickname||{})[child.id]||m.def?.name||m.def?.label||"あいぼう",
+    move:pickMove(m.curId), img:m.def?.gs?`/assets/gacha_gs_${m.def.gs}_a.png`:`/assets/monster_${m.curId}_f0.png`,
   };
 }
 // HP自然回復: 1分で1回復(時間経過ぶんを保存値に加算)
@@ -2088,7 +2098,7 @@ function BattleModal({child,data,update,onClose}){
       if(dropInfo?.kind==="equip"){ const drp=(d.equipUnlock?.[child.id])||[]; nd.equipUnlock={...(d.equipUnlock||{}),[child.id]:[...drp,dropInfo.id]}; }
       if(dropInfo?.kind==="egg"){
         nd.eggDrops={...(d.eggDrops||{}),[child.id]:((d.eggDrops?.[child.id])||0)+1};   // 基礎ステ+1%(累積)
-        if(!(d.darkEgg?.[child.id])) nd.darkEgg={...(d.darkEgg||{}),[child.id]:{care:0,last:""}};  // 倒した本人だけが入手
+        if(!(d.yamiEgg?.[child.id]) && !String((d.monsterEvolved||{})[child.id]||"").startsWith("yami")) nd.yamiEgg={...(d.yamiEgg||{}),[child.id]:true};  // 倒した本人だけが ヤミノオウのタマゴ入手(育成は通常タネモンと同じ。既に育成中なら配らない)
       }
       // かけら計算は同期後の最新値(d)から行う＝多端末でのスナップショット二重加算/喪失を防ぐ
       if(r==="win"){
@@ -3848,8 +3858,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           );
         })()}
-        {/* 🥚 ヤミノオウの卵: いつものモンスターを育てる場所に並べて表示・育成 */}
-        {data.darkEgg?.[child.id] && <div style={{position:"relative",zIndex:2}}><DarkEggCard child={child} data={data} update={update}/></div>}
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
@@ -4077,28 +4085,34 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* 🤝 あいぼう切替: ヤミノオウを独立パートナーとして選べる(卵を持っているとき) */}
-      {effectiveTab==="rpg" && !isJunior && data.darkEgg?.[child.id] && (()=>{
-        const ap=(data.activePartner||{})[child.id]||"normal";
-        const setAP=(v)=>update(d=>({...d,activePartner:{...(d.activePartner||{}),[child.id]:v}}));
-        const btn=(active)=>({flex:1,borderRadius:12,padding:"10px",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F,border:active?"2px solid #b07bff":`1.5px solid ${darkBG?"rgba(255,255,255,0.15)":BORDER}`,background:active?"linear-gradient(135deg,#7b61c9,#b07bff)":(darkBG?"rgba(255,255,255,0.06)":CARD),color:active?"#fff":(darkBG?"rgba(255,255,255,0.85)":TEXT)});
+      {/* 🥚 ヤミノオウのタマゴを持っているとき: 育て始める(=今の相棒を卒業して、ヤミノオウを通常タネモンとして育成) */}
+      {effectiveTab==="rpg" && data.yamiEgg?.[child.id] && (()=>{
+        const startYami=()=>{ if(typeof window!=="undefined" && !window.confirm("ヤミノオウのタマゴを 育てはじめる？\n今の あいぼうは 図鑑(うちのこ)へ 卒業して、ヤミノオウのタマゴが 新しい あいぼうに なるよ。")) return;
+          update(d=>{ const curId=(d.monsterEvolved||{})[child.id]; const curDef=curId?MONSTER_TREE[curId]:null;
+            const coll=(curId && curDef)?[...((d.collectedMons||{})[child.id]||[]),{species:String(curId).split("_")[0],id:curId,name:curDef.name,rarity:curDef.rarity||1,date:new Date().toISOString()}]:((d.collectedMons||{})[child.id]||[]);
+            return {...d, collectedMons:{...(d.collectedMons||{}),[child.id]:coll},
+              monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:"yami_egg"},
+              monsterEvolvedAt:{...(d.monsterEvolvedAt||{}),[child.id]:null},
+              monsterStageAt:{...(d.monsterStageAt||{}),[child.id]:new Date().toISOString()},
+              monsterIV:{...(d.monsterIV||{}),[child.id]:{hp:7,atk:7,def:7,spd:7}},
+              monsterDiscovered:{...(d.monsterDiscovered||{}),[child.id]:[...new Set([...((d.monsterDiscovered||{})[child.id]||[]),"yami_egg"])]},
+              yamiEgg:{...(d.yamiEgg||{}),[child.id]:false} }; });
+        };
         return (
           <div style={{padding:"0 16px 8px"}}>
-            <div style={{background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.12)":BORDER}`,borderRadius:14,padding:"11px 13px"}}>
-              <div style={{fontSize:12,fontWeight:800,color:darkBG?"#fff":TEXT,marginBottom:8}}>🤝 いっしょに ぼうけんする あいぼう</div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setAP("normal")} style={btn(ap!=="yami")}>🌱 タネモン</button>
-                <button onClick={()=>setAP("yami")} style={btn(ap==="yami")}>👑 ヤミノオウ</button>
+            <div style={{position:"relative",overflow:"hidden",background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:"1.5px solid #7b61c9",borderRadius:16,padding:"13px 15px",color:"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:34}}>🥚</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:900,fontSize:14}}>👑 ヤミノオウの タマゴ を持っている！</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2,lineHeight:1.5}}>育てはじめると あいぼうに なるよ。ふつうの タネモンと 同じく お手伝い・なでなで・時間で 進化して、究極体 ヤミノオウ を めざそう！</div>
+                </div>
               </div>
-              <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED,marginTop:7,lineHeight:1.5}}>あいぼうに すると ホームや バトルに とうじょう！ヤミノオウは 下の🥚カードの「お世話」で そだつよ。</div>
+              <button onClick={startYami} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>🥚 このタマゴを 育てる（今の あいぼうは 卒業）</button>
             </div>
           </div>
         );
       })()}
-      {/* 🥚 ヤミノオウの卵: そだてるハブにも表示(teen/adultはヘッダーに無いのでここで育成) */}
-      {effectiveTab==="rpg" && !isJunior && data.darkEgg?.[child.id] && (
-        <DarkEggCard child={child} data={data} update={update}/>
-      )}
 
       {/* 🧭 とっくんの旅(旅先を選択・遠いほどEXP大・放置系) */}
       {effectiveTab==="rpg" && showExpedF && (()=>{
@@ -7231,7 +7245,6 @@ function SeedMonster({ child, data, size=90, update }) {
   const isFinal        = mon.isFinal;
   const isEgg          = monsterId==="egg" || /_egg$/.test(String(monsterId));  // 卵は「しんか」でなく「うまれる」
   const canEvolve      = mon.canEvolve && !!update;
-  const isYami         = !!mon.isYami;   // ヤミノオウを相棒にしている(独立パートナー)
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
@@ -7246,15 +7259,15 @@ function SeedMonster({ child, data, size=90, update }) {
   const fIdx           = hatching ? (3 + Math.floor(frame/2) % 3)
                        : multiFront ? Math.floor(frame / 3) % frontFrames
                        : Math.floor(frame / 5) % 2;
-  // どうぶつ仲間スキン(gacha_gs_*)は2コマ(a/b)でぴょこぴょこ。ヤミノオウ相棒は現段階のスプライト
-  const gsSkin         = isYami ? mon.yamiSprite : (skinActive && skinDef && skinDef.sprite ? skinDef.sprite : null);
+  // どうぶつ仲間スキン＆ヤミノオウ系統(MONSTER_TREE.gs)は gacha_gs_*_a/b の2コマで表示
+  const gsSkin         = skinActive ? (skinDef && skinDef.sprite ? skinDef.sprite : null) : (monDef && monDef.gs ? monDef.gs : null);
   // ── 怠けもん退化(一時的): 最後の接触(なでなで or タスク)から24時間で"怠けもん"に変身。なでなで/タスクで即もとに戻る・進化や育てた度は失わない ──
   const _careRec    = (data.monsterCare||{})[child.id]||{};
   const _caredToday = _careRec.last === todayKey();
   const _careTs     = _careRec.ts || 0;
   const _taskTs     = myLogs.reduce((mx,l)=>((l.type==="good"||l.type==="daily")?Math.max(mx,new Date(l.date).getTime()||0):mx),0);
   const _lastTouch  = Math.max(_careTs,_taskTs);
-  const neglected   = !isYami && !evolving && !hatching && monsterId!=="egg" && !_caredToday && _lastTouch>0 && (Date.now()-_lastTouch >= 86400000);
+  const neglected   = !evolving && !hatching && monsterId!=="egg" && !_caredToday && _lastTouch>0 && (Date.now()-_lastTouch >= 86400000);
   // 全コマを重ねて常時マウントし、表示コマだけvisibilityで切替(src差し替えのデコード点滅を防止)
   const _nFront = hatching ? 6 : frontFrames;
   const frameList = neglected
@@ -7309,30 +7322,8 @@ function SeedMonster({ child, data, size=90, update }) {
     ? ["いっしょにがんばろ！","きょうもよろしく！","タスクやってみよ！"]
     : ["さびしいな…","がんばって！","タッチしてくれた！"];
 
-  const yamiTapRef = useRef(0);
   const handleTap = () => {
     if (evolving) return;
-    // ヤミノオウを相棒にしているときは、タップで直接お世話して育てられる(タネモンと同じ感覚)
-    if (update && isYami) {
-      const eg = data.darkEgg?.[child.id];
-      const fedT = eg && eg.last===todayISO();
-      if (eg && (eg.care||0) < DARK_EGG_MAX && !fedT) {
-        // 期間ゲート: お世話は1日1回(ほかのタネモンと同様にじっくり)
-        update(d => {
-          const e = d.darkEgg?.[child.id] || {care:0};
-          if ((e.care||0) >= DARK_EGG_MAX || (e.last===todayISO())) return d;
-          return {...d, darkEgg:{...(d.darkEgg||{}), [child.id]:{care:(e.care||0)+1, last:todayISO()}}};
-        });
-        setSpeech(["おせわ ありがとう！","つよくなる…！","うれしい…！","また あした そだててね！"][Math.floor(Math.random()*4)]);
-      } else {
-        setSpeech(isFinal ? "さいきょうの ヤミノオウ！✨" : "きょうは お世話したよ！また あした🌙");
-      }
-      const id = now;
-      setSparkles(s=>[...s,{id,x:Math.random()*60-30,y:-(20+Math.random()*30)}]);
-      setTimeout(()=>setSparkles(s=>s.filter(x=>x.id!==id)),800);
-      setTimeout(()=>setSpeech(null),1800);
-      return;
-    }
     // なでなで(お世話)を1日1回だけ育てた度に加算
     if (update) {
       const today = todayKey();
@@ -7454,8 +7445,8 @@ function SeedMonster({ child, data, size=90, update }) {
   const evoPct       = mon.growthPct;
   const evoRemaining = mon.growthRemain;
   const nickname  = (data.monsterNickname||{})[child.id];
-  const dispName  = isYami ? monDef.name : (nickname || (skinActive ? skinDef.name : monDef.name));
-  const rarityStr = "★".repeat((isYami ? 5 : (skinActive ? skinDef.rarity : monDef.rarity)) || 1);
+  const dispName  = nickname || (skinActive ? skinDef.name : monDef.name);
+  const rarityStr = "★".repeat((skinActive ? skinDef.rarity : monDef.rarity) || 1);
   const monLv = monLevel((data.monsterExp||{})[child.id]||0).lv;
 
   return (
@@ -7543,7 +7534,7 @@ function SeedMonster({ child, data, size=90, update }) {
       )}
 
       {/* 進化バー or 最終形バッジ */}
-      {!isFinal && !isYami && (
+      {!isFinal && (
         <>
           <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"4px auto 0",overflow:"hidden"}}>
             <div style={{height:"100%",width:`${evoPct}%`,background:canEvolve?"linear-gradient(90deg,#fde68a,#f59e0b)":"rgba(255,255,255,0.72)",borderRadius:999,transition:"width 0.6s ease"}}/>
@@ -7555,17 +7546,7 @@ function SeedMonster({ child, data, size=90, update }) {
           )}
         </>
       )}
-      {isFinal && !isYami && <div style={{fontSize:11,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
-      {isYami && (
-        <div style={{marginTop:3}}>
-          {!isFinal && (
-            <div style={{width:90,height:3,background:"rgba(255,255,255,0.18)",borderRadius:999,margin:"0 auto 3px",overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${mon.growthPct}%`,background:"linear-gradient(90deg,#b07bff,#e8b83e)",borderRadius:999,transition:"width .5s"}}/>
-            </div>
-          )}
-          <div style={{fontSize:11,color:"rgba(216,200,255,0.95)",fontWeight:700}}>👑 {isFinal?"ヤミノオウ 完成！":(data.darkEgg?.[child.id]?.last===todayISO()?"きょうは おしまい（またあした）":`タップで お世話（あと${Math.max(0,DARK_EGG_MAX-(mon.careDays||0))}）`)}</div>
-        </div>
-      )}
+      {isFinal && <div style={{fontSize:11,color:"rgba(255,220,0,0.9)",fontWeight:700,marginTop:3}}>👑 さいしゅうしんか！</div>}
 
       {/* 進化ボタン＋進化先ヒント (テスト中は分岐ステージでも必ず表示) */}
       {(canEvolve || (mon.testEvolve && !isFinal)) && !evolving && (()=>{
@@ -7599,7 +7580,7 @@ function SeedMonster({ child, data, size=90, update }) {
         )
       )}
       {/* 転生までのヒント（最終形でまだ条件未達のとき） */}
-      {isFinal && !canReincarnate && !evolving && !isYami && (
+      {isFinal && !canReincarnate && !evolving && (
         <div style={{marginTop:6,fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:700}}>
           🔄 転生まで {fmtTimeRemain(mon.reincRemainMs)||"もう少し…"}
         </div>
@@ -7608,7 +7589,7 @@ function SeedMonster({ child, data, size=90, update }) {
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
       )}
       {/* タマゴからやり直す(別の進化を試せる) */}
-      {evolved && !evolving && update && !isYami && (
+      {evolved && !evolving && update && (
         <button onClick={()=>{ if(typeof window!=="undefined" && window.confirm("タマゴからやり直す？\nずかんはそのまま。ちがう進化を試せるよ！")) doRehatch(); }}
           style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
           🥚 タマゴからやり直す
@@ -7725,12 +7706,13 @@ function MonsterZukan({ data, child }) {
         </div>
       ))}
 
-      {/* ── 👑 ヤミノオウの道(特別・ボス撃破の卵から育てる7段階) ── */}
+      {/* ── 👑 ヤミノオウの道(特別・ボス撃破の卵から育てる7段階。通常タネモンと同じく進化で図鑑登録) ── */}
       {(()=>{
-        const care = data.darkEgg?.[child.id]?.care;
-        const hasEgg = care!==undefined;
-        const reached = (s)=> hasEgg && care>=s.min;
-        const reachedCount = hasEgg ? DARK_EGG_STAGES.filter(reached).length : 0;
+        const disc = data.monsterDiscovered?.[child.id]||[];
+        const sid = (s)=> s.sprite==="yamiegg"?"yami_egg":s.sprite==="yami"?"yami_u":s.sprite;
+        const reached = (s)=> disc.includes(sid(s));
+        const reachedCount = DARK_EGG_STAGES.filter(reached).length;
+        const hasEgg = !!data.yamiEgg?.[child.id] || reachedCount>0;
         return (
           <div style={{marginTop:6,background:"linear-gradient(135deg,#2a1f4a,#3d2b66)",border:"1.5px solid #7b61c9",borderRadius:14,padding:"10px 8px",color:"#fff"}}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
@@ -7738,7 +7720,7 @@ function MonsterZukan({ data, child }) {
               <span style={{fontSize:11,fontWeight:900}}>ヤミノオウの道（特別）</span>
               <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginLeft:"auto"}}>{reachedCount}/{DARK_EGG_STAGES.length}</span>
             </div>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginBottom:8,lineHeight:1.5}}>{hasEgg?"お世話で育てるほど 進化！🐣そだてる で育てよう":"バトルで ヤミノオウを 倒すと タマゴが手に入る"}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.55)",marginBottom:8,lineHeight:1.5}}>{hasEgg?"そだてる で タネモンとして 育てよう！お手伝い・なでなで・時間で 進化":"バトルで ヤミノオウを 倒すと タマゴが手に入る"}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
               {DARK_EGG_STAGES.map(s=>{
                 const ok=reached(s);
