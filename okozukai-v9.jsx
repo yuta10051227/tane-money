@@ -785,7 +785,9 @@ function getMonState(data, child){
   const tasksDone  = logs.filter(l=>l.type==="good"||l.type==="daily").length;
   const badgeCount = logs.filter(l=>l.type==="badge").length;
   const careDays   = ((data.monsterCare||{})[cid]||{}).days || 0;
-  const gauge      = tasksDone + badgeCount*3 + careDays*2;   // 育てた度
+  // 配当ごはん: 長期保有の配当(interestログのうち「配当」)を相棒の育てた度に加算(上限30=投資→育成の融合)
+  const dividendFeed = Math.min(30, logs.filter(l=>l.type==="interest" && /配当/.test(l.label||"")).length);
+  const gauge      = tasksDone + badgeCount*3 + careDays*2 + dividendFeed;   // 育てた度
   const rawId = (data.monsterEvolved||{})[cid] || null;
   const curId = (rawId && MONSTER_TREE[rawId]) ? rawId : "egg";
   const def   = MONSTER_TREE[curId];
@@ -8494,6 +8496,28 @@ function ForexSection({data, update, child}){
 }
 
 
+// ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
+const INVEST_NAVI = {
+  kotsu:{e:"🌲",n:"コツメ",c:"#34C77B"},
+  garu:{e:"🐉",n:"ガルド",c:"#3478D4"},
+  fukuro:{e:"🦉",n:"フクロ博士",c:"#7B61C9"},
+  chale:{e:"⚡",n:"チャレ",c:"#E8B83E"},
+  ame:{e:"🌧",n:"アメフリ",c:"#929B95"},
+};
+function pickInvestNavi(gp, holdDays, concentrated, has, rot){
+  const pick=(arr)=>arr[rot%arr.length];
+  if(!has) return {...INVEST_NAVI.chale, line:"いこうぜ！でも“なくなってもいい分だけ”な。まずは ひとつ タネをまこう。"};
+  if(gp<=-10) return {...INVEST_NAVI.ame, line:pick(["大きな雨だね。こわいよね。でも ひとりじゃないよ、いっしょに待とう。","たくさん下がったね。でも じぶんのせいじゃないよ。みんなにふる雨だから。"])};
+  if(gp<-3) return {...INVEST_NAVI.ame, line:pick(["雨の日もあるよ。畑は枯れてないよ。","下がってるね。でもね、雨は かならず あがるよ。"])};
+  if(gp>=20) return {...INVEST_NAVI.kotsu, line:pick(["すごいね、育ってる。でも あわてなくていいよ。","ここまで きたね。つづけてきた おかげだよ。"])};
+  if(concentrated) return {...INVEST_NAVI.garu, line:"ひとつに ぜんぶ かけちゃダメ。ちらして まもろう。"};
+  if(holdDays>=30) return {...INVEST_NAVI.kotsu, line:"ずっと つづけてるね。それが いちばん つよいやり方だよ。"};
+  return pick([
+    {...INVEST_NAVI.fukuro, line:"なんで 上がったり 下がったり するのかな？理由を 見るのが 投資だよ。"},
+    {...INVEST_NAVI.garu, line:"いろんな タネを まくと、ぜんぶ いっぺんに しおれにくいよ。"},
+    {...INVEST_NAVI.kotsu, line:"ゆっくりで いいよ。畑は 1日にして ならず、だよ。"},
+  ]);
+}
 function InvestTab({child,data,update}){
   const [investTab,setInvestTab]=useState("stocks"); // stocks | forex
   const [selected,setSelected]=useState(null);
@@ -8513,6 +8537,13 @@ function InvestTab({child,data,update}){
   const portfolioVal=myHoldings.reduce((s,h)=>{const st=stocks.find(x=>x.id===h.stockId);return s+(st?toPts(st,st.price)*h.qty:0);},0);
   const portfolioCost=myHoldings.reduce((s,h)=>s+h.avgPrice*h.qty,0);
   const portfolioGain=Math.round(portfolioVal*0.98)-portfolioCost; // 今売ったら戻るpt基準(手数料2%込)
+  // ナビ・タネモンの語り(ポートフォリオ全体の状態で出し分け)
+  const naviGainPct = portfolioCost>0?portfolioGain/portfolioCost*100:0;
+  const holdMaxDays = myHoldings.reduce((mx,h)=>{const d=h.firstBuyDate?(Date.now()-new Date(h.firstBuyDate).getTime())/86400000:0;return d>mx?d:mx;},0);
+  const topShare = portfolioVal>0?myHoldings.reduce((mx,h)=>{const st=stocks.find(x=>x.id===h.stockId);const v=st?toPts(st,st.price)*h.qty/portfolioVal:0;return v>mx?v:mx;},0):0;
+  const navi = pickInvestNavi(naviGainPct, holdMaxDays, topShare>0.6 && myHoldings.length>1, myHoldings.length>0, Math.floor(Date.now()/10000));
+  // 畑ビュー: 銘柄の含み損益で 作物の育ち(土→芽→葉→花/雨)を出す
+  const cropEmoji = (gp)=> gp==null?"🟫" : gp>=10?"🌸" : gp>=3?"🌿" : gp>=-3?"🌱" : "🌧";
   const selStock=stocks.find(s=>s.id===selected);
   const selHolding=myHoldings.find(h=>h.stockId===selected);
   const qtyN=Math.max(0.1,Math.round((parseFloat(qty)||0.1)*10)/10);
@@ -8673,11 +8704,17 @@ function InvestTab({child,data,update}){
               {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=toPts(st,st.price)*h.qty/total*100;return<div key={h.stockId} style={{width:`${pct}%`,background:colors[st.ticker]||"#4a9eff",minWidth:3}}/>;  })}
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>
-              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><div style={{width:8,height:8,borderRadius:2,background:colors[st.ticker]||"#4a9eff"}}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
+              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;const cg=cropEmoji((toPts(st,st.price)-h.avgPrice)/Math.max(1,h.avgPrice)*100);return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{fontSize:13}}>{cg}</span><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
             </div>
           </>);
         })()}
         <div style={{marginTop:8,color:"#aaa",fontSize:11}}>💰 残高: <span style={{color:"#fff",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
+      </div>
+
+      {/* 🗣 ナビ・タネモンの語り(いろんな視点で投資を語る・損は責めない) */}
+      <div style={{display:"flex",alignItems:"flex-start",gap:9,background:CARD,border:`1.5px solid ${navi.c}40`,borderLeft:`4px solid ${navi.c}`,borderRadius:12,padding:"9px 12px",marginBottom:12}}>
+        <span style={{fontSize:22,lineHeight:1.1}}>{navi.e}</span>
+        <div style={{flex:1,minWidth:0}}><div style={{fontSize:10,fontWeight:800,color:navi.c,marginBottom:1}}>{navi.n}</div><div style={{fontSize:12,color:TEXT,fontWeight:700,lineHeight:1.5}}>{navi.line}</div></div>
       </div>
 
       {/* 銘柄一覧 */}
