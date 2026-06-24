@@ -8262,6 +8262,7 @@ function ForexSection({data, update, child}){
   const [selected, setSelected] = useState(null);
   const [tradeMode, setTradeMode] = useState("buy"); // buy | sell
   const [tradeAmt, setTradeAmt] = useState(""); // 外貨の金額
+  const [fxFlash, setFxFlash] = useState(null);   // 売買トースト
   const myBal = bal(data.logs, child?.id||"");
 
   const FOREX_BUY_FEE  = 0.005; // 買い手数料0.5%
@@ -8290,6 +8291,8 @@ function ForexSection({data, update, child}){
       }
     }));
     addLogToFirestore(entry);
+    setFxFlash({msg:`💱 ${fx.flag}${fx.code} ${amt} こうにゅう！`,color:"#22c55e"});
+    setTimeout(()=>setFxFlash(null),1700);
     setTradeAmt("");
   };
 
@@ -8313,6 +8316,8 @@ function ForexSection({data, update, child}){
       }
     }));
     addLogToFirestore(entry);
+    setFxFlash({msg:`💱 ${fx.flag}${fx.code} ${amt} 売却 +${earnPts.toLocaleString()}pt`,color:"#E8B83E"});
+    setTimeout(()=>setFxFlash(null),1700);
     setTradeAmt("");
   };
 
@@ -8333,6 +8338,11 @@ function ForexSection({data, update, child}){
 
   return(
     <div>
+      {fxFlash&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1400,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
+          <div style={{marginTop:14,background:fxFlash.color,color:"#fff",fontWeight:900,fontSize:14,padding:"11px 20px",borderRadius:14,boxShadow:"0 8px 24px rgba(0,0,0,.35)"}}>{fxFlash.msg}</div>
+        </div>
+      )}
       {/* 外貨ポートフォリオカード（常時表示） */}
       <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:20,padding:18,marginBottom:14,color:"#fff"}}>
         <p style={{color:"#aaa",fontSize:12,fontWeight:700,margin:"0 0 4px"}}>💱 外貨ポートフォリオ</p>
@@ -8510,6 +8520,7 @@ function InvestTab({child,data,update}){
   const [tradeComment,setTradeComment]=useState("");
   const [showChart,setShowChart]=useState(null);
   const [showShare,setShowShare]=useState(false);
+  const [tradeFlash,setTradeFlash]=useState(null);   // 売買の気持ちいい完了トースト
   const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
@@ -8541,16 +8552,28 @@ function InvestTab({child,data,update}){
       const commentPart=tradeComment?` ・ ${tradeComment}`:"";
       return{...d,holdings:{...(d.holdings||{}),[child.id]:newH},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_buy",label:`📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 購入${commentPart}`,pts:-costPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()};
     });
+    setTradeFlash({msg:`📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 ゲット！`,color:"#22c55e"});
+    setTimeout(()=>setTradeFlash(null),1700);
     setQty("0.1");setSelected(null);setTradeComment("");
   }
   function doSell(){
     if(!selStock||!selHolding||qtyN<0.1||qtyN>selHolding.qty) return;
     if(!txGuard("sell_"+child.id)) return;   // 連打ガード(二重売却防止)
+    const _profit=Math.round(sellPts-(selHolding?selHolding.avgPrice*qtyN:0));
+    setTradeFlash(_profit>=0?{msg:`💰 +${_profit.toLocaleString()}pt 確定！`,color:"#E8B83E"}:{msg:`📉 ${_profit.toLocaleString()}pt 売却。つぎ いこう！`,color:"#D95C55"});
+    setTimeout(()=>setTradeFlash(null),1700);
     update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
 
   return(<div style={{padding:"12px 16px",paddingBottom:32}}>
+    {/* 売買の気持ちいい完了トースト(上から落ちて消える) */}
+    {tradeFlash&&(
+      <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1400,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
+        <div style={{marginTop:14,background:tradeFlash.color,color:"#fff",fontWeight:900,fontSize:14,padding:"11px 20px",borderRadius:14,boxShadow:"0 8px 24px rgba(0,0,0,.35)",animation:"tradePop .3s cubic-bezier(.34,1.56,.64,1)"}}>{tradeFlash.msg}</div>
+        <style>{`@keyframes tradePop{0%{transform:translateY(-24px);opacity:0}100%{transform:translateY(0);opacity:1}}`}</style>
+      </div>
+    )}
     {/* ポートフォリオ シェアモーダル */}
     {showShare&&(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowShare(false)}>
@@ -8653,8 +8676,10 @@ function InvestTab({child,data,update}){
         <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
-          <div><span style={{color:"#aaa",fontSize:11}}>損益 </span><span style={{fontWeight:700,fontSize:13,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"+":""}{portfolioGain.toLocaleString()}pt</span></div>
+          <div><span style={{color:"#aaa",fontSize:11}}>損益 </span><span style={{fontWeight:700,fontSize:13,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"+":""}{portfolioGain.toLocaleString()}pt</span>{myHoldings.length>0&&(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const lab=gp>=10?{t:"🚀 絶好調！",c:"#4ade80"}:gp>=0?{t:"🎉 いい調子！",c:"#4ade80"}:gp>=-5?{t:"😌 まだ大丈夫",c:"#ccc"}:{t:"🌱 長期目線で！",c:"#f5c842"};return <span style={{marginLeft:6,fontSize:11,fontWeight:800,color:lab.c}}>{lab.t}</span>;})()}</div>
         </div>
+        {/* 🌱 ポートフォリオが育つ畑(保有数・含み益で 土→芽→葉→花) */}
+        {(()=>{const cnt=myHoldings.length;const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const st=cnt===0?{e:"🟫",t:"タネをまこう（株を買ってみよう）"}:gp>=10?{e:"🌸",t:"含み益で 花が さいた！"}:cnt>=3?{e:"🌿",t:`${cnt}銘柄を そだて中！`}:{e:"🌱",t:`${cnt}銘柄を そだて中`};return(<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:myHoldings.length>0?12:0,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"7px 11px"}}><span style={{fontSize:24}}>{st.e}</span><span style={{fontSize:11.5,color:"#cfe9d6",fontWeight:700}}>{st.t}</span></div>);})()}
         {myHoldings.length>0&&(()=>{
           const total=portfolioVal||1;
           const colors={"7974.T":"#e4002b","6758.T":"#003087","7203.T":"#eb0a1e","MCD":"#ffc72c","AAPL":"#999"};
@@ -8750,6 +8775,8 @@ function InvestTab({child,data,update}){
               <div style={{flex:1}}><div style={{fontWeight:900,fontSize:14,color:"#fff"}}>{selStock.name}</div><div style={{color:"#aaa",fontSize:11}}>{fmtPrice(selStock)} = {toPts(selStock,selStock.price).toLocaleString()}pt/株</div></div>
               <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:"#aaa",fontSize:18,cursor:"pointer"}}>✕</button>
             </div>
+            {/* 🌱 タネモンのひとこと(値動きに応じて問いかけ＝考える習慣) */}
+            {(()=>{const lc=selStock.lastChange||0;const c=lc>3?"きょうは 元気だね！高いときの 買いすぎ 注意！":lc>0?"少し 上がってるよ。どうする？":lc>-3?"下がってるけど、長く 持てば どうなるかな？":"大きく 下がってる！チャンス？リスク？かんがえてみて";return(<div style={{display:"flex",alignItems:"flex-start",gap:7,background:"rgba(52,199,123,0.14)",border:"1px solid rgba(52,199,123,0.3)",borderRadius:12,padding:"8px 11px",marginBottom:12}}><span style={{fontSize:16,lineHeight:1.2}}>🌱</span><span style={{fontSize:12,color:"#bff0c8",fontWeight:700,lineHeight:1.5}}>{c}</span></div>);})()}
             <div style={{display:"flex",gap:0,background:"#0d0d1a",borderRadius:10,overflow:"hidden",marginBottom:12}}>
               {["buy","sell"].map(m=><button key={m} onClick={()=>{setMode(m);setQty("0.1");setTradeComment("");}} style={{flex:1,padding:"9px 0",border:"none",background:mode===m?(m==="buy"?"#22c55e":"#ef4444"):"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>{m==="buy"?"買う":"売る"}</button>)}
             </div>
