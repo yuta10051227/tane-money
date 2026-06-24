@@ -8571,6 +8571,17 @@ function ForexSection({data, update, child}){
 
 
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
+// 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
+const CROP_ART = { s5:"crop_apple" };
+function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
+function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
+function CropArt({stockId, stage, emoji, size}){
+  const pre=CROP_ART[stockId];
+  if(!pre) return <span style={{fontSize:size}}>{emoji}</span>;
+  const file = stage==="seed" ? `${pre}_seed` : `${pre}_${stage}`;
+  return <img src={`/assets/${file}.png`} alt="" style={{width:size,height:size,objectFit:"contain",imageRendering:"pixelated",verticalAlign:"middle"}}
+    onError={e=>{const s=document.createElement("span");s.textContent=emoji;s.style.fontSize=Math.round(size*0.82)+"px";e.target.replaceWith(s);}}/>;
+}
 const INVEST_NAVI = {
   kotsu:{e:"🌲",n:"コツメ",c:"#34C77B"},
   garu:{e:"🐉",n:"ガルド",c:"#3478D4"},
@@ -8824,7 +8835,7 @@ function InvestTab({child,data,update}){
               {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=toPts(st,st.price)*h.qty/total*100;return<div key={h.stockId} style={{width:`${pct}%`,background:colors[st.ticker]||"#4a9eff",minWidth:3}}/>;  })}
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>
-              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;const cg=cropEmoji((toPts(st,st.price)-h.avgPrice)/Math.max(1,h.avgPrice)*100);return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><span style={{fontSize:13}}>{cg}</span><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
+              {myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);if(!st)return null;const pct=Math.round(toPts(st,st.price)*h.qty/total*100);const fq=h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`;const cg=cropEmoji((toPts(st,st.price)-h.avgPrice)/Math.max(1,h.avgPrice)*100);return(<div key={h.stockId} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}><CropArt stockId={st.id} stage={cropStageDays(holdDaysOf(h))} emoji={cg} size={20}/><span style={{color:"#ccc"}}>{st.emoji}{st.name} {fq}株 {pct}%</span></div>);})}
             </div>
           </>);
         })()}
@@ -8856,7 +8867,7 @@ function InvestTab({child,data,update}){
           <button onClick={()=>{setSelected(isSel?null:s.id);setMode("buy");setQty("0.1");setTradeComment("");}}
             style={{width:"100%",background:isSel?"#1a1a2e":CARD,border:`2px solid ${isSel?"#4a9eff":BORDER}`,borderRadius:18,padding:"12px 14px",cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .2s"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:26}}>{s.emoji}</span>
+              <CropArt stockId={s.id} stage={h?cropStageDays(holdDaysOf(h)):"seed"} emoji={s.emoji} size={40}/>
               <div style={{flex:1}}>
                 <div style={{fontWeight:800,fontSize:14,color:isSel?"#fff":TEXT}}>{s.name}</div>
                 <div style={{color:isSel?"#aaa":MUTED,fontSize:11}}>{s.sector}</div>
