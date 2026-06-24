@@ -8848,6 +8848,40 @@ function InvestTab({child,data,update}){
         <div style={{marginTop:8,color:"#aaa",fontSize:11}}>💰 残高: <span style={{color:"#fff",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
       </div>
 
+      {/* 🌾 畑ビュー：保有銘柄が作物として畑に並ぶ（タップで種まき/手入れ） */}
+      {(()=>{
+        const has=myHoldings.length>0;
+        const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
+        const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
+        return(
+          <div style={{position:"relative",borderRadius:16,overflow:"hidden",marginBottom:12,border:`2px solid ${G}`,boxShadow:SHADOW}}>
+            <div style={{height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",paddingLeft:10}}>
+              <span style={{fontSize:11,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.6)",borderRadius:8,padding:"2px 8px"}}>🪵 きみの はたけ</span>
+            </div>
+            <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"56px",imageRendering:"pixelated",padding:"8px 8px 10px",display:"flex",gap:6,alignItems:"flex-end",overflowX:"auto"}}>
+              {stocks.map(s=>{
+                const h=myHoldings.find(x=>x.stockId===s.id);
+                const held=!!h; const days=holdDaysOf(h); const stage=cropStageDays(days);
+                const fq=held?(h.qty%1===0?`${h.qty}`:`${h.qty.toFixed(1)}`):"";
+                return(
+                  <button key={s.id} onClick={()=>{setSelected(s.id);setMode(held?"sell":"buy");setQty("0.1");setTradeComment("");}}
+                    style={{flex:"0 0 auto",width:62,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                    <div style={{position:"relative",width:56,height:56,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                      <img src={`/assets/${(held&&stage>=3)?"plot_ripe":"plot_empty"}.png`} alt="" style={{position:"absolute",bottom:0,left:3,width:50,height:50,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
+                      {held
+                        ? <div style={{position:"relative",zIndex:1,marginBottom:6}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={46}/></div>
+                        : <span style={{position:"relative",zIndex:1,marginBottom:13,fontSize:17,opacity:.8}}>➕</span>}
+                    </div>
+                    <span style={{fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 2px #000",whiteSpace:"nowrap"}}>{held?`${fq}株`:"まく"}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <img src="/assets/tanemon_water.png" alt="" style={{position:"absolute",right:5,bottom:3,width:40,height:40,objectFit:"contain",imageRendering:"pixelated",pointerEvents:"none"}} onError={e=>{e.target.style.display="none";}}/>
+          </div>
+        );
+      })()}
+
       {/* 🗣 ナビ・タネモンの語り(いろんな視点で投資を語る・損は責めない) */}
       <div style={{display:"flex",alignItems:"flex-start",gap:9,background:CARD,border:`1.5px solid ${navi.c}40`,borderLeft:`4px solid ${navi.c}`,borderRadius:12,padding:"9px 12px",marginBottom:12}}>
         {NAVI_ART[navi.e]
