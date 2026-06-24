@@ -7437,12 +7437,19 @@ function SeedMonster({ child, data, size=90, update }) {
     setTimeout(()=>setSpeech(null),2200);
   };
 
+  // 含み益でタネモン変化: 投資が好調(含み益+10%以上)なら相棒に💹バッジ＋ほんのり光る(損では何もしない=健全)
+  const _invH=(data.holdings||{})[child.id]||[]; const _invStocks=data.stocks||[];
+  const _invToPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
+  const _invVal=_invH.reduce((s,h)=>{const st=_invStocks.find(x=>x.id===h.stockId);return s+(st?_invToPts(st,st.price)*h.qty:0);},0);
+  const _invCost=_invH.reduce((s,h)=>s+h.avgPrice*h.qty,0);
+  const invThriving = _invCost>0 && (_invVal*0.98-_invCost)/_invCost >= 0.1;
   const accessories = [
+    invThriving      ? {emoji:"💹",bg:GS,   pos:{top:16,right:-8}}   : null,
     goodCount>=100   ? {emoji:"🏆",bg:GOLDS,pos:{top:-6,right:-6}}  : null,
     maxStreak>=7     ? {emoji:"⚡",bg:BS,   pos:{top:-6,left:-6}}   : null,
     badgeCount>=5    ? {emoji:"📚",bg:PS,   pos:{bottom:6,left:-6}} : null,
     myBal>=5000      ? {emoji:"💎",bg:BS,   pos:{bottom:6,right:-6}}: null,
-  ].filter(Boolean).slice(0,3);
+  ].filter(Boolean).slice(0,4);
 
   const evoPct       = mon.growthPct;
   const evoRemaining = mon.growthRemain;
@@ -7488,7 +7495,7 @@ function SeedMonster({ child, data, size=90, update }) {
           <div style={{
             animation:hatching?"shk 0.3s ease-in-out infinite":evolving?"evoFlash 0.35s ease-in-out infinite":"monBreathe 3.5s ease-in-out infinite",
             cursor:"pointer",display:"inline-block",userSelect:"none",position:"relative",
-            filter:hatching?"none":evolving?"brightness(2.5) saturate(0.2)":"none",  // ハッチ中はヒビを見せる(白飛びさせない)
+            filter:hatching?"none":evolving?"brightness(2.5) saturate(0.2)":(invThriving?"drop-shadow(0 0 7px rgba(52,199,123,.85))":"none"),  // ハッチ中はヒビを見せる/投資好調はほんのり緑に光る
             transition:"filter 0.4s",
           }}>
             <div style={{position:"relative",width:size,height:size}}>
@@ -8527,6 +8534,7 @@ function InvestTab({child,data,update}){
   const [showChart,setShowChart]=useState(null);
   const [showShare,setShowShare]=useState(false);
   const [tradeFlash,setTradeFlash]=useState(null);   // 売買の気持ちいい完了トースト
+  const [harvestBurst,setHarvestBurst]=useState(null);   // 利益確定の全画面・収穫バースト
   const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
@@ -8544,6 +8552,8 @@ function InvestTab({child,data,update}){
   const navi = pickInvestNavi(naviGainPct, holdMaxDays, topShare>0.6 && myHoldings.length>1, myHoldings.length>0, Math.floor(Date.now()/10000));
   // 畑ビュー: 銘柄の含み損益で 作物の育ち(土→芽→葉→花/雨)を出す
   const cropEmoji = (gp)=> gp==null?"🟫" : gp>=10?"🌸" : gp>=3?"🌿" : gp>=-3?"🌱" : "🌧";
+  // 配当ごはん: 配当が相棒の育てた度に変わった量(可視化用・getMonStateと同じ上限30)
+  const divFed = Math.min(30, (data.logs||[]).filter(l=>l.cid===child.id && l.type==="interest" && /配当/.test(l.label||"")).length);
   const selStock=stocks.find(s=>s.id===selected);
   const selHolding=myHoldings.find(h=>h.stockId===selected);
   const qtyN=Math.max(0.1,Math.round((parseFloat(qty)||0.1)*10)/10);
@@ -8575,6 +8585,7 @@ function InvestTab({child,data,update}){
     const _profit=Math.round(sellPts-(selHolding?selHolding.avgPrice*qtyN:0));
     setTradeFlash(_profit>=0?{msg:`🌾 +${_profit.toLocaleString()}pt 収穫！豊作だね！`,color:"#E8B83E"}:{msg:`🌱 ${_profit.toLocaleString()}pt 収穫。また たねを まこう！`,color:"#D95C55"});
     setTimeout(()=>setTradeFlash(null),1700);
+    if(_profit>=0){ setHarvestBurst(_profit); setTimeout(()=>setHarvestBurst(null),900); }
     update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
@@ -8585,6 +8596,14 @@ function InvestTab({child,data,update}){
       <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1400,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
         <div style={{marginTop:14,background:tradeFlash.color,color:"#fff",fontWeight:900,fontSize:14,padding:"11px 20px",borderRadius:14,boxShadow:"0 8px 24px rgba(0,0,0,.35)",animation:"tradePop .3s cubic-bezier(.34,1.56,.64,1)"}}>{tradeFlash.msg}</div>
         <style>{`@keyframes tradePop{0%{transform:translateY(-24px);opacity:0}100%{transform:translateY(0);opacity:1}}`}</style>
+      </div>
+    )}
+    {/* 🌾 収穫フラッシュ(利益確定の全画面バースト) */}
+    {harvestBurst!=null&&(
+      <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",background:"radial-gradient(circle at 50% 45%,rgba(232,184,62,.35),rgba(52,199,123,.18) 55%,transparent 75%)"}}>
+        <div style={{fontSize:72,animation:"harvestBurst .9s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾</div>
+        <div style={{marginTop:6,fontSize:24,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst .9s .05s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.toLocaleString()}pt 収穫！</div>
+        <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(0deg);opacity:0}55%{transform:scale(1.2) rotate(180deg);opacity:1}100%{transform:scale(1) rotate(360deg);opacity:0}}`}</style>
       </div>
     )}
     {/* ポートフォリオ シェアモーダル */}
@@ -8716,6 +8735,14 @@ function InvestTab({child,data,update}){
         <span style={{fontSize:22,lineHeight:1.1}}>{navi.e}</span>
         <div style={{flex:1,minWidth:0}}><div style={{fontSize:10,fontWeight:800,color:navi.c,marginBottom:1}}>{navi.n}</div><div style={{fontSize:12,color:TEXT,fontWeight:700,lineHeight:1.5}}>{navi.line}</div></div>
       </div>
+
+      {/* 🍙 配当ごはん: 配当が相棒の育てた度になっている可視化 */}
+      {divFed>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:8,background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"8px 12px",marginBottom:12}}>
+          <span style={{fontSize:18}}>🍙</span>
+          <span style={{fontSize:11.5,color:"#8a6a00",fontWeight:800,lineHeight:1.5}}>長く持った配当が 相棒の ごはんに！（育てた度 +{divFed}）</span>
+        </div>
+      )}
 
       {/* 銘柄一覧 */}
       <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>🌾 畑にまける タネ（銘柄・毎日更新）</p>
