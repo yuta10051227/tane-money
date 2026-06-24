@@ -635,12 +635,11 @@ function Panel({ title, accent, right, help, children }) {
         marginBottom: 16,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 14, gap: 8 }}>
-        <span style={{ width: 8, height: 20, borderRadius: 4, background: accent || C.accent }} />
-        <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: 0.4, margin: 0 }}>{title}</h2>
+      <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
+        <span style={{ width: 8, height: 20, borderRadius: 4, background: accent || C.accent, flex: "0 0 auto", marginTop: 2 }} />
+        <h2 style={{ fontSize: 17, fontWeight: 700, letterSpacing: 0.4, margin: 0, flex: "1 1 auto", minWidth: 0, overflowWrap: "anywhere" }}>{title}</h2>
         {help && <Help text={help} />}
-        <span style={{ flex: 1 }} />
-        {right}
+        {right && <div style={{ marginLeft: "auto", flex: "0 0 auto" }}>{right}</div>}
       </div>
       {children}
     </section>
@@ -5709,13 +5708,14 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, 'Hiragino Sans', sans-serif", overflowX: "hidden" }}>
       {/* ヘッダー＋タブバー */}
       <header style={{ position: "sticky", top: 0, zIndex: 10, background: C.bg, borderBottom: `1px solid ${C.line}`, padding: "10px 14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <strong style={{ fontSize: 16, letterSpacing: 1 }}>ひとり秘書</strong>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
-          <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
-          <button onClick={() => update({ theme: data.theme === "light" ? "dark" : "light" })} title="背景の明るさを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>{data.theme === "light" ? "🌙暗くする" : "🌞明るくする"}</button>
-          {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 16, letterSpacing: 1, flex: "0 0 auto", whiteSpace: "nowrap" }}>ひとり秘書</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: 12, color: C.sub }}>{dateLabel}</span>
+            <button onClick={cycleFont} title="文字サイズを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>文字{fontLabel}</button>
+            <button onClick={() => update({ theme: data.theme === "light" ? "dark" : "light" })} title="背景の明るさを変える" style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto", border: `1px solid ${C.line}`, borderRadius: 8 }}>{data.theme === "light" ? "🌙暗くする" : "🌞明るくする"}</button>
+            {firebaseEnabled && <button onClick={logout} style={{ ...iconBtn, fontSize: 12, padding: "4px 8px", width: "auto" }}>ログアウト</button>}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
           {TABS.map((t) => (
