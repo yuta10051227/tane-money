@@ -3336,6 +3336,51 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   </div>
                 )}
               </div>
+              {/* 投資ワールド設定: 投資のON/OFF・為替だけOFF・1日の売買回数(小中向けに親が手綱を握れる) */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>投資ワールド（畑）</div>
+                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>株や為替の体験を どこまで見せるか。お金はポイントで、実際のお金は動きません。</div>
+                {/* 投資ワールド ON/OFF */}
+                <div style={{display:"flex",alignItems:"center",gap:12,paddingBottom:10,borderBottom:`1px solid ${BORDER}`}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>投資ワールドを見せる</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>OFFにすると 畑（株・為替）を まるごと非表示に</div>
+                  </div>
+                  <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),investOff:!(d.familySettings?.investOff)}}))}
+                    style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.investOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
+                    <div style={{position:"absolute",top:3,left:(!fs.investOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                  </button>
+                </div>
+                {/* 為替だけ OFF (株はOKだが値動きの激しい為替は隠す) */}
+                {!fs.investOff && (
+                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:800,fontSize:13,color:TEXT}}>為替（かわせ）を見せる</div>
+                      <div style={{color:MUTED,fontSize:11,marginTop:2}}>為替は値動きが激しめ。株だけにしたいときはOFFに</div>
+                    </div>
+                    <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),forexOff:!(d.familySettings?.forexOff)}}))}
+                      style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.forexOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
+                      <div style={{position:"absolute",top:3,left:(!fs.forexOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                    </button>
+                  </div>
+                )}
+                {/* 1日の売買回数(張り付き・回転売買の防止) */}
+                {!fs.investOff && (
+                  <div style={{marginTop:10}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>1日の売り買い回数</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:8}}>何度も売り買い（回転売買）が気になるときに上限を。投資は「待つ」のが学びです。</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {[{v:0,t:"なし"},{v:1,t:"1回"},{v:3,t:"3回"},{v:5,t:"5回"}].map(o=>{
+                        const sel=((fs.dailyTradeLimit)||0)===o.v;
+                        return (
+                          <button key={o.v} onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),dailyTradeLimit:o.v}}))}
+                            style={{flex:1,minWidth:56,background:sel?GP:CARD,border:sel?`2px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 4px",color:sel?"#fff":TEXT,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{o.t}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
               {/* 承認通知 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -4505,8 +4550,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </>}
       </>}
 
-      {/* ── ACTIVITY サブナビ ── */}
-      {effectiveTab==="activity"&&!isJunior&&!young&&(
+      {/* ── ACTIVITY サブナビ ──（投資ワールドが保護者設定でOFFのときは投資/為替タブごと隠す） */}
+      {effectiveTab==="activity"&&!isJunior&&!young&&!data.familySettings?.investOff&&(
         <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
           {[["tasks","✅ タスク"],["invest","📈 投資/為替"]].map(([v,l])=>(
             <button key={v} onClick={()=>setActTab(v)}
@@ -4518,7 +4563,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── ACTIVITY ── */}
-      {effectiveTab==="activity"&&(actTab==="tasks"||young)&&(()=>{
+      {effectiveTab==="activity"&&(actTab==="tasks"||young||data.familySettings?.investOff)&&(()=>{
         return(<div style={{padding:16}}>
           <TabHint id="tasks" text="やったお手伝いをタップして記録しよう！✏リスト編集で自分用のタスクを選べるよ" data={data} update={update} cid={child.id}/>
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
@@ -4555,7 +4600,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           )}
         </div>);
       })()}
-      {effectiveTab==="activity"&&actTab==="invest"&&!young&&<InvestTab child={child} data={data} update={update}/>}
+      {effectiveTab==="activity"&&actTab==="invest"&&!young&&!data.familySettings?.investOff&&<InvestTab child={child} data={data} update={update}/>}
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
@@ -7437,14 +7482,12 @@ function SeedMonster({ child, data, size=90, update }) {
     setTimeout(()=>setSpeech(null),2200);
   };
 
-  // 含み益でタネモン変化: 投資が好調(含み益+10%以上)なら相棒に💹バッジ＋ほんのり光る(損では何もしない=健全)
-  const _invH=(data.holdings||{})[child.id]||[]; const _invStocks=data.stocks||[];
-  const _invToPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
-  const _invVal=_invH.reduce((s,h)=>{const st=_invStocks.find(x=>x.id===h.stockId);return s+(st?_invToPts(st,st.price)*h.qty:0);},0);
-  const _invCost=_invH.reduce((s,h)=>s+h.avgPrice*h.qty,0);
-  const invThriving = _invCost>0 && (_invVal*0.98-_invCost)/_invCost >= 0.1;
+  // タネモン変化: 含み益(上がってる=正義)ではなく「長く持てている=辛抱」を称える(射幸性カット/健全)
+  const _invH=(data.holdings||{})[child.id]||[];
+  const _invHeldMax=_invH.reduce((mx,h)=>{const d=h.firstBuyDate?(Date.now()-new Date(h.firstBuyDate).getTime())/86400000:0;return d>mx?d:mx;},0);
+  const invThriving = _invHeldMax>=30;   // 30日以上 持ち続けている相棒は ほんのり光る＋🌳バッジ
   const accessories = [
-    invThriving      ? {emoji:"💹",bg:GS,   pos:{top:16,right:-8}}   : null,
+    invThriving      ? {emoji:"🌳",bg:GS,   pos:{top:16,right:-8}}   : null,
     goodCount>=100   ? {emoji:"🏆",bg:GOLDS,pos:{top:-6,right:-6}}  : null,
     maxStreak>=7     ? {emoji:"⚡",bg:BS,   pos:{top:-6,left:-6}}   : null,
     badgeCount>=5    ? {emoji:"📚",bg:PS,   pos:{bottom:6,left:-6}} : null,
@@ -8262,9 +8305,16 @@ function ForexSection({data, update, child}){
   // 保有外貨
   const myForex = (data.forexHoldings||{})[child?.id||""]||{};
 
+  // 保護者設定: 1日の売買回数上限(株と為替の合算)
+  const _fxLimit=(data.familySettings?.dailyTradeLimit)||0;
+  const _fxTodayStr=new Date().toDateString();
+  const _fxTradesToday=(data.logs||[]).filter(l=>l.cid===(child?.id||"")&&(l.type==="invest_buy"||l.type==="invest_sell"||l.type==="forex_buy"||l.type==="forex_sell")&&new Date(l.date).toDateString()===_fxTodayStr).length;
+  const _fxLimitReached=_fxLimit>0&&_fxTradesToday>=_fxLimit;
+
   const doForexBuy = (fx) => {
     const amt = parseFloat(tradeAmt);
     if(!amt || amt <= 0 || !child) return;
+    if(_fxLimitReached){ alert("きょうの 売り買いは ここまで！また あした🌙"); return; }
     const rate = fx.price||0;
     const costPts = Math.ceil(amt * rate * (1 + FOREX_BUY_FEE));
     if(myBal < costPts) { alert("残高が足りないよ！"); return; }
@@ -8291,6 +8341,7 @@ function ForexSection({data, update, child}){
     const amt = parseFloat(tradeAmt);
     const held = myForex[fx.code]||0;
     if(!amt || amt <= 0 || amt > held || !child) return;
+    if(_fxLimitReached){ alert("きょうの 売り買いは ここまで！また あした🌙"); return; }
     if(!txGuard("fxsell_"+child.id)) return;   // 連打ガード(二重売却防止)
     const rate = fx.price||0;
     const earnPts = Math.floor(amt * rate * (1 - FOREX_SELL_FEE));
@@ -8538,6 +8589,13 @@ function InvestTab({child,data,update}){
   const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
+  // 保護者設定: 為替OFF / 1日の売買回数上限
+  const _fs=data.familySettings||{};
+  const forexOff=!!_fs.forexOff;
+  const tradeLimit=(_fs.dailyTradeLimit)||0;
+  const _todayStr=new Date().toDateString();
+  const tradesToday=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="invest_buy"||l.type==="invest_sell"||l.type==="forex_buy"||l.type==="forex_sell")&&new Date(l.date).toDateString()===_todayStr).length;
+  const tradeLimitReached=tradeLimit>0&&tradesToday>=tradeLimit;
   const stocks=data.stocks||[];
   const fetchStatus=data.stockFetchStatus||"idle";
   const fmtPrice=s=>s.currency==="USD"?`$${s.price.toFixed(2)}`:`¥${Math.round(s.price).toLocaleString()}`;
@@ -8565,6 +8623,7 @@ function InvestTab({child,data,update}){
   const fmtQty=q=>(q%1===0)?`${q}`:`${q.toFixed(1)}`;
   function doBuy(){
     if(!selStock||qtyN<0.1||myBal<costPts) return;
+    if(tradeLimitReached){ setTradeFlash({msg:`🌙 きょうの 売り買いは ここまで！また あした`,color:"#D95C55"}); setTimeout(()=>setTradeFlash(null),1900); return; }
     if(!txGuard("buy_"+child.id)) return;   // 連打ガード(二重購入防止)
     update(d=>{
       const existH=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
@@ -8581,11 +8640,15 @@ function InvestTab({child,data,update}){
   }
   function doSell(){
     if(!selStock||!selHolding||qtyN<0.1||qtyN>selHolding.qty) return;
+    if(tradeLimitReached){ setTradeFlash({msg:`🌙 きょうの 売り買いは ここまで！また あした`,color:"#D95C55"}); setTimeout(()=>setTradeFlash(null),1900); return; }
     if(!txGuard("sell_"+child.id)) return;   // 連打ガード(二重売却防止)
     const _profit=Math.round(sellPts-(selHolding?selHolding.avgPrice*qtyN:0));
-    setTradeFlash(_profit>=0?{msg:`🌾 +${_profit.toLocaleString()}pt 収穫！豊作だね！`,color:"#E8B83E"}:{msg:`🌱 ${_profit.toLocaleString()}pt 収穫。また たねを まこう！`,color:"#D95C55"});
+    const _invHeld=selHolding?.firstBuyDate?(Date.now()-new Date(selHolding.firstBuyDate).getTime())/86400000:0; // 保有日数(辛抱の度合い)
+    if(_profit>=0){ setTradeFlash(_invHeld>=30?{msg:`🌾 ${Math.floor(_invHeld)}日 そだてて 収穫！+${_profit.toLocaleString()}pt`,color:"#E8B83E"}:{msg:`🌱 +${_profit.toLocaleString()}pt 収穫。長く そだてると もっと実るよ`,color:"#34C77B"}); }
+    else { setTradeFlash({msg:`🌱 ${_profit.toLocaleString()}pt 収穫。また たねを まこう！`,color:"#D95C55"}); }
     setTimeout(()=>setTradeFlash(null),1700);
-    if(_profit>=0){ setHarvestBurst(_profit); setTimeout(()=>setHarvestBurst(null),900); }
+    // 収穫フラッシュ(全画面)は「長く育てて勝てた=辛抱」のときだけ。短期の利確では出さない(射幸性カット)
+    if(_profit>=0 && _invHeld>=30){ setHarvestBurst({pts:_profit,days:Math.floor(_invHeld)}); setTimeout(()=>setHarvestBurst(null),1300); }
     update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
@@ -8598,12 +8661,14 @@ function InvestTab({child,data,update}){
         <style>{`@keyframes tradePop{0%{transform:translateY(-24px);opacity:0}100%{transform:translateY(0);opacity:1}}`}</style>
       </div>
     )}
-    {/* 🌾 収穫フラッシュ(利益確定の全画面バースト) */}
+    {/* 🌾 収穫フラッシュ：長く育てて勝てた時だけの「辛抱ごほうび」演出(射幸性カットのため利確即発火はしない) */}
     {harvestBurst!=null&&(
-      <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",background:"radial-gradient(circle at 50% 45%,rgba(232,184,62,.35),rgba(52,199,123,.18) 55%,transparent 75%)"}}>
-        <div style={{fontSize:72,animation:"harvestBurst .9s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾</div>
-        <div style={{marginTop:6,fontSize:24,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst .9s .05s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.toLocaleString()}pt 収穫！</div>
-        <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(0deg);opacity:0}55%{transform:scale(1.2) rotate(180deg);opacity:1}100%{transform:scale(1) rotate(360deg);opacity:0}}`}</style>
+      <div style={{position:"fixed",inset:0,zIndex:1500,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",background:"radial-gradient(circle at 50% 45%,rgba(232,184,62,.3),rgba(52,199,123,.16) 55%,transparent 75%)"}}>
+        <div style={{fontSize:64,animation:"harvestBurst 1.1s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾</div>
+        <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#8a6a00",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .04s cubic-bezier(.2,.9,.3,1.2) forwards"}}>{harvestBurst.days}日 そだてた ごほうび</div>
+        <div style={{marginTop:2,fontSize:22,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst 1.1s .08s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.pts.toLocaleString()}pt 収穫！</div>
+        <div style={{marginTop:2,fontSize:11,fontWeight:700,color:"#59645E",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .12s cubic-bezier(.2,.9,.3,1.2) forwards"}}>本物なら ≈{(harvestBurst.pts*100).toLocaleString()}円</div>
+        <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:0}}`}</style>
       </div>
     )}
     {/* ポートフォリオ シェアモーダル */}
@@ -8674,7 +8739,14 @@ function InvestTab({child,data,update}){
         </div>
       </div>
     )}
-    {/* タブ切替：株 / 為替 */}
+    {/* 1日の売り買い回数の残り（保護者設定時のみ） */}
+    {tradeLimit>0 && (
+      <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:tradeLimitReached?"#ffb4b4":"#bff0c8",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:"7px 12px",marginBottom:12}}>
+        {tradeLimitReached?"🌙 きょうの 売り買いは ここまで！また あした":`🌱 きょうの 売り買い のこり ${Math.max(0,tradeLimit-tradesToday)}回（保護者せってい）`}
+      </div>
+    )}
+    {/* タブ切替：株 / 為替（為替は保護者設定でOFFにできる） */}
+    {!forexOff && (
     <div style={{display:"flex",gap:0,background:"#1a1a2e",borderRadius:14,overflow:"hidden",marginBottom:14}}>
       {[["stocks","📈 株"],["forex","💱 為替"]].map(([v,l])=>(
         <button key={v} onClick={()=>setInvestTab(v)}
@@ -8683,10 +8755,11 @@ function InvestTab({child,data,update}){
         </button>
       ))}
     </div>
+    )}
 
-    {investTab==="forex"&&<ForexSection data={data} update={update} child={child}/>}
+    {!forexOff&&investTab==="forex"&&<ForexSection data={data} update={update} child={child}/>}
 
-    {investTab==="stocks"&&<>
+    {(forexOff||investTab==="stocks")&&<>
       {/* ステータスバー */}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         <div style={{flex:1,fontSize:11,color:fetchStatus==="ok"?"#4ade80":fetchStatus==="error"?"#f87171":MUTED,fontWeight:700}}>
@@ -8708,7 +8781,8 @@ function InvestTab({child,data,update}){
             <button onClick={()=>setShowShare(true)} style={{background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"4px 10px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸</button>
           </div>);})()}
         <div style={{fontSize:11,color:"#aaa",fontWeight:700,marginBottom:2}}>🌾 きみの畑（ポートフォリオ）</div>
-        <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
+        <div style={{fontSize:28,fontWeight:900,marginBottom:2}}>{portfolioVal.toLocaleString()}pt</div>
+        <div style={{fontSize:12,color:"#cfe9d6",fontWeight:700,marginBottom:4}}>💴 本物なら ≈{(portfolioVal*100).toLocaleString()}円（1pt=100円）</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
           <div><span style={{color:"#aaa",fontSize:11}}>損益 </span><span style={{fontWeight:700,fontSize:13,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"+":""}{portfolioGain.toLocaleString()}pt</span>{myHoldings.length>0&&(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const lab=gp>=10?{t:"🚀 絶好調！",c:"#4ade80"}:gp>=0?{t:"🎉 いい調子！",c:"#4ade80"}:gp>=-5?{t:"😌 まだ大丈夫",c:"#ccc"}:{t:"🌱 長期目線で！",c:"#f5c842"};return <span style={{marginLeft:6,fontSize:11,fontWeight:800,color:lab.c}}>{lab.t}</span>;})()}</div>
