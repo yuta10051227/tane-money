@@ -1339,11 +1339,11 @@ function ScheduleRow({ e, source, onSetCat, onSetAxis, writableIds, onEditEvent,
     );
   }
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
       <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 14, width: 46, flex: "0 0 auto", paddingTop: 1 }}>{e.time}</span>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 7 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, lineHeight: 1.35, color: isFamily ? C.sub : C.text }}>{e.title}</div>
+      <div style={{ flex: "1 1 150px", minWidth: 0 }}>
+        <div style={{ fontSize: 15, lineHeight: 1.4, overflowWrap: "anywhere", color: isFamily ? C.sub : C.text }}>{e.title}</div>
         <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {canCat ? (
             <button
@@ -1368,7 +1368,7 @@ function ScheduleRow({ e, source, onSetCat, onSetAxis, writableIds, onEditEvent,
         </div>
       </div>
       {editable && (
-        <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
+        <div style={{ display: "flex", gap: 2, flex: "0 0 auto", marginLeft: "auto" }}>
           <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✏️</button>
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
         </div>
@@ -1561,19 +1561,19 @@ function UpcomingRow({ e, writableIds, onEditEvent, onDeleteEvent, busy }) {
     );
   }
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-      <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 13, width: 78, flex: "0 0 auto", paddingTop: 1 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ fontVariantNumeric: "tabular-nums", color: C.sub, fontSize: 13, width: 70, flex: "0 0 auto", paddingTop: 1 }}>
         {e.start.getMonth() + 1}/{e.start.getDate()}({WD[e.start.getDay()]}){e.allDay ? "" : ` ${e.time}`}
       </span>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: catColor(e.cat), flex: "0 0 auto", marginTop: 6 }} />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 14, lineHeight: 1.35, color: e.role === "family" ? C.sub : C.text }}>{e.title}</span>
+      <span style={{ flex: "1 1 130px", minWidth: 0, fontSize: 14, lineHeight: 1.4, overflowWrap: "anywhere", color: e.role === "family" ? C.sub : C.text }}>{e.title}</span>
       {editable ? (
-        <>
+        <div style={{ display: "flex", flex: "0 0 auto", marginLeft: "auto" }}>
           <button onClick={startEdit} style={iconBtn} title="時間・内容を編集">✏️</button>
           <button onClick={() => onDeleteEvent(e.calendarId, e.id)} style={iconBtn} title="Googleカレンダーから削除">✕</button>
-        </>
+        </div>
       ) : (
-        <span style={{ fontSize: 12, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto" }}>{e.role === "family" ? "家族" : labelOf(e.cat)}</span>
+        <span style={{ fontSize: 12, color: catColor(e.cat), fontWeight: 700, flex: "0 0 auto", marginLeft: "auto", paddingTop: 2 }}>{e.role === "family" ? "家族" : labelOf(e.cat)}</span>
       )}
     </div>
   );
@@ -5728,7 +5728,7 @@ export default function App() {
         </div>
       </header>
 
-      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 18, boxSizing: "border-box", position: "relative", zoom: fontScale }}>
+      <main onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ width: `${100 / fontScale}%`, maxWidth: `${760 / fontScale}px`, margin: "0 auto", padding: 14, boxSizing: "border-box", position: "relative", zoom: fontScale }}>
         {!firebaseEnabled && (
           <div style={{ background: C.panel2, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: C.sub, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ color: C.accent }}>●</span>
