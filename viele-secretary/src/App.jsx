@@ -8,6 +8,7 @@ import { CALENDAR_SCOPE, fetchCalendarList, fetchEvents, classifyEvent, isNotabl
 import { revokeToken } from "./gauth";
 import { computeChart, dayEnergy, stancesFor, sanmei, sanmeiDetail, tenchusatsu, daiun, aishou, familyFortune, sanmeiUn, koyomi, koyomiMonth, bestDays, shugojin } from "./natal";
 import { initAnalytics, identifyUser, track, resetAnalytics } from "./analytics";
+import TimeTreeImport from "./TimeTreeImport";
 
 const STORE_KEY = "viele-secretary";
 
@@ -5399,6 +5400,19 @@ export default function App() {
   };
   const clearManual = () => { if (window.confirm("取り込んだ予定をすべて消去しますか？")) update({ manualEvents: [] }); };
 
+  // TimeTree移行用：スクショ1枚を既存の import-schedule(Gemini) で解析し、予定配列 [{date,time,title}] を返す。
+  // ※ manualEvents には保存せず、呼び出し側(TimeTreeImport)がGoogleカレンダーへ直接登録する。
+  const parseTimeTreeImage = async (file) => {
+    const dataUrl = await downscaleImage(file, 1280, 0.7);
+    const r = await authedFetch("/api/import-schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl, mime: "image/jpeg", today: iso(new Date()) }) });
+    const text = await r.text();
+    let j; try { j = JSON.parse(text); } catch { throw new Error("サーバーとの通信に失敗しました。"); }
+    if (j && j.quotaExceeded) throw new Error(j.error || "本日のAI利用上限に達しました。");
+    if (!r.ok || j.error) throw new Error("サーバーとの通信に失敗しました。");
+    if (j.aiEnabled === false) throw new Error("AI機能は現在オフです。");
+    return j.events || [];
+  };
+
   useEffect(() => {
     if (!data || fortuneRef.current) return;
     if (!(data.birth && data.birth.date)) return; // birth 未設定時は自動 fetch しない
@@ -5852,6 +5866,7 @@ export default function App() {
                 {usingCal && calList.length > 0 && <CalendarSettings calList={calList} roleForCal={roleForCal} onSetRole={setCalRole} onDisconnect={disconnectCalendar} catForCal={catForCal} onSetCat={setCalCat} />}
                 <CatLabelSettings labels={data.catLabels || {}} onChange={(l) => update({ catLabels: l })} />
                 <ScheduleImport importing={importing} msg={importMsg} count={(data.manualEvents || []).length} onPick={importSchedule} onClear={clearManual} />
+                <TimeTreeImport C={C} onParse={parseTimeTreeImage} />
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>表示するタブ</div>
                   <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>使わないタブは隠せます（データは消えません。あとでいつでも戻せます）。</div>

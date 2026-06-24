@@ -1,8 +1,10 @@
 // Googleカレンダー連携（クライアント側・複数カレンダー対応）。
-// Firebaseの Google ログインに calendar.readonly スコープを足して得たアクセストークンで
+// Firebaseの Google ログインに calendar スコープを足して得たアクセストークンで
 // Calendar REST API を直接叩く。バックエンド不要。トークンは短命(約1時間)。
+// 注: 書き込み(イベント作成)に対応するため calendar.readonly → calendar に拡張。
+//     既存ユーザーは初回の書き込み時に同意画面で再承認が必要。
 
-export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
 export const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -97,4 +99,49 @@ export async function fetchEvents(token, calendarId, timeMinISO, timeMaxISO) {
       startISO: e.start.dateTime || e.start.date,
       endISO: (e.end && (e.end.dateTime || e.end.date)) || null,
     }));
+}
+
+// イベントを1件作成（書き込み）。event は Calendar API の Events リソース形式。
+export async function createEvent(token, calendarId, event) {
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(event),
+    }
+  );
+  if (!res.ok) {
+    let d = ""; try { d = (await res.json())?.error?.message || ""; } catch { /* ignore */ }
+    throw apiError(res, d);
+  }
+  return res.json();
+}
+
+// 同タイトル・同日付の重複判定。dateStr は "YYYY-MM-DD"。
+// その日の範囲でイベントを引き、タイトル一致があれば true。判定不能時は false（登録を止めない）。
+export async function checkDuplicate(token, calendarId, title, dateStr) {
+  if (!dateStr) return false;
+  const timeMin = new Date(`${dateStr}T00:00:00`).toISOString();
+  const timeMax = new Date(`${dateStr}T23:59:59`).toISOString();
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: "true",
+    maxResults: "250",
+  });
+  let res;
+  try {
+    res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`,
+      AUTH(token)
+    );
+  } catch {
+    return false;
+  }
+  if (!res.ok) return false;
+  let j; try { j = await res.json(); } catch { return false; }
+  const norm = (s) => String(s || "").trim();
+  const target = norm(title);
+  return (j.items || []).some((e) => norm(e.summary) === target);
 }
