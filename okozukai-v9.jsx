@@ -8615,9 +8615,19 @@ function InvestTab({child,data,update}){
   const [showShare,setShowShare]=useState(false);
   const [tradeFlash,setTradeFlash]=useState(null);   // 売買の気持ちいい完了トースト
   const [harvestBurst,setHarvestBurst]=useState(null);   // 利益確定の全画面・収穫バースト
+  const [showDex,setShowDex]=useState(false);   // 収穫シール帳・作物図鑑
   const [shareCopied,setShareCopied]=useState(false);
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
+  // 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
+  const cropDex=(data.cropDex||{})[child.id]||{};
+  useEffect(()=>{
+    const cur={};
+    myHoldings.forEach(h=>{ if(CROP_ART[h.stockId]!==undefined){ const st=cropStageDays(holdDaysOf(h)); cur[h.stockId]=Math.max(cur[h.stockId]??-1, st); }});
+    const prev=(data.cropDex||{})[child.id]||{}; let changed=false; const next={...prev};
+    Object.entries(cur).forEach(([k,v])=>{ if((next[k]??-1)<v){ next[k]=v; changed=true; }});
+    if(changed) update(d=>({...d,cropDex:{...(d.cropDex||{}),[child.id]:next}}));
+  },[]);
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
   const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
@@ -8715,6 +8725,47 @@ function InvestTab({child,data,update}){
         <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:0}}`}</style>
       </div>
     )}
+    {/* 📖 収穫シール帳・作物図鑑 */}
+    {showDex&&(()=>{
+      const STAGES=[{k:"seed",th:0,l:"たね"},{k:"0",th:0,l:"め"},{k:"1",th:1,l:"なえ"},{k:"2",th:2,l:"はな"},{k:"3",th:3,l:"みのり"}];
+      const dexStocks=stocks.filter(s=>CROP_ART[s.id]!==undefined);
+      let got=0,total=0;
+      dexStocks.forEach(s=>{const mx=cropDex[s.id]??-1;STAGES.forEach(st=>{total++;if(mx>=st.th&&mx>=0)got++;});});
+      return(
+      <div onClick={()=>setShowDex(false)} style={{position:"fixed",inset:0,zIndex:1450,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:BG,borderRadius:20,padding:"16px 14px",maxWidth:380,width:"100%",maxHeight:"86vh",overflowY:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.4)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <img src="/assets/album_icon.png" alt="" style={{width:30,height:30,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";s.style.fontSize="24px";e.target.replaceWith(s);}}/>
+            <div style={{flex:1}}><div style={{fontWeight:900,fontSize:16,color:GP}}>さくもつ ずかん</div><div style={{fontSize:11,fontWeight:800,color:TEXTS}}>そだてた さくもつを あつめよう（{got}/{total}）</div></div>
+            <button onClick={()=>setShowDex(false)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
+          </div>
+          {dexStocks.map(s=>{
+            const mx=cropDex[s.id]??-1;
+            return(
+              <div key={s.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"9px 10px",marginTop:10}}>
+                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:6}}>{s.emoji} {s.name}</div>
+                <div style={{display:"flex",gap:5,justifyContent:"space-between"}}>
+                  {STAGES.map(st=>{
+                    const ok=mx>=0&&mx>=st.th;
+                    const frame=ok?(st.k==="3"?"collect_shiny":"collect_slot"):"collect_locked";
+                    return(
+                      <div key={st.k} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                        <div style={{position:"relative",width:54,height:54,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <img src={`/assets/${frame}.png`} alt="" style={{position:"absolute",inset:0,width:54,height:54,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
+                          {ok&&<div style={{position:"relative",zIndex:1}}><CropArt stockId={s.id} stage={st.k} emoji={s.emoji} size={32}/></div>}
+                        </div>
+                        <span style={{fontSize:9,fontWeight:800,color:ok?GP:MUTED}}>{ok?st.l:"？"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          <div style={{fontSize:10.5,color:MUTED,fontWeight:700,textAlign:"center",marginTop:12,lineHeight:1.6}}>長く そだてるほど 上の シールが もらえるよ🌱<br/>うっても シールは きえないよ</div>
+        </div>
+      </div>);
+    })()}
     {/* ポートフォリオ シェアモーダル */}
     {showShare&&(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowShare(false)}>
@@ -8855,8 +8906,12 @@ function InvestTab({child,data,update}){
         const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
         return(
           <div style={{position:"relative",borderRadius:16,overflow:"hidden",marginBottom:12,border:`2px solid ${G}`,boxShadow:SHADOW}}>
-            <div style={{height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",paddingLeft:10}}>
+            <div style={{height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px 0 10px"}}>
               <span style={{fontSize:11,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.6)",borderRadius:8,padding:"2px 8px"}}>🪵 きみの はたけ</span>
+              <button onClick={()=>setShowDex(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.72)",border:"none",borderRadius:9,padding:"3px 8px",cursor:"pointer",fontFamily:F}}>
+                <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
+                <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
+              </button>
             </div>
             <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"56px",imageRendering:"pixelated",padding:"8px 8px 10px",display:"flex",gap:6,alignItems:"flex-end",overflowX:"auto"}}>
               {stocks.map(s=>{
