@@ -8617,6 +8617,7 @@ function InvestTab({child,data,update}){
   const [harvestBurst,setHarvestBurst]=useState(null);   // 利益確定の全画面・収穫バースト
   const [showDex,setShowDex]=useState(false);   // 収穫シール帳・作物図鑑
   const [shareCopied,setShareCopied]=useState(false);
+  const [showTrade,setShowTrade]=useState(false);   // ゲームホーム ⇄ とりひき/くら（数字はここ）
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
   // 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
@@ -8628,6 +8629,17 @@ function InvestTab({child,data,update}){
     Object.entries(cur).forEach(([k,v])=>{ if((next[k]??-1)<v){ next[k]=v; changed=true; }});
     if(changed) update(d=>({...d,cropDex:{...(d.cropDex||{}),[child.id]:next}}));
   },[]);
+  // 🌱 カウシェ型「おみず／お世話で確実に育つ」エンゲージ層（射幸性なし・努力で確実）
+  const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};
+  const careDaysOf=(h)=> (farmData.care&&farmData.care[h.stockId])||0;
+  const effDaysOf=(h)=> holdDaysOf(h)+careDaysOf(h);              // 実日数＋お世話ぶん＝見た目の成長
+  const bucketG = farmData.lastDraw ? Math.min(30, Math.max(0,(Date.now()-new Date(farmData.lastDraw).getTime())/1000*0.01)) : 30;
+  const waterReserve=Math.floor(farmData.water||0);
+  const farmXp=farmData.xp||0; const farmLv=Math.floor(farmXp/12)+1; const lvProg=(farmXp%12)/12;
+  const flash=(msg,color)=>{ setTradeFlash({msg,color}); setTimeout(()=>setTradeFlash(null),1600); };
+  const setFarm=(mut)=>update(d=>{ const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f,care:{...(f.care||{})}}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
+  const drawWater=()=>{ const g=bucketG; if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;} setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()})); flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4"); };
+  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} if(careDaysOf(h)>=15){flash(`🌱 ${s.name}は たっぷり！べつの作物にも あげてみよう`,"#34C77B");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1,care:{...f.care,[s.id]:Math.min(15,((f.care||{})[s.id]||0)+0.5)}})); flash(`💧 ${s.name}に みずやり！ぐんぐん育つ🌱`,"#34C77B"); };
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
   const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
@@ -8830,6 +8842,74 @@ function InvestTab({child,data,update}){
         </div>
       </div>
     )}
+    {/* ===== 🌱 はたけホーム（ゲーム画面）。数字は「とりひき/くら」へ ===== */}
+    {!showTrade && (()=>{
+      const has=myHoldings.length>0;
+      const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
+      const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
+      const NEXT=[3,10,30];
+      const ripeCount=myHoldings.filter(h=>cropStageDays(effDaysOf(h))>=3).length;
+      return(<div>
+        <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
+          <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
+            <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
+          </div>
+          <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div>
+          <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}>💰{myBal.toLocaleString()}</div>
+        </div>
+        <div style={{position:"relative",borderRadius:18,overflow:"hidden",marginBottom:10,border:`3px solid ${G}`,boxShadow:"0 6px 22px rgba(52,199,123,.3)"}}>
+          <div style={{height:44,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px 0 10px"}}>
+            <span style={{fontSize:12,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.65)",borderRadius:8,padding:"3px 9px"}}>🪵 きみの はたけ</span>
+            <button onClick={()=>setShowDex(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.8)",border:"none",borderRadius:9,padding:"4px 9px",cursor:"pointer",fontFamily:F}}>
+              <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
+              <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
+            </button>
+          </div>
+          <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
+            {stocks.map(s=>{
+              const h=myHoldings.find(x=>x.stockId===s.id);
+              const held=!!h; const d=effDaysOf(h); const stage=cropStageDays(d);
+              const ripe=held&&stage>=3;
+              const nextIn=(held&&stage<3)?Math.max(1,Math.ceil(NEXT[stage]-d)):0;
+              return(
+                <button key={s.id} onClick={()=>{ if(ripe){setSelected(s.id);setMode("sell");setQty("0.1");setShowTrade(true);} else if(held){waterCrop(s,h);} else {setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);} }}
+                  style={{flex:"0 0 auto",width:74,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                  <div style={{position:"relative",width:66,height:66,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                    <img src={`/assets/${ripe?"plot_ripe":"plot_empty"}.png`} alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
+                    {held
+                      ? <div style={{position:"relative",zIndex:1,marginBottom:8,...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:{})}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/></div>
+                      : <span style={{position:"relative",zIndex:1,marginBottom:16,fontSize:20,opacity:.85,animation:"plantPulse 1.6s ease-in-out infinite"}}>➕</span>}
+                    {ripe&&<span style={{position:"absolute",top:-2,right:4,fontSize:15,animation:"ripeBounce 1s ease-in-out infinite",zIndex:2}}>🌟</span>}
+                    {held&&!ripe&&<span style={{position:"absolute",top:0,right:2,fontSize:12,zIndex:2}}>💧</span>}
+                  </div>
+                  <span style={{fontSize:9.5,fontWeight:900,whiteSpace:"nowrap",borderRadius:999,padding:"2px 7px",...(ripe?{background:GOLD,color:"#fff"}:held?{background:"rgba(255,255,255,.9)",color:GP}:{background:"rgba(255,255,255,.78)",color:"#7a6a3a"})}}>
+                    {ripe?"🌟しゅうかく":held?`あと${nextIn}日`:"＋まく"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{background:"rgba(24,122,78,.92)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
+            <img src="/assets/tanemon_water.png" alt="" style={{width:26,height:26,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
+            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?"作物を タップで 💧みずやり。コツコツ そだてよう":"あいてる畑を タップで タネを まこう！"}</span>
+          </div>
+          <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}`}</style>
+        </div>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <span style={{fontSize:18}}>🪣</span><span style={{fontSize:11,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9,fontWeight:800,color:"#4a7"}}>{Math.floor(bucketG)}g たまってる</span>
+          </button>
+          <button onClick={()=>setShowTrade(true)} style={{flex:1.5,background:GP,border:"none",borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            <span style={{fontSize:18}}>🏠</span><span style={{fontSize:11,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span>
+          </button>
+        </div>
+      </div>);
+    })()}
+
+    {/* ===== とりひき/くら（投資の数字・売買リスト）===== */}
+    {showTrade && (<>
+      <button onClick={()=>setShowTrade(false)} style={{display:"flex",alignItems:"center",gap:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:999,padding:"7px 14px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,marginBottom:12}}>‹ はたけに もどる</button>
     {/* 1日の売り買い回数の残り（保護者設定時のみ） */}
     {tradeLimit>0 && (
       <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:tradeLimitReached?"#ffb4b4":"#bff0c8",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:"7px 12px",marginBottom:12}}>
@@ -8851,54 +8931,6 @@ function InvestTab({child,data,update}){
     {!forexOff&&investTab==="forex"&&<ForexSection data={data} update={update} child={child}/>}
 
     {(forexOff||investTab==="stocks")&&<>
-      {/* 🌾 畑ビュー（主役）：作物が育ち、ひかったら収穫。あと◯日でみのる */}
-      {(()=>{
-        const has=myHoldings.length>0;
-        const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
-        const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
-        const NEXT=[3,10,30]; // 次の段階までの日数(芽→なえ→はな→みのり)
-        const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
-        return(
-          <div style={{position:"relative",borderRadius:18,overflow:"hidden",marginBottom:12,border:`3px solid ${G}`,boxShadow:"0 6px 22px rgba(52,199,123,.3)"}}>
-            <div style={{height:44,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px 0 10px"}}>
-              <span style={{fontSize:12,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.65)",borderRadius:8,padding:"3px 9px"}}>🪵 きみの はたけ</span>
-              <button onClick={()=>setShowDex(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.78)",border:"none",borderRadius:9,padding:"4px 9px",cursor:"pointer",fontFamily:F}}>
-                <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
-                <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
-              </button>
-            </div>
-            <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
-              {stocks.map(s=>{
-                const h=myHoldings.find(x=>x.stockId===s.id);
-                const held=!!h; const days=holdDaysOf(h); const stage=cropStageDays(days);
-                const ripe=held&&stage>=3;
-                const nextIn=(held&&stage<3)?Math.max(1,Math.ceil(NEXT[stage]-days)):0;
-                return(
-                  <button key={s.id} onClick={()=>{setSelected(s.id);setMode(ripe?"sell":"buy");setQty("0.1");setTradeComment("");}}
-                    style={{flex:"0 0 auto",width:74,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                    <div style={{position:"relative",width:66,height:66,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                      <img src={`/assets/${ripe?"plot_ripe":"plot_empty"}.png`} alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
-                      {held
-                        ? <div style={{position:"relative",zIndex:1,marginBottom:8,...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:{})}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/></div>
-                        : <span style={{position:"relative",zIndex:1,marginBottom:16,fontSize:20,opacity:.85,animation:"plantPulse 1.6s ease-in-out infinite"}}>➕</span>}
-                      {ripe&&<span style={{position:"absolute",top:-2,right:4,fontSize:15,animation:"ripeBounce 1s ease-in-out infinite",zIndex:2}}>🌟</span>}
-                    </div>
-                    <span style={{fontSize:9.5,fontWeight:900,whiteSpace:"nowrap",borderRadius:999,padding:"2px 7px",
-                      ...(ripe?{background:GOLD,color:"#fff"}:held?{background:"rgba(255,255,255,.85)",color:GP}:{background:"rgba(255,255,255,.7)",color:"#7a6a3a"})}}>
-                      {ripe?"🌟しゅうかく":held?`あと${nextIn}日🌱`:"＋まく"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{background:"rgba(24,122,78,.92)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
-              <img src="/assets/tanemon_water.png" alt="" style={{width:26,height:26,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
-              <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 みのった作物が ${ripeCount}コ！タップで しゅうかくしよう`:has?"じっくり そだて中。あわてず 長く そだてよう🌱":"あいてる畑を タップして タネを まこう！"}</span>
-            </div>
-            <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}`}</style>
-          </div>
-        );
-      })()}
       {/* ステータスバー */}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         <div style={{flex:1,fontSize:11,color:fetchStatus==="ok"?"#4ade80":fetchStatus==="error"?"#f87171":MUTED,fontWeight:700}}>
@@ -9078,6 +9110,7 @@ function InvestTab({child,data,update}){
         </div>);
       })}
     </>}
+    </>)}
   </div>);
 }
 
