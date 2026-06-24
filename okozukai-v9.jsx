@@ -8640,6 +8640,25 @@ function InvestTab({child,data,update}){
   const setFarm=(mut)=>update(d=>{ const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f,care:{...(f.care||{})}}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
   const drawWater=()=>{ const g=bucketG; if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;} setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()})); flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4"); };
   const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} if(careDaysOf(h)>=15){flash(`🌱 ${s.name}は たっぷり！べつの作物にも あげてみよう`,"#34C77B");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1,care:{...f.care,[s.id]:Math.min(15,((f.care||{})[s.id]||0)+0.5)}})); flash(`💧 ${s.name}に みずやり！ぐんぐん育つ🌱`,"#34C77B"); };
+  const loginStreak=farmData.streak||0;
+  // 📅 連続ログインボーナス(マイル型・毎日の理由。FOMOにしすぎない)
+  useEffect(()=>{
+    const today=new Date().toDateString();
+    if(farmData.lastLogin===today) return;
+    const y=new Date(Date.now()-86400000).toDateString();
+    const ns=farmData.lastLogin===y?(farmData.streak||0)+1:1;
+    const gain=8+Math.min(7,ns);
+    setFarm(f=>({...f,water:(f.water||0)+gain,lastLogin:today,streak:ns}));
+    flash(`📅 ${ns}日れんぞく ログイン！おみず +${gain}g🎁`,"#34C77B");
+  },[]);
+  // 🐣 なでなで(たまごっち型お世話の入口・1日10回までxp)
+  const patMon=()=>{
+    const today=new Date().toDateString();
+    const done=farmData.patDate===today?(farmData.patN||0):0;
+    if(done>=10){ flash("🌱 タネモン ごきげん！また あした なでようね","#34C77B"); return; }
+    setFarm(f=>({...f,xp:(f.xp||0)+1,patDate:today,patN:(f.patDate===today?(f.patN||0):0)+1}));
+    flash("🌱 なでなで♪ タネモンが よろこんでる","#34C77B");
+  };
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
   const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
@@ -8855,6 +8874,7 @@ function InvestTab({child,data,update}){
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
             <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
           </div>
+          {loginStreak>0&&<div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"7px 8px",fontSize:12,fontWeight:900,color:GP,whiteSpace:"nowrap"}}>📅{loginStreak}</div>}
           <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div>
           <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}>💰{myBal.toLocaleString()}</div>
         </div>
@@ -8890,9 +8910,12 @@ function InvestTab({child,data,update}){
               );
             })}
           </div>
-          <div style={{background:"rgba(24,122,78,.92)",padding:"5px 10px",display:"flex",alignItems:"center",gap:6}}>
-            <img src="/assets/tanemon_water.png" alt="" style={{width:26,height:26,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
-            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?"作物を タップで 💧みずやり。コツコツ そだてよう":"あいてる畑を タップで タネを まこう！"}</span>
+          <div style={{background:"rgba(24,122,78,.92)",padding:"5px 8px",display:"flex",alignItems:"center",gap:6}}>
+            <button onClick={patMon} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"3px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,fontFamily:F,flexShrink:0}}>
+              <img src="/assets/tanemon_water.png" alt="" style={{width:24,height:24,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
+              <span style={{fontSize:9,fontWeight:900,color:"#fff"}}>なでる</span>
+            </button>
+            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?"作物を タップで 💧みずやり。タネモンも なでてあげよう":"あいてる畑を タップで タネを まこう！"}</span>
           </div>
           <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}`}</style>
         </div>
