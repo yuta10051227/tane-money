@@ -8573,6 +8573,8 @@ function ForexSection({data, update, child}){
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
 const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
+// ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
+const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu" };
 function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
 function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
 function CropArt({stockId, stage, emoji, size}){
@@ -8689,7 +8691,7 @@ function InvestTab({child,data,update}){
     {/* 小学生むけ：やさしい はたけの あいさつ（どうぶつの森っぽい ほっこり導入） */}
     {isJr&&(
       <div style={{display:"flex",alignItems:"center",gap:10,background:"linear-gradient(180deg,#eaf7ec,#dff0e4)",border:`2px solid ${G}`,borderRadius:18,padding:"11px 14px",marginBottom:12}}>
-        <span style={{fontSize:30}}>🌱</span>
+        <img src="/assets/tanemon.png" alt="" style={{width:40,height:40,objectFit:"contain",imageRendering:"pixelated",flexShrink:0}} onError={e=>{const s=document.createElement("span");s.textContent="🌱";s.style.fontSize="30px";e.target.replaceWith(s);}}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontWeight:900,fontSize:14,color:GP}}>ようこそ、きみの はたけへ！</div>
           <div style={{fontSize:11.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginTop:1}}>たね（株）を まいて、じっくり そだてよう。あわてて うらなくて だいじょうぶ。まいにち ちょっとずつ おおきくなるよ🌾</div>
@@ -8848,7 +8850,9 @@ function InvestTab({child,data,update}){
 
       {/* 🗣 ナビ・タネモンの語り(いろんな視点で投資を語る・損は責めない) */}
       <div style={{display:"flex",alignItems:"flex-start",gap:9,background:CARD,border:`1.5px solid ${navi.c}40`,borderLeft:`4px solid ${navi.c}`,borderRadius:12,padding:"9px 12px",marginBottom:12}}>
-        <span style={{fontSize:22,lineHeight:1.1}}>{navi.e}</span>
+        {NAVI_ART[navi.e]
+          ? <img src={`/assets/${NAVI_ART[navi.e]}.png`} alt="" style={{width:42,height:42,objectFit:"contain",imageRendering:"pixelated",flexShrink:0}} onError={e=>{const s=document.createElement("span");s.textContent=navi.e;s.style.fontSize="22px";e.target.replaceWith(s);}}/>
+          : <span style={{fontSize:22,lineHeight:1.1}}>{navi.e}</span>}
         <div style={{flex:1,minWidth:0}}><div style={{fontSize:10,fontWeight:800,color:navi.c,marginBottom:1}}>{navi.n}</div><div style={{fontSize:12,color:TEXT,fontWeight:700,lineHeight:1.5}}>{navi.line}</div></div>
       </div>
 
