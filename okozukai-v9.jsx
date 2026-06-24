@@ -304,6 +304,10 @@ function startRealtimeSync(updateFn){
             // 利子/配当の付与記録: 進んでいる方(最新)を採用＝同期巻き戻しによる二重付与を防止
             if(prev.interestLastDate){merged.interestLastDate={...(merged.interestLastDate||{})};Object.keys(prev.interestLastDate).forEach(cid=>{const p=prev.interestLastDate[cid],m=merged.interestLastDate[cid];const pt=p?new Date(String(p).replace(/-/g,'/')).getTime():0;const mt=m?new Date(String(m).replace(/-/g,'/')).getTime():0;if(pt>mt)merged.interestLastDate[cid]=p;});}
             if(prev.holdBonusLastDate){merged.holdBonusLastDate={...(merged.holdBonusLastDate||{})};Object.keys(prev.holdBonusLastDate).forEach(cid=>{if((prev.holdBonusLastDate[cid]||0)>(merged.holdBonusLastDate[cid]||0))merged.holdBonusLastDate[cid]=prev.holdBonusLastDate[cid];});}
+            // 相棒選択(ヤミノオウ/タネモン)はローカル優先＝同期で勝手に戻らない
+            if(prev.activePartner) merged.activePartner={...(merged.activePartner||{}),...prev.activePartner};
+            // 1日のバトル回数: 今日の分は多い方を採用＝同期巻き戻しで上限を超えられないように
+            if(prev.battleCountDay){merged.battleCountDay={...(merged.battleCountDay||{})};const _td=todayKey();Object.keys(prev.battleCountDay).forEach(cid=>{const p=prev.battleCountDay[cid]||{},m=merged.battleCountDay[cid]||{};const pT=p.date===_td,mT=m.date===_td;if(pT&&mT)merged.battleCountDay[cid]={date:_td,n:Math.max(p.n||0,m.n||0)};else if(pT)merged.battleCountDay[cid]=p;else if(!mT)merged.battleCountDay[cid]=p;});}
             if(prev.streak) merged.streak=prev.streak;
             if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
             // モンスター進化/やり直し/転生：最終更新時刻(monsterStageAt)が新しい方を優先＝巻き戻り防止。
@@ -1143,6 +1147,9 @@ function migrate(d) {
 const todayKey = () => { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 // 期間(startDate/endDate)はtype="date"のゼロ埋め"YYYY-MM-DD"。比較はこちらで揃える(todayKeyはゼロ埋め無しなので文字列比較が壊れる)
 const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+// 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
+const _txLocks={};
+function txGuard(key, ms=800){ const now=Date.now(); if(_txLocks[key] && now-_txLocks[key]<ms) return false; _txLocks[key]=now; return true; }
 
 // ── 運用損益計算ヘルパー ──────────────────────────────
 // 手数料込みの実質損益率を計算
@@ -2969,6 +2976,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                         <button onClick={()=>{
                           const amt=parseInt(grantAmt);
                           if(isNaN(amt)||amt===0) return;
+                          if(!txGuard("grant_"+member.id)) return;   // 連打ガード(二重付与防止)
                           (()=>{const _e={id:uid(),cid:member.id,type:"grant",label:`🎁 親からのポイント付与`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
                           setGrantAmt("");setGrantChild(null);
                         }} style={{padding:"10px 16px",background:G,border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
@@ -2979,6 +2987,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                         <button onClick={()=>{
                           const amt=parseInt(grantAmt);
                           if(isNaN(amt)||amt===0) return;
+                          if(!txGuard("deduct_"+member.id)) return;   // 連打ガード(二重減算防止)
                           (()=>{const _e={id:uid(),cid:member.id,type:"grant",label:`⚠ ポイント減算`,pts:-amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
                           setGrantAmt("");setGrantChild(null);
                         }} style={{flex:1,padding:"8px 0",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,color:R,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>
@@ -3669,6 +3678,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doRedeem = r => {
+    if(!txGuard("redeem_"+child.id+"_"+r.id)) return;   // 連打ガード(二重交換/二重消費防止)
     setRewardPop(null);
     const _rfs = data.familySettings || INIT.familySettings;
     if(_rfs.rewardApproval) {
@@ -5849,6 +5859,7 @@ function ParentScreen({ data, update, onBack }) {
 
   const doGrant = () => {
     const amt=parseInt(grantAmt); if(!amt||!grantChild)return;
+    if(!txGuard("grant2_"+grantChild.id)) return;   // 連打ガード(二重付与防止)
     (()=>{const _e={id:uid(),cid:grantChild.id,type:"grant",label:grantLabel||"おこづかい",pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
     setGrantChild(null); setGrantAmt(""); setGrantLabel("おこづかい");
   };
@@ -8265,6 +8276,7 @@ function ForexSection({data, update, child}){
     const rate = fx.price||0;
     const costPts = Math.ceil(amt * rate * (1 + FOREX_BUY_FEE));
     if(myBal < costPts) { alert("残高が足りないよ！"); return; }
+    if(!txGuard("fxbuy_"+child.id)) return;   // 連打ガード(二重購入防止)
     const entry = {id:uid(),cid:child.id,type:"forex_buy",
       label:`💱 ${fx.flag}${fx.code} ${amt}購入（¥${rate}・手数料${(FOREX_BUY_FEE*100).toFixed(1)}%込）`,
       pts:-costPts, date:new Date().toISOString()};
@@ -8285,6 +8297,7 @@ function ForexSection({data, update, child}){
     const amt = parseFloat(tradeAmt);
     const held = myForex[fx.code]||0;
     if(!amt || amt <= 0 || amt > held || !child) return;
+    if(!txGuard("fxsell_"+child.id)) return;   // 連打ガード(二重売却防止)
     const rate = fx.price||0;
     const earnPts = Math.floor(amt * rate * (1 - FOREX_SELL_FEE));
     const entry = {id:uid(),cid:child.id,type:"forex_sell",
@@ -8518,6 +8531,7 @@ function InvestTab({child,data,update}){
   const fmtQty=q=>(q%1===0)?`${q}`:`${q.toFixed(1)}`;
   function doBuy(){
     if(!selStock||qtyN<0.1||myBal<costPts) return;
+    if(!txGuard("buy_"+child.id)) return;   // 連打ガード(二重購入防止)
     update(d=>{
       const existH=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
       let newH;
@@ -8531,6 +8545,7 @@ function InvestTab({child,data,update}){
   }
   function doSell(){
     if(!selStock||!selHolding||qtyN<0.1||qtyN>selHolding.qty) return;
+    if(!txGuard("sell_"+child.id)) return;   // 連打ガード(二重売却防止)
     update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
