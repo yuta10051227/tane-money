@@ -1001,6 +1001,8 @@ const INIT = {
     {id:"s24",emoji:"🚄",name:"JR東日本",ticker:"9020.T",sector:"鉄道",price:2800,history:[2800],currency:"JPY"},
     {id:"s25",emoji:"🧴",name:"資生堂",ticker:"4911.T",sector:"化粧品",price:2500,history:[2500],currency:"JPY"},
     {id:"s26",emoji:"🎢",name:"オリエンタルランド",ticker:"4661.T",sector:"レジャー",price:3500,history:[3500],currency:"JPY"},
+    {id:"s27",emoji:"🌍",name:"全世界株(オルカン)",ticker:"VT",sector:"インデックス",price:125,history:[125],currency:"USD",isIndex:true},
+    {id:"s28",emoji:"🇺🇸",name:"米国株(S&P500)",ticker:"VOO",sector:"インデックス",price:560,history:[560],currency:"USD",isIndex:true},
   ],
   holdings: {},
   stockLastUpdate: "",
@@ -1022,6 +1024,7 @@ const INIT = {
     requireApproval: false,
     approvalNotification: false,
     rewardApproval: false,
+    gachaSimple: true,  // 初期値=ガチャ演出シンプル(まぶしさ/タメ演出を省く＝射幸性を抑える安全寄りの初期値)
     gameMode: "full",   // full=全部 / light=バトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
     dailyBattleLimit: 0,   // 1日のバトル回数上限(0=無制限・周回しすぎ防止)
   },
@@ -6969,7 +6972,7 @@ function applyInterest(data,update,cid){
 }
 
 // ── 配当（毎週・控えめ週0.3〜0.5%）。株価変動より小さく＝「持てば必ず増える」誤学習をしない健全設計 ─────
-// 実データの株価は短期だと横ばい＋手数料で利益が出にくいので、保有報酬を厚くして"長期で増える"を実感できるように
+// 配当は控えめ(週0.3〜0.5%)＝株価変動より小さく。短期売買は手数料で損しやすく、長く持つと配当でコツコツ。ただし株価が下がればトータルでは損もある(健全)
 function applyHoldingBonus(data,update,cid){
   const week=Math.floor(Date.now()/(7*86400000));  // 週単位で支払い
   if((data.holdings||{})[cid]==null || !((data.holdings||{})[cid]||[]).length) return;
@@ -9230,6 +9233,7 @@ function InvestTab({child,data,update}){
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#aaa",marginBottom:4}}><span>合計</span><span style={{color:"#fff",fontWeight:700}}>{costPts.toLocaleString()}pt</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>残高</span><span style={{color:myBal>=costPts?"#4ade80":"#f87171",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
                 {myBal<costPts&&<p style={{color:"#f87171",fontSize:11,margin:"6px 0 0",fontWeight:700}}>残高が足りないよ</p>}
+                {selStock?.isIndex&&<div style={{marginTop:8,fontSize:11,color:"#7fb0ff",fontWeight:700,lineHeight:1.5,background:"rgba(52,120,212,.12)",borderRadius:8,padding:"7px 9px"}}>🌍 これ1本で たくさんの会社に まとめて分散！コツコツ 長く積み立てるのが 投資の王道だよ（プロもおすすめ）</div>}
                 <div style={{marginTop:8,fontSize:11,color:"#aaa",marginBottom:4}}>💬 なぜ この タネをまく？（任意）</div>
                 <input value={tradeComment} onChange={e=>setTradeComment(e.target.value.slice(0,30))} placeholder="例：任天堂好きだから" maxLength={30} style={{width:"100%",background:"#0d0d1a",border:"1px solid #333",borderRadius:8,padding:"7px 10px",color:"#fff",fontSize:13,fontFamily:F,boxSizing:"border-box"}}/>
               </>:<>
@@ -9406,18 +9410,24 @@ const ALL_TIPS=[
   {id:"t28",cat:"Tane Money",emoji:"🌱",title:"Tane Moneyのコンセプト",body:"「お金は種」。種を蒔いて育てるように、小さなお手伝いの積み重ねが大きな力になる。毎日コツコツが一番！",q:"Tane Moneyの 考えは？",o:["お金は 種、コツコツ 育てる","一発 大もうけ","運 だめし"],a:0},
   {id:"t29",cat:"Tane Money",emoji:"🏆",title:"ランキングで成長できる理由",body:"家族でランキングを競うことで「やる気」が生まれる。競争ではなく「昨日の自分より成長する」ことが大切。",q:"ランキングで 大切なのは？",o:["昨日の 自分より 成長","1位 いがいは だめ","人を ばかに する"],a:0},
   {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャと上手につきあう",body:"ガチャは「確率」の体験。レアが出るかはランダムで、たくさん引いても必ず当たるわけじゃない。お金は計画的に使い、貯金やコツコツの積み重ねが一番たしかな力になるよ。",q:"ガチャと 上手に つきあうには？",o:["お金は 計画的に、コツコツが 一番","全部 つぎこむ","借金して 引く"],a:0},
+  {id:"t31",cat:"投資",emoji:"🪙",title:"ドルコスト平均法",body:"毎月おなじ金額で 買い続けると、高い時は少なく・安い時は多く買えて、買う値段が ならされる。タイミングを当てなくていいから、初心者にやさしい王道のやり方だよ。",q:"ドルコスト平均法の よさは？",o:["高い時に少なく、安い時に多く 買える","必ず もうかる","一度に 全部 買う"],a:0},
+  {id:"t32",cat:"投資",emoji:"🏛",title:"NISAってなに？",body:"ふつう 投資のもうけには 約20%の税金がかかる。でも「NISA」という国の制度を使うと、その税金が0になるんだ。長くコツコツ 積み立てる人ほどお得な、応援の仕組みだよ。",q:"NISAを 使うと？",o:["もうけの 税金が 0になる","お金が 2倍になる","買い物が 無料"],a:0},
+  {id:"t33",cat:"社会・経済",emoji:"📊",title:"インフレとデフレ",body:"物の値段が だんだん上がるのが「インフレ」、下がるのが「デフレ」。インフレだと 同じ100円で買えるものが減る＝お金の価値が下がる。だから お金を ねかせず 育てる視点も大事。",q:"インフレとは？",o:["物の値段が 上がること","お金が増える 魔法","銀行の 名前"],a:0},
+  {id:"t34",cat:"貯金・節約",emoji:"🆘",title:"もしもの備え",body:"急な出費（こわれた・病気など）に備えて、すぐ使わない「もしものお金」を 少し貯めておくと安心。投資の前に、まず この安心のお金を 用意するのが順番だよ。",q:"もしもの備えは？",o:["使わないお金を 少し貯めておく","全部 使う","借りれば いい"],a:0},
+  {id:"t35",cat:"お金のきほん",emoji:"🤐",title:"お金の詐欺に注意",body:"「絶対もうかる」「あなただけ特別」はウソのサイン。うまい話には 裏がある。あやしいと思ったら お金を出す前に、かならず 大人に相談しようね。",q:"『絶対もうかる』と 言われたら？",o:["あやしい！大人に 相談","すぐ お金を 出す","ひみつに する"],a:0},
+  {id:"t36",cat:"投資",emoji:"🧮",title:"複利でふえる例",body:"毎年5%ずつ増えると、10年で約1.6倍、20年で約2.6倍、30年で約4.3倍に。早く始めて 長く続けるほど、時間が味方してくれる。これが複利の力だよ。",q:"複利で 一番 大事なのは？",o:["長い 時間","一発の 大勝負","運だけ"],a:0},
 ];
 
 // 🎓 金融教育プログラム: まめちしきを「順番のある8コース」に再編＝学びの地図(カリキュラム)
 const CURRICULUM=[
   {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23"]},
   {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20"]},
-  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12"]},
+  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12","t34"]},
   {id:"c4",e:"💼",t:"かせぐ・はたらく",tips:["t07","t24","t25","t26","t27"]},
-  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18"]},
-  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16"]},
-  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22"]},
-  {id:"c8",e:"🛡",t:"かしこく・だまされない",tips:["t21","t30","t28","t29"]},
+  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18","t31"]},
+  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16","t36"]},
+  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22","t32","t33"]},
+  {id:"c8",e:"🛡",t:"かしこく・だまされない",tips:["t21","t30","t28","t29","t35"]},
 ];
 function TipsSection({ageMode,child,data,update}){
   const [cat,setCat]=useState("すべて");
@@ -9463,6 +9473,14 @@ function TipsSection({ageMode,child,data,update}){
     }
   };
   return(<div style={{padding:"12px 16px"}}>
+    {/* 📅 今月のまめちしき（毎月 自動で変わる注目トピック＝継続のフレッシュさ） */}
+    {(()=>{const d=new Date();const fi=(d.getFullYear()*12+d.getMonth())%ALL_TIPS.length;const ft=ALL_TIPS[fi];return(
+      <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:14,padding:"11px 13px",marginBottom:12}}>
+        <div style={{fontSize:10,fontWeight:900,color:"#8a6a00",marginBottom:3}}>📅 今月のまめちしき</div>
+        <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ft.title}</div>
+        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:1.6}}>{ft.body}</div>
+      </div>
+    );})()}
     {/* 🎓 金融教育プログラム（学びの地図＋金融リテラシー級） */}
     <div style={{background:"linear-gradient(135deg,#2d2640,#1f2b3e)",borderRadius:18,padding:"14px 16px",marginBottom:12,color:"#fff"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
