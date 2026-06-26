@@ -8640,15 +8640,14 @@ function InvestTab({child,data,update}){
   },[]);
   // 🌱 カウシェ型「おみず／お世話で確実に育つ」エンゲージ層（射幸性なし・努力で確実）
   const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};
-  const careDaysOf=(h)=> (h&&farmData.care&&farmData.care[h.stockId])||0;
-  const effDaysOf=(h)=> holdDaysOf(h)+careDaysOf(h);              // 実日数＋お世話ぶん＝見た目の成長
   const bucketG = farmData.lastDraw ? Math.min(30, Math.max(0,(Date.now()-new Date(farmData.lastDraw).getTime())/1000*0.01)) : 30;
   const waterReserve=Math.floor(farmData.water||0);
   const farmXp=farmData.xp||0; const farmLv=Math.floor(farmXp/12)+1; const lvProg=(farmXp%12)/12;
   const flash=(msg,color)=>{ setTradeFlash({msg,color}); setTimeout(()=>setTradeFlash(null),1600); };
   const setFarm=(mut)=>update(d=>{ const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f,care:{...(f.care||{})}}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
   const drawWater=()=>{ const g=bucketG; if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;} setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()})); flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4"); };
-  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} if(careDaysOf(h)>=15){flash(`🌱 ${s.name}は たっぷり！べつの作物にも あげてみよう`,"#34C77B");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1,care:{...f.care,[s.id]:Math.min(15,((f.care||{})[s.id]||0)+0.5)}})); flash(`💧 ${s.name}に みずやり！ぐんぐん育つ🌱`,"#34C77B"); };
+  // 水やり＝お世話(はたけレベル＋タネモンの絆)。作物の成長/売り時には影響しない=投資は保有日数で正直に
+  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1})); flash("💧 おせわした！はたけレベルUPで かざりが ふえる🌱","#34C77B"); };
   const loginStreak=farmData.streak||0;
   // 📅 連続ログインボーナス(マイル型・毎日の理由。FOMOにしすぎない)
   useEffect(()=>{
@@ -8915,7 +8914,7 @@ function InvestTab({child,data,update}){
       const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
       const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
       const NEXT=[3,10,30];
-      const ripeCount=myHoldings.filter(h=>cropStageDays(effDaysOf(h))>=3).length;
+      const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
         <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
           <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
@@ -8942,7 +8941,7 @@ function InvestTab({child,data,update}){
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {stocks.map(s=>{
               const h=myHoldings.find(x=>x.stockId===s.id);
-              const held=!!h; const d=effDaysOf(h); const stage=cropStageDays(d);
+              const held=!!h; const d=holdDaysOf(h); const stage=cropStageDays(d);
               const ripe=held&&stage>=3;
               const nextIn=(held&&stage<3)?Math.max(1,Math.ceil(NEXT[stage]-d)):0;
               return(
