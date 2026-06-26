@@ -8951,7 +8951,7 @@ function InvestTab({child,data,update}){
                   <div style={{position:"relative",width:66,height:66,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
                     <img src={`/assets/${ripe?"plot_ripe":"plot_empty"}.png`} alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
                     {held
-                      ? <div style={{position:"relative",zIndex:1,marginBottom:8,...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:{})}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/></div>
+                      ? <div style={{position:"relative",zIndex:1,marginBottom:8,transformOrigin:"bottom center",...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:{animation:`growSway ${2.2+(s.id.charCodeAt(s.id.length-1)%5)*0.18}s ease-in-out infinite`})}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/></div>
                       : <span style={{position:"relative",zIndex:1,marginBottom:16,fontSize:20,opacity:.85,animation:"plantPulse 1.6s ease-in-out infinite"}}>➕</span>}
                     {ripe&&<span style={{position:"absolute",top:-2,right:4,fontSize:15,animation:"ripeBounce 1s ease-in-out infinite",zIndex:2}}>🌟</span>}
                     {held&&!ripe&&<span style={{position:"absolute",top:0,right:2,fontSize:12,zIndex:2}}>💧</span>}
@@ -8970,7 +8970,7 @@ function InvestTab({child,data,update}){
             </button>
             <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?"作物を タップで 💧みずやり。タネモンも なでてあげよう":"あいてる畑を タップで タネを まこう！"}</span>
           </div>
-          <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}`}</style>
+          <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
         </div>
         <div style={{display:"flex",gap:7}}>
           <button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
