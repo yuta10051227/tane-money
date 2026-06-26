@@ -2916,7 +2916,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   };
 
   const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
-  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["members","🔐 PIN"],["transfer","🔄 引継"]];
+  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["plan","💳 プラン"],["members","🔐 PIN"],["transfer","🔄 引継"]];
   const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
 
   if(!authed) return (
@@ -3302,6 +3302,29 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               update(d=>({...d,pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             return(<div>
+              {/* 💤 休眠アラート（子が数日ログインしていない＝静かな解約の予兆を親に知らせる） */}
+              {(()=>{
+                const DAY=86400000;const now=Date.now();
+                const rows=(data.children||[]).map(c=>{
+                  const ls=(data.logs||[]).filter(l=>l.cid===c.id).map(l=>new Date(l.date).getTime());
+                  const last=ls.length?Math.max(...ls):0;
+                  const days=last?Math.floor((now-last)/DAY):999;
+                  return {c,days,ever:!!last};
+                });
+                const sleeping=rows.filter(r=>r.days>=3);
+                if(sleeping.length===0) return null;
+                return(<div style={{background:RS,border:`1.5px solid ${R}`,borderRadius:14,padding:"13px 15px",marginBottom:12}}>
+                  <div style={{fontWeight:900,fontSize:13,color:R,marginBottom:6}}>💤 しばらく使っていないお子さま</div>
+                  {sleeping.map(r=>(
+                    <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0"}}>
+                      <span style={{fontSize:18}}>{r.c.emoji||"🧒"}</span>
+                      <span style={{flex:1,fontWeight:800,fontSize:12.5,color:TEXT}}>{r.c.name}</span>
+                      <span style={{fontWeight:900,fontSize:12,color:R}}>{r.ever?`${r.days}日 ログインなし`:"まだ未ログイン"}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や畑のお世話に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
+                </div>);
+              })()}
               {/* 承認モード切り替え */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -3568,6 +3591,77 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 </>}
               </div>
             );
+          })()}
+
+          {/* ── プランタブ（料金・無料体験・解約） ── */}
+          {settingsTab==="plan"&&(()=>{
+            const sub=data.subscription||{};
+            const nKids=Math.max(1,(data.children||[]).length);
+            const DAY=86400000;
+            const trialStart=sub.trialStart?new Date(sub.trialStart).getTime():null;
+            const trialDaysLeft=trialStart?Math.max(0,14-Math.floor((Date.now()-trialStart)/DAY)):null;
+            const inTrial=trialDaysLeft!==null&&trialDaysLeft>0&&!sub.active;
+            const PLANS=[
+              {id:"single",e:"🌱",name:"1人プラン",price:"¥980",unit:"/月",sub:"お子さま1人",rec:nKids===1},
+              {id:"sibling",e:"👧👦",name:"きょうだいプラン",price:"¥1,460",unit:"/月",sub:"1人目¥980＋2人目以降 各¥480",rec:nKids===2},
+              {id:"family",e:"👨‍👩‍👧‍👦",name:"家族プラン",price:"¥1,480",unit:"/月",sub:"最大4人・3人目以降ずっと無料",rec:nKids>=3},
+              {id:"annual",e:"🎁",name:"年額プラン",price:"¥9,800",unit:"/年",sub:"2ヶ月分おトク（実質月¥817）",rec:false},
+            ];
+            const setPlan=(id)=>update(d=>({...d,subscription:{...(d.subscription||{}),plan:id}}));
+            const startTrial=()=>update(d=>(d.subscription?.trialStart?d:{...d,subscription:{...(d.subscription||{}),trialStart:new Date().toISOString()}}));
+            return(<div>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>料金プラン・お支払い</p>
+              {/* 現在の状態 */}
+              <div style={{background:`linear-gradient(135deg,${GS},#fff)`,border:`2px solid ${G}`,borderRadius:16,padding:"16px",marginBottom:14,textAlign:"center"}}>
+                {inTrial?(<>
+                  <div style={{fontSize:12,color:GP,fontWeight:800,marginBottom:4}}>🎉 無料体験中</div>
+                  <div style={{fontSize:24,fontWeight:900,color:GP}}>あと {trialDaysLeft}日</div>
+                  <div style={{fontSize:11,color:MUTED,marginTop:6}}>体験中はすべての機能が使えます。体験が終わっても自動課金はされません。</div>
+                </>):trialStart?(<>
+                  <div style={{fontSize:13,fontWeight:900,color:TEXT,marginBottom:4}}>無料体験は終了しました</div>
+                  <div style={{fontSize:11,color:MUTED}}>下のプランから選んでご継続いただけます。</div>
+                </>):(<>
+                  <div style={{fontSize:13,color:TEXT,fontWeight:800,marginBottom:8}}>まずは14日間 無料でお試し</div>
+                  <div style={{fontSize:11,color:MUTED,marginBottom:12}}>クレジットカード登録不要・自動課金なし。お子さまが続くか見てから決められます。</div>
+                  <button onClick={startTrial} style={{background:GP,border:"none",borderRadius:12,padding:"11px 28px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>14日間の無料体験を始める</button>
+                </>)}
+              </div>
+              {/* おすすめバッジ付きプラン一覧 */}
+              <div style={{fontSize:11,fontWeight:800,color:TEXTS,margin:"0 0 8px"}}>お子さま{nKids}人のご家庭におすすめのプラン</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+                {PLANS.map(p=>{const sel=sub.plan===p.id;return(
+                  <button key={p.id} onClick={()=>setPlan(p.id)}
+                    style={{textAlign:"left",background:sel?GS:CARD,border:`2px solid ${sel?G:p.rec?GOLD:BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+                    <span style={{fontSize:24,flexShrink:0}}>{p.e}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontWeight:900,fontSize:14,color:TEXT}}>{p.name}</span>
+                        {p.rec&&<span style={{fontSize:9,fontWeight:900,color:"#7a5a00",background:GOLDS,borderRadius:6,padding:"1px 6px"}}>おすすめ</span>}
+                        {sel&&<span style={{fontSize:9,fontWeight:900,color:"#fff",background:G,borderRadius:6,padding:"1px 6px"}}>選択中</span>}
+                      </div>
+                      <div style={{fontSize:10.5,color:MUTED,fontWeight:700,marginTop:2}}>{p.sub}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <span style={{fontWeight:900,fontSize:16,color:GP}}>{p.price}</span>
+                      <span style={{fontSize:10,color:MUTED,fontWeight:700}}>{p.unit}</span>
+                    </div>
+                  </button>
+                );})}
+              </div>
+              {/* 購入導線（決済は近日対応・正直表示） */}
+              <button disabled={!sub.plan} onClick={()=>{}}
+                style={{width:"100%",padding:"13px",background:sub.plan?GP:BORDER,border:"none",borderRadius:12,color:"#fff",fontWeight:800,fontSize:14,cursor:sub.plan?"pointer":"default",fontFamily:F,marginBottom:8}}>
+                {sub.plan?"このプランで購入手続きへ":"プランを選んでください"}
+              </button>
+              <div style={{background:BS,border:`1px solid ${B}`,borderRadius:10,padding:"9px 12px",marginBottom:12}}>
+                <div style={{fontSize:10.5,color:B,fontWeight:800,lineHeight:1.5}}>※ オンライン決済は近日対応予定です。現在は無料でご利用いただけます。正式リリース時に、選択中のプランをそのまま引き継げます。</div>
+              </div>
+              {/* 解約はいつでも */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"11px 14px"}}>
+                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:3}}>解約について</div>
+                <div style={{fontSize:10.5,color:MUTED,fontWeight:700,lineHeight:1.5}}>いつでもこの画面から解約できます（解約後も期間終了までは利用可能）。違約金や最低利用期間はありません。学んだ記録・級は解約後も残ります。</div>
+              </div>
+            </div>);
           })()}
 
           {/* ── 引き継ぎタブ ── */}
@@ -9475,14 +9569,42 @@ function TipsSection({ageMode,child,data,update}){
   const ldToday=ld.last===_todayISO;
   const missRead=ldToday&&ld.read, missQuiz=ldToday&&ld.quiz, missDone=missRead&&missQuiz;
   const learnStreak=ld.last===_todayISO?ld.streak:(ld.last===_yISO?ld.streak:0);
+  const _d2ISO=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
   const markLearn=(kind)=>update(d=>{
-    const k=child.id; const cur=(d.learnDays||{})[k]||{last:"",streak:0,best:0,read:false,quiz:false};
-    let {last,streak,best,read,quiz}=cur;
-    if(last!==_todayISO){ streak=last===_yISO?(streak||0)+1:1; last=_todayISO; read=false; quiz=false; }
+    const k=child.id; const cur=(d.learnDays||{})[k]||{last:"",streak:0,best:0,read:false,quiz:false,freeze:""};
+    let {last,streak,best,read,quiz,freeze}=cur;
+    if(last!==_todayISO){
+      if(last===_yISO){ streak=(streak||0)+1; }
+      // 🛡 ストリーク保護: 1日の抜けは週1回まで救済(やる気が折れないように)
+      else if(last===_d2ISO && (!freeze || (Date.now()-new Date(freeze).getTime())/86400000>=7)){ streak=(streak||0)+1; freeze=_todayISO; }
+      else { streak=1; }
+      last=_todayISO; read=false; quiz=false;
+    }
     if(kind==="read")read=true; if(kind==="quiz")quiz=true;
     best=Math.max(best||0,streak||0);
-    return {...d,learnDays:{...(d.learnDays||{}),[k]:{last,streak,best,read,quiz}}};
+    return {...d,learnDays:{...(d.learnDays||{}),[k]:{last,streak,best,read,quiz,freeze:freeze||""}}};
   });
+  // 🔔 リマインダー: 起動時に「今日のミッション未達」なら通知（許可済みのみ・同意ベース）
+  const reminderOn=!!((data.reminders||{})[child.id]);
+  useEffect(()=>{
+    try{
+      if(!reminderOn) return;
+      if(!("Notification"in window)||Notification.permission!=="granted") return;
+      if(missDone) return;
+      const k="tane_remind_"+child.id+"_"+_todayISO;
+      if(localStorage.getItem(k)) return;   // 1日1回まで
+      localStorage.setItem(k,"1");
+      new Notification("タネマネー",{body:`${child.name}の きょうの学習ミッションが まってるよ📖 れんぞくを のばそう！`});
+    }catch(e){}
+  },[reminderOn,missDone]);
+  const enableReminder=async()=>{
+    try{
+      if(!("Notification"in window)){update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}}));return;}
+      let perm=Notification.permission;
+      if(perm==="default") perm=await Notification.requestPermission();
+      if(perm==="granted"){ update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}})); try{new Notification("タネマネー",{body:"まいにちリマインダーをオンにしたよ🔔"});}catch(e){} }
+    }catch(e){}
+  };
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
   const cats=["すべて",...Array.from(new Set(ALL_TIPS.map(t=>t.cat)))];
   // 🎓 プログラム(カリキュラム)進捗と金融リテラシー級
@@ -9557,6 +9679,14 @@ function TipsSection({ageMode,child,data,update}){
         ))}
       </div>
       {!missDone&&<div style={{fontSize:10,color:MUTED,fontWeight:700,marginTop:6}}>2つ クリアで きょうのミッション達成。あしたも つづけて れんぞくを のばそう！</div>}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${BORDER}`}}>
+        <span style={{flex:1,fontSize:10,color:TEXTS,fontWeight:700,lineHeight:1.4}}>🛡 1日 おやすみしても、れんぞくは 週1回まで まもられるよ。</span>
+        {!reminderOn?(
+          <button onClick={enableReminder} style={{flexShrink:0,background:BS,border:`1.5px solid ${B}`,borderRadius:9,padding:"6px 10px",color:B,fontWeight:800,fontSize:10.5,cursor:"pointer",fontFamily:F}}>🔔 リマインダーON</button>
+        ):(
+          <span style={{flexShrink:0,fontSize:10,fontWeight:800,color:GP}}>🔔 通知ON</span>
+        )}
+      </div>
     </div>
     {/* 🎓 金融教育プログラム（学びの地図＋金融リテラシー級） */}
     <div style={{background:"linear-gradient(135deg,#2d2640,#1f2b3e)",borderRadius:18,padding:"14px 16px",marginBottom:12,color:"#fff"}}>
