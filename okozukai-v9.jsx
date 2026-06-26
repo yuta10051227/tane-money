@@ -9432,6 +9432,10 @@ const CURRICULUM=[
 function TipsSection({ageMode,child,data,update}){
   const [cat,setCat]=useState("すべて");
   const [course,setCourse]=useState(null);   // 選択中コース(カリキュラム)
+  const [reviewOn,setReviewOn]=useState(false);  // 🔁 おさらいクイズ(間隔反復)
+  const [rList,setRList]=useState([]);
+  const [rIdx,setRIdx]=useState(0);
+  const [rPick,setRPick]=useState(null);
   const [openId,setOpenId]=useState(null);
   const readIds=(data.tipsRead||{})[child.id]||[];
   const TIP_PTS=5;
@@ -9464,6 +9468,13 @@ function TipsSection({ageMode,child,data,update}){
   const baseRank=baseline?(9-(baseline.courses||0)):9;
   const ymNow=new Date().toISOString().slice(0,7);
   const choresThisMonth=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(ymNow)).length;
+  // 🔁 おさらいクイズ(間隔反復): 正解済みでも7日以上おさらいしていない問題を再出題＝「暗記でなく定着」
+  const reviewLog=(data.tipsReview||{})[child.id]||{};
+  const dueTips=ALL_TIPS.filter(t=>quizDone.includes(t.id)).filter(t=>{const dd=reviewLog[t.id];if(!dd)return true;return (Date.now()-new Date(dd).getTime())/86400000>=7;});
+  const startReview=()=>{const due=dueTips.slice(0,10);if(!due.length)return;setRList(due.map(t=>t.id));setRIdx(0);setRPick(null);setReviewOn(true);};
+  const rTip=reviewOn?ALL_TIPS.find(t=>t.id===rList[rIdx]):null;
+  const reviewAnswer=(tip,idx)=>{ if(rPick!=null)return; setRPick(idx); if(idx===tip.a){ update(d=>({...d,tipsReview:{...(d.tipsReview||{}),[child.id]:{...((d.tipsReview?.[child.id])||{}),[tip.id]:new Date().toISOString()}},monsterExp:{...(d.monsterExp||{}),[child.id]:((d.monsterExp?.[child.id])||0)+2}})); } };
+  const nextReview=()=>{ if(rIdx+1>=rList.length){setReviewOn(false);} else {setRIdx(rIdx+1);setRPick(null);} };
   const totalRead=readIds.filter(id=>ALL_TIPS.find(t=>t.id===id)).length;
   const handleOpen=tipId=>{
     if(openId===tipId){setOpenId(null);return;}
@@ -9528,6 +9539,35 @@ function TipsSection({ageMode,child,data,update}){
       </div>
       <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5}}>習得した分野：{completedCourses>0?CURRICULUM.filter(courseDone).map(c=>c.t).join("・"):"まだクリアしたコースはありません。クイズに挑戦して級を上げよう！"}</div>
     </div>
+    {/* 🔁 おさらいクイズ（間隔反復＝暗記でなく定着。級の本物度を担保） */}
+    {(quizDone.length>0)&&(
+      <div style={{background:PS,border:`1.5px solid ${P}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
+        {!reviewOn?(
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>🔁</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:13,color:P}}>おさらいクイズ</div>
+              <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:1}}>{dueTips.length>0?`まえに正解した ${dueTips.length}問を おさらいして「本当に身についたか」たしかめよう`:"いまは おさらい対象なし。また数日後にね！"}</div>
+            </div>
+            {dueTips.length>0&&<button onClick={startReview} style={{background:P,border:"none",borderRadius:10,padding:"8px 13px",color:"#fff",fontWeight:900,fontSize:12,cursor:"pointer",fontFamily:F,flexShrink:0}}>おさらい</button>}
+          </div>
+        ):rTip&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:11,fontWeight:900,color:P}}>🔁 おさらい {rIdx+1}/{rList.length}</span><button onClick={()=>setReviewOn(false)} style={{background:"none",border:"none",color:MUTED,fontSize:16,cursor:"pointer"}}>✕</button></div>
+            <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>{rTip.emoji} {rTip.q}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {rTip.o.map((opt,i)=>{const ans=rPick!=null;const correct=i===rTip.a;const picked=rPick===i;return(
+                <button key={i} onClick={()=>reviewAnswer(rTip,i)} disabled={ans}
+                  style={{textAlign:"left",background:ans?(correct?GS:picked?RS:CARD):CARD,border:`2px solid ${ans?(correct?GP:picked?R:BORDER):BORDER}`,borderRadius:10,padding:"9px 11px",fontSize:12.5,fontWeight:700,color:TEXT,cursor:ans?"default":"pointer",fontFamily:F}}>
+                  {ans&&correct?"✅ ":ans&&picked?"❌ ":""}{opt}
+                </button>
+              );})}
+            </div>
+            {rPick!=null&&<button onClick={nextReview} style={{marginTop:9,width:"100%",background:GP,border:"none",borderRadius:10,padding:"10px",color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F}}>{rIdx+1>=rList.length?"おさらい おわり！":"つぎの問題 →"}</button>}
+          </div>
+        )}
+      </div>
+    )}
     <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:20}}>💡</span>
       <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:"#fff"}}>まめちしき</div><div style={{color:"rgba(255,255,255,0.55)",fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
