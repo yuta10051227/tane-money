@@ -3381,6 +3381,17 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   </div>
                 )}
               </div>
+              {/* 学習特化モード（ゲーム要素をOFF＝学びに集中） */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>学習特化モード</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>畑のゲーム要素（デコ・なでなで・みず・連続ログイン・レベル）を隠して、お金の学びと記録に集中。受験期などに。</div>
+                </div>
+                <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),studyMode:!(d.familySettings?.studyMode)}}))}
+                  style={{position:"relative",width:48,height:26,borderRadius:13,background:(fs.studyMode)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
+                  <div style={{position:"absolute",top:3,left:(fs.studyMode)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
               {/* 承認通知 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:fs.approvalNotification?8:16,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -8687,6 +8698,7 @@ function InvestTab({child,data,update}){
   const _fs=data.familySettings||{};
   const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
   const forexOff=!!_fs.forexOff || isJr;
+  const studyMode=!!_fs.studyMode;   // 学習特化: 畑のゲーム要素(デコ/なでなで/みず/ログボ/レベル)を隠す
   const tradeLimit=(_fs.dailyTradeLimit)||0;
   const _todayStr=new Date().toDateString();
   const tradesToday=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="invest_buy"||l.type==="invest_sell"||l.type==="forex_buy"||l.type==="forex_sell")&&new Date(l.date).toDateString()===_todayStr).length;
@@ -8925,12 +8937,14 @@ function InvestTab({child,data,update}){
       const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
         <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
-          <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
-            <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
-          </div>
-          {loginStreak>0&&<div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"7px 8px",fontSize:12,fontWeight:900,color:GP,whiteSpace:"nowrap"}}>📅{loginStreak}</div>}
-          <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div>
+          {studyMode
+            ? <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
+            : <><div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
+                <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
+              </div>
+              {loginStreak>0&&<div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"7px 8px",fontSize:12,fontWeight:900,color:GP,whiteSpace:"nowrap"}}>📅{loginStreak}</div>}
+              <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div></>}
           <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}>💰{myBal.toLocaleString()}</div>
         </div>
         <div style={{position:"relative",borderRadius:18,overflow:"hidden",marginBottom:10,border:`3px solid ${G}`,boxShadow:"0 6px 22px rgba(52,199,123,.3)"}}>
@@ -8941,11 +8955,11 @@ function InvestTab({child,data,update}){
               <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
             </button>
           </div>
-          {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える */}
-          <div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#bfe6a0,#a6d885)",padding:"4px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"2px solid #8fc070"}}>
+          {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える（学習モードでは非表示） */}
+          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#bfe6a0,#a6d885)",padding:"4px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"2px solid #8fc070"}}>
             {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.45}}>{it?it.e:"・"}</span>; })}
             <span style={{marginLeft:"auto",fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"rgba(255,255,255,.78)",borderRadius:8,padding:"2px 8px",flexShrink:0,whiteSpace:"nowrap"}}>🎨 もようがえ</span>
-          </div>
+          </div>}
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {stocks.map(s=>{
               const h=myHoldings.find(x=>x.stockId===s.id);
@@ -8971,18 +8985,18 @@ function InvestTab({child,data,update}){
             })}
           </div>
           <div style={{background:"rgba(24,122,78,.92)",padding:"5px 8px",display:"flex",alignItems:"center",gap:6}}>
-            <button onClick={patMon} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"3px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,fontFamily:F,flexShrink:0}}>
+            {!studyMode&&<button onClick={patMon} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"3px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,fontFamily:F,flexShrink:0}}>
               <img src="/assets/tanemon_water.png" alt="" style={{width:24,height:24,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
               <span style={{fontSize:9,fontWeight:900,color:"#fff"}}>なでる</span>
-            </button>
-            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?"作物を タップで 💧みずやり。タネモンも なでてあげよう":"あいてる畑を タップで タネを まこう！"}</span>
+            </button>}
+            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?(studyMode?"作物を タップで 売買。コツコツ 長く持とう":"作物を タップで 💧みずやり。タネモンも なでてあげよう"):"あいてる畑を タップで タネを まこう！"}</span>
           </div>
           <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
         </div>
         <div style={{display:"flex",gap:7}}>
-          <button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+          {!studyMode&&<button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{fontSize:18}}>🪣</span><span style={{fontSize:11,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9,fontWeight:800,color:"#4a7"}}>{Math.floor(bucketG)}g たまってる</span>
-          </button>
+          </button>}
           <button onClick={()=>setShowTrade(true)} style={{flex:1.5,background:GP,border:"none",borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{fontSize:18}}>🏠</span><span style={{fontSize:11,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span>
           </button>
@@ -9399,6 +9413,13 @@ function TipsSection({ageMode,child,data,update}){
   const rank=completedCourses>=8?"1級 修了🎓":`${9-completedCourses}級`;
   const curCourse=course?CURRICULUM.find(c=>c.id===course):null;
   const filtered=curCourse?ALL_TIPS.filter(t=>curCourse.tips.includes(t.id)):ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
+  // 📈 成長レポート(保護者向けROI): 入会時ベースラインを記録し Before/After を見せる
+  const quizMasteredN=quizDone.filter(id=>ALL_TIPS.find(t=>t.id===id)).length;
+  const baseline=(data.learnBaseline||{})[child.id];
+  useEffect(()=>{ if(!((data.learnBaseline||{})[child.id])){ update(d=>(d.learnBaseline?.[child.id]?d:{...d,learnBaseline:{...(d.learnBaseline||{}),[child.id]:{date:new Date().toISOString(),courses:completedCourses,quiz:quizMasteredN}}})); } },[]);
+  const baseRank=baseline?(9-(baseline.courses||0)):9;
+  const ymNow=new Date().toISOString().slice(0,7);
+  const choresThisMonth=(data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(ymNow)).length;
   const totalRead=readIds.filter(id=>ALL_TIPS.find(t=>t.id===id)).length;
   const handleOpen=tipId=>{
     if(openId===tipId){setOpenId(null);return;}
@@ -9434,6 +9455,26 @@ function TipsSection({ageMode,child,data,update}){
         );})}
       </div>
       {course&&<button onClick={()=>setCourse(null)} style={{marginTop:10,background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,padding:"6px 12px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>← ぜんぶのコースに もどる</button>}
+    </div>
+    {/* 📈 成長レポート（保護者向け・¥980のROIを見せる Before/After） */}
+    <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+        <span style={{fontSize:16}}>📈</span>
+        <span style={{fontWeight:900,fontSize:13,color:TEXT}}>成長レポート</span>
+        <span style={{fontSize:10,color:MUTED,fontWeight:700}}>（保護者向け）</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:GS,borderRadius:12,padding:"10px",marginBottom:8}}>
+        <div style={{textAlign:"center"}}><div style={{fontSize:9,fontWeight:800,color:TEXTS}}>入会時</div><div style={{fontSize:16,fontWeight:900,color:MUTED}}>{baseRank}級</div></div>
+        <span style={{fontSize:18,color:GP}}>→</span>
+        <div style={{textAlign:"center"}}><div style={{fontSize:9,fontWeight:800,color:GP}}>いま</div><div style={{fontSize:18,fontWeight:900,color:GP}}>{rank}</div></div>
+        {(9-completedCourses)<baseRank&&<span style={{fontSize:11,fontWeight:900,color:"#fff",background:G,borderRadius:8,padding:"3px 8px"}}>↑{baseRank-(9-completedCourses)}級UP</span>}
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:8}}>
+        {[["クイズ正解",`${quizMasteredN}/${ALL_TIPS.length}`],["コースクリア",`${completedCourses}/8`],["今月お手伝い",`${choresThisMonth}回`]].map(([k,v])=>(
+          <div key={k} style={{flex:1,background:BG,borderRadius:10,padding:"7px 4px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:900,color:TEXT}}>{v}</div><div style={{fontSize:9,color:MUTED,fontWeight:700}}>{k}</div></div>
+        ))}
+      </div>
+      <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5}}>習得した分野：{completedCourses>0?CURRICULUM.filter(courseDone).map(c=>c.t).join("・"):"まだクリアしたコースはありません。クイズに挑戦して級を上げよう！"}</div>
     </div>
     <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:20}}>💡</span>
