@@ -980,6 +980,17 @@ const INIT = {
     {id:"s3",emoji:"🚗",name:"トヨタ",ticker:"7203.T",sector:"自動車",price:3000,history:[3000],currency:"JPY"},
     {id:"s4",emoji:"🍔",name:"マクドナルド",ticker:"MCD",sector:"食品",price:380,history:[380],currency:"USD"},
     {id:"s5",emoji:"🍎",name:"Apple",ticker:"AAPL",sector:"テクノロジー",price:220,history:[220],currency:"USD"},
+    {id:"s6",emoji:"🧸",name:"タカラトミー",ticker:"7867.T",sector:"おもちゃ",price:2800,history:[2800],currency:"JPY"},
+    {id:"s7",emoji:"🎀",name:"サンリオ",ticker:"8136.T",sector:"キャラクター",price:6000,history:[6000],currency:"JPY"},
+    {id:"s8",emoji:"🥤",name:"コカ・コーラ",ticker:"KO",sector:"飲料",price:62,history:[62],currency:"USD"},
+    {id:"s9",emoji:"📦",name:"アマゾン",ticker:"AMZN",sector:"小売",price:220,history:[220],currency:"USD"},
+    {id:"s10",emoji:"👟",name:"ナイキ",ticker:"NKE",sector:"スポーツ",price:75,history:[75],currency:"USD"},
+    {id:"s11",emoji:"🏰",name:"ディズニー",ticker:"DIS",sector:"エンタメ",price:110,history:[110],currency:"USD"},
+    {id:"s12",emoji:"👕",name:"ユニクロ",ticker:"9983.T",sector:"衣料",price:48000,history:[48000],currency:"JPY"},
+    {id:"s13",emoji:"🏦",name:"三菱UFJ",ticker:"8306.T",sector:"銀行",price:1800,history:[1800],currency:"JPY"},
+    {id:"s14",emoji:"📱",name:"ソフトバンク",ticker:"9984.T",sector:"通信",price:9000,history:[9000],currency:"JPY"},
+    {id:"s15",emoji:"🍜",name:"日清食品",ticker:"2897.T",sector:"食品",price:3700,history:[3700],currency:"JPY"},
+    {id:"s16",emoji:"⚡",name:"テスラ",ticker:"TSLA",sector:"自動車",price:340,history:[340],currency:"USD"},
   ],
   holdings: {},
   stockLastUpdate: "",
@@ -1111,6 +1122,8 @@ function migrate(d) {
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
   if(!d.stocks||d.stocks.length===0) d.stocks=INIT.stocks;
   if(d.stocks&&d.stocks[0]&&!d.stocks[0].ticker) d.stocks=INIT.stocks;
+  // 銘柄拡充マイグレーション: 既存ユーザーのstocksに、INITの新銘柄(未保有のもの)を追加(価格は次回fetchで更新)
+  if(d.stocks){ const have=new Set(d.stocks.map(s=>s.id)); const add=INIT.stocks.filter(s=>!have.has(s.id)); if(add.length) d.stocks=[...d.stocks,...add]; }
   if(!d.forex||Object.keys(d.forex).length===0) d.forex={
     "USDJPY=X":{code:"USD",flag:"🇺🇸",name:"アメリカ ドル",price:155,prev:155,history:[152,153,154,155,155],changePct:0,realData:false},
     "EURJPY=X":{code:"EUR",flag:"🇪🇺",name:"ユーロ",price:168,prev:168,history:[165,166,167,168,168],changePct:0,realData:false},
@@ -9063,6 +9076,16 @@ function InvestTab({child,data,update}){
           </div>
           <span style={{fontSize:17,fontWeight:900,color:"#ffd966",whiteSpace:"nowrap"}}>+{totalDividend.toLocaleString()}pt</span>
         </div>
+        {/* 🧺 分散メーター: 何業種に分けて持っているか(卵は1つのカゴに盛るな) */}
+        {myHoldings.length>0&&(()=>{
+          const secs=[...new Set(myHoldings.map(h=>{const st=stocks.find(x=>x.id===h.stockId);return st?st.sector:null;}).filter(Boolean))];
+          const n=secs.length;
+          const lab=n>=4?{t:"バランス◎ 分散できてる！",c:"#4ade80",pct:100}:n>=2?{t:"もう少し 業種を分けると安心",c:"#f5c842",pct:60}:{t:"1業種に集中。分けると リスクが減るよ",c:"#f87171",pct:28};
+          return(<div style={{marginBottom:12,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"8px 11px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}><span style={{fontSize:11,fontWeight:800,color:"#cfe9d6"}}>🧺 分散（{n}業種）</span><span style={{fontSize:10.5,fontWeight:800,color:lab.c}}>{lab.t}</span></div>
+            <div style={{height:7,background:"rgba(255,255,255,.12)",borderRadius:4,overflow:"hidden"}}><div style={{width:`${lab.pct}%`,height:"100%",background:lab.c,borderRadius:4,transition:"width .4s"}}/></div>
+          </div>);
+        })()}
         {/* 🌱 ポートフォリオが育つ畑(保有数・含み益で 土→芽→葉→花) */}
         {(()=>{const cnt=myHoldings.length;const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const st=cnt===0?{e:"🟫",t:"タネをまこう（株を買ってみよう）"}:gp>=10?{e:"🌸",t:"含み益で 花が さいた！"}:cnt>=3?{e:"🌿",t:`${cnt}銘柄を そだて中！`}:{e:"🌱",t:`${cnt}銘柄を そだて中`};return(<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:myHoldings.length>0?12:0,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"7px 11px"}}><span style={{fontSize:24}}>{st.e}</span><span style={{fontSize:11.5,color:"#cfe9d6",fontWeight:700}}>{st.t}</span></div>);})()}
         {myHoldings.length>0&&(()=>{
