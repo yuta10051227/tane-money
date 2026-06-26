@@ -23,6 +23,48 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "168102674534",
   appId: "1:168102674534:web:691b66d776ed0d60b5ada7"
 };
+// ── バックエンド連携設定（未設定なら各機能は安全に無効化＝従来動作のまま）──
+// FCM Web Push の公開VAPIDキー（Firebase Console > Cloud Messaging > Web Push 証明書）。
+// 空のままだとサーバープッシュ登録はスキップされ、起動時ローカル通知のみ動く。
+const TANE_VAPID_KEY = "";
+// Serverless API のベースURL。同一オリジン(Vercel)に置くなら空でOK("/api/...")。
+const TANE_API_BASE = "";
+
+// 外部スクリプトの動的ロード（FCM messaging-compat 用）
+function taneLoadScript(src){
+  return new Promise((resolve,reject)=>{
+    try{
+      if(document.querySelector(`script[src="${src}"]`)){ resolve(); return; }
+      const s=document.createElement("script"); s.src=src; s.async=true;
+      s.onload=()=>resolve(); s.onerror=()=>reject(new Error("load_failed"));
+      document.head.appendChild(s);
+    }catch(e){ reject(e); }
+  });
+}
+// FCMトークンを取得（許可が無ければ要求）。失敗時は{ok:false}で、呼び出し側は従来動作にフォールバック。
+async function taneGetPushToken(){
+  try{
+    if(!TANE_VAPID_KEY) return {ok:false,reason:"no_vapid"};
+    if(!("Notification"in window)||!("serviceWorker"in navigator)) return {ok:false,reason:"unsupported"};
+    let perm=Notification.permission;
+    if(perm==="default") perm=await Notification.requestPermission();
+    if(perm!=="granted") return {ok:false,reason:"denied"};
+    await taneLoadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js");
+    if(typeof firebase==="undefined"||!firebase.messaging) return {ok:false,reason:"no_lib"};
+    getDB(); // app初期化＋匿名認証を保証
+    const reg=await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const token=await firebase.messaging().getToken({vapidKey:TANE_VAPID_KEY,serviceWorkerRegistration:reg});
+    return token?{ok:true,token}:{ok:false,reason:"no_token"};
+  }catch(e){ return {ok:false,reason:String(e&&e.message||e)}; }
+}
+// Serverless API 呼び出し（POST JSON）
+async function taneApi(path,body){
+  const r=await fetch((TANE_API_BASE||"")+"/api/"+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  let j={}; try{ j=await r.json(); }catch(e){}
+  return {status:r.status,...j};
+}
+function taneFamilyCode(){ try{ return localStorage.getItem(FAMILY_CODE_KEY)||_familyCode||""; }catch(e){ return _familyCode||""; } }
+
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
 // ── データ消失の防止ガード ──
 // クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。
@@ -2892,6 +2934,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [smRLabel, setSmRLabel] = useState("");
   const [smRCost, setSmRCost] = useState("5");
   const [smRUnit, setSmRUnit] = useState("");
+  const [planMsg, setPlanMsg] = useState("");
+  const [planBusy, setPlanBusy] = useState(false);
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -3648,18 +3692,52 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   </button>
                 );})}
               </div>
-              {/* 購入導線（決済は近日対応・正直表示） */}
-              <button disabled={!sub.plan} onClick={()=>{}}
-                style={{width:"100%",padding:"13px",background:sub.plan?GP:BORDER,border:"none",borderRadius:12,color:"#fff",fontWeight:800,fontSize:14,cursor:sub.plan?"pointer":"default",fontFamily:F,marginBottom:8}}>
-                {sub.plan?"このプランで購入手続きへ":"プランを選んでください"}
+              {/* 購入導線（Stripe Checkout。バックエンド未設定なら正直に案内） */}
+              <button disabled={!sub.plan||planBusy} onClick={async()=>{
+                if(!sub.plan)return; setPlanMsg(""); setPlanBusy(true);
+                try{
+                  const code=taneFamilyCode();
+                  const r=await taneApi("checkout",{plan:sub.plan,familyCode:code});
+                  if(r.url){ window.location.href=r.url; return; }
+                  if(r.error==="billing_not_configured"||r.error==="price_not_configured"||r.status===503)
+                    setPlanMsg("オンライン決済は近日対応予定です。現在は無料でご利用いただけます。");
+                  else setPlanMsg("手続きを開始できませんでした。時間をおいてお試しください。");
+                }catch(e){ setPlanMsg("オンライン決済は近日対応予定です。現在は無料でご利用いただけます。"); }
+                setPlanBusy(false);
+              }}
+                style={{width:"100%",padding:"13px",background:sub.plan&&!planBusy?GP:BORDER,border:"none",borderRadius:12,color:"#fff",fontWeight:800,fontSize:14,cursor:sub.plan&&!planBusy?"pointer":"default",fontFamily:F,marginBottom:8}}>
+                {planBusy?"処理中…":sub.plan?"このプランで購入手続きへ":"プランを選んでください"}
               </button>
-              <div style={{background:BS,border:`1px solid ${B}`,borderRadius:10,padding:"9px 12px",marginBottom:12}}>
-                <div style={{fontSize:10.5,color:B,fontWeight:800,lineHeight:1.5}}>※ オンライン決済は近日対応予定です。現在は無料でご利用いただけます。正式リリース時に、選択中のプランをそのまま引き継げます。</div>
-              </div>
-              {/* 解約はいつでも */}
+              {planMsg&&<div style={{background:BS,border:`1px solid ${B}`,borderRadius:10,padding:"9px 12px",marginBottom:8}}>
+                <div style={{fontSize:10.5,color:B,fontWeight:800,lineHeight:1.5}}>{planMsg}</div>
+              </div>}
+              <div style={{fontSize:10,color:MUTED,fontWeight:700,lineHeight:1.5,marginBottom:12}}>※ 14日間は無料体験。トライアル終了までは課金されません。正式リリース時に選択中のプランをそのまま引き継げます。</div>
+              {/* 保護者の端末で通知を受け取る（サーバープッシュ登録） */}
+              <button onClick={async()=>{
+                setPlanMsg("");
+                const pt=await taneGetPushToken();
+                const me=(data.parents||[])[0];
+                if(pt.ok&&me){ update(d=>({...d,pushTokens:{...(d.pushTokens||{}),[me.id]:{token:pt.token,role:"parent",name:me.name||"保護者",ts:Date.now()}}})); setPlanMsg("保護者の端末で通知を受け取ります🔔（お子さまが数日使わないとお知らせします）"); }
+                else if(pt.reason==="no_vapid") setPlanMsg("プッシュ通知は近日対応予定です（現在は承認タブの休眠アラートでご確認いただけます）。");
+                else if(pt.reason==="denied") setPlanMsg("通知がブロックされています。端末の設定から許可してください。");
+                else setPlanMsg("通知を登録できませんでした。");
+              }} style={{width:"100%",padding:"11px",background:BS,border:`1.5px solid ${B}`,borderRadius:12,color:B,fontWeight:800,fontSize:12.5,cursor:"pointer",fontFamily:F,marginBottom:12}}>
+                🔔 保護者の端末で「休眠お知らせ」を受け取る
+              </button>
+              {/* 解約・支払い管理 */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"11px 14px"}}>
-                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:3}}>解約について</div>
-                <div style={{fontSize:10.5,color:MUTED,fontWeight:700,lineHeight:1.5}}>いつでもこの画面から解約できます（解約後も期間終了までは利用可能）。違約金や最低利用期間はありません。学んだ記録・級は解約後も残ります。</div>
+                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:3}}>解約・お支払い管理</div>
+                <div style={{fontSize:10.5,color:MUTED,fontWeight:700,lineHeight:1.5,marginBottom:8}}>いつでも解約できます（解約後も期間終了までは利用可能）。違約金や最低利用期間はありません。学んだ記録・級は解約後も残ります。</div>
+                <button onClick={async()=>{
+                  setPlanMsg("");
+                  const code=taneFamilyCode();
+                  const r=await taneApi("portal",{familyCode:code});
+                  if(r.url){ window.location.href=r.url; return; }
+                  if(r.error==="no_customer") setPlanMsg("現在は無料体験中です（解約手続きは課金開始後にご利用いただけます）。");
+                  else setPlanMsg("お支払い管理は近日対応予定です。");
+                }} style={{width:"100%",padding:"9px",background:"transparent",border:`1.5px solid ${BORDER}`,borderRadius:10,color:TEXTS,fontWeight:800,fontSize:11.5,cursor:"pointer",fontFamily:F}}>
+                  お支払い・解約の管理ページへ
+                </button>
               </div>
             </div>);
           })()}
@@ -9602,7 +9680,13 @@ function TipsSection({ageMode,child,data,update}){
       if(!("Notification"in window)){update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}}));return;}
       let perm=Notification.permission;
       if(perm==="default") perm=await Notification.requestPermission();
-      if(perm==="granted"){ update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}})); try{new Notification("タネマネー",{body:"まいにちリマインダーをオンにしたよ🔔"});}catch(e){} }
+      if(perm==="granted"){
+        update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}}));
+        try{new Notification("タネマネー",{body:"まいにちリマインダーをオンにしたよ🔔"});}catch(e){}
+        // サーバープッシュ用トークンを登録（アプリを閉じていても引き戻せるように）。VAPID未設定なら自動スキップ。
+        const pt=await taneGetPushToken();
+        if(pt.ok) update(d=>({...d,pushTokens:{...(d.pushTokens||{}),[child.id]:{token:pt.token,role:"child",name:child.name,ts:Date.now()}}}));
+      }
     }catch(e){}
   };
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
