@@ -8741,13 +8741,16 @@ function InvestTab({child,data,update}){
     if(tradeLimitReached){ setTradeFlash({msg:`🌙 きょうの 売り買いは ここまで！また あした`,color:"#D95C55"}); setTimeout(()=>setTradeFlash(null),1900); return; }
     if(!txGuard("sell_"+child.id)) return;   // 連打ガード(二重売却防止)
     const _profit=Math.round(sellPts-(selHolding?selHolding.avgPrice*qtyN:0));
+    const _tax=_profit>0?Math.round(_profit*0.20315):0;   // 譲渡益課税20.315%(本物だと利益にかかる。NISAなら0)
+    const _net=sellPts-_tax;                              // 手取り
+    const _netGain=_profit-_tax;                          // 税引後の もうけ
     const _invHeld=selHolding?.firstBuyDate?(Date.now()-new Date(selHolding.firstBuyDate).getTime())/86400000:0; // 保有日数(辛抱の度合い)
-    if(_profit>=0){ setTradeFlash(_invHeld>=30?{msg:`🌾 ${Math.floor(_invHeld)}日 そだてて 収穫！+${_profit.toLocaleString()}pt`,color:"#E8B83E"}:{msg:`🌱 +${_profit.toLocaleString()}pt 収穫。長く そだてると もっと実るよ`,color:"#34C77B"}); }
+    if(_profit>=0){ const _taxNote=_tax>0?`（税-${_tax}pt）`:""; setTradeFlash(_invHeld>=30?{msg:`🌾 ${Math.floor(_invHeld)}日 そだてて 収穫！手取り+${_netGain.toLocaleString()}pt${_taxNote}`,color:"#E8B83E"}:{msg:`🌱 手取り+${_netGain.toLocaleString()}pt 収穫${_taxNote}。長く そだてると もっと実るよ`,color:"#34C77B"}); }
     else { setTradeFlash({msg:`🌱 ${_profit.toLocaleString()}pt 収穫。また たねを まこう！`,color:"#D95C55"}); }
     setTimeout(()=>setTradeFlash(null),1700);
     // 収穫フラッシュ(全画面)は「長く育てて勝てた=辛抱」のときだけ。短期の利確では出さない(射幸性カット)
-    if(_profit>=0 && _invHeld>=30){ setHarvestBurst({pts:_profit,days:Math.floor(_invHeld)}); setTimeout(()=>setHarvestBurst(null),1300); }
-    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%引後）`,pts:sellPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
+    if(_profit>=0 && _invHeld>=30){ setHarvestBurst({pts:_netGain,days:Math.floor(_invHeld)}); setTimeout(()=>setHarvestBurst(null),1300); }
+    update(d=>({...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:Math.round((h.qty-qtyN)*10)/10}:h).filter(h=>h.qty>0)},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_sell",label:`📉 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 売却（手数料2%${_tax>0?`・税${_tax}pt`:""}引後）`,pts:_net,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     setQty("0.1");setSelected(null);
   }
 
@@ -9175,7 +9178,7 @@ function InvestTab({child,data,update}){
             <div style={{background:"#0d0d1a",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
               {mode==="buy"?<>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa",marginBottom:2}}><span>株価</span><span style={{color:"#fff"}}>{basePrice.toLocaleString()}pt</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>手数料(10%)</span><span>{(costPts-basePrice).toLocaleString()}pt</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>手数料(2%)</span><span>{(costPts-basePrice).toLocaleString()}pt</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#aaa",marginBottom:4}}><span>合計</span><span style={{color:"#fff",fontWeight:700}}>{costPts.toLocaleString()}pt</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>残高</span><span style={{color:myBal>=costPts?"#4ade80":"#f87171",fontWeight:700}}>{myBal.toLocaleString()}pt</span></div>
                 {myBal<costPts&&<p style={{color:"#f87171",fontSize:11,margin:"6px 0 0",fontWeight:700}}>残高が足りないよ</p>}
@@ -9183,16 +9186,20 @@ function InvestTab({child,data,update}){
                 <input value={tradeComment} onChange={e=>setTradeComment(e.target.value.slice(0,30))} placeholder="例：任天堂好きだから" maxLength={30} style={{width:"100%",background:"#0d0d1a",border:"1px solid #333",borderRadius:8,padding:"7px 10px",color:"#fff",fontSize:13,fontFamily:F,boxSizing:"border-box"}}/>
               </>:<>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa",marginBottom:2}}><span>売却額</span><span style={{color:"#fff"}}>{Math.floor(toPts(selStock||{price:0},selStock?.price||0)*qtyN).toLocaleString()}pt</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>手数料(10%)</span><span>-{(Math.floor(toPts(selStock||{price:0},selStock?.price||0)*qtyN)-sellPts).toLocaleString()}pt</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#aaa",marginBottom:4}}><span>受取金額</span><span style={{color:"#fff",fontWeight:700}}>{sellPts.toLocaleString()}pt</span></div>
-                {selHolding&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>損益</span><span style={{color:(sellPts-selHolding.avgPrice*qtyN)>=0?"#4ade80":"#f87171",fontWeight:700}}>{(sellPts-selHolding.avgPrice*qtyN)>=0?"+":""}{(sellPts-selHolding.avgPrice*qtyN).toLocaleString()}pt</span></div>}
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>手数料(2%)</span><span>-{(Math.floor(toPts(selStock||{price:0},selStock?.price||0)*qtyN)-sellPts).toLocaleString()}pt</span></div>
+                {selHolding&&(()=>{const _p=Math.round(sellPts-selHolding.avgPrice*qtyN);const _t=_p>0?Math.round(_p*0.20315):0;return(<>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa",marginBottom:2}}><span>もうけ（損益）</span><span style={{color:_p>=0?"#4ade80":"#f87171",fontWeight:700}}>{_p>=0?"+":""}{_p.toLocaleString()}pt</span></div>
+                  {_t>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f5c842",marginBottom:4}}><span>税金(20.315%)</span><span>-{_t.toLocaleString()}pt</span></div>}
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#aaa",marginBottom:_t>0?4:0}}><span>手取り</span><span style={{color:"#fff",fontWeight:700}}>{(sellPts-_t).toLocaleString()}pt</span></div>
+                  {_t>0&&<div style={{fontSize:10,color:"#7fb0ff",fontWeight:700}}>💡 本物だと もうけの約20%は税金。でも「NISA」なら税金は0だよ</div>}
+                </>);})()}
                 {(!selHolding||qtyN>selHolding.qty)&&<p style={{color:"#f87171",fontSize:11,margin:"6px 0 0",fontWeight:700}}>保有株数が足りない（{selHolding?.qty||0}株）</p>}
               </>}
             </div>
             <button onClick={mode==="buy"?doBuy:doSell}
               disabled={mode==="buy"?(myBal<costPts||qtyN<0.1):(!selHolding||qtyN>selHolding.qty||qtyN<0.1)}
               style={{width:"100%",background:mode==="buy"?"#22c55e":"#ef4444",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,opacity:(mode==="buy"?(myBal<costPts||qtyN<0.1):(!selHolding||qtyN>selHolding.qty||qtyN<0.1))?0.4:1}}>
-              {mode==="buy"?`🌱 ${fmtQty(qtyN)}株 タネをまく！（${costPts.toLocaleString()}pt）`:`🌾 ${fmtQty(qtyN)}株 収穫する！（${sellPts.toLocaleString()}pt受取）`}
+              {mode==="buy"?`🌱 ${fmtQty(qtyN)}株 タネをまく！（${costPts.toLocaleString()}pt）`:(()=>{const _p=selHolding?Math.round(sellPts-selHolding.avgPrice*qtyN):0;const _t=_p>0?Math.round(_p*0.20315):0;return `🌾 ${fmtQty(qtyN)}株 収穫する！（手取り${(sellPts-_t).toLocaleString()}pt）`;})()}
             </button>
           </div>}
         </div>);
