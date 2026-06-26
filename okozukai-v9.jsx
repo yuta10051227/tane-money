@@ -8702,6 +8702,9 @@ function InvestTab({child,data,update}){
   const cropEmoji = (gp)=> gp==null?"🟫" : gp>=10?"🌸" : gp>=3?"🌿" : gp>=-3?"🌱" : "🌧";
   // 配当ごはん: 配当が相棒の育てた度に変わった量(可視化用・getMonStateと同じ上限30)
   const divFed = Math.min(30, (data.logs||[]).filter(l=>l.cid===child.id && l.type==="interest" && /配当/.test(l.label||"")).length);
+  const divLogs = (data.logs||[]).filter(l=>l.cid===child.id && l.type==="interest");
+  const totalDividend = divLogs.reduce((s,l)=>s+(l.pts||0),0);   // 配当でふえた累計
+  const lastDividend = divLogs.length>0 ? (divLogs[0].pts||0) : 0; // 直近の配当(logsは新しい順)
   const selStock=stocks.find(s=>s.id===selected);
   const selHolding=myHoldings.find(h=>h.stockId===selected);
   const qtyN=Math.max(0.1,Math.round((parseFloat(qty)||0.1)*10)/10);
@@ -9030,6 +9033,15 @@ function InvestTab({child,data,update}){
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
           <div><span style={{color:"#aaa",fontSize:11}}>損益 </span><span style={{fontWeight:700,fontSize:13,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"+":""}{portfolioGain.toLocaleString()}pt</span>{myHoldings.length>0&&(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const lab=gp>=10?{t:"🚀 絶好調！",c:"#4ade80"}:gp>=0?{t:"🎉 いい調子！",c:"#4ade80"}:gp>=-5?{t:"😌 まだ大丈夫",c:"#ccc"}:{t:"🌱 長期目線で！",c:"#f5c842"};return <span style={{marginLeft:6,fontSize:11,fontWeight:800,color:lab.c}}>{lab.t}</span>;})()}</div>
+        </div>
+        {/* 💰 配当でふえた合計（毎週もらえる配当の累計） */}
+        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:myHoldings.length>0?12:0,background:"rgba(232,184,62,.14)",border:"1px solid rgba(232,184,62,.4)",borderRadius:12,padding:"8px 11px"}}>
+          <span style={{fontSize:16}}>💰</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,color:"#ffe9b0",fontWeight:800}}>配当で ふえた合計（毎週もらえるよ）</div>
+            {lastDividend>0&&<div style={{fontSize:10,color:"#cdb88a",fontWeight:700,marginTop:1}}>このまえの配当：+{lastDividend.toLocaleString()}pt</div>}
+          </div>
+          <span style={{fontSize:17,fontWeight:900,color:"#ffd966",whiteSpace:"nowrap"}}>+{totalDividend.toLocaleString()}pt</span>
         </div>
         {/* 🌱 ポートフォリオが育つ畑(保有数・含み益で 土→芽→葉→花) */}
         {(()=>{const cnt=myHoldings.length;const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const st=cnt===0?{e:"🟫",t:"タネをまこう（株を買ってみよう）"}:gp>=10?{e:"🌸",t:"含み益で 花が さいた！"}:cnt>=3?{e:"🌿",t:`${cnt}銘柄を そだて中！`}:{e:"🌱",t:`${cnt}銘柄を そだて中`};return(<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:myHoldings.length>0?12:0,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"7px 11px"}}><span style={{fontSize:24}}>{st.e}</span><span style={{fontSize:11.5,color:"#cfe9d6",fontWeight:700}}>{st.t}</span></div>);})()}
