@@ -991,6 +991,16 @@ const INIT = {
     {id:"s14",emoji:"📱",name:"ソフトバンク",ticker:"9984.T",sector:"通信",price:9000,history:[9000],currency:"JPY"},
     {id:"s15",emoji:"🍜",name:"日清食品",ticker:"2897.T",sector:"食品",price:3700,history:[3700],currency:"JPY"},
     {id:"s16",emoji:"⚡",name:"テスラ",ticker:"TSLA",sector:"自動車",price:340,history:[340],currency:"USD"},
+    {id:"s17",emoji:"🔍",name:"グーグル",ticker:"GOOGL",sector:"テクノロジー",price:175,history:[175],currency:"USD"},
+    {id:"s18",emoji:"🪟",name:"マイクロソフト",ticker:"MSFT",sector:"テクノロジー",price:420,history:[420],currency:"USD"},
+    {id:"s19",emoji:"💻",name:"エヌビディア",ticker:"NVDA",sector:"半導体",price:130,history:[130],currency:"USD"},
+    {id:"s20",emoji:"🎬",name:"ネットフリックス",ticker:"NFLX",sector:"エンタメ",price:900,history:[900],currency:"USD"},
+    {id:"s21",emoji:"🍫",name:"明治",ticker:"2269.T",sector:"お菓子",price:3300,history:[3300],currency:"JPY"},
+    {id:"s22",emoji:"🍙",name:"セブン&アイ",ticker:"3382.T",sector:"コンビニ",price:2200,history:[2200],currency:"JPY"},
+    {id:"s23",emoji:"✈",name:"ANA",ticker:"9202.T",sector:"航空",price:3000,history:[3000],currency:"JPY"},
+    {id:"s24",emoji:"🚄",name:"JR東日本",ticker:"9020.T",sector:"鉄道",price:2800,history:[2800],currency:"JPY"},
+    {id:"s25",emoji:"🧴",name:"資生堂",ticker:"4911.T",sector:"化粧品",price:2500,history:[2500],currency:"JPY"},
+    {id:"s26",emoji:"🎢",name:"オリエンタルランド",ticker:"4661.T",sector:"レジャー",price:3500,history:[3500],currency:"JPY"},
   ],
   holdings: {},
   stockLastUpdate: "",
@@ -1122,8 +1132,8 @@ function migrate(d) {
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
   if(!d.stocks||d.stocks.length===0) d.stocks=INIT.stocks;
   if(d.stocks&&d.stocks[0]&&!d.stocks[0].ticker) d.stocks=INIT.stocks;
-  // 銘柄拡充マイグレーション: 既存ユーザーのstocksに、INITの新銘柄(未保有のもの)を追加(価格は次回fetchで更新)
-  if(d.stocks){ const have=new Set(d.stocks.map(s=>s.id)); const add=INIT.stocks.filter(s=>!have.has(s.id)); if(add.length) d.stocks=[...d.stocks,...add]; }
+  // 銘柄拡充マイグレーション: 既存ユーザーのstocksにINITの新銘柄を追加し、株価取得を強制再実行(チャート用の30日履歴を入れる)
+  if(d.stocks){ const have=new Set(d.stocks.map(s=>s.id)); const add=INIT.stocks.filter(s=>!have.has(s.id)); if(add.length){ d.stocks=[...d.stocks,...add]; d.stockLastUpdate=""; d.stockFetchStatus="idle"; } }
   if(!d.forex||Object.keys(d.forex).length===0) d.forex={
     "USDJPY=X":{code:"USD",flag:"🇺🇸",name:"アメリカ ドル",price:155,prev:155,history:[152,153,154,155,155],changePct:0,realData:false},
     "EURJPY=X":{code:"EUR",flag:"🇪🇺",name:"ユーロ",price:168,prev:168,history:[165,166,167,168,168],changePct:0,realData:false},
@@ -7122,8 +7132,9 @@ async function fetchRealStockPrices(data,update){
         currency, realData:true
       };
     }catch(e){
-      // この銘柄は前回値を維持
-      stockResults[s.id]=null;
+      // 取得失敗: 履歴が無い/短い銘柄(新銘柄など)はダミー30日履歴を作ってチャートを出せるように。既存銘柄は前回値を維持
+      if(!s.history||s.history.length<2){ stockResults[s.id]={price:s.price,history:makeFallbackHistory(s.price),changePct:0,currency:s.currency,realData:false}; }
+      else stockResults[s.id]=null;
     }
     // 取得できたものから随時update
     const currentResults = {...stockResults};
