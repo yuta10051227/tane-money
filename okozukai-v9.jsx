@@ -9416,18 +9416,33 @@ const ALL_TIPS=[
   {id:"t34",cat:"貯金・節約",emoji:"🆘",title:"もしもの備え",body:"急な出費（こわれた・病気など）に備えて、すぐ使わない「もしものお金」を 少し貯めておくと安心。投資の前に、まず この安心のお金を 用意するのが順番だよ。",q:"もしもの備えは？",o:["使わないお金を 少し貯めておく","全部 使う","借りれば いい"],a:0},
   {id:"t35",cat:"お金のきほん",emoji:"🤐",title:"お金の詐欺に注意",body:"「絶対もうかる」「あなただけ特別」はウソのサイン。うまい話には 裏がある。あやしいと思ったら お金を出す前に、かならず 大人に相談しようね。",q:"『絶対もうかる』と 言われたら？",o:["あやしい！大人に 相談","すぐ お金を 出す","ひみつに する"],a:0},
   {id:"t36",cat:"投資",emoji:"🧮",title:"複利でふえる例",body:"毎年5%ずつ増えると、10年で約1.6倍、20年で約2.6倍、30年で約4.3倍に。早く始めて 長く続けるほど、時間が味方してくれる。これが複利の力だよ。",q:"複利で 一番 大事なのは？",o:["長い 時間","一発の 大勝負","運だけ"],a:0},
+  // ── 純増コンテンツ 第1弾（コンテンツ枯渇対策・48話へ）──
+  {id:"t37",cat:"投資",emoji:"📜",title:"72の法則",body:"「72 ÷ 年の利率」で、お金が2倍になるまでの年数がだいたい分かる。年6%なら72÷6=12年。早見できる便利な計算だよ。",q:"年6%だと お金が2倍に なるのは およそ？",o:["12年","2年","50年"],a:0},
+  {id:"t38",cat:"投資",emoji:"🛟",title:"暴落はこわくない",body:"株が大きく下がる「暴落」は、長く投資する人にはむしろ安く買えるチャンス。みんなが売ってあわてる時こそ、コツコツ続ける人が強いよ。",q:"暴落のとき コツコツ投資の人は？",o:["あわてず 続ける","全部 売る","借金して 買う"],a:0},
+  {id:"t39",cat:"お金のきほん",emoji:"📐",title:"金利ってなに？",body:"お金を借りたり預けたりするときの「レンタル料」が金利。借りると払う・預けるともらえる。低い金利で借り、高い利回りで増やすのが基本だよ。",q:"金利は お金の？",o:["レンタル料","重さ","色"],a:0},
+  {id:"t40",cat:"貯金・節約",emoji:"🏠",title:"固定費と変動費",body:"毎月きまってかかるのが「固定費」（サブスク・家賃など）、月で変わるのが「変動費」（おやつ・遊び）。節約は まず固定費を見直すと効果が大きいよ。",q:"節約で 先に見直すと よいのは？",o:["固定費","変動費","おこづかい全部"],a:0},
+  {id:"t41",cat:"社会・経済",emoji:"💱",title:"円安と円高",body:"1ドル=100円→150円になるのが「円安」、150円→100円が「円高」。円安だと輸入品が高く、海外旅行も高くつく。ニュースでよく出る言葉だよ。",q:"1ドル100円→150円は？",o:["円安","円高","金利"],a:0},
+  {id:"t42",cat:"働くこと",emoji:"🚀",title:"会社をつくるってどんなこと？",body:"自分でサービスや商品を考えて売るのが「起業」。うまくいけば大きく稼げるけど、お客さんに価値を届けられるかが すべて。失敗から学ぶ力も大事だよ。",q:"起業で 一番 大切なのは？",o:["お客さんに 価値を届ける","運だけ","ねがうこと"],a:0},
+  {id:"t43",cat:"投資",emoji:"🎁",title:"配当ってなに？",body:"会社がもうけの一部を、株を持つ人に分けてくれるのが「配当」。ただし会社の調子が悪いと減ったり止まったりする。「持てば必ずもらえる」わけではないよ。",q:"配当について 正しいのは？",o:["減ったり止まったり する","ぜったい もらえる","税金が 0になる"],a:0},
+  {id:"t44",cat:"お金のきほん",emoji:"☂",title:"保険ってなに？",body:"みんなで少しずつお金を出し合い、だれかに「もしも」が起きた時に助ける仕組みが保険。大きな事故や病気の備え。かけすぎ・入りすぎにも注意だよ。",q:"保険は どんな しくみ？",o:["みんなで 出し合い 助け合う","必ず もうかる","税金の こと"],a:0},
+  {id:"t45",cat:"貯金・節約",emoji:"🔁",title:"サブスクの見直し",body:"毎月じわじわ引かれるサブスクは、使っていないものを 1つ解約するだけで 年に数千円の節約に。「なんとなく続けている」を見つけよう。",q:"使ってない サブスクは？",o:["解約して 節約","ぜんぶ 続ける","気にしない"],a:0},
+  {id:"t46",cat:"社会・経済",emoji:"🌐",title:"GDPってなに？",body:"その国で1年間に作られたモノ・サービスの合計が「GDP」。国の経済の元気さをはかるものさし。増えると景気が良い、減ると不景気の目安だよ。",q:"GDPは 何を はかる？",o:["国の経済の 元気さ","人口の 多さ","土地の 広さ"],a:0},
+  {id:"t47",cat:"Tane Money",emoji:"💪",title:"失敗から学ぶ",body:"投資もお手伝いも、うまくいかない日がある。大事なのは「なぜ？」と考えて次に活かすこと。失敗は学びの種。タネマネーは何度でも挑戦できるよ。",q:"失敗したとき 大切なのは？",o:["なぜか考えて 次に活かす","あきらめる","かくす"],a:0},
+  {id:"t48",cat:"投資",emoji:"🧰",title:"投資信託・ETFってなに？",body:"たくさんの会社の株を 1つにまとめた「おべんとうパック」が投資信託やETF。1本買うだけで自然に分散できる。オルカンやS&P500もこの仲間だよ。",q:"投資信託・ETFの よさは？",o:["1本で 分散できる","必ず 勝てる","税金0になる"],a:0},
 ];
 
 // 🎓 金融教育プログラム: まめちしきを「順番のある8コース」に再編＝学びの地図(カリキュラム)
 const CURRICULUM=[
-  {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23"]},
-  {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20"]},
-  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12","t34"]},
+  {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23","t39"]},
+  {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20","t44"]},
+  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12","t34","t40","t45"]},
   {id:"c4",e:"💼",t:"かせぐ・はたらく",tips:["t07","t24","t25","t26","t27"]},
-  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18","t31"]},
-  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16","t36"]},
-  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22","t32","t33"]},
+  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18","t31","t43"]},
+  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16","t36","t48"]},
+  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22","t32","t33","t41"]},
   {id:"c8",e:"🛡",t:"かしこく・だまされない",tips:["t21","t30","t28","t29","t35"]},
+  // 🏅 1級修了後の「次の山」＝達人への道（中学〜・やり込み向け）
+  {id:"c9",e:"🏅",t:"達人への道（中学〜）",tips:["t37","t38","t42","t46","t47"],adv:true},
 ];
 function TipsSection({ageMode,child,data,update}){
   const [cat,setCat]=useState("すべて");
@@ -9445,6 +9460,7 @@ function TipsSection({ageMode,child,data,update}){
   // クイズに正解(初回のみ): モンスターにEXP=お金の知識→ゲームの成長を直結
   const answerQuiz=(tip,idx)=>{
     setQuizPick(p=>({...p,[tip.id]:idx}));
+    if(idx===tip.a){ markLearn("quiz"); }
     if(idx===tip.a && !quizDone.includes(tip.id)){
       update(d=>({...d,
         tipsQuiz:{...(d.tipsQuiz||{}),[child.id]:[...((d.tipsQuiz?.[child.id])||[]),tip.id]},
@@ -9452,13 +9468,33 @@ function TipsSection({ageMode,child,data,update}){
       }));
     }
   };
+  // 🔥 学習れんぞく＋きょうのミッション（毎日もどってくる理由＝子の継続フック）
+  const _todayISO=new Date().toISOString().slice(0,10);
+  const _yISO=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const ld=(data.learnDays||{})[child.id]||{last:"",streak:0,best:0,read:false,quiz:false};
+  const ldToday=ld.last===_todayISO;
+  const missRead=ldToday&&ld.read, missQuiz=ldToday&&ld.quiz, missDone=missRead&&missQuiz;
+  const learnStreak=ld.last===_todayISO?ld.streak:(ld.last===_yISO?ld.streak:0);
+  const markLearn=(kind)=>update(d=>{
+    const k=child.id; const cur=(d.learnDays||{})[k]||{last:"",streak:0,best:0,read:false,quiz:false};
+    let {last,streak,best,read,quiz}=cur;
+    if(last!==_todayISO){ streak=last===_yISO?(streak||0)+1:1; last=_todayISO; read=false; quiz=false; }
+    if(kind==="read")read=true; if(kind==="quiz")quiz=true;
+    best=Math.max(best||0,streak||0);
+    return {...d,learnDays:{...(d.learnDays||{}),[k]:{last,streak,best,read,quiz}}};
+  });
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
   const cats=["すべて",...Array.from(new Set(ALL_TIPS.map(t=>t.cat)))];
   // 🎓 プログラム(カリキュラム)進捗と金融リテラシー級
   const courseProg=(c)=>c.tips.filter(id=>quizDone.includes(id)).length;
   const courseDone=(c)=>c.tips.length>0 && c.tips.every(id=>quizDone.includes(id));
-  const completedCourses=CURRICULUM.filter(courseDone).length;
-  const rank=completedCourses>=8?"1級 修了🎓":`${9-completedCourses}級`;
+  const LADDER=CURRICULUM.filter(c=>!c.adv);   // 9級→1級の本道(8コース)
+  const ADV=CURRICULUM.filter(c=>c.adv);        // 達人への道(1級後の次の山)
+  const ladderDone=LADDER.filter(courseDone).length;
+  const advDone=ADV.filter(courseDone).length;
+  const completedCourses=ladderDone;            // 級ラダー＝成長レポートのベースライン基準
+  const oneKyu=ladderDone>=LADDER.length;       // 1級到達
+  const rank=oneKyu?(advDone>=ADV.length?"達人 🏅":"1級 修了🎓"):`${9-ladderDone}級`;
   const curCourse=course?CURRICULUM.find(c=>c.id===course):null;
   const filtered=curCourse?ALL_TIPS.filter(t=>curCourse.tips.includes(t.id)):ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
   // 📈 成長レポート(保護者向けROI): 入会時ベースラインを記録し Before/After を見せる
@@ -9479,19 +9515,49 @@ function TipsSection({ageMode,child,data,update}){
   const handleOpen=tipId=>{
     if(openId===tipId){setOpenId(null);return;}
     setOpenId(tipId);
+    markLearn("read");
     if(!readIds.includes(tipId)){
       update(d=>({...d,tipsRead:{...(d.tipsRead||{}),[child.id]:[...(d.tipsRead?.[child.id]||[]),tipId]},logs:(()=>{const _e={id:uid(),cid:child.id,type:"tips",label:`💡 まめちしき読んだ！+${TIP_PTS}pt`,pts:TIP_PTS,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     }
   };
   return(<div style={{padding:"12px 16px"}}>
-    {/* 📅 今月のまめちしき（毎月 自動で変わる注目トピック＝継続のフレッシュさ） */}
-    {(()=>{const d=new Date();const fi=(d.getFullYear()*12+d.getMonth())%ALL_TIPS.length;const ft=ALL_TIPS[fi];return(
+    {/* 📅 今月のまめちしき（毎月 自動で3話 入れ替わる注目テーマ＝継続のフレッシュさ） */}
+    {(()=>{const d=new Date();const mi=d.getFullYear()*12+d.getMonth();const pick=[0,1,2].map(k=>ALL_TIPS[(mi*3+k)%ALL_TIPS.length]);const ft=pick[0];const sub=pick.slice(1);return(
       <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:14,padding:"11px 13px",marginBottom:12}}>
-        <div style={{fontSize:10,fontWeight:900,color:"#8a6a00",marginBottom:3}}>📅 今月のまめちしき</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:3}}>
+          <div style={{fontSize:10,fontWeight:900,color:"#8a6a00"}}>📅 今月のまめちしき（毎月かわる）</div>
+          <div style={{fontSize:9,fontWeight:800,color:"#8a6a00",opacity:.8}}>全{ALL_TIPS.length}話</div>
+        </div>
         <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ft.title}</div>
-        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:1.6}}>{ft.body}</div>
+        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:1.6,marginBottom:6}}>{ft.body}</div>
+        <div style={{display:"flex",gap:6}}>
+          {sub.map(s=>(<div key={s.id} style={{flex:1,background:"rgba(255,255,255,.55)",borderRadius:9,padding:"5px 7px"}}>
+            <div style={{fontSize:9.5,fontWeight:900,color:"#8a6a00",marginBottom:1}}>つづき</div>
+            <div style={{fontSize:10.5,fontWeight:800,color:TEXT,lineHeight:1.3}}>{s.emoji} {s.title}</div>
+          </div>))}
+        </div>
       </div>
     );})()}
+    {/* 🔥 きょうの学習ミッション＋れんぞく日数（毎日もどってくる理由＝子の継続フック） */}
+    <div style={{background:missDone?GS:CARD,border:`1.5px solid ${missDone?G:BORDER}`,borderRadius:16,padding:"11px 13px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+        <span style={{fontSize:20}}>🔥</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:900,fontSize:13,color:TEXT}}>きょうの学習ミッション</div>
+          <div style={{fontSize:10.5,color:learnStreak>0?GP:MUTED,fontWeight:800,marginTop:1}}>{learnStreak>0?`${learnStreak}日れんぞくで 学習中！`:"きょうから れんぞく学習を はじめよう"}</div>
+        </div>
+        {missDone&&<span style={{fontSize:10,fontWeight:900,color:"#fff",background:G,borderRadius:8,padding:"3px 8px"}}>コンプリート！</span>}
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        {[["📖 まめちしきを 1つよむ",missRead],["✏️ クイズに 1問せいかい",missQuiz]].map(([k,ok])=>(
+          <div key={k} style={{flex:1,display:"flex",alignItems:"center",gap:6,background:ok?GS:BG,border:`1px solid ${ok?G:BORDER}`,borderRadius:10,padding:"7px 9px"}}>
+            <span style={{fontSize:14}}>{ok?"✅":"⬜"}</span>
+            <span style={{fontSize:10.5,fontWeight:800,color:ok?GP:TEXTS,lineHeight:1.25}}>{k}</span>
+          </div>
+        ))}
+      </div>
+      {!missDone&&<div style={{fontSize:10,color:MUTED,fontWeight:700,marginTop:6}}>2つ クリアで きょうのミッション達成。あしたも つづけて れんぞくを のばそう！</div>}
+    </div>
     {/* 🎓 金融教育プログラム（学びの地図＋金融リテラシー級） */}
     <div style={{background:"linear-gradient(135deg,#2d2640,#1f2b3e)",borderRadius:18,padding:"14px 16px",marginBottom:12,color:"#fff"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -9506,13 +9572,13 @@ function TipsSection({ageMode,child,data,update}){
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-        {CURRICULUM.map((c,i)=>{const prog=courseProg(c);const done=courseDone(c);const sel=course===c.id;return(
-          <button key={c.id} onClick={()=>{setCourse(sel?null:c.id);setOpenId(null);}}
-            style={{flex:"1 1 46%",minWidth:0,textAlign:"left",background:sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
-            <span style={{fontSize:18,flexShrink:0}}>{done?"✅":c.e}</span>
+        {CURRICULUM.map((c,i)=>{const prog=courseProg(c);const done=courseDone(c);const sel=course===c.id;const locked=c.adv&&!oneKyu;return(
+          <button key={c.id} disabled={locked} onClick={()=>{if(locked)return;setCourse(sel?null:c.id);setOpenId(null);}}
+            style={{flex:"1 1 46%",minWidth:0,textAlign:"left",opacity:locked?0.55:1,background:c.adv&&!locked?"rgba(255,217,102,.16)":sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:c.adv?"1.5px solid #ffd966":sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:locked?"default":"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:18,flexShrink:0}}>{locked?"🔒":done?"✅":c.e}</span>
             <span style={{flex:1,minWidth:0}}>
-              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i+1}. {c.t}</span>
-              <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
+              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.adv?"🏅 ":`${i+1}. `}{c.t}</span>
+              <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{locked?"1級になると ひらく":done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
             </span>
           </button>
         );})}
