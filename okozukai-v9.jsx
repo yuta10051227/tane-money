@@ -8769,7 +8769,6 @@ function InvestTab({child,data,update}){
         <img src="/assets/tanemon_harvest.png" alt="" style={{width:96,height:96,objectFit:"contain",imageRendering:"pixelated",animation:"harvestBurst 1.1s cubic-bezier(.2,.9,.3,1.2) forwards"}} onError={e=>{const s=document.createElement("span");s.textContent="🌾";s.style.fontSize="64px";e.target.replaceWith(s);}}/>
         <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#8a6a00",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .04s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾 {harvestBurst.days}日 そだてた ごほうび</div>
         <div style={{marginTop:2,fontSize:22,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst 1.1s .08s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.pts.toLocaleString()}pt 収穫！</div>
-        <div style={{marginTop:2,fontSize:11,fontWeight:700,color:"#59645E",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .12s cubic-bezier(.2,.9,.3,1.2) forwards"}}>本物なら ≈{(harvestBurst.pts*100).toLocaleString()}円</div>
         <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:0}}`}</style>
       </div>
     )}
@@ -9027,8 +9026,7 @@ function InvestTab({child,data,update}){
             <button onClick={()=>setShowShare(true)} style={{background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"4px 10px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸</button>
           </div>);})()}
         <div style={{fontSize:11,color:"#aaa",fontWeight:700,marginBottom:2}}>🌾 きみの畑（ポートフォリオ）</div>
-        <div style={{fontSize:28,fontWeight:900,marginBottom:2}}>{portfolioVal.toLocaleString()}pt</div>
-        <div style={{fontSize:12,color:"#cfe9d6",fontWeight:700,marginBottom:4}}>💴 本物なら ≈{(portfolioVal*100).toLocaleString()}円（1pt=100円）</div>
+        <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
           <div><span style={{color:"#aaa",fontSize:11}}>損益 </span><span style={{fontWeight:700,fontSize:13,color:portfolioGain>=0?"#4ade80":"#f87171"}}>{portfolioGain>=0?"+":""}{portfolioGain.toLocaleString()}pt</span>{myHoldings.length>0&&(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const lab=gp>=10?{t:"🚀 絶好調！",c:"#4ade80"}:gp>=0?{t:"🎉 いい調子！",c:"#4ade80"}:gp>=-5?{t:"😌 まだ大丈夫",c:"#ccc"}:{t:"🌱 長期目線で！",c:"#f5c842"};return <span style={{marginLeft:6,fontSize:11,fontWeight:800,color:lab.c}}>{lab.t}</span>;})()}</div>
