@@ -3708,6 +3708,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const doTask = task => {
+    if(pressed[task.id]) return;   // 連打ガード(二重記録＆巨大state連続再描画でのフリーズ防止)
     const basePts = taskPts(task, child.id);
     // 転生ボーナス適用
     const reincBonus = data.reincarnationBonus?.[child.id];
@@ -3729,8 +3730,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       }
     } else {
       showFlash(pts, task.emoji);
-      addLog({ cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id });
-      if(pts>0){ const doneToday=(data.logs||[]).filter(l=>l.rid===task.id&&(l.date||"").startsWith(todayISO())).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; update(d=>careCap(d,child.id,0.25,Math.max(1,pts*factor))); }  // お手伝いEXP(初回pt×1.5・連打は逓減・日次上限)
+      // ログ追加＋お手伝いEXP(初回pt×1.5・連打逓減・日次上限)を1回のupdateに統合(再描画を半減)
+      update(d=>{
+        const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
+        const withLog={...d, logs:[e, ...d.logs]};
+        if(pts>0){ const doneToday=(d.logs||[]).filter(l=>l.rid===task.id&&(l.date||"").startsWith(todayISO())).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; return careCap(withLog,child.id,0.25,Math.max(1,pts*factor)); }
+        return withLog;
+      });
     }
   };
 
