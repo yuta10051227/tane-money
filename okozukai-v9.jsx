@@ -9360,8 +9360,20 @@ const ALL_TIPS=[
   {id:"t30",cat:"Tane Money",emoji:"🎰",title:"ガチャと上手につきあう",body:"ガチャは「確率」の体験。レアが出るかはランダムで、たくさん引いても必ず当たるわけじゃない。お金は計画的に使い、貯金やコツコツの積み重ねが一番たしかな力になるよ。",q:"ガチャと 上手に つきあうには？",o:["お金は 計画的に、コツコツが 一番","全部 つぎこむ","借金して 引く"],a:0},
 ];
 
+// 🎓 金融教育プログラム: まめちしきを「順番のある8コース」に再編＝学びの地図(カリキュラム)
+const CURRICULUM=[
+  {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23"]},
+  {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20"]},
+  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12"]},
+  {id:"c4",e:"💼",t:"かせぐ・はたらく",tips:["t07","t24","t25","t26","t27"]},
+  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18"]},
+  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16"]},
+  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22"]},
+  {id:"c8",e:"🛡",t:"かしこく・だまされない",tips:["t21","t30","t28","t29"]},
+];
 function TipsSection({ageMode,child,data,update}){
   const [cat,setCat]=useState("すべて");
+  const [course,setCourse]=useState(null);   // 選択中コース(カリキュラム)
   const [openId,setOpenId]=useState(null);
   const readIds=(data.tipsRead||{})[child.id]||[];
   const TIP_PTS=5;
@@ -9380,7 +9392,13 @@ function TipsSection({ageMode,child,data,update}){
   };
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
   const cats=["すべて",...Array.from(new Set(ALL_TIPS.map(t=>t.cat)))];
-  const filtered=ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
+  // 🎓 プログラム(カリキュラム)進捗と金融リテラシー級
+  const courseProg=(c)=>c.tips.filter(id=>quizDone.includes(id)).length;
+  const courseDone=(c)=>c.tips.length>0 && c.tips.every(id=>quizDone.includes(id));
+  const completedCourses=CURRICULUM.filter(courseDone).length;
+  const rank=completedCourses>=8?"1級 修了🎓":`${9-completedCourses}級`;
+  const curCourse=course?CURRICULUM.find(c=>c.id===course):null;
+  const filtered=curCourse?ALL_TIPS.filter(t=>curCourse.tips.includes(t.id)):ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
   const totalRead=readIds.filter(id=>ALL_TIPS.find(t=>t.id===id)).length;
   const handleOpen=tipId=>{
     if(openId===tipId){setOpenId(null);return;}
@@ -9390,6 +9408,33 @@ function TipsSection({ageMode,child,data,update}){
     }
   };
   return(<div style={{padding:"12px 16px"}}>
+    {/* 🎓 金融教育プログラム（学びの地図＋金融リテラシー級） */}
+    <div style={{background:"linear-gradient(135deg,#2d2640,#1f2b3e)",borderRadius:18,padding:"14px 16px",marginBottom:12,color:"#fff"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+        <span style={{fontSize:26}}>🎓</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:900,fontSize:15}}>おうち金融教育プログラム</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:700}}>コースをクリアして 級を上げよう</div>
+        </div>
+        <div style={{background:"#ffd966",borderRadius:12,padding:"5px 11px",textAlign:"center",flexShrink:0}}>
+          <div style={{fontSize:9,fontWeight:800,color:"#7a5a00"}}>金融リテラシー</div>
+          <div style={{fontSize:15,fontWeight:900,color:"#5a4300",lineHeight:1.1}}>{rank}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {CURRICULUM.map((c,i)=>{const prog=courseProg(c);const done=courseDone(c);const sel=course===c.id;return(
+          <button key={c.id} onClick={()=>{setCourse(sel?null:c.id);setOpenId(null);}}
+            style={{flex:"1 1 46%",minWidth:0,textAlign:"left",background:sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:18,flexShrink:0}}>{done?"✅":c.e}</span>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i+1}. {c.t}</span>
+              <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
+            </span>
+          </button>
+        );})}
+      </div>
+      {course&&<button onClick={()=>setCourse(null)} style={{marginTop:10,background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,padding:"6px 12px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>← ぜんぶのコースに もどる</button>}
+    </div>
     <div style={{marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
       <span style={{fontSize:20}}>💡</span>
       <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:"#fff"}}>まめちしき</div><div style={{color:"rgba(255,255,255,0.55)",fontSize:11}}>{filtered.length}件 · タップで詳しく読む</div></div>
@@ -9406,7 +9451,9 @@ function TipsSection({ageMode,child,data,update}){
       <span style={{fontSize:12,color:"#7a5a00",fontWeight:700}}><Ico name="books" fb="📚" size={14} style={{marginRight:4}}/>読んで獲得したpt</span>
       <span style={{fontWeight:900,fontSize:15,color:Y}}>+{(totalRead*TIP_PTS).toLocaleString()}pt</span>
     </div>
-    <div style={{marginBottom:14}}><SortBar options={cats.filter(c=>ageCats?ageCats.includes(c)||c==="すべて":true).map(c=>[c,c])} value={cat} onChange={setCat}/></div>
+    {course
+      ? <div style={{marginBottom:14,fontSize:12,fontWeight:800,color:GP}}>📘 {CURRICULUM.find(c=>c.id===course)?.t} のレッスン（{filtered.length}）</div>
+      : <div style={{marginBottom:14}}><SortBar options={cats.filter(c=>ageCats?ageCats.includes(c)||c==="すべて":true).map(c=>[c,c])} value={cat} onChange={setCat}/></div>}
     {filtered.map(tip=>{
       const isOpen=openId===tip.id;
       const isRead=readIds.includes(tip.id);
