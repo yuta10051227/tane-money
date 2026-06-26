@@ -8575,6 +8575,14 @@ function ForexSection({data, update, child}){
 const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
 const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu", "⚡":"navi_chale", "🌧":"navi_amefuri" };
+// 🏡 模様替えデコ(あつ森型・自己表現)。lv=はたけレベルで解放。現状は絵文字プレースホルダ
+const DECO_ITEMS = [
+  {id:"fence",e:"🪵",n:"フェンス",lv:1},{id:"sign",e:"🪧",n:"かんばん",lv:1},{id:"tulip",e:"🌷",n:"チューリップ",lv:1},
+  {id:"sun",e:"🌻",n:"ひまわり",lv:2},{id:"tree",e:"🌳",n:"き",lv:2},{id:"bush",e:"🌿",n:"しげみ",lv:2},
+  {id:"mush",e:"🍄",n:"きのこ",lv:3},{id:"well",e:"⛲",n:"いど",lv:3},{id:"bench",e:"🪑",n:"ベンチ",lv:3},
+  {id:"hut",e:"🏡",n:"こや",lv:4},{id:"scarecrow",e:"🧑‍🌾",n:"かかし",lv:4},{id:"butterfly",e:"🦋",n:"ちょう",lv:5},
+  {id:"tractor",e:"🚜",n:"トラクター",lv:5},{id:"pond",e:"🪷",n:"いけ",lv:6},{id:"rainbow",e:"🌈",n:"にじ",lv:7},{id:"star",e:"⭐",n:"おほしさま",lv:8},
+];
 function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
 function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
 function CropArt({stockId, stage, emoji, size}){
@@ -8618,6 +8626,7 @@ function InvestTab({child,data,update}){
   const [showDex,setShowDex]=useState(false);   // 収穫シール帳・作物図鑑
   const [shareCopied,setShareCopied]=useState(false);
   const [showTrade,setShowTrade]=useState(false);   // ゲームホーム ⇄ とりひき/くら（数字はここ）
+  const [showDeco,setShowDeco]=useState(false);     // 🏡 模様替え
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
   // 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
@@ -8658,6 +8667,16 @@ function InvestTab({child,data,update}){
     if(done>=10){ flash("🌱 タネモン ごきげん！また あした なでようね","#34C77B"); return; }
     setFarm(f=>({...f,xp:(f.xp||0)+1,patDate:today,patN:(f.patDate===today?(f.patN||0):0)+1}));
     flash("🌱 なでなで♪ タネモンが よろこんでる","#34C77B");
+  };
+  // 🏡 模様替え: 置けるデコ数は はたけレベルで増える(📈 畑が広がる)
+  const placedDeco=farmData.deco||[];
+  const decoSlots=Math.min(8,2+(farmLv-1));
+  const toggleDeco=(id)=>{
+    const cur=(farmData.deco||[]);
+    if(cur.includes(id)){ setFarm(f=>({...f,deco:(f.deco||[]).filter(x=>x!==id)})); return; }
+    if(cur.length>=decoSlots){ flash(`これ以上 置けないよ。レベルアップで 増えるよ🌱（Lv.${farmLv}＝${decoSlots}コ）`,"#D95C55"); return; }
+    setFarm(f=>({...f,deco:[...(f.deco||[]),id]}));
+    flash("🏡 かざりを おいたよ！","#34C77B");
   };
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
@@ -8793,6 +8812,32 @@ function InvestTab({child,data,update}){
         </div>
       </div>);
     })()}
+    {/* 🏡 もようがえ（畑のデコ・あつ森型／レベルで増える） */}
+    {showDeco&&(
+      <div onClick={()=>setShowDeco(false)} style={{position:"fixed",inset:0,zIndex:1450,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:BG,borderRadius:20,padding:"16px 14px",maxWidth:380,width:"100%",maxHeight:"86vh",overflowY:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.4)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <span style={{fontSize:24}}>🏡</span>
+            <div style={{flex:1}}><div style={{fontWeight:900,fontSize:16,color:GP}}>もようがえ</div><div style={{fontSize:11,fontWeight:800,color:TEXTS}}>畑を じぶんらしく かざろう（{placedDeco.length}/{decoSlots}コ・Lv.{farmLv}）</div></div>
+            <button onClick={()=>setShowDeco(false)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+            {DECO_ITEMS.map(d=>{
+              const locked=farmLv<d.lv; const on=placedDeco.includes(d.id);
+              return(
+                <button key={d.id} disabled={locked} onClick={()=>toggleDeco(d.id)}
+                  style={{background:on?GS:CARD,border:on?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:14,padding:"9px 2px",cursor:locked?"default":"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:2,opacity:locked?0.5:1}}>
+                  <span style={{fontSize:26,filter:locked?"grayscale(1)":"none"}}>{locked?"🔒":d.e}</span>
+                  <span style={{fontSize:9,fontWeight:800,color:locked?MUTED:on?GP:TEXT}}>{locked?`Lv.${d.lv}`:d.n}</span>
+                  {on&&<span style={{fontSize:8,fontWeight:900,color:GP}}>おいてる</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{fontSize:10.5,color:MUTED,fontWeight:700,textAlign:"center",marginTop:12,lineHeight:1.6}}>はたけレベルが 上がると、置ける数と アイテムが ふえるよ🌱<br/>（水やり・なでなで・ログインで レベルアップ）</div>
+        </div>
+      </div>
+    )}
     {/* ポートフォリオ シェアモーダル */}
     {showShare&&(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowShare(false)}>
@@ -8885,6 +8930,11 @@ function InvestTab({child,data,update}){
               <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
               <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
             </button>
+          </div>
+          {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える */}
+          <div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#bfe6a0,#a6d885)",padding:"4px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"2px solid #8fc070"}}>
+            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.45}}>{it?it.e:"・"}</span>; })}
+            <span style={{marginLeft:"auto",fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"rgba(255,255,255,.78)",borderRadius:8,padding:"2px 8px",flexShrink:0,whiteSpace:"nowrap"}}>🎨 もようがえ</span>
           </div>
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {stocks.map(s=>{
