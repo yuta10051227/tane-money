@@ -65,6 +65,63 @@ async function taneApi(path,body){
 }
 function taneFamilyCode(){ try{ return localStorage.getItem(FAMILY_CODE_KEY)||_familyCode||""; }catch(e){ return _familyCode||""; } }
 
+// ── 🔄 自動アップデート検知（古いキャッシュのまま使われる問題の恒久対策）──
+// 仕組み: ビルド時に index.html の <meta tane-version> と /version.json に同じ版を刻む。
+// 起動中のアプリは「いま動いている版(meta)」を持ち、定期的に /version.json を no-store で取得。
+// サーバーの版が違えば＝新デプロイが出た合図 → 画面下に「更新する」バーを出し、
+// タップでキャッシュ全消し＋SW更新＋リロードして確実に最新へ揃える（端末ごとのズレを解消）。
+function taneRunningVersion(){ try{ return (document.querySelector('meta[name="tane-version"]')||{}).content||""; }catch(e){ return ""; } }
+let _taneUpdateShown=false;
+function taneShowUpdateBanner(){
+  try{
+    if(_taneUpdateShown||!document.body) return; _taneUpdateShown=true;
+    const bar=document.createElement("div");
+    bar.style.cssText="position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;background:#187A4E;color:#fff;font-family:'M PLUS Rounded 1c',sans-serif;padding:12px 14px;border-radius:14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.25)";
+    const txt=document.createElement("span");
+    txt.style.cssText="flex:1;font-weight:800;font-size:13px;line-height:1.4";
+    txt.textContent="新しいバージョンがあります";
+    const btn=document.createElement("button");
+    btn.textContent="更新する";
+    btn.style.cssText="flex-shrink:0;background:#fff;color:#187A4E;border:none;border-radius:10px;padding:9px 16px;font-weight:900;font-size:13px;cursor:pointer;font-family:inherit";
+    btn.onclick=taneForceUpdate;
+    bar.appendChild(txt); bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }catch(e){}
+}
+async function taneForceUpdate(){
+  try{ if("caches"in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
+  try{ if(navigator.serviceWorker){ const rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r=>r.update().catch(()=>{}))); } }catch(e){}
+  try{ location.reload(); }catch(e){ location.href=location.href; }
+}
+async function taneCheckUpdate(){
+  try{
+    const cur=taneRunningVersion(); if(!cur) return;
+    const r=await fetch("/version.json?_="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j&&j.version&&j.version!==cur) taneShowUpdateBanner();
+  }catch(e){}
+}
+function taneStartUpdateWatcher(){
+  try{
+    taneCheckUpdate();
+    setInterval(taneCheckUpdate,5*60*1000);
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) taneCheckUpdate(); });
+    window.addEventListener("focus",taneCheckUpdate);
+    if(navigator.serviceWorker&&navigator.serviceWorker.addEventListener){
+      navigator.serviceWorker.addEventListener("message",e=>{
+        if(e.data&&e.data.type==="SW_ACTIVATED"&&e.data.version&&e.data.version!==taneRunningVersion()) taneShowUpdateBanner();
+      });
+    }
+  }catch(e){}
+}
+try{
+  if(typeof document!=="undefined"){
+    if(document.readyState==="complete") taneStartUpdateWatcher();
+    else window.addEventListener("load",taneStartUpdateWatcher);
+  }
+}catch(e){}
+
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
 // ── データ消失の防止ガード ──
 // クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。

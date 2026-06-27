@@ -145,6 +145,29 @@ npm run deploy "メッセージ"  # check→build→commit→push 一括
 
 ---
 
+## キャッシュ更新ルール（古い版が端末に残る問題の恒久対策）
+
+**もう手作業でキャッシュ対応をしない。`npm run build` が自動でやる。** 仕組み：
+
+1. `build` が `index.html` の `<meta tane-version>` と `version.json` に**同じ版（コミットhash）**を刻む。
+2. `build` が `sw.js` の `const CACHE = 'tane-money-<version>'` を**毎回書き換える** → デプロイ毎にSWが必ず更新され、旧キャッシュを掃除＋全ページへ更新通知。
+3. アプリは起動中に `version.json` を `no-store` で定期取得し、版が違えば画面下に「**更新する**」バーを表示 → タップでキャッシュ全消し＋リロードして最新へ揃える。
+
+**やってよい / ダメ：**
+- ✅ `okozukai-v9.jsx` を編集 → `npm run check` → `npm run build` → デプロイ（`version.json`/`sw.js`は自動更新される）
+- ✅ デプロイ時は `version.json`・`sw.js` を必ずコミットに含める（`deploy.sh`が自動addする）
+- ❌ `sw.js` の `CACHE` 名を手で固定値に戻さない（buildが版を刻む前提）
+- ❌ HTML/アプリ本体を SW で「キャッシュ優先」にしない（必ずネットワーク優先）
+
+**動作確認：** デプロイ後、旧版を開いた端末に数分以内（or 再フォーカス時）に「更新する」バーが出ればOK。
+
+## バックエンド（サーバープッシュ＋課金）
+
+`api/*`（Vercel Serverless）＝Stripe課金・FCM再エンゲージ。設定は `BACKEND_SETUP.md`。
+鍵未設定でもアプリは従来動作（各機能は安全に無効化）。`TANE_VAPID_KEY`/`TANE_API_BASE` は `okozukai-v9.jsx` 先頭。
+
+---
+
 ## 過去に発生したバグ（再発防止）
 
 | バグ | 原因 | 対策 |
@@ -154,3 +177,4 @@ npm run deploy "メッセージ"  # check→build→commit→push 一括
 | タブバー2重表示 | 旧バーを残したまま新バー追加 | str_replace前にview確認 |
 | タブ押してもコンテンツ出ない | MAIN_TABS変更後にrender条件を変えなかった | 3点セット徹底 |
 | ためるタブでエラー | tabAliasで3画面が全て同じeffectiveTabに集約 | サブタブはstateで分岐 |
+| 端末ごとに古い版が残る | アプリに更新検知が無く、SWのCACHE名も不変だった | build が version.json/sw.js を自動更新＋アプリが「更新する」バー表示 |

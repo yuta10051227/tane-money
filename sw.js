@@ -1,4 +1,4 @@
-const CACHE = 'tane-money-v7';
+const CACHE = 'tane-money-8db4083';
 // バージョン固定のCDN資産(React/Firebase/フォントCSS)はimmutable扱いでprecache。
 // install時に取りに行き、以降のリピート起動はネットワーク無しで即起動できる。
 const CDN_PRECACHE = [
@@ -38,9 +38,19 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim()).then(() =>
+      // 新バージョンが有効化されたら、開いている全ページに通知して「更新する」バーを出させる。
+      // CACHE名は build が 'tane-money-<version>' に毎デプロイ書き換える（＝SW更新が必ず走る）。
+      self.clients.matchAll({ includeUncontrolled: true }).then(cs =>
+        cs.forEach(c => c.postMessage({ type: 'SW_ACTIVATED', version: CACHE.replace('tane-money-', '') }))
+      )
     )
   );
-  self.clients.claim();
+});
+
+// ページ側から即時更新を要求できるように
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', e => {
@@ -48,6 +58,9 @@ self.addEventListener('fetch', e => {
 
   // Firestore等のデータAPIは常にネットワーク（キャッシュしない）
   if (url.includes('firestore') || url.includes('googleapis.com/google.firestore')) return;
+
+  // バージョン確認用 /version.json と /api/ は常にネットワーク（キャッシュ介在させない）
+  if (url.includes('/version.json') || url.includes('/api/')) return;
 
   // バージョン固定CDN(React/Firebase/フォント)はキャッシュ優先 → リピート起動を高速化
   if (isImmutableCDN(url)) {
