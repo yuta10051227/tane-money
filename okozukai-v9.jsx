@@ -9960,6 +9960,34 @@ function TipsSection({ageMode,child,data,update}){
       </div>
       <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5}}>習得した分野：{completedCourses>0?CURRICULUM.filter(courseDone).map(c=>c.t).join("・"):"まだクリアしたコースはありません。クイズに挑戦して級を上げよう！"}</div>
     </div>
+    {/* 💰 金銭感覚の育ち（保護者向け・"級"とは別軸の実生活の成果＝課金者価値の証明 R4） */}
+    {(()=>{
+      const myL=(data.logs||[]).filter(l=>l.cid===child.id);
+      const saved=myL.reduce((s,l)=>s+(l.pts||0),0);
+      const divTotal=myL.filter(l=>l.type==="interest").reduce((s,l)=>s+(l.pts||0),0);
+      const buyCount=myL.filter(l=>l.type==="invest_buy").length;
+      const totalChores=myL.filter(l=>l.type==="good"||l.type==="daily").length;
+      const rewardCount=myL.filter(l=>l.type==="reward").length;
+      return(<div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+          <span style={{fontSize:16}}>💰</span>
+          <span style={{fontWeight:900,fontSize:13,color:TEXT}}>金銭感覚の育ち</span>
+          <span style={{fontSize:10,color:MUTED,fontWeight:700}}>（保護者向け）</span>
+        </div>
+        <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginBottom:8}}>“貯める・ふやす・はたらいて得る・考えて使う”の実体験が、どれだけ積み上がっているか。</div>
+        <div style={{display:"flex",gap:6,marginBottom:8}}>
+          {[["いま貯まっている",`${saved.toLocaleString()}pt`,GP],["配当・利子でふえた",`${divTotal.toLocaleString()}pt`,GOLD],["投資にチャレンジ",`${buyCount}回`,B]].map(([k,v,c])=>(
+            <div key={k} style={{flex:1,background:BG,borderRadius:10,padding:"7px 4px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:9,color:MUTED,fontWeight:700,lineHeight:1.3,marginTop:2}}>{k}</div></div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {[["はたらいて得た（お手伝い）",`${totalChores}回`],["考えて使った（こうかん）",`${rewardCount}回`]].map(([k,v])=>(
+            <div key={k} style={{flex:1,background:BG,borderRadius:10,padding:"7px 6px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:900,color:TEXT}}>{v}</div><div style={{fontSize:9,color:MUTED,fontWeight:700,lineHeight:1.3,marginTop:2}}>{k}</div></div>
+          ))}
+        </div>
+        <div style={{fontSize:10,color:MUTED,fontWeight:700,lineHeight:1.5,marginTop:8}}>※ クイズの“級”は知識、こちらは実際のお金の行動。両方そろって本物の金銭感覚が育ちます。</div>
+      </div>);
+    })()}
     {/* 🔁 おさらいクイズ（間隔反復＝暗記でなく定着。級の本物度を担保） */}
     {(quizDone.length>0)&&(
       <div style={{background:PS,border:`1.5px solid ${P}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
