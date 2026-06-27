@@ -27,6 +27,14 @@ service cloud.firestore {
         // ログは改ざん・削除不可（取り消しは逆仕訳エントリの追記で行う設計）
         allow update, delete: if false;
       }
+
+      // 課金エンタイトルメント(meta/billing 等)。サーバー(Stripe Webhook + Admin SDK)が
+      // 書き込み、クライアントは read のみ。クライアントからの改ざんを防ぐため write は禁止
+      //（Admin SDK はルールをバイパスするのでサーバー書き込みは可能）。
+      match /meta/{doc} {
+        allow get: if request.auth != null;
+        allow list, write: if false;
+      }
     }
 
     // それ以外（viele-secretary等の別アプリのコレクションを含む）は

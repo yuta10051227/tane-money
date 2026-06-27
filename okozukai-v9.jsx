@@ -23,6 +23,105 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "168102674534",
   appId: "1:168102674534:web:691b66d776ed0d60b5ada7"
 };
+// ── バックエンド連携設定（未設定なら各機能は安全に無効化＝従来動作のまま）──
+// FCM Web Push の公開VAPIDキー（Firebase Console > Cloud Messaging > Web Push 証明書）。
+// 空のままだとサーバープッシュ登録はスキップされ、起動時ローカル通知のみ動く。
+const TANE_VAPID_KEY = "";
+// Serverless API のベースURL。同一オリジン(Vercel)に置くなら空でOK("/api/...")。
+const TANE_API_BASE = "";
+
+// 外部スクリプトの動的ロード（FCM messaging-compat 用）
+function taneLoadScript(src){
+  return new Promise((resolve,reject)=>{
+    try{
+      if(document.querySelector(`script[src="${src}"]`)){ resolve(); return; }
+      const s=document.createElement("script"); s.src=src; s.async=true;
+      s.onload=()=>resolve(); s.onerror=()=>reject(new Error("load_failed"));
+      document.head.appendChild(s);
+    }catch(e){ reject(e); }
+  });
+}
+// FCMトークンを取得（許可が無ければ要求）。失敗時は{ok:false}で、呼び出し側は従来動作にフォールバック。
+async function taneGetPushToken(){
+  try{
+    if(!TANE_VAPID_KEY) return {ok:false,reason:"no_vapid"};
+    if(!("Notification"in window)||!("serviceWorker"in navigator)) return {ok:false,reason:"unsupported"};
+    let perm=Notification.permission;
+    if(perm==="default") perm=await Notification.requestPermission();
+    if(perm!=="granted") return {ok:false,reason:"denied"};
+    await taneLoadScript("https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js");
+    if(typeof firebase==="undefined"||!firebase.messaging) return {ok:false,reason:"no_lib"};
+    getDB(); // app初期化＋匿名認証を保証
+    const reg=await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    const token=await firebase.messaging().getToken({vapidKey:TANE_VAPID_KEY,serviceWorkerRegistration:reg});
+    return token?{ok:true,token}:{ok:false,reason:"no_token"};
+  }catch(e){ return {ok:false,reason:String(e&&e.message||e)}; }
+}
+// Serverless API 呼び出し（POST JSON）
+async function taneApi(path,body){
+  const r=await fetch((TANE_API_BASE||"")+"/api/"+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  let j={}; try{ j=await r.json(); }catch(e){}
+  return {status:r.status,...j};
+}
+function taneFamilyCode(){ try{ return localStorage.getItem(FAMILY_CODE_KEY)||_familyCode||""; }catch(e){ return _familyCode||""; } }
+
+// ── 🔄 自動アップデート検知（古いキャッシュのまま使われる問題の恒久対策）──
+// 仕組み: ビルド時に index.html の <meta tane-version> と /version.json に同じ版を刻む。
+// 起動中のアプリは「いま動いている版(meta)」を持ち、定期的に /version.json を no-store で取得。
+// サーバーの版が違えば＝新デプロイが出た合図 → 画面下に「更新する」バーを出し、
+// タップでキャッシュ全消し＋SW更新＋リロードして確実に最新へ揃える（端末ごとのズレを解消）。
+function taneRunningVersion(){ try{ return (document.querySelector('meta[name="tane-version"]')||{}).content||""; }catch(e){ return ""; } }
+let _taneUpdateShown=false;
+function taneShowUpdateBanner(){
+  try{
+    if(_taneUpdateShown||!document.body) return; _taneUpdateShown=true;
+    const bar=document.createElement("div");
+    bar.style.cssText="position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;background:#187A4E;color:#fff;font-family:'M PLUS Rounded 1c',sans-serif;padding:12px 14px;border-radius:14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.25)";
+    const txt=document.createElement("span");
+    txt.style.cssText="flex:1;font-weight:800;font-size:13px;line-height:1.4";
+    txt.textContent="新しいバージョンがあります";
+    const btn=document.createElement("button");
+    btn.textContent="更新する";
+    btn.style.cssText="flex-shrink:0;background:#fff;color:#187A4E;border:none;border-radius:10px;padding:9px 16px;font-weight:900;font-size:13px;cursor:pointer;font-family:inherit";
+    btn.onclick=taneForceUpdate;
+    bar.appendChild(txt); bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }catch(e){}
+}
+async function taneForceUpdate(){
+  try{ if("caches"in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
+  try{ if(navigator.serviceWorker){ const rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r=>r.update().catch(()=>{}))); } }catch(e){}
+  try{ location.reload(); }catch(e){ location.href=location.href; }
+}
+async function taneCheckUpdate(){
+  try{
+    const cur=taneRunningVersion(); if(!cur) return;
+    const r=await fetch("/version.json?_="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const j=await r.json();
+    if(j&&j.version&&j.version!==cur) taneShowUpdateBanner();
+  }catch(e){}
+}
+function taneStartUpdateWatcher(){
+  try{
+    taneCheckUpdate();
+    setInterval(taneCheckUpdate,5*60*1000);
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) taneCheckUpdate(); });
+    window.addEventListener("focus",taneCheckUpdate);
+    if(navigator.serviceWorker&&navigator.serviceWorker.addEventListener){
+      navigator.serviceWorker.addEventListener("message",e=>{
+        if(e.data&&e.data.type==="SW_ACTIVATED"&&e.data.version&&e.data.version!==taneRunningVersion()) taneShowUpdateBanner();
+      });
+    }
+  }catch(e){}
+}
+try{
+  if(typeof document!=="undefined"){
+    if(document.readyState==="complete") taneStartUpdateWatcher();
+    else window.addEventListener("load",taneStartUpdateWatcher);
+  }
+}catch(e){}
+
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
 // ── データ消失の防止ガード ──
 // クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。
@@ -419,13 +518,33 @@ async function loadLogsFromFirestore() {
   if(!db) return null;
   try {
     const snap = await db.collection("families").doc(code)
-                         .collection("logs").orderBy("date","desc").limit(500).get();
+                         .collection("logs").orderBy("date","desc").limit(5000).get();
     if(snap.empty) return null;
     return snap.docs.map(d => d.data());
   } catch(e) {
     console.warn("Firestore logs load failed:", e);
     return null;
   }
+}
+
+// ── 端末間でポイント残高がズレる問題の収束ロジック ──
+// Firestoreのlogsサブコレクション(全件=唯一の正)へ収束させる。
+// carry(くりこし)は全件取得できている時は二重計上になるため除外する。
+function _isCarryLog(l){ return !!(l && typeof l.id==="string" && l.id.indexOf("carry_")===0); }
+function reconcileFullLogs(prevLogs, fsLogs){
+  // id で完全に重複排除(Firestore側・ローカル側どちらの重複も残高に二重計上しない)。
+  // carry(くりこし)は全件取得時は二重計上になるため捨てる。
+  const out=[]; const seen=new Set();
+  const push=(l)=>{ if(l && l.id!=null && !_isCarryLog(l) && !seen.has(l.id)){ seen.add(l.id); out.push(l); } };
+  (fsLogs||[]).forEach(push);  // Firestore全件(=唯一の正)を優先採用
+  const fsIds = new Set((fsLogs||[]).filter(l=>l&&l.id!=null).map(l=>l.id));
+  const localOnly = [];
+  (prevLogs||[]).forEach(l=>{
+    if(l && l.id!=null && !_isCarryLog(l) && !fsIds.has(l.id) && !seen.has(l.id)) localOnly.push(l);
+    push(l);  // ローカルにしか無い未同期ログも残す(重複は自動的に弾かれる)
+  });
+  out.sort((a,b)=> new Date(b.date) - new Date(a.date));
+  return { merged: out, localOnly };
 }
 
 // ── logsコレクションのリアルタイム監視 ──
@@ -1298,7 +1417,20 @@ const Y     = GOLD;        // 後方互換
 const SHADOW = "0 4px 16px rgba(24,35,29,0.05)";
 const F  = "'Noto Sans JP','M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
 const FB = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
+// ===== UIクロム・デザイントークン（プレミアム化：角丸/影/枠/余白を統一）=====
+// 既存カラー定数のみで構成（新ブランド色を作らない）。
+const RAD_CARD = 16;   // カード・畑の額縁
+const RAD_CHIP = 12;   // 小チップ・スタット
+const RAD_PILL = 999;  // ピル・ラベル
+const BD_THIN   = `1px solid ${BORDER}`;
+const BD_ACCENT = (c)=>`1px solid ${c}`;
+const SHADOW_SM = "0 1px 4px rgba(24,35,29,0.07)";   // チップ（うっすら浮かせる）
+const SHADOW_MD = "0 6px 20px rgba(24,35,29,0.10)";  // 主役カード（畑）
+const PRESS = { transform:"translateY(1px)" };       // 押下の沈み込み（onPointerで適用）
+const SP = { xs:4, sm:8, md:12, lg:16 };
 const AGE={young:{label:"低学年",emoji:"🌱"},middle:{label:"中学年",emoji:"🌿"},senior:{label:"中高生",emoji:"🌳"}};
+// 🎓 専門家監修（手配できたら name/title を埋める。空のままなら監修バッジは表示されない＝虚偽表示しない）
+const SUPERVISOR = { name: "", title: "" };  // 例: { name:"山田 太郎", title:"ファイナンシャルプランナー(CFP®)" }
 const INP = { fontFamily:F, padding:"9px 11px", borderRadius:10, border:`1.5px solid ${BORDER}`, fontSize:14, background:BG2, color:TEXT, width:"100%", boxSizing:"border-box" };
 
 // ═══════════════════════════════════════════════════════
@@ -2892,6 +3024,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [smRLabel, setSmRLabel] = useState("");
   const [smRCost, setSmRCost] = useState("5");
   const [smRUnit, setSmRUnit] = useState("");
+  const [planMsg, setPlanMsg] = useState("");
+  const [planBusy, setPlanBusy] = useState(false);
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -2916,7 +3050,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   };
 
   const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
-  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["members","🔐 PIN"],["transfer","🔄 引継"]];
+  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["plan","💳 プラン"],["members","🔐 PIN"],["transfer","🔄 引継"]];
   const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
 
   if(!authed) return (
@@ -3302,6 +3436,29 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               update(d=>({...d,pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
             return(<div>
+              {/* 💤 休眠アラート（子が数日ログインしていない＝静かな解約の予兆を親に知らせる） */}
+              {(()=>{
+                const DAY=86400000;const now=Date.now();
+                const rows=(data.children||[]).map(c=>{
+                  const ls=(data.logs||[]).filter(l=>l.cid===c.id).map(l=>new Date(l.date).getTime());
+                  const last=ls.length?Math.max(...ls):0;
+                  const days=last?Math.floor((now-last)/DAY):999;
+                  return {c,days,ever:!!last};
+                });
+                const sleeping=rows.filter(r=>r.days>=3);
+                if(sleeping.length===0) return null;
+                return(<div style={{background:RS,border:`1.5px solid ${R}`,borderRadius:14,padding:"13px 15px",marginBottom:12}}>
+                  <div style={{fontWeight:900,fontSize:13,color:R,marginBottom:6}}>💤 しばらく使っていないお子さま</div>
+                  {sleeping.map(r=>(
+                    <div key={r.c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0"}}>
+                      <span style={{fontSize:18}}>{r.c.emoji||"🧒"}</span>
+                      <span style={{flex:1,fontWeight:800,fontSize:12.5,color:TEXT}}>{r.c.name}</span>
+                      <span style={{fontWeight:900,fontSize:12,color:R}}>{r.ever?`${r.days}日 ログインなし`:"まだ未ログイン"}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や畑のお世話に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
+                </div>);
+              })()}
               {/* 承認モード切り替え */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -3568,6 +3725,111 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 </>}
               </div>
             );
+          })()}
+
+          {/* ── プランタブ（料金・無料体験・解約） ── */}
+          {settingsTab==="plan"&&(()=>{
+            const sub=data.subscription||{};
+            const nKids=Math.max(1,(data.children||[]).length);
+            const DAY=86400000;
+            const trialStart=sub.trialStart?new Date(sub.trialStart).getTime():null;
+            const trialDaysLeft=trialStart?Math.max(0,14-Math.floor((Date.now()-trialStart)/DAY)):null;
+            const inTrial=trialDaysLeft!==null&&trialDaysLeft>0&&!sub.active;
+            const PLANS=[
+              {id:"single",e:"🌱",name:"1人プラン",price:"¥980",unit:"/月",sub:"お子さま1人",rec:nKids===1},
+              {id:"sibling",e:"👧👦",name:"きょうだいプラン",price:"¥1,460",unit:"/月",sub:"1人目¥980＋2人目以降 各¥480",rec:nKids===2},
+              {id:"family",e:"👨‍👩‍👧‍👦",name:"家族プラン",price:"¥1,480",unit:"/月",sub:"最大4人・3人目以降ずっと無料",rec:nKids>=3},
+              {id:"annual",e:"🎁",name:"年額プラン",price:"¥9,800",unit:"/年",sub:"2ヶ月分おトク（実質月¥817）",rec:false},
+            ];
+            const setPlan=(id)=>update(d=>({...d,subscription:{...(d.subscription||{}),plan:id}}));
+            const startTrial=()=>update(d=>(d.subscription?.trialStart?d:{...d,subscription:{...(d.subscription||{}),trialStart:new Date().toISOString()}}));
+            return(<div>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>料金プラン・お支払い</p>
+              {/* 現在の状態 */}
+              <div style={{background:`linear-gradient(135deg,${GS},#fff)`,border:`2px solid ${G}`,borderRadius:16,padding:"16px",marginBottom:14,textAlign:"center"}}>
+                {inTrial?(<>
+                  <div style={{fontSize:12,color:GP,fontWeight:800,marginBottom:4}}>🎉 無料体験中</div>
+                  <div style={{fontSize:24,fontWeight:900,color:GP}}>あと {trialDaysLeft}日</div>
+                  <div style={{fontSize:11,color:MUTED,marginTop:6}}>体験中はすべての機能が使えます。体験が終わっても自動課金はされません。</div>
+                </>):trialStart?(<>
+                  <div style={{fontSize:13,fontWeight:900,color:TEXT,marginBottom:4}}>無料体験は終了しました</div>
+                  <div style={{fontSize:11,color:MUTED}}>下のプランから選んでご継続いただけます。</div>
+                </>):(<>
+                  <div style={{fontSize:13,color:TEXT,fontWeight:800,marginBottom:8}}>まずは14日間 無料でお試し</div>
+                  <div style={{fontSize:11,color:MUTED,marginBottom:12}}>クレジットカード登録不要・自動課金なし。お子さまが続くか見てから決められます。</div>
+                  <button onClick={startTrial} style={{background:GP,border:"none",borderRadius:12,padding:"11px 28px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>14日間の無料体験を始める</button>
+                </>)}
+              </div>
+              {/* おすすめバッジ付きプラン一覧 */}
+              <div style={{fontSize:11,fontWeight:800,color:TEXTS,margin:"0 0 8px"}}>お子さま{nKids}人のご家庭におすすめのプラン</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+                {PLANS.map(p=>{const sel=sub.plan===p.id;return(
+                  <button key={p.id} onClick={()=>setPlan(p.id)}
+                    style={{textAlign:"left",background:sel?GS:CARD,border:`2px solid ${sel?G:p.rec?GOLD:BORDER}`,borderRadius:14,padding:"12px 14px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+                    <span style={{fontSize:24,flexShrink:0}}>{p.e}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontWeight:900,fontSize:14,color:TEXT}}>{p.name}</span>
+                        {p.rec&&<span style={{fontSize:9,fontWeight:900,color:"#7a5a00",background:GOLDS,borderRadius:6,padding:"1px 6px"}}>おすすめ</span>}
+                        {sel&&<span style={{fontSize:9,fontWeight:900,color:"#fff",background:G,borderRadius:6,padding:"1px 6px"}}>選択中</span>}
+                      </div>
+                      <div style={{fontSize:10.5,color:MUTED,fontWeight:700,marginTop:2}}>{p.sub}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <span style={{fontWeight:900,fontSize:16,color:GP}}>{p.price}</span>
+                      <span style={{fontSize:10,color:MUTED,fontWeight:700}}>{p.unit}</span>
+                    </div>
+                  </button>
+                );})}
+              </div>
+              {/* 購入導線（Stripe Checkout。バックエンド未設定なら正直に案内） */}
+              <button disabled={!sub.plan||planBusy} onClick={async()=>{
+                if(!sub.plan)return; setPlanMsg(""); setPlanBusy(true);
+                try{
+                  const code=taneFamilyCode();
+                  const r=await taneApi("checkout",{plan:sub.plan,familyCode:code});
+                  if(r.url){ window.location.href=r.url; return; }
+                  if(r.error==="billing_not_configured"||r.error==="price_not_configured"||r.status===503)
+                    setPlanMsg("オンライン決済は近日対応予定です。現在は無料でご利用いただけます。");
+                  else setPlanMsg("手続きを開始できませんでした。時間をおいてお試しください。");
+                }catch(e){ setPlanMsg("オンライン決済は近日対応予定です。現在は無料でご利用いただけます。"); }
+                setPlanBusy(false);
+              }}
+                style={{width:"100%",padding:"13px",background:sub.plan&&!planBusy?GP:BORDER,border:"none",borderRadius:12,color:"#fff",fontWeight:800,fontSize:14,cursor:sub.plan&&!planBusy?"pointer":"default",fontFamily:F,marginBottom:8}}>
+                {planBusy?"処理中…":sub.plan?"このプランで購入手続きへ":"プランを選んでください"}
+              </button>
+              {planMsg&&<div style={{background:BS,border:`1px solid ${B}`,borderRadius:10,padding:"9px 12px",marginBottom:8}}>
+                <div style={{fontSize:10.5,color:B,fontWeight:800,lineHeight:1.5}}>{planMsg}</div>
+              </div>}
+              <div style={{fontSize:10,color:MUTED,fontWeight:700,lineHeight:1.5,marginBottom:12}}>※ 14日間は無料体験。トライアル終了までは課金されません。正式リリース時に選択中のプランをそのまま引き継げます。</div>
+              {/* 保護者の端末で通知を受け取る（サーバープッシュ登録） */}
+              <button onClick={async()=>{
+                setPlanMsg("");
+                const pt=await taneGetPushToken();
+                const me=(data.parents||[])[0];
+                if(pt.ok&&me){ update(d=>({...d,pushTokens:{...(d.pushTokens||{}),[me.id]:{token:pt.token,role:"parent",name:me.name||"保護者",ts:Date.now()}}})); setPlanMsg("保護者の端末で通知を受け取ります🔔（お子さまが数日使わないとお知らせします）"); }
+                else if(pt.reason==="no_vapid") setPlanMsg("プッシュ通知は近日対応予定です（現在は承認タブの休眠アラートでご確認いただけます）。");
+                else if(pt.reason==="denied") setPlanMsg("通知がブロックされています。端末の設定から許可してください。");
+                else setPlanMsg("通知を登録できませんでした。");
+              }} style={{width:"100%",padding:"11px",background:BS,border:`1.5px solid ${B}`,borderRadius:12,color:B,fontWeight:800,fontSize:12.5,cursor:"pointer",fontFamily:F,marginBottom:12}}>
+                🔔 保護者の端末で「休眠お知らせ」を受け取る
+              </button>
+              {/* 解約・支払い管理 */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"11px 14px"}}>
+                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:3}}>解約・お支払い管理</div>
+                <div style={{fontSize:10.5,color:MUTED,fontWeight:700,lineHeight:1.5,marginBottom:8}}>いつでも解約できます（解約後も期間終了までは利用可能）。違約金や最低利用期間はありません。学んだ記録・級は解約後も残ります。</div>
+                <button onClick={async()=>{
+                  setPlanMsg("");
+                  const code=taneFamilyCode();
+                  const r=await taneApi("portal",{familyCode:code});
+                  if(r.url){ window.location.href=r.url; return; }
+                  if(r.error==="no_customer") setPlanMsg("現在は無料体験中です（解約手続きは課金開始後にご利用いただけます）。");
+                  else setPlanMsg("お支払い管理は近日対応予定です。");
+                }} style={{width:"100%",padding:"9px",background:"transparent",border:`1.5px solid ${BORDER}`,borderRadius:10,color:TEXTS,fontWeight:800,fontSize:11.5,cursor:"pointer",fontFamily:F}}>
+                  お支払い・解約の管理ページへ
+                </button>
+              </div>
+            </div>);
           })()}
 
           {/* ── 引き継ぎタブ ── */}
@@ -3883,11 +4145,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
-    tasks:"activity", invest:"activity", kakeibo:"money",
+    tasks:"activity", invest:"money", kakeibo:"money",
     goals:"money", rewards:"money", log:"more",
     badges:"more", tips:"more", ranking:"more", gacha:"daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
+  // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
+  const TAB_FB = {daily:"☀️",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
   const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
@@ -4082,7 +4346,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <button key={v} onClick={()=>setTab(v)}
             style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{position:"relative",display:"inline-flex"}}>
-              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent="🐣";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
+              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent=TAB_FB[v]||"🌱";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
               {tabDot && <span style={{position:"absolute",top:-3,right:-6,width:9,height:9,borderRadius:"50%",background:GOLD,border:`1.5px solid ${isJunior?CARD:"#0f1a2e"}`}}/>}
             </span>
             {l.replace(/^\S+\s+/,"")}
@@ -4106,8 +4370,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* 🌱 はたけ フローティングボタン(そだてるボタンの上に重ねて常駐・株/畑ワールドへ) */}
       {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young)
-        && !(isJunior?(effectiveTab==="money"&&monTab==="hatake"):(effectiveTab==="activity"&&actTab==="invest")) && (
-        <button onClick={()=>{ if(isJunior){setTab("goals");setMonTab("hatake");} else {setTab("activity");setActTab("invest");} }} aria-label="はたけ"
+        && !(effectiveTab==="money"&&monTab==="hatake") && (
+        <button onClick={()=>{ setTab(isJunior?"goals":"money"); setMonTab("hatake"); }} aria-label="はたけ"
           style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
             background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
             cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
@@ -4608,19 +4872,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       </>}
 
       {/* ── ACTIVITY サブナビ ──（投資ワールドが保護者設定でOFFのときは投資/為替タブごと隠す） */}
-      {effectiveTab==="activity"&&!isJunior&&!young&&!data.familySettings?.investOff&&(
-        <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
-          {[["tasks","✅ タスク"],["invest","📈 投資/為替"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setActTab(v)}
-              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${darkBG?"#4a9eff":GP}`:"2.5px solid transparent",background:"none",color:actTab===v?(darkBG?"#4a9eff":GP):(darkBG?"rgba(255,255,255,0.4)":MUTED),fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
-              {l}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── ACTIVITY ── */}
-      {effectiveTab==="activity"&&(actTab==="tasks"||young||data.familySettings?.investOff)&&(()=>{
+      {/* ── ACTIVITY（活動=タスク専用に純化。投資「はたけ」は全モード「ためる」へ統一＝卒業時の再学習ゼロ）── */}
+      {effectiveTab==="activity"&&(()=>{
         return(<div style={{padding:16}}>
           <TabHint id="tasks" text="やったお手伝いをタップして記録しよう！✏リスト編集で自分用のタスクを選べるよ" data={data} update={update} cid={child.id}/>
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
@@ -4657,13 +4910,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           )}
         </div>);
       })()}
-      {effectiveTab==="activity"&&actTab==="invest"&&!young&&!data.familySettings?.investOff&&<InvestTab child={child} data={data} update={update}/>}
+      {/* （旧）活動>投資 は廃止。はたけは「ためる>はたけ」に統一 */}
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
           {(isJunior
             ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🌱 はたけ"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"]]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"],...(!data.familySettings?.investOff&&!young?[["hatake","🌱 はたけ"]]:[])]
           ).map(([k,l])=>(
             <button key={k} onClick={()=>setMonTab(k)}
               style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
@@ -4676,7 +4929,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
       {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
-      {effectiveTab==="money" && monTab==="hatake" && isJunior && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
+      {effectiveTab==="money" && monTab==="hatake" && (isJunior||!young) && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="kakeibo" && (
         <div>
           {/* month nav */}
@@ -6040,7 +6293,7 @@ function ParentScreen({ data, update, onBack }) {
   const addCat=()=>{if(!ncatLabel)return;update(d=>({...d,cats:[...(d.cats||[]),{id:uid(),emoji:ncatEmoji,label:ncatLabel,color:ncatColor}]}));setShowAddCat(false);setNcatLabel("");setNcatEmoji("🏷");setNcatColor("#6b7280");};
 
   const TABS=[["overview","ホーム"],["family","ファミリー"],["children","承認・管理"],["tasks","タスク"],["daily","毎日"],["rewards","特典"],["learn","学ぶ"],["log","履歴"]];
-  const AGE_MODES={young:{emoji:"🐣",label:"幼児・低学年"},middle:{emoji:"⭐",label:"小学生"},senior:{emoji:"🔥",label:"中高生"}};
+  const AGE_MODES={young:{emoji:"🐣",label:"低学年（ふりがな）"},middle:{emoji:"⭐",label:"中学年"},senior:{emoji:"🔥",label:"高学年・中学生"}};
 
   // kakeibo child view
   if (kChild) {
@@ -6890,6 +7143,22 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 // 小さなシェブロン右
 function ChevronRightIcon(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>;
+}
+
+// 操作部アイコン（lucide不使用・stroke=currentColorで親colorを継承＝新色を作らない）。
+// 世界側のemoji(➕🌟💧みのり等)は対象外。UIクロムの機能emojiのみ置換する。
+function FIcon({name,size=18,style}){
+  const c={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round",style:{display:"block",flexShrink:0,...style}};
+  switch(name){
+    case"streak": return <svg {...c}><path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.5.6-2.7 1.4-3.6C9.6 8 9 9 9 11a3 3 0 0 0 .2 1C8.5 11.4 8 10.3 8 9c0-2.4 1.8-4.4 4-6Z"/></svg>;
+    case"water": return <svg {...c}><path d="M12 3.5c3 3.6 5.5 6.4 5.5 9.6a5.5 5.5 0 0 1-11 0c0-3.2 2.5-6 5.5-9.6Z"/></svg>;
+    case"coin":  return <svg {...c}><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M9.5 10.2c0-1 1.1-1.7 2.5-1.7s2.5.7 2.5 1.7-1.1 1.6-2.5 1.6-2.5.7-2.5 1.7 1.1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></svg>;
+    case"book":  return <svg {...c}><path d="M12 6.5C10.5 5.4 8.4 5 6 5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1c2.4 0 4.5.4 6 1.5"/><path d="M12 6.5C13.5 5.4 15.6 5 18 5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1c-2.4 0-4.5.4-6 1.5"/><path d="M12 6.5v13"/></svg>;
+    case"palette": return <svg {...c}><path d="M12 4a8 8 0 0 0 0 16c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.4-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a4 4 0 0 0 4-4c0-3.9-3.6-6.4-8-6.4Z"/><circle cx="8.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="8.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10.5" r="1" fill="currentColor" stroke="none"/></svg>;
+    case"bucket": return <svg {...c}><path d="M5 7h14l-1.4 11.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8L5 7Z"/><path d="M4 7h16"/><path d="M8.5 7a3.5 3.5 0 0 1 7 0"/></svg>;
+    case"vault": return <svg {...c}><path d="M4 10.5 12 4l8 6.5"/><path d="M5.5 10v9.5h13V10"/><rect x="9.5" y="13" width="5" height="6.5"/></svg>;
+    default: return null;
+  }
 }
 
 
@@ -8305,6 +8574,40 @@ async function shareCard({ emoji, title, subtitle, color, img, rarity }){
   }catch(e){ /* キャンセル/非対応は無視 */ }
 }
 
+// 🎓 金融リテラシー認定証（賞状デザインのシェア画像）。級到達のごほうび＝継続・口コミに効く
+async function shareCertificate({ name, rank, date, supervisor }){
+  try{
+    const W=1080,H=1080; const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const x=cv.getContext("2d");
+    x.textAlign="center"; x.textBaseline="middle";
+    // クリーム地＋淡い光彩
+    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#FBF8F0"); g.addColorStop(1,"#F1F6EC"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    const rg=x.createRadialGradient(W/2,470,40,W/2,470,520); rg.addColorStop(0,"#E8B83E22"); rg.addColorStop(1,"#E8B83E00"); x.fillStyle=rg; x.fillRect(0,0,W,H);
+    // 金の二重枠
+    x.strokeStyle="#E8B83E"; x.lineWidth=10; x.strokeRect(46,46,W-92,H-92);
+    x.strokeStyle="#C9A33A"; x.lineWidth=3; x.strokeRect(70,70,W-140,H-140);
+    // タイトル
+    x.fillStyle="#187A4E"; x.font="900 62px 'M PLUS Rounded 1c',sans-serif"; x.fillText("金融リテラシー認定証", W/2, 210);
+    x.fillStyle="#929B95"; x.font="700 24px sans-serif"; x.fillText("CERTIFICATE OF FINANCIAL LITERACY", W/2, 268);
+    // 氏名
+    x.fillStyle="#18231D"; x.font="900 84px 'M PLUS Rounded 1c',serif"; x.fillText((name||"") + " さん", W/2, 440);
+    x.strokeStyle="#E8B83E"; x.lineWidth=4; x.beginPath(); x.moveTo(W/2-280,506); x.lineTo(W/2+280,506); x.stroke();
+    // 本文＋級
+    x.fillStyle="#59645E"; x.font="700 32px 'M PLUS Rounded 1c',sans-serif"; x.fillText("タネマネー金融教育プログラムにおいて", W/2, 596);
+    x.fillStyle="#187A4E"; x.font="900 78px 'M PLUS Rounded 1c',sans-serif"; x.fillText(rank||"", W/2, 690);
+    x.fillStyle="#59645E"; x.font="700 32px 'M PLUS Rounded 1c',sans-serif"; x.fillText("に到達したことを 証します。", W/2, 784);
+    // 日付・監修・印
+    x.fillStyle="#929B95"; x.font="700 26px sans-serif"; x.fillText(date||"", W/2, 872);
+    if(supervisor){ x.fillStyle="#7a5a00"; x.font="800 26px 'M PLUS Rounded 1c',sans-serif"; x.fillText("監修：" + supervisor, W/2, 916); }
+    x.fillStyle="#187A4E"; x.font="900 40px 'M PLUS Rounded 1c',sans-serif"; x.fillText("🌱 Tane Money", W/2, 988);
+    const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+    const file=new File([blob],"tane-money-certificate.png",{type:"image/png"});
+    const payload={ title:"タネマネー 認定証", text:`${name||""}さんが ${rank||""} に到達！ #タネマネー`, url:"https://tane-money.vercel.app" };
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({ ...payload, files:[file] }); }
+    else if(navigator.share){ await navigator.share(payload); }
+    else { const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="tane-money-certificate.png"; a.click(); }
+  }catch(e){ /* キャンセル/非対応は無視 */ }
+}
+
 // ── GoalCelebration ───────────────────────────────────
 function GoalCelebration({goal,onClose}){
   return(
@@ -8963,29 +9266,30 @@ function InvestTab({child,data,update}){
       const NEXT=[3,10,30];
       const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
-        <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
+        <div style={{display:"flex",gap:SP.sm,alignItems:"center",marginBottom:SP.md}}>
           {studyMode
-            ? <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
-            : <><div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
-                <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
+            ? <div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"8px 12px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
+            : <><div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
+                <div style={{height:6,background:GS,borderRadius:RAD_PILL,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G,borderRadius:RAD_PILL}}/></div>
               </div>
-              {loginStreak>0&&<div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"7px 8px",fontSize:12,fontWeight:900,color:GP,whiteSpace:"nowrap"}}>📅{loginStreak}</div>}
-              <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div></>}
-          <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}>💰{myBal.toLocaleString()}</div>
+              {loginStreak>0&&<div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:GP,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:G}}/><FIcon name="streak" size={14}/>{loginStreak}</div>}
+              <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:B,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:B}}/><FIcon name="water" size={14}/>{waterReserve}</div></>}
+          <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:GOLD}}/><FIcon name="coin" size={14}/>{myBal.toLocaleString()}</div>
         </div>
-        <div style={{position:"relative",borderRadius:18,overflow:"hidden",marginBottom:10,border:`3px solid ${G}`,boxShadow:"0 6px 22px rgba(52,199,123,.3)"}}>
-          <div style={{height:44,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px 0 10px"}}>
-            <span style={{fontSize:12,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.65)",borderRadius:8,padding:"3px 9px"}}>🪵 きみの はたけ</span>
-            <button onClick={()=>setShowDex(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.8)",border:"none",borderRadius:9,padding:"4px 9px",cursor:"pointer",fontFamily:F}}>
-              <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
-              <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
+        <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
+          <div style={{position:"relative",height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 9px 0 10px"}}>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.16))"}}/>
+            <span style={{position:"relative",fontSize:12,fontWeight:900,color:TEXT,background:"#fff",borderRadius:RAD_PILL,padding:"4px 11px",boxShadow:SHADOW_SM}}>🪵 きみの はたけ</span>
+            <button onClick={()=>setShowDex(true)} style={{position:"relative",display:"flex",alignItems:"center",gap:5,background:"#fff",border:"none",borderRadius:RAD_PILL,padding:"5px 11px",cursor:"pointer",fontFamily:F,boxShadow:SHADOW_SM,color:GP}}>
+              <FIcon name="book" size={14}/>
+              <span style={{fontSize:11,fontWeight:900,color:GP}}>ずかん</span>
             </button>
           </div>
           {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える（学習モードでは非表示） */}
-          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#bfe6a0,#a6d885)",padding:"4px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"2px solid #8fc070"}}>
-            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.45}}>{it?it.e:"・"}</span>; })}
-            <span style={{marginLeft:"auto",fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"rgba(255,255,255,.78)",borderRadius:8,padding:"2px 8px",flexShrink:0,whiteSpace:"nowrap"}}>🎨 もようがえ</span>
+          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#d2e8c6,#c0dcae)",padding:"5px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"1px solid #aacf95"}}>
+            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.4}}>{it?it.e:"・"}</span>; })}
+            <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"#fff",borderRadius:RAD_PILL,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap",boxShadow:SHADOW_SM}}><FIcon name="palette" size={12}/>もようがえ</span>
           </div>}
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {stocks.map(s=>{
@@ -9020,12 +9324,18 @@ function InvestTab({child,data,update}){
           </div>
           <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
         </div>
-        <div style={{display:"flex",gap:7}}>
-          {!studyMode&&<button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <span style={{fontSize:18}}>🪣</span><span style={{fontSize:11,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9,fontWeight:800,color:"#4a7"}}>{Math.floor(bucketG)}g たまってる</span>
+        <div style={{display:"flex",gap:SP.sm}}>
+          {!studyMode&&<button onClick={drawWater}
+            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
+            style={{flex:1,background:CARD,border:BD_ACCENT(B),borderRadius:RAD_CARD,boxShadow:SHADOW_SM,padding:"10px 10px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:9,color:B,transition:"transform .08s"}}>
+            <FIcon name="bucket" size={22}/>
+            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:12.5,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9.5,fontWeight:800,color:MUTED}}>{Math.floor(bucketG)}g たまってる</span></span>
           </button>}
-          <button onClick={()=>setShowTrade(true)} style={{flex:1.5,background:GP,border:"none",borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <span style={{fontSize:18}}>🏠</span><span style={{fontSize:11,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span>
+          <button onClick={()=>setShowTrade(true)}
+            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
+            style={{flex:1.5,background:GP,border:"none",borderRadius:RAD_CARD,boxShadow:SHADOW_MD,padding:"10px 12px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:10,color:"#fff",transition:"transform .08s"}}>
+            <FIcon name="vault" size={22}/>
+            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:13,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9.5,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span></span>
           </button>
         </div>
       </div>);
@@ -9379,6 +9689,51 @@ function BadgesSection({child,data,update}){
 }
 
 // ── Tips ──────────────────────────────────────────────
+// ===== 年齢別の読みやすさ：ふりがな自動付与＋読み上げ（低学年= young 時のみ適用）=====
+// 48本の本文データは1文字も書き換えず、表示時に <ruby> でルビを振る。
+// 誤読を避けるため「複合語・読みが安定した語」を中心にマップ化。取りこぼしは読み上げ(🔊)で補う。
+const RUBY_MAP={
+  "お金":"おかね","銀行":"ぎんこう","利息":"りそく","利子":"りし","複利":"ふくり","単利":"たんり","金利上昇":"きんりじょうしょう","金利":"きんり","利率":"りりつ","利回":"りまわ",
+  "物価":"ぶっか","値段":"ねだん","価値":"かち","価格":"かかく","為替":"かわせ","円安":"えんやす","円高":"えんだか","輸入品":"ゆにゅうひん","輸入":"ゆにゅう","輸出":"ゆしゅつ",
+  "消費税":"しょうひぜい","所得税":"しょとくぜい","住民税":"じゅうみんぜい","税金":"ぜいきん","非課税":"ひかぜい","課税":"かぜい","貯金":"ちょきん","節約":"せつやく","口座":"こうざ","預金":"よきん",
+  "投資信託":"とうししんたく","投資家":"とうしか","投資":"とうし","分散投資":"ぶんさんとうし","分散":"ぶんさん","株価":"かぶか","配当金":"はいとうきん","配当":"はいとう","銘柄":"めいがら","元本":"がんぽん",
+  "資産":"しさん","金額":"きんがく","現金":"げんきん","借金":"しゃっきん","数千円":"すうせんえん","出費":"しゅっぴ","家計簿":"かけいぼ","固定費":"こていひ","変動費":"へんどうひ","家賃":"やちん",
+  "保険":"ほけん","詐欺":"さぎ","解約":"かいやく","手数料":"てすうりょう","積立":"つみたて","制度":"せいど","確率":"かくりつ","平均法":"へいきんほう","平均":"へいきん","法則":"ほうそく","暴落":"ぼうらく","起業":"きぎょう",
+  "経済不安":"けいざいふあん","経済":"けいざい","不景気":"ふけいき","景気":"けいき","業績悪化":"ぎょうせきあっか","業績":"ぎょうせき","上昇":"じょうしょう","戦争":"せんそう","原因":"げんいん","需要":"じゅよう","供給":"きょうきゅう","不安":"ふあん",
+  "世界":"せかい","日本":"にほん","同様":"どうよう","関係":"かんけい","企業統治":"きぎょうとうち","企業":"きぎょう","環境":"かんきょう","社会":"しゃかい","配慮":"はいりょ","地球":"ちきゅう","応援":"おうえん","発展":"はってん","時代":"じだい","未来":"みらい","人口":"じんこう","土地":"とち","目安":"めやす","合計":"ごうけい","元気":"げんき",
+  "海外旅行":"かいがいりょこう","旅行":"りょこう","言葉":"ことば","仕組":"しく","仕事":"しごと","会社":"かいしゃ","社長":"しゃちょう","商品":"しょうひん","商売":"しょうばい","事業":"じぎょう","労働":"ろうどう","給料":"きゅうりょう","経験":"けいけん","業界":"ぎょうかい","規模":"きぼ","副業":"ふくぎょう","利益":"りえき","約束":"やくそく","発行":"はっこう","方法":"ほうほう","種類":"しゅるい",
+  "学校":"がっこう","道路":"どうろ","病院":"びょういん","病気":"びょうき","事故":"じこ","成長":"せいちょう","目標":"もくひょう","目的":"もくてき","途中":"とちゅう","具体的":"ぐたいてき","効果的":"こうかてき","無駄遣":"むだづか","記録":"きろく","練習":"れんしゅう","責任感":"せきにんかん","計画性":"けいかくせい","計画的":"けいかくてき","達成感":"たっせいかん","基礎":"きそ","基本":"きほん","対価":"たいか","勉強":"べんきょう","知識":"ちしき","人的資本":"じんてきしほん","可能性":"かのうせい",
+  "大切":"たいせつ","大事":"だいじ","一部":"いちぶ","全部":"ぜんぶ","全体的":"ぜんたいてき","自分":"じぶん","将来":"しょうらい","安全":"あんぜん","安心":"あんしん","注意":"ちゅうい","必要":"ひつよう","本当":"ほんとう","魔法":"まほう","強力":"きょうりょく","運用":"うんよう","予測":"よそく","傾向":"けいこう","理由":"りゆう","長期投資":"ちょうきとうし","長期":"ちょうき","短期":"たんき","有名":"ゆうめい","格言":"かくげん","複数":"ふくすう","意味":"いみ","危険":"きけん","許容度":"きょようど",
+  "一番":"いちばん","一発":"いっぱつ","一度":"いちど","家族":"かぞく","競争":"きょうそう","昨日":"きのう","体験":"たいけん","初心者":"しょしんしゃ","王道":"おうどう","視点":"してん","名前":"なまえ","順番":"じゅんばん","絶対":"ぜったい","特別":"とくべつ","相談":"そうだん","大人":"おとな","失敗":"しっぱい","挑戦":"ちょうせん","何度":"なんど","自然":"しぜん","仲間":"なかま","上手":"じょうず","時間":"じかん","味方":"みかた","年数":"ねんすう","計算":"けいさん","早見":"はやみ","見直":"みなお","全然":"ぜんぜん","反面":"はんめん","便利":"べんり","中学":"ちゅうがく","達人":"たつじん","貝殻":"かいがら","後払":"あとばら","先払":"さきばら","翌月":"よくげつ","世":"よ",
+  "使":"つか","買":"か","売":"う","持":"も","働":"はたら","考":"かんが","学":"まな","育":"そだ","続":"つづ","集":"あつ","稼":"かせ","貯":"た","払":"はら","預":"あず","増":"ふ","減":"へ","助":"たす","守":"まも","届":"とど",
+  "株":"かぶ","貸":"か","別":"べつ","量":"りょう","同":"おな","良":"よ","必":"かなら","種":"たね","倍":"ばい","昔":"むかし","券":"けん","石":"いし","紙":"かみ","裏":"うら","客":"きゃく","店":"みせ","役":"やく","急":"きゅう","広":"ひろ"
+};
+const _RUBY_KEYS=Object.keys(RUBY_MAP).sort((a,b)=>b.length-a.length);
+// 文字列→React要素配列（young時のみ呼ぶ）。マップのキーを最長一致でルビ化、その他は素通し。
+function furi(text){
+  if(text==null) return text;
+  const s=String(text);
+  const out=[]; let i=0, buf="", k=0;
+  const flush=()=>{ if(buf){ out.push(buf); buf=""; } };
+  while(i<s.length){
+    let hit=null;
+    for(const key of _RUBY_KEYS){ if(s.startsWith(key,i)){ hit=key; break; } }
+    if(hit){ flush(); out.push(<ruby key={"r"+(k++)}>{hit}<rt style={{fontSize:"0.62em",fontWeight:400,letterSpacing:0}}>{RUBY_MAP[hit]}</rt></ruby>); i+=hit.length; }
+    else { buf+=s[i]; i++; }
+  }
+  flush();
+  return out;
+}
+// 🔊 読み上げ（非識字の低学年に最も効く・ブラウザTTSが漢字を正しく読む）
+function taneSpeak(text){
+  try{
+    if(typeof window==="undefined"||!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(String(text).replace(/\s+/g," "));
+    u.lang="ja-JP"; u.rate=0.92; u.pitch=1.05;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
 const ALL_TIPS=[
   {id:"t01",cat:"お金のきほん",emoji:"💴",title:"お金ってなに？",body:"お金は「ものやサービスと交換できる券」だよ。昔は貝殻や石が使われていたんだ！",q:"むかし、お金のかわりに 使われていたものは？",o:["貝殻や石","プラスチック","紙のシール"],a:0},
   {id:"t02",cat:"お金のきほん",emoji:"🏦",title:"銀行の仕組み",body:"銀行にお金を預けると、銀行はそのお金を別の人に貸して利息をとる。その一部をあなたに「利子」として払ってくれるよ。",q:"銀行に お金を あずけると もらえるのは？",o:["罰金","利子(りし)","税金"],a:1},
@@ -9416,20 +9771,38 @@ const ALL_TIPS=[
   {id:"t34",cat:"貯金・節約",emoji:"🆘",title:"もしもの備え",body:"急な出費（こわれた・病気など）に備えて、すぐ使わない「もしものお金」を 少し貯めておくと安心。投資の前に、まず この安心のお金を 用意するのが順番だよ。",q:"もしもの備えは？",o:["使わないお金を 少し貯めておく","全部 使う","借りれば いい"],a:0},
   {id:"t35",cat:"お金のきほん",emoji:"🤐",title:"お金の詐欺に注意",body:"「絶対もうかる」「あなただけ特別」はウソのサイン。うまい話には 裏がある。あやしいと思ったら お金を出す前に、かならず 大人に相談しようね。",q:"『絶対もうかる』と 言われたら？",o:["あやしい！大人に 相談","すぐ お金を 出す","ひみつに する"],a:0},
   {id:"t36",cat:"投資",emoji:"🧮",title:"複利でふえる例",body:"毎年5%ずつ増えると、10年で約1.6倍、20年で約2.6倍、30年で約4.3倍に。早く始めて 長く続けるほど、時間が味方してくれる。これが複利の力だよ。",q:"複利で 一番 大事なのは？",o:["長い 時間","一発の 大勝負","運だけ"],a:0},
+  // ── 純増コンテンツ 第1弾（コンテンツ枯渇対策・48話へ）──
+  {id:"t37",cat:"投資",emoji:"📜",title:"72の法則",body:"「72 ÷ 年の利率」で、お金が2倍になるまでの年数がだいたい分かる。年6%なら72÷6=12年。早見できる便利な計算だよ。",q:"年6%だと お金が2倍に なるのは およそ？",o:["12年","2年","50年"],a:0},
+  {id:"t38",cat:"投資",emoji:"🛟",title:"暴落はこわくない",body:"株が大きく下がる「暴落」は、長く投資する人にはむしろ安く買えるチャンス。みんなが売ってあわてる時こそ、コツコツ続ける人が強いよ。",q:"暴落のとき コツコツ投資の人は？",o:["あわてず 続ける","全部 売る","借金して 買う"],a:0},
+  {id:"t39",cat:"お金のきほん",emoji:"📐",title:"金利ってなに？",body:"お金を借りたり預けたりするときの「レンタル料」が金利。借りると払う・預けるともらえる。低い金利で借り、高い利回りで増やすのが基本だよ。",q:"金利は お金の？",o:["レンタル料","重さ","色"],a:0},
+  {id:"t40",cat:"貯金・節約",emoji:"🏠",title:"固定費と変動費",body:"毎月きまってかかるのが「固定費」（サブスク・家賃など）、月で変わるのが「変動費」（おやつ・遊び）。節約は まず固定費を見直すと効果が大きいよ。",q:"節約で 先に見直すと よいのは？",o:["固定費","変動費","おこづかい全部"],a:0},
+  {id:"t41",cat:"社会・経済",emoji:"💱",title:"円安と円高",body:"1ドル=100円→150円になるのが「円安」、150円→100円が「円高」。円安だと輸入品が高く、海外旅行も高くつく。ニュースでよく出る言葉だよ。",q:"1ドル100円→150円は？",o:["円安","円高","金利"],a:0},
+  {id:"t42",cat:"働くこと",emoji:"🚀",title:"会社をつくるってどんなこと？",body:"自分でサービスや商品を考えて売るのが「起業」。うまくいけば大きく稼げるけど、お客さんに価値を届けられるかが すべて。失敗から学ぶ力も大事だよ。",q:"起業で 一番 大切なのは？",o:["お客さんに 価値を届ける","運だけ","ねがうこと"],a:0},
+  {id:"t43",cat:"投資",emoji:"🎁",title:"配当ってなに？",body:"会社がもうけの一部を、株を持つ人に分けてくれるのが「配当」。ただし会社の調子が悪いと減ったり止まったりする。「持てば必ずもらえる」わけではないよ。",q:"配当について 正しいのは？",o:["減ったり止まったり する","ぜったい もらえる","税金が 0になる"],a:0},
+  {id:"t44",cat:"お金のきほん",emoji:"☂",title:"保険ってなに？",body:"みんなで少しずつお金を出し合い、だれかに「もしも」が起きた時に助ける仕組みが保険。大きな事故や病気の備え。かけすぎ・入りすぎにも注意だよ。",q:"保険は どんな しくみ？",o:["みんなで 出し合い 助け合う","必ず もうかる","税金の こと"],a:0},
+  {id:"t45",cat:"貯金・節約",emoji:"🔁",title:"サブスクの見直し",body:"毎月じわじわ引かれるサブスクは、使っていないものを 1つ解約するだけで 年に数千円の節約に。「なんとなく続けている」を見つけよう。",q:"使ってない サブスクは？",o:["解約して 節約","ぜんぶ 続ける","気にしない"],a:0},
+  {id:"t46",cat:"社会・経済",emoji:"🌐",title:"GDPってなに？",body:"その国で1年間に作られたモノ・サービスの合計が「GDP」。国の経済の元気さをはかるものさし。増えると景気が良い、減ると不景気の目安だよ。",q:"GDPは 何を はかる？",o:["国の経済の 元気さ","人口の 多さ","土地の 広さ"],a:0},
+  {id:"t47",cat:"Tane Money",emoji:"💪",title:"失敗から学ぶ",body:"投資もお手伝いも、うまくいかない日がある。大事なのは「なぜ？」と考えて次に活かすこと。失敗は学びの種。タネマネーは何度でも挑戦できるよ。",q:"失敗したとき 大切なのは？",o:["なぜか考えて 次に活かす","あきらめる","かくす"],a:0},
+  {id:"t48",cat:"投資",emoji:"🧰",title:"投資信託・ETFってなに？",body:"たくさんの会社の株を 1つにまとめた「おべんとうパック」が投資信託やETF。1本買うだけで自然に分散できる。オルカンやS&P500もこの仲間だよ。",q:"投資信託・ETFの よさは？",o:["1本で 分散できる","必ず 勝てる","税金0になる"],a:0},
 ];
 
 // 🎓 金融教育プログラム: まめちしきを「順番のある8コース」に再編＝学びの地図(カリキュラム)
 const CURRICULUM=[
-  {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23"]},
-  {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20"]},
-  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12","t34"]},
+  {id:"c1",e:"💴",t:"お金の基本",tips:["t01","t02","t03","t23","t39"]},
+  {id:"c2",e:"⚖",t:"つかう・えらぶ",tips:["t11","t04","t20","t44"]},
+  {id:"c3",e:"🐷",t:"ためる・もくひょう",tips:["t08","t09","t10","t12","t34","t40","t45"]},
   {id:"c4",e:"💼",t:"かせぐ・はたらく",tips:["t07","t24","t25","t26","t27"]},
-  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18","t31"]},
-  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16","t36"]},
-  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22","t32","t33"]},
+  {id:"c5",e:"📈",t:"投資デビュー",tips:["t13","t17","t18","t31","t43"]},
+  {id:"c6",e:"🧺",t:"リスクと分散",tips:["t14","t15","t16","t36","t48"]},
+  {id:"c7",e:"🧾",t:"税金・世界のお金",tips:["t06","t05","t19","t22","t32","t33","t41"]},
   {id:"c8",e:"🛡",t:"かしこく・だまされない",tips:["t21","t30","t28","t29","t35"]},
+  // 🏅 1級修了後の「次の山」＝達人への道（中学〜・やり込み向け）
+  {id:"c9",e:"🏅",t:"達人への道（中学〜）",tips:["t37","t38","t42","t46","t47"],adv:true},
 ];
 function TipsSection({ageMode,child,data,update}){
+  // 低学年(young)のときだけ漢字に自動ふりがな。middle/seniorは素通し（既存挙動を壊さない）
+  const young2=ageMode==="young";
+  const ruby=(t)=> young2 ? furi(t) : t;
   const [cat,setCat]=useState("すべて");
   const [course,setCourse]=useState(null);   // 選択中コース(カリキュラム)
   const [reviewOn,setReviewOn]=useState(false);  // 🔁 おさらいクイズ(間隔反復)
@@ -9445,6 +9818,7 @@ function TipsSection({ageMode,child,data,update}){
   // クイズに正解(初回のみ): モンスターにEXP=お金の知識→ゲームの成長を直結
   const answerQuiz=(tip,idx)=>{
     setQuizPick(p=>({...p,[tip.id]:idx}));
+    if(idx===tip.a){ markLearn("quiz"); }
     if(idx===tip.a && !quizDone.includes(tip.id)){
       update(d=>({...d,
         tipsQuiz:{...(d.tipsQuiz||{}),[child.id]:[...((d.tipsQuiz?.[child.id])||[]),tip.id]},
@@ -9452,13 +9826,67 @@ function TipsSection({ageMode,child,data,update}){
       }));
     }
   };
+  // 🔥 学習れんぞく＋きょうのミッション（毎日もどってくる理由＝子の継続フック）
+  const _todayISO=new Date().toISOString().slice(0,10);
+  const _yISO=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const ld=(data.learnDays||{})[child.id]||{last:"",streak:0,best:0,read:false,quiz:false};
+  const ldToday=ld.last===_todayISO;
+  const missRead=ldToday&&ld.read, missQuiz=ldToday&&ld.quiz, missDone=missRead&&missQuiz;
+  const learnStreak=ld.last===_todayISO?ld.streak:(ld.last===_yISO?ld.streak:0);
+  const _d2ISO=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
+  const markLearn=(kind)=>update(d=>{
+    const k=child.id; const cur=(d.learnDays||{})[k]||{last:"",streak:0,best:0,read:false,quiz:false,freeze:""};
+    let {last,streak,best,read,quiz,freeze}=cur;
+    if(last!==_todayISO){
+      if(last===_yISO){ streak=(streak||0)+1; }
+      // 🛡 ストリーク保護: 1日の抜けは週1回まで救済(やる気が折れないように)
+      else if(last===_d2ISO && (!freeze || (Date.now()-new Date(freeze).getTime())/86400000>=7)){ streak=(streak||0)+1; freeze=_todayISO; }
+      else { streak=1; }
+      last=_todayISO; read=false; quiz=false;
+    }
+    if(kind==="read")read=true; if(kind==="quiz")quiz=true;
+    best=Math.max(best||0,streak||0);
+    return {...d,learnDays:{...(d.learnDays||{}),[k]:{last,streak,best,read,quiz,freeze:freeze||""}}};
+  });
+  // 🔔 リマインダー: 起動時に「今日のミッション未達」なら通知（許可済みのみ・同意ベース）
+  const reminderOn=!!((data.reminders||{})[child.id]);
+  useEffect(()=>{
+    try{
+      if(!reminderOn) return;
+      if(!("Notification"in window)||Notification.permission!=="granted") return;
+      if(missDone) return;
+      const k="tane_remind_"+child.id+"_"+_todayISO;
+      if(localStorage.getItem(k)) return;   // 1日1回まで
+      localStorage.setItem(k,"1");
+      new Notification("タネマネー",{body:`${child.name}の きょうの学習ミッションが まってるよ📖 れんぞくを のばそう！`});
+    }catch(e){}
+  },[reminderOn,missDone]);
+  const enableReminder=async()=>{
+    try{
+      if(!("Notification"in window)){update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}}));return;}
+      let perm=Notification.permission;
+      if(perm==="default") perm=await Notification.requestPermission();
+      if(perm==="granted"){
+        update(d=>({...d,reminders:{...(d.reminders||{}),[child.id]:true}}));
+        try{new Notification("タネマネー",{body:"まいにちリマインダーをオンにしたよ🔔"});}catch(e){}
+        // サーバープッシュ用トークンを登録（アプリを閉じていても引き戻せるように）。VAPID未設定なら自動スキップ。
+        const pt=await taneGetPushToken();
+        if(pt.ok) update(d=>({...d,pushTokens:{...(d.pushTokens||{}),[child.id]:{token:pt.token,role:"child",name:child.name,ts:Date.now()}}}));
+      }
+    }catch(e){}
+  };
   const ageCats=ageMode==="young"?["お金のきほん","貯金・節約","Tane Money"]:null;
   const cats=["すべて",...Array.from(new Set(ALL_TIPS.map(t=>t.cat)))];
   // 🎓 プログラム(カリキュラム)進捗と金融リテラシー級
   const courseProg=(c)=>c.tips.filter(id=>quizDone.includes(id)).length;
   const courseDone=(c)=>c.tips.length>0 && c.tips.every(id=>quizDone.includes(id));
-  const completedCourses=CURRICULUM.filter(courseDone).length;
-  const rank=completedCourses>=8?"1級 修了🎓":`${9-completedCourses}級`;
+  const LADDER=CURRICULUM.filter(c=>!c.adv);   // 9級→1級の本道(8コース)
+  const ADV=CURRICULUM.filter(c=>c.adv);        // 達人への道(1級後の次の山)
+  const ladderDone=LADDER.filter(courseDone).length;
+  const advDone=ADV.filter(courseDone).length;
+  const completedCourses=ladderDone;            // 級ラダー＝成長レポートのベースライン基準
+  const oneKyu=ladderDone>=LADDER.length;       // 1級到達
+  const rank=oneKyu?(advDone>=ADV.length?"達人 🏅":"1級 修了🎓"):`${9-ladderDone}級`;
   const curCourse=course?CURRICULUM.find(c=>c.id===course):null;
   const filtered=curCourse?ALL_TIPS.filter(t=>curCourse.tips.includes(t.id)):ALL_TIPS.filter(t=>(ageCats?ageCats.includes(t.cat):true)&&(cat==="すべて"||t.cat===cat));
   // 📈 成長レポート(保護者向けROI): 入会時ベースラインを記録し Before/After を見せる
@@ -9479,19 +9907,57 @@ function TipsSection({ageMode,child,data,update}){
   const handleOpen=tipId=>{
     if(openId===tipId){setOpenId(null);return;}
     setOpenId(tipId);
+    markLearn("read");
     if(!readIds.includes(tipId)){
       update(d=>({...d,tipsRead:{...(d.tipsRead||{}),[child.id]:[...(d.tipsRead?.[child.id]||[]),tipId]},logs:(()=>{const _e={id:uid(),cid:child.id,type:"tips",label:`💡 まめちしき読んだ！+${TIP_PTS}pt`,pts:TIP_PTS,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()}));
     }
   };
   return(<div style={{padding:"12px 16px"}}>
-    {/* 📅 今月のまめちしき（毎月 自動で変わる注目トピック＝継続のフレッシュさ） */}
-    {(()=>{const d=new Date();const fi=(d.getFullYear()*12+d.getMonth())%ALL_TIPS.length;const ft=ALL_TIPS[fi];return(
+    {/* 📅 今月のまめちしき（毎月 自動で3話 入れ替わる注目テーマ＝継続のフレッシュさ） */}
+    {(()=>{const d=new Date();const mi=d.getFullYear()*12+d.getMonth();const pick=[0,1,2].map(k=>ALL_TIPS[(mi*3+k)%ALL_TIPS.length]);const ft=pick[0];const sub=pick.slice(1);return(
       <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:14,padding:"11px 13px",marginBottom:12}}>
-        <div style={{fontSize:10,fontWeight:900,color:"#8a6a00",marginBottom:3}}>📅 今月のまめちしき</div>
-        <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ft.title}</div>
-        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:1.6}}>{ft.body}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:3}}>
+          <div style={{fontSize:10,fontWeight:900,color:"#8a6a00"}}>📅 今月のまめちしき（毎月かわる）</div>
+          <div style={{fontSize:9,fontWeight:800,color:"#8a6a00",opacity:.8}}>全{ALL_TIPS.length}話</div>
+        </div>
+        <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ruby(ft.title)}</div>
+        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:young2?1.9:1.6,marginBottom:6}}>{ruby(ft.body)}</div>
+        <div style={{display:"flex",gap:6}}>
+          {sub.map(s=>(<div key={s.id} style={{flex:1,background:"rgba(255,255,255,.55)",borderRadius:9,padding:"5px 7px"}}>
+            <div style={{fontSize:9.5,fontWeight:900,color:"#8a6a00",marginBottom:1}}>つづき</div>
+            <div style={{fontSize:10.5,fontWeight:800,color:TEXT,lineHeight:1.3}}>{s.emoji} {s.title}</div>
+          </div>))}
+        </div>
       </div>
     );})()}
+    {/* 🔥 きょうの学習ミッション＋れんぞく日数（毎日もどってくる理由＝子の継続フック） */}
+    <div style={{background:missDone?GS:CARD,border:`1.5px solid ${missDone?G:BORDER}`,borderRadius:16,padding:"11px 13px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+        <span style={{fontSize:20}}>🔥</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:900,fontSize:13,color:TEXT}}>きょうの学習ミッション</div>
+          <div style={{fontSize:10.5,color:learnStreak>0?GP:MUTED,fontWeight:800,marginTop:1}}>{learnStreak>0?`${learnStreak}日れんぞくで 学習中！`:"きょうから れんぞく学習を はじめよう"}</div>
+        </div>
+        {missDone&&<span style={{fontSize:10,fontWeight:900,color:"#fff",background:G,borderRadius:8,padding:"3px 8px"}}>コンプリート！</span>}
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        {[["📖 まめちしきを 1つよむ",missRead],["✏️ クイズに 1問せいかい",missQuiz]].map(([k,ok])=>(
+          <div key={k} style={{flex:1,display:"flex",alignItems:"center",gap:6,background:ok?GS:BG,border:`1px solid ${ok?G:BORDER}`,borderRadius:10,padding:"7px 9px"}}>
+            <span style={{fontSize:14}}>{ok?"✅":"⬜"}</span>
+            <span style={{fontSize:10.5,fontWeight:800,color:ok?GP:TEXTS,lineHeight:1.25}}>{k}</span>
+          </div>
+        ))}
+      </div>
+      {!missDone&&<div style={{fontSize:10,color:MUTED,fontWeight:700,marginTop:6}}>2つ クリアで きょうのミッション達成。あしたも つづけて れんぞくを のばそう！</div>}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${BORDER}`}}>
+        <span style={{flex:1,fontSize:10,color:TEXTS,fontWeight:700,lineHeight:1.4}}>🛡 1日 おやすみしても、れんぞくは 週1回まで まもられるよ。</span>
+        {!reminderOn?(
+          <button onClick={enableReminder} style={{flexShrink:0,background:BS,border:`1.5px solid ${B}`,borderRadius:9,padding:"6px 10px",color:B,fontWeight:800,fontSize:10.5,cursor:"pointer",fontFamily:F}}>🔔 リマインダーON</button>
+        ):(
+          <span style={{flexShrink:0,fontSize:10,fontWeight:800,color:GP}}>🔔 通知ON</span>
+        )}
+      </div>
+    </div>
     {/* 🎓 金融教育プログラム（学びの地図＋金融リテラシー級） */}
     <div style={{background:"linear-gradient(135deg,#2d2640,#1f2b3e)",borderRadius:18,padding:"14px 16px",marginBottom:12,color:"#fff"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -9506,18 +9972,31 @@ function TipsSection({ageMode,child,data,update}){
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-        {CURRICULUM.map((c,i)=>{const prog=courseProg(c);const done=courseDone(c);const sel=course===c.id;return(
-          <button key={c.id} onClick={()=>{setCourse(sel?null:c.id);setOpenId(null);}}
-            style={{flex:"1 1 46%",minWidth:0,textAlign:"left",background:sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
-            <span style={{fontSize:18,flexShrink:0}}>{done?"✅":c.e}</span>
+        {CURRICULUM.map((c,i)=>{const prog=courseProg(c);const done=courseDone(c);const sel=course===c.id;const locked=c.adv&&!oneKyu;return(
+          <button key={c.id} disabled={locked} onClick={()=>{if(locked)return;setCourse(sel?null:c.id);setOpenId(null);}}
+            style={{flex:"1 1 46%",minWidth:0,textAlign:"left",opacity:locked?0.55:1,background:c.adv&&!locked?"rgba(255,217,102,.16)":sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:c.adv?"1.5px solid #ffd966":sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:locked?"default":"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
+            <span style={{fontSize:18,flexShrink:0}}>{locked?"🔒":done?"✅":c.e}</span>
             <span style={{flex:1,minWidth:0}}>
-              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i+1}. {c.t}</span>
-              <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
+              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.adv?"🏅 ":`${i+1}. `}{ruby(c.t)}</span>
+              <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{locked?"1級になると ひらく":done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
             </span>
           </button>
         );})}
       </div>
       {course&&<button onClick={()=>setCourse(null)} style={{marginTop:10,background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,padding:"6px 12px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>← ぜんぶのコースに もどる</button>}
+      {/* 🏅 認定証（級を1つでも取ったら発行・賞状をシェア/保存できる） */}
+      {ladderDone>=1&&(
+        <div style={{marginTop:10,background:"rgba(255,217,102,.14)",border:"1.5px solid #ffd966",borderRadius:12,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>🏅</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:900,fontSize:12.5,color:"#ffe9a8"}}>{rank} 認定証</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:700}}>がんばりの証。おうちの人とシェアしよう</div>
+          </div>
+          <button onClick={()=>shareCertificate({name:child.name,rank,date:`${new Date().getFullYear()}年${new Date().getMonth()+1}月${new Date().getDate()}日`,supervisor:SUPERVISOR.name?`${SUPERVISOR.title} ${SUPERVISOR.name}`.trim():""})}
+            style={{flexShrink:0,background:"#ffd966",border:"none",borderRadius:10,padding:"8px 12px",color:"#5a4300",fontWeight:900,fontSize:11.5,cursor:"pointer",fontFamily:F}}>認定証を出す 📤</button>
+        </div>
+      )}
+      {SUPERVISOR.name&&<div style={{marginTop:8,fontSize:10,color:"rgba(255,255,255,.72)",fontWeight:700,textAlign:"center"}}>🎓 {`${SUPERVISOR.title} ${SUPERVISOR.name}`.trim()} 監修</div>}
     </div>
     {/* 📈 成長レポート（保護者向け・¥980のROIを見せる Before/After） */}
     <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
@@ -9539,6 +10018,34 @@ function TipsSection({ageMode,child,data,update}){
       </div>
       <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5}}>習得した分野：{completedCourses>0?CURRICULUM.filter(courseDone).map(c=>c.t).join("・"):"まだクリアしたコースはありません。クイズに挑戦して級を上げよう！"}</div>
     </div>
+    {/* 💰 金銭感覚の育ち（保護者向け・"級"とは別軸の実生活の成果＝課金者価値の証明 R4） */}
+    {(()=>{
+      const myL=(data.logs||[]).filter(l=>l.cid===child.id);
+      const saved=myL.reduce((s,l)=>s+(l.pts||0),0);
+      const divTotal=myL.filter(l=>l.type==="interest").reduce((s,l)=>s+(l.pts||0),0);
+      const buyCount=myL.filter(l=>l.type==="invest_buy").length;
+      const totalChores=myL.filter(l=>l.type==="good"||l.type==="daily").length;
+      const rewardCount=myL.filter(l=>l.type==="reward").length;
+      return(<div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+          <span style={{fontSize:16}}>💰</span>
+          <span style={{fontWeight:900,fontSize:13,color:TEXT}}>金銭感覚の育ち</span>
+          <span style={{fontSize:10,color:MUTED,fontWeight:700}}>（保護者向け）</span>
+        </div>
+        <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginBottom:8}}>“貯める・ふやす・はたらいて得る・考えて使う”の実体験が、どれだけ積み上がっているか。</div>
+        <div style={{display:"flex",gap:6,marginBottom:8}}>
+          {[["いま貯まっている",`${saved.toLocaleString()}pt`,GP],["配当・利子でふえた",`${divTotal.toLocaleString()}pt`,GOLD],["投資にチャレンジ",`${buyCount}回`,B]].map(([k,v,c])=>(
+            <div key={k} style={{flex:1,background:BG,borderRadius:10,padding:"7px 4px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:9,color:MUTED,fontWeight:700,lineHeight:1.3,marginTop:2}}>{k}</div></div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {[["はたらいて得た（お手伝い）",`${totalChores}回`],["考えて使った（こうかん）",`${rewardCount}回`]].map(([k,v])=>(
+            <div key={k} style={{flex:1,background:BG,borderRadius:10,padding:"7px 6px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:900,color:TEXT}}>{v}</div><div style={{fontSize:9,color:MUTED,fontWeight:700,lineHeight:1.3,marginTop:2}}>{k}</div></div>
+          ))}
+        </div>
+        <div style={{fontSize:10,color:MUTED,fontWeight:700,lineHeight:1.5,marginTop:8}}>※ クイズの“級”は知識、こちらは実際のお金の行動。両方そろって本物の金銭感覚が育ちます。</div>
+      </div>);
+    })()}
     {/* 🔁 おさらいクイズ（間隔反復＝暗記でなく定着。級の本物度を担保） */}
     {(quizDone.length>0)&&(
       <div style={{background:PS,border:`1.5px solid ${P}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
@@ -9554,12 +10061,12 @@ function TipsSection({ageMode,child,data,update}){
         ):rTip&&(
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:11,fontWeight:900,color:P}}>🔁 おさらい {rIdx+1}/{rList.length}</span><button onClick={()=>setReviewOn(false)} style={{background:"none",border:"none",color:MUTED,fontSize:16,cursor:"pointer"}}>✕</button></div>
-            <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>{rTip.emoji} {rTip.q}</div>
+            <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>{rTip.emoji} {ruby(rTip.q)}</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {rTip.o.map((opt,i)=>{const ans=rPick!=null;const correct=i===rTip.a;const picked=rPick===i;return(
                 <button key={i} onClick={()=>reviewAnswer(rTip,i)} disabled={ans}
                   style={{textAlign:"left",background:ans?(correct?GS:picked?RS:CARD):CARD,border:`2px solid ${ans?(correct?GP:picked?R:BORDER):BORDER}`,borderRadius:10,padding:"9px 11px",fontSize:12.5,fontWeight:700,color:TEXT,cursor:ans?"default":"pointer",fontFamily:F}}>
-                  {ans&&correct?"✅ ":ans&&picked?"❌ ":""}{opt}
+                  {ans&&correct?"✅ ":ans&&picked?"❌ ":""}{ruby(opt)}
                 </button>
               );})}
             </div>
@@ -9595,17 +10102,18 @@ function TipsSection({ageMode,child,data,update}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:22,flexShrink:0}}>{tip.emoji}</span>
           <div style={{flex:1}}>
-            <div style={{fontWeight:800,fontSize:13,color:isOpen?B:TEXT}}>{tip.title}</div>
+            <div style={{fontWeight:800,fontSize:13,color:isOpen?B:TEXT}}>{ruby(tip.title)}</div>
             <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
-              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>{tip.cat}</span>
+              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>{ruby(tip.cat)}</span>
               {!isRead&&<span style={{background:`${Y}20`,color:"#9a7000",padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>+{TIP_PTS}pt</span>}
               {isRead&&<span style={{color:G,fontSize:11,fontWeight:700}}>✓ 読んだ</span>}
             </div>
           </div>
           <span style={{color:MUTED,fontSize:14,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
         </div>
-        {isOpen&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${B}30`,fontSize:13,color:TEXT,lineHeight:1.8,fontWeight:500}}>
-          {tip.body}
+        {isOpen&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${B}30`,fontSize:young2?14:13,color:TEXT,lineHeight:young2?2.15:1.8,fontWeight:500}}>
+          {young2&&<div onClick={e=>{e.stopPropagation();taneSpeak(tip.title+"。"+tip.body);}} role="button" style={{display:"inline-flex",alignItems:"center",gap:5,background:BS,border:`1.5px solid ${B}`,borderRadius:RAD_PILL,padding:"5px 12px",marginBottom:8,cursor:"pointer",color:B,fontWeight:900,fontSize:12}}>🔊 よみあげ</div>}
+          {ruby(tip.body)}
           {!isRead&&<div style={{marginTop:8,background:`${G}15`,border:`1px solid ${G}`,borderRadius:8,padding:"6px 10px",display:"inline-block",fontSize:12,color:G,fontWeight:700}}>🎉 +{TIP_PTS}pt ゲット！</div>}
           {/* 💡→🎮 再接続: 読んだあとのミニクイズ。正解でモンスターにEXP */}
           {tip.q&&(()=>{
@@ -9614,7 +10122,7 @@ function TipsSection({ageMode,child,data,update}){
             const reveal=mastered||picked!=null;
             return (
               <div onClick={e=>e.stopPropagation()} style={{marginTop:12,background:CARDS,border:`1px solid ${BORDER}`,borderRadius:12,padding:"11px 12px"}}>
-                <div style={{fontSize:12.5,fontWeight:800,color:TEXT,marginBottom:9}}>🧠 クイズ：{tip.q}</div>
+                <div style={{fontSize:12.5,fontWeight:800,color:TEXT,marginBottom:9}}>🧠 クイズ：{ruby(tip.q)}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {tip.o.map((opt,i)=>{
                     const isCorrect=i===tip.a, isPicked=picked===i;
@@ -9624,7 +10132,7 @@ function TipsSection({ageMode,child,data,update}){
                     return (
                       <div key={i} role="button" onClick={e=>{e.stopPropagation(); if(!mastered) answerQuiz(tip,i);}}
                         style={{display:"flex",alignItems:"center",gap:8,background:bg,border:`1.5px solid ${bd}`,borderRadius:10,padding:"9px 11px",cursor:mastered?"default":"pointer",fontFamily:F}}>
-                        <span style={{flex:1,fontSize:12.5,fontWeight:700,color:col}}>{opt}</span>
+                        <span style={{flex:1,fontSize:12.5,fontWeight:700,color:col}}>{ruby(opt)}</span>
                         {reveal&&isCorrect&&<span style={{fontSize:14}}>⭕</span>}
                         {reveal&&isPicked&&!isCorrect&&<span style={{fontSize:14}}>❌</span>}
                       </div>
@@ -9790,6 +10298,7 @@ function SetupWizard({ data, update, onComplete }) {
   const [childName,   setChildName]  = useState("");
   const [childEmoji,  setChildEmoji] = useState("⚡");
   const [childMode,   setChildMode]  = useState("teen");
+  const [childGrade,  setChildGrade] = useState(null); // 'young'|'middle'|'senior'（小学生のとき学年から初期レベルを提案）
   const [parentJoin,  setParentJoin] = useState(false);  // true/false
   const [parentName,  setParentName] = useState("");
   const [parentEmoji, setParentEmoji]= useState("👨");
@@ -9835,8 +10344,9 @@ function SetupWizard({ data, update, onComplete }) {
     const newChild = {
       id:childId, name:childName.trim()||"こども", emoji:childEmoji,
       pinh:pinHash("0000"), displayMode:childMode, role:"child",
-      gradeLabel:childMode==="junior"?"小学生":"中学生",
-      ageMode:childMode==="junior"?"young":"middle",
+      gradeLabel:childMode==="junior"?({young:"小学校低学年",middle:"小学校中学年",senior:"小学校高学年"}[childGrade]||"小学生"):"中学生",
+      // 案2: 学年を選んでいればそれを初期レベルに。未選択なら従来マッピング。あとで親が変更可。
+      ageMode:childMode==="junior"?(childGrade||"young"):"middle",
       permissions:{canChangePin:true,canViewBalance:true,canCreateGoals:true,canRedeemRewards:true},
       visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
     };
@@ -9995,7 +10505,17 @@ function SetupWizard({ data, update, onComplete }) {
               </button>
             ))}
           </div>
-          <p style={{color:MUTED,fontSize:11,margin:"0 0 22px"}}>あとから設定画面で変更できます</p>
+          {childMode==="junior"&&(<>
+            <div style={{fontSize:12,fontWeight:700,color:MUTED,margin:"10px 0 8px"}}>学年（文字のやさしさが変わります）</div>
+            <div style={{display:"flex",gap:6,marginBottom:6}}>
+              {[["young","1〜2年","ふりがな"],["middle","3〜4年","かんたん"],["senior","5〜6年","ふつう"]].map(([v,l,d])=>(
+                <button key={v} onClick={()=>setChildGrade(v)} style={{flex:1,padding:"9px 0",border:`2px solid ${childGrade===v?GP:BORDER}`,borderRadius:10,background:childGrade===v?`${GP}15`:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,color:childGrade===v?GP:MUTED}}>
+                  {l}<br/><span style={{fontSize:10,fontWeight:600,color:MUTED}}>{d}</span>
+                </button>
+              ))}
+            </div>
+          </>)}
+          <p style={{color:MUTED,fontSize:11,margin:"6px 0 22px"}}>あとから保護者設定でいつでも変更できます</p>
           <button onClick={()=>setStep(3)} style={btnStyle(!!childName.trim())} disabled={!childName.trim()}>
             つぎへ →
           </button>
@@ -10415,11 +10935,11 @@ export default function App() {
         if(!firestoreLogs || firestoreLogs.length===0) return;
         setData(prev=>{
           if(!prev) return prev;
-          const existingIds = new Set((prev.logs||[]).map(l=>l.id));
-          const added = firestoreLogs.filter(l=>!existingIds.has(l.id));
-          if(added.length===0) return prev;
-          const merged = [...added,...(prev.logs||[])];
-          merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+          const had = (prev.logs||[]).length;
+          const hadCarry = (prev.logs||[]).some(_isCarryLog);
+          const { merged } = reconcileFullLogs(prev.logs, firestoreLogs);
+          // 件数が同じ＆carryも無い＝変化なし → 再描画しない
+          if(merged.length===had && !hadCarry) return prev;
           return {...prev, logs: merged};
         });
       }, 5000);
@@ -10457,17 +10977,13 @@ export default function App() {
           if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
         }catch(e){}
       }
-      // Firestoreのlogsコレクションからログを追加読み込み
+      // Firestoreのlogsサブコレクション(全件=唯一の正)へ収束＝端末間の残高ズレを解消
       const firestoreLogs = await loadLogsFromFirestore();
       if(firestoreLogs && firestoreLogs.length > 0) {
-        // ローカルログとFirestoreログをマージ（重複排除）
-        const localIds = new Set((migrated.logs||[]).map(l=>l.id));
-        const newLogs = firestoreLogs.filter(l => !localIds.has(l.id));
-        if(newLogs.length > 0) {
-          const merged = [...newLogs, ...(migrated.logs||[])];
-          merged.sort((a,b) => new Date(b.date) - new Date(a.date));
-          migrated.logs = merged;
-        }
+        const { merged, localOnly } = reconcileFullLogs(migrated.logs, firestoreLogs);
+        migrated.logs = merged;
+        // ローカルにしか無い(未同期の)ログをFirestoreへ送り、他端末にも反映させる
+        try{ localOnly.forEach(l=>{ if(l && l.id && !_isCarryLog(l)) addLogToFirestore(l); }); }catch(e){}
       }
       setData(migrated);
       if(!shownLocal) setLoading(false);

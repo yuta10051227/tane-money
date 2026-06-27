@@ -44,6 +44,9 @@ echo ""
 echo "▶ [4/5] GitHub へ push 中..."
 git add index.html "$JSX" okozukai-v9-stable.jsx manifest.json sw.js icon.svg vercel.json 2>/dev/null || true
 git add index.html "$JSX"
+# キャッシュ更新の自動化で生成・書き換えされる成果物を必ず含める（古い版が端末に残るのを防ぐ）
+git add version.json sw.js firebase-messaging-sw.js 2>/dev/null || true
+git add api/ firestore.rules package.json BACKEND_SETUP.md 2>/dev/null || true
 git add assets/ 2>/dev/null || true
 git commit -m "$MSG
 

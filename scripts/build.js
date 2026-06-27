@@ -53,4 +53,23 @@ const withVersion = newHtml.replace(
 
 fs.writeFileSync(htmlPath, withVersion.includes('name="tane-version"') ? withVersion : newHtml);
 console.log("index.html updated:", (withVersion || newHtml).length, "bytes");
+
+// ── キャッシュ更新の自動化（古い版が端末に残る問題の恒久対策）──
+// 1) /version.json を index.html の <meta tane-version> と同じ版で書き出す。
+//    起動中のアプリがこれを no-store で取得し、版が違えば「更新する」バーを出す。
+const versionJsonPath = path.join(root, "version.json");
+fs.writeFileSync(versionJsonPath, JSON.stringify({ version: commitHash, builtAt: new Date().toISOString() }) + "\n");
+console.log("version.json updated:", commitHash);
+
+// 2) sw.js の CACHE 名を 'tane-money-<version>' に毎ビルド書き換える。
+//    → デプロイ毎にSWバイト列が変わり、必ず install→activate が走って旧キャッシュを掃除＋全ページに更新通知。
+const swPath = path.join(root, "sw.js");
+try {
+  let sw = fs.readFileSync(swPath, "utf8");
+  const cacheName = `tane-money-${commitHash}`;
+  const replaced = sw.replace(/const CACHE = '[^']*';/, `const CACHE = '${cacheName}';`);
+  if (replaced !== sw) { fs.writeFileSync(swPath, replaced); console.log("sw.js CACHE updated:", cacheName); }
+  else console.warn("sw.js: CACHE 行が見つからず更新できませんでした（要確認）");
+} catch (e) { console.warn("sw.js update skipped:", e.message); }
+
 console.log("Version:", commitHash);

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>タネマネー｜お金は、種。はたけで育てて、考える力を育てる。</title>
+<meta name="description" content="小〜中学生のための金融教育アプリ。失敗しても痛くない、わが子だけの小さな経済。投資で損する経験も、1円も失わずに。年額¥9,800・無料体験あり。">
+<meta property="og:title" content="お金は、種。｜タネマネー">
+<meta property="og:description" content="算数の隣に、お金を。ドット絵のはたけで育てる、本物の金融リテラシー。">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --GP:#187A4E; --G:#34C77B; --GS:#DDF3E7; --GOLD:#E8B83E; --GOLDS:#FFF1CB;
+  --R:#D95C55; --RS:#FCE6E4; --B:#3478D4; --BS:#E5F0FF; --P:#7B61C9;
+  --BG:#F7F5EF; --CARD:#FFFFFF; --TEXT:#18231D; --TEXTS:#59645E; --MUTED:#929B95; --BORDER:#E8E3D8;
+  --F:"M PLUS Rounded 1c","Noto Sans JP","Hiragino Maru Gothic ProN",sans-serif;
+  --SHADOW:0 10px 30px rgba(24,35,29,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--F);color:var(--TEXT);background:var(--BG);line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+img{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:980px;margin:0 auto;padding:0 22px;width:100%}
+section{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:90px 0;overflow:hidden}
+h1,h2{font-weight:900;letter-spacing:.02em;line-height:1.25}
+.eyebrow{font-size:13px;font-weight:900;letter-spacing:.18em;color:var(--GP);opacity:.85;margin-bottom:14px}
+.lead{font-size:17px;color:var(--TEXTS);font-weight:700;max-width:620px;margin:18px auto 0}
+.kicker{font-size:14px;font-weight:800;color:var(--MUTED)}
+/* reveal */
+[data-reveal]{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+[data-reveal].is-visible{opacity:1;transform:none}
+[data-reveal][data-d="1"]{transition-delay:.12s}
+[data-reveal][data-d="2"]{transition-delay:.24s}
+[data-reveal][data-d="3"]{transition-delay:.36s}
+/* buttons */
+.cta{display:inline-flex;align-items:center;gap:9px;background:var(--GP);color:#fff;font-weight:900;font-size:17px;padding:16px 30px;border-radius:16px;box-shadow:var(--SHADOW);border:none;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;font-family:var(--F)}
+.cta:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(24,122,78,.28)}
+.cta.gold{background:var(--GOLD);color:#5a4300}
+.cta-sub{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:14px;font-size:12.5px;font-weight:800;color:var(--TEXTS)}
+.cta-sub span{display:inline-flex;align-items:center;gap:5px}
+.ghost{background:transparent;color:var(--GP);border:2px solid var(--GP);box-shadow:none}
+.ghost:hover{background:var(--GS)}
+/* sticky CTA bar */
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:90;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-top:1px solid var(--BORDER);transform:translateY(120%);transition:transform .35s ease;padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+#bar.show{transform:none}
+#bar .row{max-width:980px;margin:0 auto;display:flex;align-items:center;gap:12px}
+#bar .t{flex:1;min-width:0;font-weight:900;font-size:13px;line-height:1.3}
+#bar .t small{display:block;color:var(--MUTED);font-weight:800;font-size:11px}
+#bar .cta{padding:12px 18px;font-size:15px;border-radius:13px}
+/* hero */
+#hero{background:linear-gradient(180deg,#bfe6f5 0%,#e9f6e4 55%,#dff0d0 100%);min-height:100svh}
+.hero-title{font-size:clamp(44px,12vw,104px);line-height:1.02;letter-spacing:.01em}
+.hero-title .dot{color:var(--GP)}
+.hero-stage{position:relative;width:100%;max-width:760px;height:210px;margin:26px auto 0}
+.ground{position:absolute;left:0;right:0;bottom:0;height:74px;background-image:url(/assets/soil_tile.png);background-size:74px 74px;background-repeat:repeat-x;image-rendering:pixelated;box-shadow:inset 0 8px 16px rgba(0,0,0,.12)}
+.plots{position:absolute;left:0;right:0;bottom:6px;display:flex;justify-content:center;gap:18px}
+.plots img{width:62px;height:62px}
+.sprout{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);width:96px;height:96px;will-change:transform;cursor:pointer;transform-origin:bottom center}
+.sprout img{width:96px;height:96px}
+.sway{animation:sway 3.4s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:translateX(-50%) rotate(-2.5deg)}50%{transform:translateX(-50%) rotate(2.5deg)}}
+.petal{position:absolute;width:14px;height:14px;pointer-events:none}
+.scroll-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);font-size:24px;color:var(--GP);animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
+/* generic dark section */
+.dark{background:radial-gradient(120% 90% at 50% 0%,#16241c 0%,#0c130f 100%);color:#eaf3ec}
+.dark h2{color:#fff}
+.dark .lead{color:#b8c8bd}
+.seed-mini{width:40px;height:40px;margin:0 auto 18px}
+/* world / showcase */
+.evo{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.evo .mon{width:74px;height:74px}
+.evo .arr{color:var(--GOLD);font-size:22px;font-weight:900}
+.dexgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-width:520px;margin:26px auto 0;opacity:.9}
+.dexgrid .slot{aspect-ratio:1;background:url(/assets/collect_slot.png) center/contain no-repeat}
+/* feature list */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;max-width:760px;margin:26px auto 0}
+.card{background:var(--CARD);border:1px solid var(--BORDER);border-radius:16px;padding:16px 14px;box-shadow:var(--SHADOW);text-align:left}
+.card .ic{font-size:22px;margin-bottom:8px}
+.card b{font-size:14.5px;display:block;margin-bottom:4px}
+.card p{font-size:12.5px;color:var(--TEXTS);font-weight:700;line-height:1.55}
+/* truth chart */
+.chartbox{width:100%;max-width:560px;margin:24px auto 0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:18px}
+.chart svg{width:100%;height:160px;display:block}
+.chart .line{fill:none;stroke:var(--G);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1400;stroke-dashoffset:1400;transition:stroke-dashoffset 2.2s ease}
+.is-visible .chart .line{stroke-dashoffset:0}
+.dipnote{margin-top:10px;font-size:13px;font-weight:900;color:var(--GOLD)}
+.becausebox{max-width:600px;margin:22px auto 0;background:rgba(232,184,62,.12);border:1px solid var(--GOLD);border-radius:16px;padding:16px 18px;color:#f4e6bf;font-weight:800;font-size:15px;line-height:1.7}
+.becausebox b{color:#fff}
+/* safety */
+.safe{display:flex;flex-direction:column;gap:10px;max-width:520px;margin:22px auto 0;text-align:left}
+.safe .it{display:flex;align-items:center;gap:12px;background:var(--CARD);border:1px solid var(--BORDER);border-radius:14px;padding:13px 16px;box-shadow:var(--SHADOW)}
+.safe .it .ic{width:34px;height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;background:var(--GS);border-radius:50%;font-size:18px}
+.safe .it b{font-size:14px}
+.safe .it p{font-size:12px;color:var(--TEXTS);font-weight:700}
+/* results */
+.report{max-width:520px;margin:22px auto 0;background:var(--CARD);border:1px solid var(--BORDER);border-radius:18px;padding:18px;box-shadow:var(--SHADOW);text-align:left}
+.report .row{display:flex;align-items:center;justify-content:center;gap:14px;background:var(--GS);border-radius:14px;padding:14px;margin-bottom:12px}
+.report .big{font-size:30px;font-weight:900;color:var(--GP)}
+.report .small{font-size:11px;font-weight:800;color:var(--TEXTS)}
+.stats{display:flex;gap:8px}
+.stats .s{flex:1;background:var(--BG);border-radius:12px;padding:10px 6px;text-align:center}
+.stats .s b{font-size:20px;color:var(--TEXT)}
+.stats .s span{font-size:10px;color:var(--MUTED);font-weight:800}
+.badges{display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.badges img{width:34px;height:34px}
+.medal{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;padding:0 8px;border-radius:50%;background:var(--GS);border:2px solid var(--G);color:var(--GP);font-weight:900;font-size:13px}
+.medal.gold{background:var(--GOLDS);border-color:var(--GOLD);color:#7a5a00}
+/* pricing */
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;max-width:760px;margin:26px auto 0}
+.plan{background:var(--CARD);border:2px solid var(--BORDER);border-radius:18px;padding:20px 18px;box-shadow:var(--SHADOW);position:relative}
+.plan.reco{border-color:var(--GOLD)}
+.plan .tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--GOLD);color:#5a4300;font-size:11px;font-weight:900;padding:3px 12px;border-radius:999px}
+.plan h3{font-size:16px;margin-bottom:6px}
+.plan .price{font-size:30px;font-weight:900;color:var(--GP)}
+.plan .price small{font-size:13px;color:var(--MUTED);font-weight:800}
+.plan p{font-size:12px;color:var(--TEXTS);font-weight:700;margin-top:8px;line-height:1.55}
+/* faq */
+.faq{max-width:640px;margin:22px auto 0;text-align:left}
+.qa{background:var(--CARD);border:1px solid var(--BORDER);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--SHADOW)}
+.qa b{display:block;font-size:14px;margin-bottom:5px}
+.qa b::before{content:"Q. ";color:var(--GP)}
+.qa p{font-size:13px;color:var(--TEXTS);font-weight:700}
+/* footer */
+footer{background:#0c130f;color:#9fb0a4;text-align:center;padding:40px 22px calc(40px + env(safe-area-inset-bottom));font-size:12px;font-weight:700;min-height:auto}
+footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
+.note{font-size:11px;color:var(--MUTED);font-weight:700;margin-top:10px;max-width:620px}
+@media (max-width:560px){
+  .dexgrid{grid-template-columns:repeat(8,1fr)}
+  .lead{font-size:15.5px}
+  section{padding:74px 0}
+}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *{animation:none!important;transition-duration:.001s!important}
+  [data-reveal]{opacity:1;transform:none}
+  .chart .line{stroke-dashoffset:0}
+}
+</style>
+</head>
+<body>
+
+<!-- 00 HERO -->
+<section id="hero">
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>小〜中学生のための、お金の"はたけ"</div>
+    <h1 class="hero-title" data-reveal data-d="1">お金は、種<span class="dot">。</span></h1>
+    <p class="lead" data-reveal data-d="2">はたけで育てて、考える力を育てる。<br>失敗しても痛くない、わが子だけの小さな経済。</p>
+    <div data-reveal data-d="3" style="margin-top:24px">
+      <a class="cta" href="https://tane-money.vercel.app/">🌱 無料ではじめる</a>
+      <div class="cta-sub">
+        <span>✓ クレジットカード不要</span>
+        <span>✓ 実際のお金は1円も動きません</span>
+        <span>✓ いつでも解約</span>
+      </div>
+      <div class="kicker" style="margin-top:10px">年額 ¥9,800（1日あたり約27円）・14日間 無料体験</div>
+    </div>
+    <div class="hero-stage" data-reveal data-d="3">
+      <div class="ground"></div>
+      <div class="plots">
+        <img src="/assets/crop_apple_0.png" alt="芽">
+        <img src="/assets/crop_apple_3.png" alt="りんごの木">
+        <img src="/assets/crop_potato_2.png" alt="作物" onerror="this.style.display='none'">
+      </div>
+      <div class="sprout" id="hero-mon" title="タップでなでなで">
+        <img id="heroMonImg" src="/assets/tanemon.png" alt="タネモン">
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">↓</div>
+</section>
+
+<!-- 01 QUESTION -->
+<section class="dark">
+  <div class="wrap">
+    <img class="seed-mini" src="/assets/tool_seed.png" alt="" data-reveal>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">「お金の話」、<br>いつ、どう教える？</h2>
+    <p class="lead" data-reveal data-d="2">正解、ありませんよね。学校では教わらない。でも社会に出れば、いちばん使う。<br>だから——「まだ早い」のではなく、「種から」始める。</p>
+  </div>
+</section>
+
+<!-- 02 WHY -->
+<section style="background:linear-gradient(180deg,#16241c 0%,#2a4a36 40%,#e9f6e4 100%)">
+  <div class="wrap">
+    <div class="eyebrow" style="color:#cfe9d6" data-reveal>わたしたちが、種をまく理由</div>
+    <h2 data-reveal data-d="1" style="color:#fff;font-size:clamp(26px,6vw,44px)">だから、はたけを作りました。</h2>
+    <p class="lead" data-reveal data-d="2" style="color:#eaf3ec">子どもがいつか一人で、自分のお金と向き合う日を信じている。<br>その日のために——失敗しても痛くない畑の中で、まいて、育てて、実らせて、<b style="color:#fff">損をする経験ごと</b>手渡したい。</p>
+    <div class="evo" data-reveal data-d="3" style="margin-top:26px">
+      <img class="mon" src="/assets/tanemon_plant.png" onerror="this.src='/assets/tanemon.png'" alt="タネモン" style="margin-right:6px">
+      <img class="mon" src="/assets/crop_apple_seed.png" alt="種"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_0.png" alt="芽"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_3.png" alt="実">
+    </div>
+  </div>
+</section>
+
+<!-- 03 WORLD -->
+<section style="background:linear-gradient(180deg,#dff0f7,#f7f5ef)">
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>たのしいから、つづく</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">きみだけの、はたけ。</h2>
+    <p class="lead" data-reveal data-d="2">タネモンと一緒に、種をまいて、水をやって、育てる。子どもが夢中になる仕掛けが、毎日の「もう一回」を生む。続くから、身につく。</p>
+    <div class="evo" data-reveal data-d="2" style="margin-top:24px">
+      <img class="mon" src="/assets/crop_apple_seed.png" alt="種"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_0.png" alt="芽"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_3.png" alt="実った木">
+      <img class="mon" src="/assets/tanemon_water.png" onerror="this.src='/assets/tanemon.png'" alt="タネモン" style="margin-left:8px">
+    </div>
+  </div>
+</section>
+
+<!-- 04 LEARNING -->
+<section>
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>ゲームで終わらない</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">ちゃんと、学びです。</h2>
+    <p class="lead" data-reveal data-d="2">水やりのように、知識が静かに根を張る。低学年には自動ふりがなと読み上げつき。</p>
+    <div class="cards" data-reveal data-d="2">
+      <div class="card"><div class="ic">📖</div><b>まめちしき 48話</b><p>お金の基本から投資・税金まで、順番に学べる8コース＋達人コース。</p></div>
+      <div class="card"><div class="ic">🎓</div><b>金融リテラシー級</b><p>9級から1級へ。クイズ正解で級が上がり、伸びが目に見える。</p></div>
+      <div class="card"><div class="ic">🔁</div><b>間隔反復クイズ</b><p>忘れた頃に再出題。暗記でなく"定着"を測る本物の設計。</p></div>
+      <div class="card"><div class="ic">🔊</div><b>ふりがな＋読み上げ</b><p>まだ字が読めない低学年も、タップで聞いて自分で学べる。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 TRUTH (信頼の頂点) -->
+<section class="dark" id="truth">
+  <div class="wrap">
+    <div class="eyebrow" style="color:var(--GOLD)" data-reveal>このアプリの、背骨</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(28px,7vw,48px)">儲かる話は、しません。</h2>
+    <p class="lead" data-reveal data-d="2">投資は、損もする。配当は控えめに、課税も、NISAも、本物のまま。<br>分散・積立・長期という王道だけを、痛くない畑で。</p>
+    <div class="chartbox" data-reveal data-d="2">
+      <div class="chart">
+        <svg viewBox="0 0 560 160" preserveAspectRatio="none" aria-label="上がっても、下がる資産グラフ">
+          <polyline class="line" points="10,120 80,96 150,104 220,60 290,92 360,132 430,84 500,52 550,40"></polyline>
+        </svg>
+      </div>
+      <div class="dipnote">↓ 下がる日も、ちゃんと描きます。</div>
+    </div>
+    <div class="becausebox" data-reveal data-d="3">
+      <b>だから、</b>相場が下がった日にこそ、わが子は「あわてて売らない」を体で覚えます。<br>これは、大人でもできない人がいる力です。
+    </div>
+    <div data-reveal data-d="3" style="margin-top:24px">
+      <a class="cta gold" href="https://tane-money.vercel.app/">🌱 この体験を、わが子に</a>
+    </div>
+  </div>
+</section>
+
+<!-- 06 SAFETY -->
+<section>
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>挑戦は子に、安全弁は親に</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">ハンドルは、親の手に。</h2>
+    <div class="safe" data-reveal data-d="2">
+      <div class="it"><div class="ic">🔌</div><div><b>投資 ON / OFF</b><p>まだ早いと思えば、投資機能はオフのままお小遣い帳として。</p></div></div>
+      <div class="it"><div class="ic">✅</div><div><b>承認制</b><p>お手伝いやお金の動きを、親が確認してから反映できる。</p></div></div>
+      <div class="it"><div class="ic">🪙</div><div><b>すべてポイント制</b><p>実際のお金は1円も動きません。安心して、まかせられる。</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 RESULTS -->
+<section style="background:linear-gradient(180deg,#f7f5ef,#eef7e8)">
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>「できた」が積み上がる</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">変化が、目に見える。</h2>
+    <p class="lead" data-reveal data-d="2">入会時から今まで、わが子がどれだけ育ったか。保護者向けの成長レポートで、静かに証明します。</p>
+    <div class="report" data-reveal data-d="2">
+      <div class="row">
+        <div><div class="small">入会時</div><div class="big" style="color:var(--MUTED)">9級</div></div>
+        <div style="font-size:22px;color:var(--GP)">→</div>
+        <div><div class="small" style="color:var(--GP)">いま</div><div class="big">3級</div></div>
+        <div style="background:var(--G);color:#fff;border-radius:8px;padding:4px 9px;font-weight:900;font-size:12px">↑6級UP</div>
+      </div>
+      <div class="stats">
+        <div class="s"><b data-count="36">0</b><span>クイズ正解</span></div>
+        <div class="s"><b data-count="5">0</b><span>コースクリア</span></div>
+        <div class="s"><b data-count="128">0</b><span>お手伝い回数</span></div>
+      </div>
+      <div class="badges">
+        <span class="medal">9級</span><span class="medal">7級</span><span class="medal">5級</span><span class="medal gold">3級</span>
+      </div>
+      <p class="note" style="margin:10px auto 0;text-align:center">※ 表示はイメージです。お子さまの実際の学習で値が変化します。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 08 GRADUATE -->
+<section style="background:linear-gradient(180deg,#ffe9b0,#ffd27a)">
+  <div class="wrap">
+    <img src="/assets/tanemon_harvest.png" onerror="this.src='/assets/tanemon.png'" alt="" style="width:80px;height:80px;margin:0 auto 14px" data-reveal>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px);color:#6a4e10">中学卒業で、卒業。</h2>
+    <p class="lead" data-reveal data-d="2" style="color:#7a5c1c">育てた種は、いつか巣立つ。タネマネーは中学卒業で役目を終える、期限のある体験です。<br><b style="color:#5a4300">だから——まくなら、今。</b>育てる時間は、戻ってきません。</p>
+  </div>
+</section>
+
+<!-- 09 PRICING -->
+<section>
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>隠さず、煽らず</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">ねだんも、誠実に。</h2>
+    <p class="lead" data-reveal data-d="2">1日あたり、ジュース1本ぶん以下。隠れた追加課金はありません。</p>
+    <div class="plans" data-reveal data-d="2">
+      <div class="plan"><h3>🌱 1人プラン</h3><div class="price">¥9,800<small>/年</small></div><p>お子さま1人。月あたり約¥817。</p></div>
+      <div class="plan reco"><div class="tag">おすすめ</div><h3>👨‍👩‍👧‍👦 ファミリー</h3><div class="price">¥14,800<small>/年</small></div><p>きょうだい最大4人まで。2人いれば断然おトク。</p></div>
+      <div class="plan"><h3>🎓 卒業パスポート</h3><div class="price">一括<small>／残年数ぶん</small></div><p>卒業までまとめて。更新の手間なし・在籍中ずっと値上げなし。</p></div>
+    </div>
+    <div data-reveal data-d="3" style="margin-top:26px">
+      <a class="cta" href="https://tane-money.vercel.app/">🌱 14日間 無料ではじめる</a>
+      <div class="cta-sub"><span>✓ クレカ不要</span><span>✓ 自動課金なし</span><span>✓ いつでも解約</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 FAQ -->
+<section style="background:var(--GS)">
+  <div class="wrap">
+    <h2 data-reveal style="font-size:clamp(24px,5.5vw,38px)">よくある質問</h2>
+    <div class="faq" data-reveal data-d="1">
+      <div class="qa"><b>実際のお金は動きますか？</b><p>動きません。すべてアプリ内のポイントです。投資シミュレーションも仮想で、財布が痛むことは一切ありません。</p></div>
+      <div class="qa"><b>投資なんて、子どもに早くないですか？</b><p>「儲ける」ためではなく「考える力」を育てる体験です。損も体験できるからこそ、お金との健全な距離感が身につきます。投資機能は親がオフにもできます。</p></div>
+      <div class="qa"><b>低学年でも使えますか？</b><p>はい。学年に合わせて漢字に自動でふりがなが付き、読み上げ機能もあります。設定は保護者がいつでも変更できます。</p></div>
+      <div class="qa"><b>解約は簡単ですか？</b><p>いつでも解約できます。違約金や最低利用期間はありません。学んだ記録や級は解約後も残ります。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 FINAL CTA -->
+<section style="background:linear-gradient(180deg,#bfe6f5,#e9f6e4)">
+  <div class="wrap">
+    <div class="evo" data-reveal style="margin-bottom:18px">
+      <img class="mon" src="/assets/crop_apple_seed.png" alt=""><span class="arr">→</span><img class="mon" src="/assets/crop_apple_3.png" alt=""><img class="mon" src="/assets/tanemon_happy.png" alt="" style="margin-left:8px">
+    </div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(30px,8vw,56px)">種をまく、はじめの日。</h2>
+    <p class="lead" data-reveal data-d="2">お金という種で、考える力を育てる。その第一歩を、今日から。</p>
+    <div data-reveal data-d="3" style="margin-top:24px">
+      <a class="cta" href="https://tane-money.vercel.app/" style="font-size:19px;padding:18px 36px">🌱 無料で種をまく</a>
+      <div class="cta-sub"><span>✓ クレカ不要</span><span>✓ 14日間 無料</span><span>✓ 実際のお金は動きません</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">🌱 タネマネー</div>
+  <div>お金は、種。はたけで育てて、考える力を育てる。</div>
+  <div class="note">※ 本ページは小〜中学生向け金融教育アプリ「タネマネー」の案内です。アプリ内のお金はすべてポイントであり、実際の金銭・有価証券の取引は行いません。投資シミュレーションは教育目的であり、特定の銘柄や投資手法を推奨するものではありません。表示価格・画面はイメージを含みます。</div>
+  <div style="margin-top:16px;color:#5e6f63">© Tane Money</div>
+</footer>
+
+<!-- sticky CTA bar -->
+<div id="bar">
+  <div class="row">
+    <div class="t">お金は、種。<small>年額¥9,800・14日間無料・クレカ不要</small></div>
+    <a class="cta" href="https://tane-money.vercel.app/">無料ではじめる</a>
+  </div>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // scroll reveal
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('is-visible'); } });
+  }, {threshold:0.18});
+  document.querySelectorAll('[data-reveal]').forEach(function(el){ io.observe(el); });
+
+  // dex grid fill
+  var dex = document.getElementById('dex');
+  if(dex){ for(var i=0;i<24;i++){ var s=document.createElement('div'); s.className='slot'; dex.appendChild(s); } }
+
+  // count up
+  var cio = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(!e.isIntersecting) return;
+      var el=e.target, target=+el.getAttribute('data-count'); cio.unobserve(el);
+      if(reduce){ el.textContent=target; return; }
+      var t0=null, dur=1100;
+      function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); el.textContent=Math.round(target*(p<1?(1-Math.pow(1-p,3)):1)); if(p<1)requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    });
+  }, {threshold:0.5});
+  document.querySelectorAll('[data-count]').forEach(function(el){ cio.observe(el); });
+
+  // hero タネモン: idle sway + なでると喜ぶ(タネモン素材のみ使用・旧モンスターは不使用)
+  var mon=document.getElementById('hero-mon'), mimg=document.getElementById('heroMonImg');
+  if(mon && !reduce){ mon.classList.add('sway'); }
+  if(mon){
+    var nudging=false;
+    function nudge(){
+      if(nudging) return; nudging=true;
+      mon.classList.remove('sway');
+      mimg.src='/assets/tanemon_happy.png';
+      mon.style.transition='transform .25s ease';
+      mon.style.transform='translateX(-50%) translateY(-16px)';
+      for(var k=0;k<3;k++){ (function(k){ var sp=document.createElement('img'); sp.src='/assets/icon_sparkle.png'; sp.className='petal';
+        sp.style.left=(44+k*8)+'%'; sp.style.bottom='150px'; sp.style.transition='all .6s ease'; mon.parentElement.appendChild(sp);
+        requestAnimationFrame(function(){ sp.style.transform='translateY(-46px)'; sp.style.opacity='0'; });
+        setTimeout(function(){ sp.remove(); },650);
+      })(k); }
+      setTimeout(function(){ mon.style.transition=''; mon.style.transform='translateX(-50%)'; mimg.src='/assets/tanemon.png'; if(!reduce) mon.classList.add('sway'); nudging=false; }, 700);
+    }
+    mon.addEventListener('pointerenter', nudge);
+    mon.addEventListener('click', nudge);
+  }
+
+  // sticky bar: show after hero
+  var hero=document.getElementById('hero'), bar=document.getElementById('bar');
+  var bio=new IntersectionObserver(function(es){ es.forEach(function(e){ bar.classList.toggle('show', !e.isIntersecting); }); }, {threshold:0.2});
+  if(hero) bio.observe(hero);
+})();
+</script>
+</body>
+</html>
