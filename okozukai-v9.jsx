@@ -4123,7 +4123,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
-    tasks:"activity", invest:"activity", kakeibo:"money",
+    tasks:"activity", invest:"money", kakeibo:"money",
     goals:"money", rewards:"money", log:"more",
     badges:"more", tips:"more", ranking:"more", gacha:"daily"
   };
@@ -4348,8 +4348,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* 🌱 はたけ フローティングボタン(そだてるボタンの上に重ねて常駐・株/畑ワールドへ) */}
       {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young)
-        && !(isJunior?(effectiveTab==="money"&&monTab==="hatake"):(effectiveTab==="activity"&&actTab==="invest")) && (
-        <button onClick={()=>{ if(isJunior){setTab("goals");setMonTab("hatake");} else {setTab("activity");setActTab("invest");} }} aria-label="はたけ"
+        && !(effectiveTab==="money"&&monTab==="hatake") && (
+        <button onClick={()=>{ setTab(isJunior?"goals":"money"); setMonTab("hatake"); }} aria-label="はたけ"
           style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
             background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
             cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
@@ -4850,19 +4850,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       </>}
 
       {/* ── ACTIVITY サブナビ ──（投資ワールドが保護者設定でOFFのときは投資/為替タブごと隠す） */}
-      {effectiveTab==="activity"&&!isJunior&&!young&&!data.familySettings?.investOff&&(
-        <div style={{display:"flex",background:darkBG?"#0f1a2e":CARD,borderBottom:`1px solid ${darkBG?"rgba(74,158,255,0.15)":BORDER}`}}>
-          {[["tasks","✅ タスク"],["invest","📈 投資/為替"]].map(([v,l])=>(
-            <button key={v} onClick={()=>setActTab(v)}
-              style={{flex:1,padding:"10px 0",border:"none",borderBottom:actTab===v?`2.5px solid ${darkBG?"#4a9eff":GP}`:"2.5px solid transparent",background:"none",color:actTab===v?(darkBG?"#4a9eff":GP):(darkBG?"rgba(255,255,255,0.4)":MUTED),fontWeight:actTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F}}>
-              {l}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── ACTIVITY ── */}
-      {effectiveTab==="activity"&&(actTab==="tasks"||young||data.familySettings?.investOff)&&(()=>{
+      {/* ── ACTIVITY（活動=タスク専用に純化。投資「はたけ」は全モード「ためる」へ統一＝卒業時の再学習ゼロ）── */}
+      {effectiveTab==="activity"&&(()=>{
         return(<div style={{padding:16}}>
           <TabHint id="tasks" text="やったお手伝いをタップして記録しよう！✏リスト編集で自分用のタスクを選べるよ" data={data} update={update} cid={child.id}/>
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
@@ -4899,13 +4888,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           )}
         </div>);
       })()}
-      {effectiveTab==="activity"&&actTab==="invest"&&!young&&!data.familySettings?.investOff&&<InvestTab child={child} data={data} update={update}/>}
+      {/* （旧）活動>投資 は廃止。はたけは「ためる>はたけ」に統一 */}
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
           {(isJunior
             ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🌱 はたけ"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"]]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"],...(!data.familySettings?.investOff&&!young?[["hatake","🌱 はたけ"]]:[])]
           ).map(([k,l])=>(
             <button key={k} onClick={()=>setMonTab(k)}
               style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
@@ -4918,7 +4907,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
       {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
-      {effectiveTab==="money" && monTab==="hatake" && isJunior && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
+      {effectiveTab==="money" && monTab==="hatake" && (isJunior||!young) && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="kakeibo" && (
         <div>
           {/* month nav */}
