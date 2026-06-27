@@ -518,13 +518,33 @@ async function loadLogsFromFirestore() {
   if(!db) return null;
   try {
     const snap = await db.collection("families").doc(code)
-                         .collection("logs").orderBy("date","desc").limit(500).get();
+                         .collection("logs").orderBy("date","desc").limit(5000).get();
     if(snap.empty) return null;
     return snap.docs.map(d => d.data());
   } catch(e) {
     console.warn("Firestore logs load failed:", e);
     return null;
   }
+}
+
+// ── 端末間でポイント残高がズレる問題の収束ロジック ──
+// Firestoreのlogsサブコレクション(全件=唯一の正)へ収束させる。
+// carry(くりこし)は全件取得できている時は二重計上になるため除外する。
+function _isCarryLog(l){ return !!(l && typeof l.id==="string" && l.id.indexOf("carry_")===0); }
+function reconcileFullLogs(prevLogs, fsLogs){
+  // id で完全に重複排除(Firestore側・ローカル側どちらの重複も残高に二重計上しない)。
+  // carry(くりこし)は全件取得時は二重計上になるため捨てる。
+  const out=[]; const seen=new Set();
+  const push=(l)=>{ if(l && l.id!=null && !_isCarryLog(l) && !seen.has(l.id)){ seen.add(l.id); out.push(l); } };
+  (fsLogs||[]).forEach(push);  // Firestore全件(=唯一の正)を優先採用
+  const fsIds = new Set((fsLogs||[]).filter(l=>l&&l.id!=null).map(l=>l.id));
+  const localOnly = [];
+  (prevLogs||[]).forEach(l=>{
+    if(l && l.id!=null && !_isCarryLog(l) && !fsIds.has(l.id) && !seen.has(l.id)) localOnly.push(l);
+    push(l);  // ローカルにしか無い未同期ログも残す(重複は自動的に弾かれる)
+  });
+  out.sort((a,b)=> new Date(b.date) - new Date(a.date));
+  return { merged: out, localOnly };
 }
 
 // ── logsコレクションのリアルタイム監視 ──
@@ -10915,11 +10935,11 @@ export default function App() {
         if(!firestoreLogs || firestoreLogs.length===0) return;
         setData(prev=>{
           if(!prev) return prev;
-          const existingIds = new Set((prev.logs||[]).map(l=>l.id));
-          const added = firestoreLogs.filter(l=>!existingIds.has(l.id));
-          if(added.length===0) return prev;
-          const merged = [...added,...(prev.logs||[])];
-          merged.sort((a,b)=>new Date(b.date)-new Date(a.date));
+          const had = (prev.logs||[]).length;
+          const hadCarry = (prev.logs||[]).some(_isCarryLog);
+          const { merged } = reconcileFullLogs(prev.logs, firestoreLogs);
+          // 件数が同じ＆carryも無い＝変化なし → 再描画しない
+          if(merged.length===had && !hadCarry) return prev;
           return {...prev, logs: merged};
         });
       }, 5000);
@@ -10957,17 +10977,13 @@ export default function App() {
           if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
         }catch(e){}
       }
-      // Firestoreのlogsコレクションからログを追加読み込み
+      // Firestoreのlogsサブコレクション(全件=唯一の正)へ収束＝端末間の残高ズレを解消
       const firestoreLogs = await loadLogsFromFirestore();
       if(firestoreLogs && firestoreLogs.length > 0) {
-        // ローカルログとFirestoreログをマージ（重複排除）
-        const localIds = new Set((migrated.logs||[]).map(l=>l.id));
-        const newLogs = firestoreLogs.filter(l => !localIds.has(l.id));
-        if(newLogs.length > 0) {
-          const merged = [...newLogs, ...(migrated.logs||[])];
-          merged.sort((a,b) => new Date(b.date) - new Date(a.date));
-          migrated.logs = merged;
-        }
+        const { merged, localOnly } = reconcileFullLogs(migrated.logs, firestoreLogs);
+        migrated.logs = merged;
+        // ローカルにしか無い(未同期の)ログをFirestoreへ送り、他端末にも反映させる
+        try{ localOnly.forEach(l=>{ if(l && l.id && !_isCarryLog(l)) addLogToFirestore(l); }); }catch(e){}
       }
       setData(migrated);
       if(!shownLocal) setLoading(false);
