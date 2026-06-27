@@ -6280,7 +6280,7 @@ function ParentScreen({ data, update, onBack }) {
   const addCat=()=>{if(!ncatLabel)return;update(d=>({...d,cats:[...(d.cats||[]),{id:uid(),emoji:ncatEmoji,label:ncatLabel,color:ncatColor}]}));setShowAddCat(false);setNcatLabel("");setNcatEmoji("🏷");setNcatColor("#6b7280");};
 
   const TABS=[["overview","ホーム"],["family","ファミリー"],["children","承認・管理"],["tasks","タスク"],["daily","毎日"],["rewards","特典"],["learn","学ぶ"],["log","履歴"]];
-  const AGE_MODES={young:{emoji:"🐣",label:"幼児・低学年"},middle:{emoji:"⭐",label:"小学生"},senior:{emoji:"🔥",label:"中高生"}};
+  const AGE_MODES={young:{emoji:"🐣",label:"低学年（ふりがな）"},middle:{emoji:"⭐",label:"中学年"},senior:{emoji:"🔥",label:"高学年・中学生"}};
 
   // kakeibo child view
   if (kChild) {
@@ -9642,6 +9642,51 @@ function BadgesSection({child,data,update}){
 }
 
 // ── Tips ──────────────────────────────────────────────
+// ===== 年齢別の読みやすさ：ふりがな自動付与＋読み上げ（低学年= young 時のみ適用）=====
+// 48本の本文データは1文字も書き換えず、表示時に <ruby> でルビを振る。
+// 誤読を避けるため「複合語・読みが安定した語」を中心にマップ化。取りこぼしは読み上げ(🔊)で補う。
+const RUBY_MAP={
+  "お金":"おかね","銀行":"ぎんこう","利息":"りそく","利子":"りし","複利":"ふくり","単利":"たんり","金利上昇":"きんりじょうしょう","金利":"きんり","利率":"りりつ","利回":"りまわ",
+  "物価":"ぶっか","値段":"ねだん","価値":"かち","価格":"かかく","為替":"かわせ","円安":"えんやす","円高":"えんだか","輸入品":"ゆにゅうひん","輸入":"ゆにゅう","輸出":"ゆしゅつ",
+  "消費税":"しょうひぜい","所得税":"しょとくぜい","住民税":"じゅうみんぜい","税金":"ぜいきん","非課税":"ひかぜい","課税":"かぜい","貯金":"ちょきん","節約":"せつやく","口座":"こうざ","預金":"よきん",
+  "投資信託":"とうししんたく","投資家":"とうしか","投資":"とうし","分散投資":"ぶんさんとうし","分散":"ぶんさん","株価":"かぶか","配当金":"はいとうきん","配当":"はいとう","銘柄":"めいがら","元本":"がんぽん",
+  "資産":"しさん","金額":"きんがく","現金":"げんきん","借金":"しゃっきん","数千円":"すうせんえん","出費":"しゅっぴ","家計簿":"かけいぼ","固定費":"こていひ","変動費":"へんどうひ","家賃":"やちん",
+  "保険":"ほけん","詐欺":"さぎ","解約":"かいやく","手数料":"てすうりょう","積立":"つみたて","制度":"せいど","確率":"かくりつ","平均法":"へいきんほう","平均":"へいきん","法則":"ほうそく","暴落":"ぼうらく","起業":"きぎょう",
+  "経済不安":"けいざいふあん","経済":"けいざい","不景気":"ふけいき","景気":"けいき","業績悪化":"ぎょうせきあっか","業績":"ぎょうせき","上昇":"じょうしょう","戦争":"せんそう","原因":"げんいん","需要":"じゅよう","供給":"きょうきゅう","不安":"ふあん",
+  "世界":"せかい","日本":"にほん","同様":"どうよう","関係":"かんけい","企業統治":"きぎょうとうち","企業":"きぎょう","環境":"かんきょう","社会":"しゃかい","配慮":"はいりょ","地球":"ちきゅう","応援":"おうえん","発展":"はってん","時代":"じだい","未来":"みらい","人口":"じんこう","土地":"とち","目安":"めやす","合計":"ごうけい","元気":"げんき",
+  "海外旅行":"かいがいりょこう","旅行":"りょこう","言葉":"ことば","仕組":"しく","仕事":"しごと","会社":"かいしゃ","社長":"しゃちょう","商品":"しょうひん","商売":"しょうばい","事業":"じぎょう","労働":"ろうどう","給料":"きゅうりょう","経験":"けいけん","業界":"ぎょうかい","規模":"きぼ","副業":"ふくぎょう","利益":"りえき","約束":"やくそく","発行":"はっこう","方法":"ほうほう","種類":"しゅるい",
+  "学校":"がっこう","道路":"どうろ","病院":"びょういん","病気":"びょうき","事故":"じこ","成長":"せいちょう","目標":"もくひょう","目的":"もくてき","途中":"とちゅう","具体的":"ぐたいてき","効果的":"こうかてき","無駄遣":"むだづか","記録":"きろく","練習":"れんしゅう","責任感":"せきにんかん","計画性":"けいかくせい","計画的":"けいかくてき","達成感":"たっせいかん","基礎":"きそ","基本":"きほん","対価":"たいか","勉強":"べんきょう","知識":"ちしき","人的資本":"じんてきしほん","可能性":"かのうせい",
+  "大切":"たいせつ","大事":"だいじ","一部":"いちぶ","全部":"ぜんぶ","全体的":"ぜんたいてき","自分":"じぶん","将来":"しょうらい","安全":"あんぜん","安心":"あんしん","注意":"ちゅうい","必要":"ひつよう","本当":"ほんとう","魔法":"まほう","強力":"きょうりょく","運用":"うんよう","予測":"よそく","傾向":"けいこう","理由":"りゆう","長期投資":"ちょうきとうし","長期":"ちょうき","短期":"たんき","有名":"ゆうめい","格言":"かくげん","複数":"ふくすう","意味":"いみ","危険":"きけん","許容度":"きょようど",
+  "一番":"いちばん","一発":"いっぱつ","一度":"いちど","家族":"かぞく","競争":"きょうそう","昨日":"きのう","体験":"たいけん","初心者":"しょしんしゃ","王道":"おうどう","視点":"してん","名前":"なまえ","順番":"じゅんばん","絶対":"ぜったい","特別":"とくべつ","相談":"そうだん","大人":"おとな","失敗":"しっぱい","挑戦":"ちょうせん","何度":"なんど","自然":"しぜん","仲間":"なかま","上手":"じょうず","時間":"じかん","味方":"みかた","年数":"ねんすう","計算":"けいさん","早見":"はやみ","見直":"みなお","全然":"ぜんぜん","反面":"はんめん","便利":"べんり","中学":"ちゅうがく","達人":"たつじん","貝殻":"かいがら","後払":"あとばら","先払":"さきばら","翌月":"よくげつ","世":"よ",
+  "使":"つか","買":"か","売":"う","持":"も","働":"はたら","考":"かんが","学":"まな","育":"そだ","続":"つづ","集":"あつ","稼":"かせ","貯":"た","払":"はら","預":"あず","増":"ふ","減":"へ","助":"たす","守":"まも","届":"とど",
+  "株":"かぶ","貸":"か","別":"べつ","量":"りょう","同":"おな","良":"よ","必":"かなら","種":"たね","倍":"ばい","昔":"むかし","券":"けん","石":"いし","紙":"かみ","裏":"うら","客":"きゃく","店":"みせ","役":"やく","急":"きゅう","広":"ひろ"
+};
+const _RUBY_KEYS=Object.keys(RUBY_MAP).sort((a,b)=>b.length-a.length);
+// 文字列→React要素配列（young時のみ呼ぶ）。マップのキーを最長一致でルビ化、その他は素通し。
+function furi(text){
+  if(text==null) return text;
+  const s=String(text);
+  const out=[]; let i=0, buf="", k=0;
+  const flush=()=>{ if(buf){ out.push(buf); buf=""; } };
+  while(i<s.length){
+    let hit=null;
+    for(const key of _RUBY_KEYS){ if(s.startsWith(key,i)){ hit=key; break; } }
+    if(hit){ flush(); out.push(<ruby key={"r"+(k++)}>{hit}<rt style={{fontSize:"0.62em",fontWeight:400,letterSpacing:0}}>{RUBY_MAP[hit]}</rt></ruby>); i+=hit.length; }
+    else { buf+=s[i]; i++; }
+  }
+  flush();
+  return out;
+}
+// 🔊 読み上げ（非識字の低学年に最も効く・ブラウザTTSが漢字を正しく読む）
+function taneSpeak(text){
+  try{
+    if(typeof window==="undefined"||!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(String(text).replace(/\s+/g," "));
+    u.lang="ja-JP"; u.rate=0.92; u.pitch=1.05;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
 const ALL_TIPS=[
   {id:"t01",cat:"お金のきほん",emoji:"💴",title:"お金ってなに？",body:"お金は「ものやサービスと交換できる券」だよ。昔は貝殻や石が使われていたんだ！",q:"むかし、お金のかわりに 使われていたものは？",o:["貝殻や石","プラスチック","紙のシール"],a:0},
   {id:"t02",cat:"お金のきほん",emoji:"🏦",title:"銀行の仕組み",body:"銀行にお金を預けると、銀行はそのお金を別の人に貸して利息をとる。その一部をあなたに「利子」として払ってくれるよ。",q:"銀行に お金を あずけると もらえるのは？",o:["罰金","利子(りし)","税金"],a:1},
@@ -9708,6 +9753,9 @@ const CURRICULUM=[
   {id:"c9",e:"🏅",t:"達人への道（中学〜）",tips:["t37","t38","t42","t46","t47"],adv:true},
 ];
 function TipsSection({ageMode,child,data,update}){
+  // 低学年(young)のときだけ漢字に自動ふりがな。middle/seniorは素通し（既存挙動を壊さない）
+  const young2=ageMode==="young";
+  const ruby=(t)=> young2 ? furi(t) : t;
   const [cat,setCat]=useState("すべて");
   const [course,setCourse]=useState(null);   // 選択中コース(カリキュラム)
   const [reviewOn,setReviewOn]=useState(false);  // 🔁 おさらいクイズ(間隔反復)
@@ -9825,8 +9873,8 @@ function TipsSection({ageMode,child,data,update}){
           <div style={{fontSize:10,fontWeight:900,color:"#8a6a00"}}>📅 今月のまめちしき（毎月かわる）</div>
           <div style={{fontSize:9,fontWeight:800,color:"#8a6a00",opacity:.8}}>全{ALL_TIPS.length}話</div>
         </div>
-        <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ft.title}</div>
-        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:1.6,marginBottom:6}}>{ft.body}</div>
+        <div style={{fontWeight:900,fontSize:14,color:TEXT,marginBottom:4}}>{ft.emoji} {ruby(ft.title)}</div>
+        <div style={{fontSize:11.5,color:TEXTS,fontWeight:600,lineHeight:young2?1.9:1.6,marginBottom:6}}>{ruby(ft.body)}</div>
         <div style={{display:"flex",gap:6}}>
           {sub.map(s=>(<div key={s.id} style={{flex:1,background:"rgba(255,255,255,.55)",borderRadius:9,padding:"5px 7px"}}>
             <div style={{fontSize:9.5,fontWeight:900,color:"#8a6a00",marginBottom:1}}>つづき</div>
@@ -9882,7 +9930,7 @@ function TipsSection({ageMode,child,data,update}){
             style={{flex:"1 1 46%",minWidth:0,textAlign:"left",opacity:locked?0.55:1,background:c.adv&&!locked?"rgba(255,217,102,.16)":sel?"rgba(255,255,255,.16)":"rgba(255,255,255,.07)",border:done?`1.5px solid #34C77B`:c.adv?"1.5px solid #ffd966":sel?"1.5px solid #ffd966":"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"7px 9px",cursor:locked?"default":"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
             <span style={{fontSize:18,flexShrink:0}}>{locked?"🔒":done?"✅":c.e}</span>
             <span style={{flex:1,minWidth:0}}>
-              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.adv?"🏅 ":`${i+1}. `}{c.t}</span>
+              <span style={{display:"block",fontSize:11,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.adv?"🏅 ":`${i+1}. `}{ruby(c.t)}</span>
               <span style={{display:"block",fontSize:9.5,fontWeight:700,color:done?"#7be0a0":"rgba(255,255,255,.5)"}}>{locked?"1級になると ひらく":done?"クリア！":`${prog}/${c.tips.length} クイズ正解`}</span>
             </span>
           </button>
@@ -9925,12 +9973,12 @@ function TipsSection({ageMode,child,data,update}){
         ):rTip&&(
           <div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:11,fontWeight:900,color:P}}>🔁 おさらい {rIdx+1}/{rList.length}</span><button onClick={()=>setReviewOn(false)} style={{background:"none",border:"none",color:MUTED,fontSize:16,cursor:"pointer"}}>✕</button></div>
-            <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>{rTip.emoji} {rTip.q}</div>
+            <div style={{fontWeight:800,fontSize:13,color:TEXT,marginBottom:8}}>{rTip.emoji} {ruby(rTip.q)}</div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {rTip.o.map((opt,i)=>{const ans=rPick!=null;const correct=i===rTip.a;const picked=rPick===i;return(
                 <button key={i} onClick={()=>reviewAnswer(rTip,i)} disabled={ans}
                   style={{textAlign:"left",background:ans?(correct?GS:picked?RS:CARD):CARD,border:`2px solid ${ans?(correct?GP:picked?R:BORDER):BORDER}`,borderRadius:10,padding:"9px 11px",fontSize:12.5,fontWeight:700,color:TEXT,cursor:ans?"default":"pointer",fontFamily:F}}>
-                  {ans&&correct?"✅ ":ans&&picked?"❌ ":""}{opt}
+                  {ans&&correct?"✅ ":ans&&picked?"❌ ":""}{ruby(opt)}
                 </button>
               );})}
             </div>
@@ -9966,17 +10014,18 @@ function TipsSection({ageMode,child,data,update}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:22,flexShrink:0}}>{tip.emoji}</span>
           <div style={{flex:1}}>
-            <div style={{fontWeight:800,fontSize:13,color:isOpen?B:TEXT}}>{tip.title}</div>
+            <div style={{fontWeight:800,fontSize:13,color:isOpen?B:TEXT}}>{ruby(tip.title)}</div>
             <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
-              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>{tip.cat}</span>
+              <span style={{background:`${B}20`,color:B,padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>{ruby(tip.cat)}</span>
               {!isRead&&<span style={{background:`${Y}20`,color:"#9a7000",padding:"1px 6px",borderRadius:8,fontWeight:700,fontSize:11}}>+{TIP_PTS}pt</span>}
               {isRead&&<span style={{color:G,fontSize:11,fontWeight:700}}>✓ 読んだ</span>}
             </div>
           </div>
           <span style={{color:MUTED,fontSize:14,flexShrink:0,transform:isOpen?"rotate(180deg)":"none",transition:"transform .2s"}}>▼</span>
         </div>
-        {isOpen&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${B}30`,fontSize:13,color:TEXT,lineHeight:1.8,fontWeight:500}}>
-          {tip.body}
+        {isOpen&&<div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${B}30`,fontSize:young2?14:13,color:TEXT,lineHeight:young2?2.15:1.8,fontWeight:500}}>
+          {young2&&<div onClick={e=>{e.stopPropagation();taneSpeak(tip.title+"。"+tip.body);}} role="button" style={{display:"inline-flex",alignItems:"center",gap:5,background:BS,border:`1.5px solid ${B}`,borderRadius:RAD_PILL,padding:"5px 12px",marginBottom:8,cursor:"pointer",color:B,fontWeight:900,fontSize:12}}>🔊 よみあげ</div>}
+          {ruby(tip.body)}
           {!isRead&&<div style={{marginTop:8,background:`${G}15`,border:`1px solid ${G}`,borderRadius:8,padding:"6px 10px",display:"inline-block",fontSize:12,color:G,fontWeight:700}}>🎉 +{TIP_PTS}pt ゲット！</div>}
           {/* 💡→🎮 再接続: 読んだあとのミニクイズ。正解でモンスターにEXP */}
           {tip.q&&(()=>{
@@ -9985,7 +10034,7 @@ function TipsSection({ageMode,child,data,update}){
             const reveal=mastered||picked!=null;
             return (
               <div onClick={e=>e.stopPropagation()} style={{marginTop:12,background:CARDS,border:`1px solid ${BORDER}`,borderRadius:12,padding:"11px 12px"}}>
-                <div style={{fontSize:12.5,fontWeight:800,color:TEXT,marginBottom:9}}>🧠 クイズ：{tip.q}</div>
+                <div style={{fontSize:12.5,fontWeight:800,color:TEXT,marginBottom:9}}>🧠 クイズ：{ruby(tip.q)}</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {tip.o.map((opt,i)=>{
                     const isCorrect=i===tip.a, isPicked=picked===i;
@@ -9995,7 +10044,7 @@ function TipsSection({ageMode,child,data,update}){
                     return (
                       <div key={i} role="button" onClick={e=>{e.stopPropagation(); if(!mastered) answerQuiz(tip,i);}}
                         style={{display:"flex",alignItems:"center",gap:8,background:bg,border:`1.5px solid ${bd}`,borderRadius:10,padding:"9px 11px",cursor:mastered?"default":"pointer",fontFamily:F}}>
-                        <span style={{flex:1,fontSize:12.5,fontWeight:700,color:col}}>{opt}</span>
+                        <span style={{flex:1,fontSize:12.5,fontWeight:700,color:col}}>{ruby(opt)}</span>
                         {reveal&&isCorrect&&<span style={{fontSize:14}}>⭕</span>}
                         {reveal&&isPicked&&!isCorrect&&<span style={{fontSize:14}}>❌</span>}
                       </div>
@@ -10161,6 +10210,7 @@ function SetupWizard({ data, update, onComplete }) {
   const [childName,   setChildName]  = useState("");
   const [childEmoji,  setChildEmoji] = useState("⚡");
   const [childMode,   setChildMode]  = useState("teen");
+  const [childGrade,  setChildGrade] = useState(null); // 'young'|'middle'|'senior'（小学生のとき学年から初期レベルを提案）
   const [parentJoin,  setParentJoin] = useState(false);  // true/false
   const [parentName,  setParentName] = useState("");
   const [parentEmoji, setParentEmoji]= useState("👨");
@@ -10206,8 +10256,9 @@ function SetupWizard({ data, update, onComplete }) {
     const newChild = {
       id:childId, name:childName.trim()||"こども", emoji:childEmoji,
       pinh:pinHash("0000"), displayMode:childMode, role:"child",
-      gradeLabel:childMode==="junior"?"小学生":"中学生",
-      ageMode:childMode==="junior"?"young":"middle",
+      gradeLabel:childMode==="junior"?({young:"小学校低学年",middle:"小学校中学年",senior:"小学校高学年"}[childGrade]||"小学生"):"中学生",
+      // 案2: 学年を選んでいればそれを初期レベルに。未選択なら従来マッピング。あとで親が変更可。
+      ageMode:childMode==="junior"?(childGrade||"young"):"middle",
       permissions:{canChangePin:true,canViewBalance:true,canCreateGoals:true,canRedeemRewards:true},
       visibility:{balanceToFamily:"hidden",goalToFamily:"progress_only",investmentResultToFamily:"ranking_only",rankingParticipation:true,operationRankingParticipation:true,rankingMetric:"approved_activity_points"},
     };
@@ -10366,7 +10417,17 @@ function SetupWizard({ data, update, onComplete }) {
               </button>
             ))}
           </div>
-          <p style={{color:MUTED,fontSize:11,margin:"0 0 22px"}}>あとから設定画面で変更できます</p>
+          {childMode==="junior"&&(<>
+            <div style={{fontSize:12,fontWeight:700,color:MUTED,margin:"10px 0 8px"}}>学年（文字のやさしさが変わります）</div>
+            <div style={{display:"flex",gap:6,marginBottom:6}}>
+              {[["young","1〜2年","ふりがな"],["middle","3〜4年","かんたん"],["senior","5〜6年","ふつう"]].map(([v,l,d])=>(
+                <button key={v} onClick={()=>setChildGrade(v)} style={{flex:1,padding:"9px 0",border:`2px solid ${childGrade===v?GP:BORDER}`,borderRadius:10,background:childGrade===v?`${GP}15`:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,color:childGrade===v?GP:MUTED}}>
+                  {l}<br/><span style={{fontSize:10,fontWeight:600,color:MUTED}}>{d}</span>
+                </button>
+              ))}
+            </div>
+          </>)}
+          <p style={{color:MUTED,fontSize:11,margin:"6px 0 22px"}}>あとから保護者設定でいつでも変更できます</p>
           <button onClick={()=>setStep(3)} style={btnStyle(!!childName.trim())} disabled={!childName.trim()}>
             つぎへ →
           </button>
