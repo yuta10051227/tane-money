@@ -55,10 +55,14 @@ h1,h2{font-weight:900;letter-spacing:.02em;line-height:1.25}
 #hero{background:linear-gradient(180deg,#bfe6f5 0%,#e9f6e4 55%,#dff0d0 100%);min-height:100svh}
 .hero-title{font-size:clamp(44px,12vw,104px);line-height:1.02;letter-spacing:.01em}
 .hero-title .dot{color:var(--GP)}
-.hero-stage{position:relative;width:100%;max-width:760px;height:200px;margin:26px auto 0}
-.ground{position:absolute;left:0;right:0;bottom:0;height:96px;background-image:url(/assets/bg_hatake.png);background-size:auto 100%;background-repeat:repeat-x;image-rendering:pixelated}
-.walker{position:absolute;bottom:78px;left:50%;width:84px;height:84px;will-change:transform}
-.walker img{width:84px;height:84px}
+.hero-stage{position:relative;width:100%;max-width:760px;height:210px;margin:26px auto 0}
+.ground{position:absolute;left:0;right:0;bottom:0;height:74px;background-image:url(/assets/soil_tile.png);background-size:74px 74px;background-repeat:repeat-x;image-rendering:pixelated;box-shadow:inset 0 8px 16px rgba(0,0,0,.12)}
+.plots{position:absolute;left:0;right:0;bottom:6px;display:flex;justify-content:center;gap:18px}
+.plots img{width:62px;height:62px}
+.sprout{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);width:96px;height:96px;will-change:transform;cursor:pointer;transform-origin:bottom center}
+.sprout img{width:96px;height:96px}
+.sway{animation:sway 3.4s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:translateX(-50%) rotate(-2.5deg)}50%{transform:translateX(-50%) rotate(2.5deg)}}
 .petal{position:absolute;width:14px;height:14px;pointer-events:none}
 .scroll-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);font-size:24px;color:var(--GP);animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
@@ -104,6 +108,8 @@ h1,h2{font-weight:900;letter-spacing:.02em;line-height:1.25}
 .stats .s span{font-size:10px;color:var(--MUTED);font-weight:800}
 .badges{display:flex;gap:6px;justify-content:center;margin-top:12px;flex-wrap:wrap}
 .badges img{width:34px;height:34px}
+.medal{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;padding:0 8px;border-radius:50%;background:var(--GS);border:2px solid var(--G);color:var(--GP);font-weight:900;font-size:13px}
+.medal.gold{background:var(--GOLDS);border-color:var(--GOLD);color:#7a5a00}
 /* pricing */
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;max-width:760px;margin:26px auto 0}
 .plan{background:var(--CARD);border:2px solid var(--BORDER);border-radius:18px;padding:20px 18px;box-shadow:var(--SHADOW);position:relative}
@@ -155,8 +161,13 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
     </div>
     <div class="hero-stage" data-reveal data-d="3">
       <div class="ground"></div>
-      <div class="walker" id="walker" title="タップでなでなで">
-        <img id="walkerImg" src="/assets/monster_mameko_side_f0.png" alt="タネモン">
+      <div class="plots">
+        <img src="/assets/crop_apple_0.png" alt="芽">
+        <img src="/assets/crop_apple_3.png" alt="りんごの木">
+        <img src="/assets/crop_potato_2.png" alt="作物" onerror="this.style.display='none'">
+      </div>
+      <div class="sprout" id="hero-mon" title="タップでなでなで">
+        <img id="heroMonImg" src="/assets/tanemon.png" alt="タネモン">
       </div>
     </div>
   </div>
@@ -190,14 +201,14 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
 <section style="background:linear-gradient(180deg,#dff0f7,#f7f5ef)">
   <div class="wrap">
     <div class="eyebrow" data-reveal>たのしいから、つづく</div>
-    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">仲間が、育っていく。</h2>
-    <p class="lead" data-reveal data-d="2">タネモン、広がるはたけ、実る作物。子どもが夢中になる仕掛けが、毎日の「もう一回」を生む。続くから、身につく。</p>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">きみだけの、はたけ。</h2>
+    <p class="lead" data-reveal data-d="2">タネモンと一緒に、種をまいて、水をやって、育てる。子どもが夢中になる仕掛けが、毎日の「もう一回」を生む。続くから、身につく。</p>
     <div class="evo" data-reveal data-d="2" style="margin-top:24px">
-      <img class="mon" src="/assets/monster_egg_f0.png" alt=""><span class="arr">→</span>
-      <img class="mon" src="/assets/monster_niji_f0.png" alt=""><span class="arr">→</span>
-      <img class="mon" src="/assets/tanemon_happy.png" alt="">
+      <img class="mon" src="/assets/crop_apple_seed.png" alt="種"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_0.png" alt="芽"><span class="arr">→</span>
+      <img class="mon" src="/assets/crop_apple_3.png" alt="実った木">
+      <img class="mon" src="/assets/tanemon_water.png" onerror="this.src='/assets/tanemon.png'" alt="タネモン" style="margin-left:8px">
     </div>
-    <div class="dexgrid" data-reveal data-d="3" id="dex"></div>
   </div>
 </section>
 
@@ -271,7 +282,7 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
         <div class="s"><b data-count="128">0</b><span>お手伝い回数</span></div>
       </div>
       <div class="badges">
-        <img src="/assets/badge_b01.png" alt=""><img src="/assets/badge_b01.png" alt="" style="filter:hue-rotate(40deg)"><img src="/assets/badge_b01.png" alt="" style="filter:hue-rotate(120deg)"><img src="/assets/badge_b01.png" alt="" style="filter:hue-rotate(220deg)">
+        <span class="medal">9級</span><span class="medal">7級</span><span class="medal">5級</span><span class="medal gold">3級</span>
       </div>
       <p class="note" style="margin:10px auto 0;text-align:center">※ 表示はイメージです。お子さまの実際の学習で値が変化します。</p>
     </div>
@@ -281,7 +292,7 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
 <!-- 08 GRADUATE -->
 <section style="background:linear-gradient(180deg,#ffe9b0,#ffd27a)">
   <div class="wrap">
-    <img src="/assets/monster_mameko_side_f0.png" alt="" style="width:72px;height:72px;margin:0 auto 14px" data-reveal>
+    <img src="/assets/tanemon_harvest.png" onerror="this.src='/assets/tanemon.png'" alt="" style="width:80px;height:80px;margin:0 auto 14px" data-reveal>
     <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px);color:#6a4e10">中学卒業で、卒業。</h2>
     <p class="lead" data-reveal data-d="2" style="color:#7a5c1c">育てた種は、いつか巣立つ。タネマネーは中学卒業で役目を終える、期限のある体験です。<br><b style="color:#5a4300">だから——まくなら、今。</b>育てる時間は、戻ってきません。</p>
   </div>
@@ -322,7 +333,7 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
 <section style="background:linear-gradient(180deg,#bfe6f5,#e9f6e4)">
   <div class="wrap">
     <div class="evo" data-reveal style="margin-bottom:18px">
-      <img class="mon" src="/assets/tanemon_happy.png" alt=""><img class="mon" src="/assets/monster_niji_f0.png" alt=""><img class="mon" src="/assets/monster_egg_f0.png" alt="">
+      <img class="mon" src="/assets/crop_apple_seed.png" alt=""><span class="arr">→</span><img class="mon" src="/assets/crop_apple_3.png" alt=""><img class="mon" src="/assets/tanemon_happy.png" alt="" style="margin-left:8px">
     </div>
     <h2 data-reveal data-d="1" style="font-size:clamp(30px,8vw,56px)">種をまく、はじめの日。</h2>
     <p class="lead" data-reveal data-d="2">お金という種で、考える力を育てる。その第一歩を、今日から。</p>
@@ -375,33 +386,26 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
   }, {threshold:0.5});
   document.querySelectorAll('[data-count]').forEach(function(el){ cio.observe(el); });
 
-  // hero walker: walk + frame swap + nudge
-  var walker=document.getElementById('walker'), wimg=document.getElementById('walkerImg');
-  if(walker && !reduce){
-    var frame=0, dir=1, x=0, t=0;
-    setInterval(function(){ frame^=1; wimg.src='/assets/monster_mameko_side_f'+frame+'.png'; }, 380);
-    function loop(){ t+=0.008; x=Math.sin(t)*140; dir=Math.cos(t)>=0?1:-1; var bob=Math.abs(Math.sin(t*12))*3;
-      walker.style.transform='translateX(calc(-50% + '+x+'px)) translateY('+(-bob)+'px) scaleX('+dir+')';
-      requestAnimationFrame(loop); }
-    requestAnimationFrame(loop);
-  }
-  if(walker){
+  // hero タネモン: idle sway + なでると喜ぶ(タネモン素材のみ使用・旧モンスターは不使用)
+  var mon=document.getElementById('hero-mon'), mimg=document.getElementById('heroMonImg');
+  if(mon && !reduce){ mon.classList.add('sway'); }
+  if(mon){
     var nudging=false;
     function nudge(){
       if(nudging) return; nudging=true;
-      var base=walker.querySelector('img'); base.src='/assets/tanemon_happy.png';
-      walker.style.transition='transform .25s ease'; var cur=walker.style.transform;
-      walker.style.transform=cur+' translateY(-14px)';
-      // sparkle
+      mon.classList.remove('sway');
+      mimg.src='/assets/tanemon_happy.png';
+      mon.style.transition='transform .25s ease';
+      mon.style.transform='translateX(-50%) translateY(-16px)';
       for(var k=0;k<3;k++){ (function(k){ var sp=document.createElement('img'); sp.src='/assets/icon_sparkle.png'; sp.className='petal';
-        sp.style.left=(45+k*8)+'%'; sp.style.bottom='150px'; sp.style.transition='all .6s ease'; walker.parentElement.appendChild(sp);
+        sp.style.left=(44+k*8)+'%'; sp.style.bottom='150px'; sp.style.transition='all .6s ease'; mon.parentElement.appendChild(sp);
         requestAnimationFrame(function(){ sp.style.transform='translateY(-46px)'; sp.style.opacity='0'; });
         setTimeout(function(){ sp.remove(); },650);
       })(k); }
-      setTimeout(function(){ walker.style.transition=''; nudging=false; if(reduce) base.src='/assets/tanemon.png'; }, 420);
+      setTimeout(function(){ mon.style.transition=''; mon.style.transform='translateX(-50%)'; mimg.src='/assets/tanemon.png'; if(!reduce) mon.classList.add('sway'); nudging=false; }, 700);
     }
-    walker.addEventListener('pointerenter', nudge);
-    walker.addEventListener('click', nudge);
+    mon.addEventListener('pointerenter', nudge);
+    mon.addEventListener('click', nudge);
   }
 
   // sticky bar: show after hero
