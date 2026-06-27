@@ -716,6 +716,29 @@ const MONSTER_TREE = {
           desc:"究極体・天使のシー。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
   cshi_ultB:   { id:"cshi_ultB",   name:"星界神シーゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
           desc:"究極体・星界の神シー。", edu:"目標をかなえ続けた者だけが届く伝説のすがた。" },
+  // ── ✨ひみつ系統「スラリル」(隠し・保護者がプレゼントで配布。表には出さない特別枠) ──
+  // 異世界転生スライム風: しずく→転生スライム→名付け→嵐竜の友→あおの魔人→竜魔王。直線進化(yami式)。
+  srimu_egg: { id:"srimu_egg", name:"ひかるしずく", rarity:5, line:"srimu", stage:0, evolveTo:"srimu1",
+          desc:"どこかから ころんと あらわれた、ふしぎに ひかる しずくの タマゴ。なかで なにかが ねむっている。",
+          edu:"小さな 一しずくも、たいせつに 育てれば 大きくなる。お金も 育成も、はじまりは いつも ちいさい。" },
+  srimu1:    { id:"srimu1", name:"スラっこ", rarity:5, line:"srimu", stage:1, evolveTo:"srimu2",
+          desc:"べつの せかいから 生まれかわった ちいさな スライム。よわいけど、だれより げんきで すなお。",
+          edu:"いちばん よわい スタートでも、まいにちの つみ重ねで だれでも 強くなれる。コツコツが 才能だよ。" },
+  srimu2:    { id:"srimu2", name:"うつしスライム", rarity:5, line:"srimu", stage:2, evolveTo:"srimu3",
+          desc:"見たものの かたちや わざを 「うつして」 おぼえる スライム。まねっこ 名人。",
+          edu:"上手な人の まねから 学ぶのが いちばんの 近道。お金の つかい方も、上手な人を まねしてみよう。" },
+  srimu3:    { id:"srimu3", name:"なまえスライム", rarity:5, line:"srimu", stage:3, evolveTo:"srimu4",
+          desc:"友だちに 「名前」を もらって ぐんと 成長した すがた。名前は こころの きずな。",
+          edu:"だいじに されると 力が わく。お金も「なんの ための お金か」名前(目的)を つけると 大切にできる。" },
+  srimu4:    { id:"srimu4", name:"あらし竜の友", rarity:5, line:"srimu", stage:4, evolveTo:"srimu5",
+          desc:"ちいさな 嵐の子竜と 仲よくなり、ツノと 風の翼を 手に入れた。竜の力が めばえはじめた。",
+          edu:"いい 仲間と つながると、ひとりでは できない 力が 出る。たすけ合いも 大きな『たから』。" },
+  srimu5:    { id:"srimu5", name:"あおの魔人", rarity:5, line:"srimu", stage:5, evolveTo:"srimu_u",
+          desc:"人の すがたも とれるようになった、あおく かがやく 魔人。やさしくて たよれる リーダー。",
+          edu:"強くなるほど、まわりを たすける 力にも なる。お金も 同じで、ふやした力で 人を しあわせにできる。" },
+  srimu_u:   { id:"srimu_u", name:"竜魔王スラリル", rarity:5, line:"srimu", stage:6, evolveTo:null,
+          desc:"竜と 魔の 力を あわせもつ やさしき 王・究極体。みんなの 国を まもる、せかいに ひとつの あいぼう。",
+          edu:"いちばん つよい 王は、ちからを みんなの ために つかう。育てる力・まもる力こそ 本物の つよさ。" },
 };
 
 // 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
@@ -3166,6 +3189,22 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                           −減算
                         </button>
                       </div>
+                      {/* ✨ ひみつのプレゼント: スラリルのタマゴを贈る(表に出さない特別枠) */}
+                      {(()=>{
+                        const hasEgg=!!(data.slimeEgg?.[member.id]);
+                        const owned=((data.monsterDiscovered?.[member.id]||[]).some(x=>String(x).startsWith("srimu")))||((data.collectedMons?.[member.id]||[]).some(m=>String(m.id||"").startsWith("srimu")));
+                        return (
+                          <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
+                            <button disabled={hasEgg||owned}
+                              onClick={()=>{ if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ひかるしずく(ひみつのタマゴ)」をプレゼントする？\nそだてる画面に「育てはじめる」が出るよ。`)) return;
+                                update(d=>({...d,slimeEgg:{...(d.slimeEgg||{}),[member.id]:true}})); setGrantChild(null); }}
+                              style={{width:"100%",padding:"9px 0",borderRadius:10,border:"none",cursor:hasEgg||owned?"default":"pointer",fontFamily:F,fontWeight:800,fontSize:12,
+                                background:hasEgg||owned?"#eceae3":"linear-gradient(135deg,#6db8ff,#7b61c9)",color:hasEgg||owned?MUTED:"#fff"}}>
+                              {owned?"✨ もう持っているよ":hasEgg?"✨ タマゴをプレゼント済み":"✨ ひみつのタマゴをプレゼント"}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -4477,6 +4516,35 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </div>
               </div>
               <button onClick={startYami} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#7b61c9,#b07bff)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>🥚 このタマゴを 育てる（今の あいぼうは 卒業）</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ✨ ひみつ：スラリルのタマゴ(親からのプレゼント)を持っているとき */}
+      {effectiveTab==="rpg" && data.slimeEgg?.[child.id] && (()=>{
+        const startSlime=()=>{ if(typeof window!=="undefined" && !window.confirm("ひかるしずく（ひみつのタマゴ）を 育てはじめる？\n今の あいぼうは 図鑑(うちのこ)へ 卒業して、しずくが 新しい あいぼうに なるよ。")) return;
+          update(d=>{ const curId=(d.monsterEvolved||{})[child.id]; const curDef=curId?MONSTER_TREE[curId]:null;
+            const coll=(curId && curDef)?[...((d.collectedMons||{})[child.id]||[]),{species:String(curId).split("_")[0],id:curId,name:curDef.name,rarity:curDef.rarity||1,date:new Date().toISOString()}]:((d.collectedMons||{})[child.id]||[]);
+            return {...d, collectedMons:{...(d.collectedMons||{}),[child.id]:coll},
+              monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:"srimu_egg"},
+              monsterEvolvedAt:{...(d.monsterEvolvedAt||{}),[child.id]:null},
+              monsterStageAt:{...(d.monsterStageAt||{}),[child.id]:new Date().toISOString()},
+              monsterIV:{...(d.monsterIV||{}),[child.id]:{hp:8,atk:8,def:8,spd:8}},
+              monsterDiscovered:{...(d.monsterDiscovered||{}),[child.id]:[...new Set([...((d.monsterDiscovered||{})[child.id]||[]),"srimu_egg"])]},
+              slimeEgg:{...(d.slimeEgg||{}),[child.id]:false} }; });
+        };
+        return (
+          <div style={{padding:"0 16px 8px"}}>
+            <div style={{position:"relative",overflow:"hidden",background:"linear-gradient(135deg,#15324f,#243b66)",border:"1.5px solid #6db8ff",borderRadius:16,padding:"13px 15px",color:"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <img src="/assets/monster_srimu_egg_f0.png" alt="" style={{width:46,height:46,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:"💧",style:"font-size:34px"}));}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:900,fontSize:14}}>✨ ひみつの「ひかるしずく」を もらった！</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.78)",marginTop:2,lineHeight:1.5}}>育てると あいぼうに なるよ。お手伝い・なでなで・時間で 進化して、究極体「竜魔王スラリル」を めざそう！</div>
+                </div>
+              </div>
+              <button onClick={startSlime} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#6db8ff,#7b61c9)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>💧 このタマゴを 育てる（今の あいぼうは 卒業）</button>
             </div>
           </div>
         );
@@ -7627,7 +7695,7 @@ function SeedMonster({ child, data, size=90, update }) {
   const skinActive     = !!(skinDef && hiddenUnlocked(skinDef,data,child,totalTasksDone) && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
   // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
-  const isCat          = /^(cpurin|cku|cshi)_/.test(String(dispId));
+  const isCat          = /^(cpurin|cku|cshi|srimu)/.test(String(dispId));
   const frontFrames    = MON_FRAMES6[dispId] ? 6 : isCat ? 4 : 0;
   const multiFront     = frontFrames > 0;   // 前向き多コマ(歩行はするが左右反転しない)
   // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
