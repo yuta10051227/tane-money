@@ -1397,6 +1397,17 @@ const Y     = GOLD;        // 後方互換
 const SHADOW = "0 4px 16px rgba(24,35,29,0.05)";
 const F  = "'Noto Sans JP','M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
 const FB = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
+// ===== UIクロム・デザイントークン（プレミアム化：角丸/影/枠/余白を統一）=====
+// 既存カラー定数のみで構成（新ブランド色を作らない）。
+const RAD_CARD = 16;   // カード・畑の額縁
+const RAD_CHIP = 12;   // 小チップ・スタット
+const RAD_PILL = 999;  // ピル・ラベル
+const BD_THIN   = `1px solid ${BORDER}`;
+const BD_ACCENT = (c)=>`1px solid ${c}`;
+const SHADOW_SM = "0 1px 4px rgba(24,35,29,0.07)";   // チップ（うっすら浮かせる）
+const SHADOW_MD = "0 6px 20px rgba(24,35,29,0.10)";  // 主役カード（畑）
+const PRESS = { transform:"translateY(1px)" };       // 押下の沈み込み（onPointerで適用）
+const SP = { xs:4, sm:8, md:12, lg:16 };
 const AGE={young:{label:"低学年",emoji:"🌱"},middle:{label:"中学年",emoji:"🌿"},senior:{label:"中高生",emoji:"🌳"}};
 const INP = { fontFamily:F, padding:"9px 11px", borderRadius:10, border:`1.5px solid ${BORDER}`, fontSize:14, background:BG2, color:TEXT, width:"100%", boxSizing:"border-box" };
 
@@ -7121,6 +7132,22 @@ function ChevronRightIcon(){
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>;
 }
 
+// 操作部アイコン（lucide不使用・stroke=currentColorで親colorを継承＝新色を作らない）。
+// 世界側のemoji(➕🌟💧みのり等)は対象外。UIクロムの機能emojiのみ置換する。
+function FIcon({name,size=18,style}){
+  const c={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round",style:{display:"block",flexShrink:0,...style}};
+  switch(name){
+    case"streak": return <svg {...c}><path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.5.6-2.7 1.4-3.6C9.6 8 9 9 9 11a3 3 0 0 0 .2 1C8.5 11.4 8 10.3 8 9c0-2.4 1.8-4.4 4-6Z"/></svg>;
+    case"water": return <svg {...c}><path d="M12 3.5c3 3.6 5.5 6.4 5.5 9.6a5.5 5.5 0 0 1-11 0c0-3.2 2.5-6 5.5-9.6Z"/></svg>;
+    case"coin":  return <svg {...c}><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M9.5 10.2c0-1 1.1-1.7 2.5-1.7s2.5.7 2.5 1.7-1.1 1.6-2.5 1.6-2.5.7-2.5 1.7 1.1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></svg>;
+    case"book":  return <svg {...c}><path d="M12 6.5C10.5 5.4 8.4 5 6 5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1c2.4 0 4.5.4 6 1.5"/><path d="M12 6.5C13.5 5.4 15.6 5 18 5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1c-2.4 0-4.5.4-6 1.5"/><path d="M12 6.5v13"/></svg>;
+    case"palette": return <svg {...c}><path d="M12 4a8 8 0 0 0 0 16c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.9-.5-1.2-.3-.4-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6H16a4 4 0 0 0 4-4c0-3.9-3.6-6.4-8-6.4Z"/><circle cx="8.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="8.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10.5" r="1" fill="currentColor" stroke="none"/></svg>;
+    case"bucket": return <svg {...c}><path d="M5 7h14l-1.4 11.2a2 2 0 0 1-2 1.8H8.4a2 2 0 0 1-2-1.8L5 7Z"/><path d="M4 7h16"/><path d="M8.5 7a3.5 3.5 0 0 1 7 0"/></svg>;
+    case"vault": return <svg {...c}><path d="M4 10.5 12 4l8 6.5"/><path d="M5.5 10v9.5h13V10"/><rect x="9.5" y="13" width="5" height="6.5"/></svg>;
+    default: return null;
+  }
+}
+
 
 function PinResetScreen({ data, update, onBack }) {
   const [target, setTarget] = useState(null);
@@ -9192,29 +9219,30 @@ function InvestTab({child,data,update}){
       const NEXT=[3,10,30];
       const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
-        <div style={{display:"flex",gap:7,alignItems:"center",marginBottom:10}}>
+        <div style={{display:"flex",gap:SP.sm,alignItems:"center",marginBottom:SP.md}}>
           {studyMode
-            ? <div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"8px 10px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
-            : <><div style={{flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"6px 10px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>🌱 はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
-                <div style={{height:6,background:GS,borderRadius:3,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G}}/></div>
+            ? <div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"8px 12px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
+            : <><div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
+                <div style={{height:6,background:GS,borderRadius:RAD_PILL,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G,borderRadius:RAD_PILL}}/></div>
               </div>
-              {loginStreak>0&&<div style={{background:GS,border:`1.5px solid ${G}`,borderRadius:12,padding:"7px 8px",fontSize:12,fontWeight:900,color:GP,whiteSpace:"nowrap"}}>📅{loginStreak}</div>}
-              <div style={{background:BS,border:`1.5px solid ${B}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:B,whiteSpace:"nowrap"}}>💧{waterReserve}</div></>}
-          <div style={{background:GOLDS,border:`1.5px solid ${GOLD}`,borderRadius:12,padding:"7px 9px",fontSize:12,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}>💰{myBal.toLocaleString()}</div>
+              {loginStreak>0&&<div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:GP,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:G}}/><FIcon name="streak" size={14}/>{loginStreak}</div>}
+              <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:B,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:B}}/><FIcon name="water" size={14}/>{waterReserve}</div></>}
+          <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:GOLD}}/><FIcon name="coin" size={14}/>{myBal.toLocaleString()}</div>
         </div>
-        <div style={{position:"relative",borderRadius:18,overflow:"hidden",marginBottom:10,border:`3px solid ${G}`,boxShadow:"0 6px 22px rgba(52,199,123,.3)"}}>
-          <div style={{height:44,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 8px 0 10px"}}>
-            <span style={{fontSize:12,fontWeight:900,color:"#5a4a2a",background:"rgba(255,255,255,.65)",borderRadius:8,padding:"3px 9px"}}>🪵 きみの はたけ</span>
-            <button onClick={()=>setShowDex(true)} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,.8)",border:"none",borderRadius:9,padding:"4px 9px",cursor:"pointer",fontFamily:F}}>
-              <img src="/assets/album_icon.png" alt="" style={{width:18,height:18,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";e.target.replaceWith(s);}}/>
-              <span style={{fontSize:11,fontWeight:900,color:"#3a6a2a"}}>ずかん</span>
+        <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
+          <div style={{position:"relative",height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 9px 0 10px"}}>
+            <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.16))"}}/>
+            <span style={{position:"relative",fontSize:12,fontWeight:900,color:TEXT,background:"#fff",borderRadius:RAD_PILL,padding:"4px 11px",boxShadow:SHADOW_SM}}>🪵 きみの はたけ</span>
+            <button onClick={()=>setShowDex(true)} style={{position:"relative",display:"flex",alignItems:"center",gap:5,background:"#fff",border:"none",borderRadius:RAD_PILL,padding:"5px 11px",cursor:"pointer",fontFamily:F,boxShadow:SHADOW_SM,color:GP}}>
+              <FIcon name="book" size={14}/>
+              <span style={{fontSize:11,fontWeight:900,color:GP}}>ずかん</span>
             </button>
           </div>
           {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える（学習モードでは非表示） */}
-          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#bfe6a0,#a6d885)",padding:"4px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"2px solid #8fc070"}}>
-            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.45}}>{it?it.e:"・"}</span>; })}
-            <span style={{marginLeft:"auto",fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"rgba(255,255,255,.78)",borderRadius:8,padding:"2px 8px",flexShrink:0,whiteSpace:"nowrap"}}>🎨 もようがえ</span>
+          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#d2e8c6,#c0dcae)",padding:"5px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"1px solid #aacf95"}}>
+            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.4}}>{it?it.e:"・"}</span>; })}
+            <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"#fff",borderRadius:RAD_PILL,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap",boxShadow:SHADOW_SM}}><FIcon name="palette" size={12}/>もようがえ</span>
           </div>}
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {stocks.map(s=>{
@@ -9249,12 +9277,18 @@ function InvestTab({child,data,update}){
           </div>
           <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
         </div>
-        <div style={{display:"flex",gap:7}}>
-          {!studyMode&&<button onClick={drawWater} style={{flex:1,background:BS,border:`2px solid ${B}`,borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <span style={{fontSize:18}}>🪣</span><span style={{fontSize:11,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9,fontWeight:800,color:"#4a7"}}>{Math.floor(bucketG)}g たまってる</span>
+        <div style={{display:"flex",gap:SP.sm}}>
+          {!studyMode&&<button onClick={drawWater}
+            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
+            style={{flex:1,background:CARD,border:BD_ACCENT(B),borderRadius:RAD_CARD,boxShadow:SHADOW_SM,padding:"10px 10px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:9,color:B,transition:"transform .08s"}}>
+            <FIcon name="bucket" size={22}/>
+            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:12.5,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9.5,fontWeight:800,color:MUTED}}>{Math.floor(bucketG)}g たまってる</span></span>
           </button>}
-          <button onClick={()=>setShowTrade(true)} style={{flex:1.5,background:GP,border:"none",borderRadius:14,padding:"9px 6px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
-            <span style={{fontSize:18}}>🏠</span><span style={{fontSize:11,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span>
+          <button onClick={()=>setShowTrade(true)}
+            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
+            style={{flex:1.5,background:GP,border:"none",borderRadius:RAD_CARD,boxShadow:SHADOW_MD,padding:"10px 12px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:10,color:"#fff",transition:"transform .08s"}}>
+            <FIcon name="vault" size={22}/>
+            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:13,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9.5,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span></span>
           </button>
         </div>
       </div>);
