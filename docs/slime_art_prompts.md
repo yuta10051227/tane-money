@@ -35,19 +35,22 @@ cropped, extra limbs, busy background, photo, 3d render noise, low quality, jpeg
 ### 🥚 srimu_egg「ひかるしずく」（タマゴ／rarity5）
 ```
 [STYLE BIBLE] +
-a mysterious glowing teardrop-shaped egg made of translucent sky-blue jelly,
-soft inner light, a few darker blue water-drop spots, tiny sparkle on top,
-no face, calm and magical, sitting still
+a perfectly round plump egg-droplet made of glossy translucent sky-blue jelly,
+very smooth and chubby, jiggly soft surface, big soft inner glow,
+a few gentle darker-blue droplet spots, one big bright sparkle on top,
+no face, calm and magical, squishy and adorable
 ```
-JP：しずく型のタマゴ。半透明で内側がほんのり発光、青い水玉模様、上にキラッと光。顔なし。
+JP：**まんまるで ぷっくり**した、つやつや半透明の青ジェルのタマゴ。なめらかで ぷるぷる。内側がやわらかく発光、青い水玉、上に大きなキラッ。顔なし。
 
 ### 💧 srimu1「スラっこ」（転生したて／最弱だけど元気）← **基準キャラ**
 ```
 [STYLE BIBLE] +
-a tiny round baby blue slime, very small and simple, huge innocent sparkling eyes,
-tiny happy smile, pure and cheerful, a little bounce, nothing else on body
+a very round chubby baby blue slime, big plump jelly dome shape, super glossy and jiggly,
+huge round innocent eyes (extra large, with two white sparkle highlights each),
+tiny happy smile, soft rounded cheeks, pure cheerful and squishy, gentle bounce,
+nothing else on body, maximum cuteness
 ```
-JP：小さくシンプルな丸い赤ちゃんスライム。大きな無垢な目、ちいさな笑顔。装飾なし。**この子を基準に**。
+JP：**まんまる・ぷくぷく**の赤ちゃん青スライム。つやつや・ぷるぷるのジェルドーム。**瞳は特大**で、それぞれに白いキラキラ2つ。ちいさな笑顔、やわらかいほっぺ。装飾なし、**かわいさ最大**。**この子を基準に**。
 
 ### ✨ srimu2「うつしスライム」（見たものを“うつす”まねっこ名人）
 ```

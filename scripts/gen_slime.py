@@ -31,10 +31,10 @@ def slime_body(d, cx, baseY, rw, rh, body, shade, hi, line):
     # ハイライト(左上のつや)
     d.ellipse([cx-rw+2, top+1, cx-rw+2+int(rw*0.7), top+1+int(rh*0.7)], fill=hi)
 
-def eyes(d, cx, cy, body_line, blink=False, dx=0, big=True):
-    sp = 5 if big else 4
-    ew = 3 if big else 2
-    eh = 4 if big else 3
+def eyes(d, cx, cy, body_line, blink=False, dx=0, big=True, ew=None, eh=None, sp=None):
+    if sp is None: sp = 5 if big else 4
+    if ew is None: ew = 3 if big else 2
+    if eh is None: eh = 4 if big else 3
     for sx in (-1, 1):
         ox = cx + sx*sp + dx
         if blink:
@@ -76,7 +76,7 @@ def aura(d, cx, cy, r, col):
 # ステージ定義: body/shade/hi/line + アクセサリflags
 STAGES = {
  "srimu_egg": dict(kind="egg", body=(150,210,255,255), shade=(110,180,240,255), line=(70,120,190,255), hi=(235,250,255,255)),
- "srimu1":    dict(kind="slime", rw=9,  rh=7,  body=(120,205,255,255), shade=(70,165,235,255), line=(40,110,185,255), hi=(240,252,255,255), aura=None),
+ "srimu1":    dict(kind="slime", rw=10, rh=9,  body=(120,205,255,255), shade=(70,165,235,255), line=(40,110,185,255), hi=(240,252,255,255), eye=dict(ew=4,eh=5,sp=6)),
  "srimu2":    dict(kind="slime", rw=10, rh=8,  body=(110,200,255,255), shade=(60,160,230,255), line=(35,105,180,255), hi=(240,252,255,255), copy=True),
  "srimu3":    dict(kind="slime", rw=11, rh=9,  body=(105,195,255,255), shade=(55,155,225,255), line=(30,100,175,255), hi=(240,252,255,255), name=True, halo=True),
  "srimu4":    dict(kind="slime", rw=12, rh=9,  body=(95,210,225,255),  shade=(45,165,185,255), line=(25,110,135,255), hi=(235,255,255,255), horns=True, wings=True, storm=True),
@@ -95,7 +95,7 @@ def draw(stage_id, frame=0, side=False):
     baseY = 31
 
     if kind == "egg":
-        rw, rh = 9, 12
+        rw, rh = 11, 12   # まんまる寄りの ぷっくり卵
         wob = [0,-1,0,1][frame%4]
         top = baseY-2*rh
         d.ellipse([cx-rw, top+wob, cx+rw, baseY], fill=cfg["body"], outline=cfg["line"])
@@ -152,7 +152,7 @@ def draw(stage_id, frame=0, side=False):
     cyf = cyb - rh   # 顔の中心
     if cfg.get("horns"):
         horns(d, cx, cyb-2*rh)
-    eyes(d, cx, cyf, cfg["line"], blink=blink, dx=dx, big=True)
+    eyes(d, cx, cyf, cfg["line"], blink=blink, dx=dx, big=True, **cfg.get("eye",{}))
     mouth(d, cx, cyf+4)
     if cfg.get("halo"):
         d.arc([cx-5, cyb-2*rh-4, cx+5, cyb-2*rh], 0, 180, fill=(255,235,150,255))
