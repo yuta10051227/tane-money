@@ -4128,6 +4128,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     badges:"more", tips:"more", ranking:"more", gacha:"daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
+  // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
+  const TAB_FB = {daily:"☀️",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
   const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
@@ -4322,7 +4324,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <button key={v} onClick={()=>setTab(v)}
             style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{position:"relative",display:"inline-flex"}}>
-              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent="🐣";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
+              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent=TAB_FB[v]||"🌱";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
               {tabDot && <span style={{position:"absolute",top:-3,right:-6,width:9,height:9,borderRadius:"50%",background:GOLD,border:`1.5px solid ${isJunior?CARD:"#0f1a2e"}`}}/>}
             </span>
             {l.replace(/^\S+\s+/,"")}
