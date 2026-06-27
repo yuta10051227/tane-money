@@ -1409,6 +1409,8 @@ const SHADOW_MD = "0 6px 20px rgba(24,35,29,0.10)";  // 主役カード（畑）
 const PRESS = { transform:"translateY(1px)" };       // 押下の沈み込み（onPointerで適用）
 const SP = { xs:4, sm:8, md:12, lg:16 };
 const AGE={young:{label:"低学年",emoji:"🌱"},middle:{label:"中学年",emoji:"🌿"},senior:{label:"中高生",emoji:"🌳"}};
+// 🎓 専門家監修（手配できたら name/title を埋める。空のままなら監修バッジは表示されない＝虚偽表示しない）
+const SUPERVISOR = { name: "", title: "" };  // 例: { name:"山田 太郎", title:"ファイナンシャルプランナー(CFP®)" }
 const INP = { fontFamily:F, padding:"9px 11px", borderRadius:10, border:`1.5px solid ${BORDER}`, fontSize:14, background:BG2, color:TEXT, width:"100%", boxSizing:"border-box" };
 
 // ═══════════════════════════════════════════════════════
@@ -8552,6 +8554,40 @@ async function shareCard({ emoji, title, subtitle, color, img, rarity }){
   }catch(e){ /* キャンセル/非対応は無視 */ }
 }
 
+// 🎓 金融リテラシー認定証（賞状デザインのシェア画像）。級到達のごほうび＝継続・口コミに効く
+async function shareCertificate({ name, rank, date, supervisor }){
+  try{
+    const W=1080,H=1080; const cv=document.createElement("canvas"); cv.width=W; cv.height=H; const x=cv.getContext("2d");
+    x.textAlign="center"; x.textBaseline="middle";
+    // クリーム地＋淡い光彩
+    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#FBF8F0"); g.addColorStop(1,"#F1F6EC"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    const rg=x.createRadialGradient(W/2,470,40,W/2,470,520); rg.addColorStop(0,"#E8B83E22"); rg.addColorStop(1,"#E8B83E00"); x.fillStyle=rg; x.fillRect(0,0,W,H);
+    // 金の二重枠
+    x.strokeStyle="#E8B83E"; x.lineWidth=10; x.strokeRect(46,46,W-92,H-92);
+    x.strokeStyle="#C9A33A"; x.lineWidth=3; x.strokeRect(70,70,W-140,H-140);
+    // タイトル
+    x.fillStyle="#187A4E"; x.font="900 62px 'M PLUS Rounded 1c',sans-serif"; x.fillText("金融リテラシー認定証", W/2, 210);
+    x.fillStyle="#929B95"; x.font="700 24px sans-serif"; x.fillText("CERTIFICATE OF FINANCIAL LITERACY", W/2, 268);
+    // 氏名
+    x.fillStyle="#18231D"; x.font="900 84px 'M PLUS Rounded 1c',serif"; x.fillText((name||"") + " さん", W/2, 440);
+    x.strokeStyle="#E8B83E"; x.lineWidth=4; x.beginPath(); x.moveTo(W/2-280,506); x.lineTo(W/2+280,506); x.stroke();
+    // 本文＋級
+    x.fillStyle="#59645E"; x.font="700 32px 'M PLUS Rounded 1c',sans-serif"; x.fillText("タネマネー金融教育プログラムにおいて", W/2, 596);
+    x.fillStyle="#187A4E"; x.font="900 78px 'M PLUS Rounded 1c',sans-serif"; x.fillText(rank||"", W/2, 690);
+    x.fillStyle="#59645E"; x.font="700 32px 'M PLUS Rounded 1c',sans-serif"; x.fillText("に到達したことを 証します。", W/2, 784);
+    // 日付・監修・印
+    x.fillStyle="#929B95"; x.font="700 26px sans-serif"; x.fillText(date||"", W/2, 872);
+    if(supervisor){ x.fillStyle="#7a5a00"; x.font="800 26px 'M PLUS Rounded 1c',sans-serif"; x.fillText("監修：" + supervisor, W/2, 916); }
+    x.fillStyle="#187A4E"; x.font="900 40px 'M PLUS Rounded 1c',sans-serif"; x.fillText("🌱 Tane Money", W/2, 988);
+    const blob=await new Promise(r=>cv.toBlob(r,"image/png"));
+    const file=new File([blob],"tane-money-certificate.png",{type:"image/png"});
+    const payload={ title:"タネマネー 認定証", text:`${name||""}さんが ${rank||""} に到達！ #タネマネー`, url:"https://tane-money.vercel.app" };
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({ ...payload, files:[file] }); }
+    else if(navigator.share){ await navigator.share(payload); }
+    else { const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="tane-money-certificate.png"; a.click(); }
+  }catch(e){ /* キャンセル/非対応は無視 */ }
+}
+
 // ── GoalCelebration ───────────────────────────────────
 function GoalCelebration({goal,onClose}){
   return(
@@ -9928,6 +9964,19 @@ function TipsSection({ageMode,child,data,update}){
         );})}
       </div>
       {course&&<button onClick={()=>setCourse(null)} style={{marginTop:10,background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,padding:"6px 12px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>← ぜんぶのコースに もどる</button>}
+      {/* 🏅 認定証（級を1つでも取ったら発行・賞状をシェア/保存できる） */}
+      {ladderDone>=1&&(
+        <div style={{marginTop:10,background:"rgba(255,217,102,.14)",border:"1.5px solid #ffd966",borderRadius:12,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>🏅</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:900,fontSize:12.5,color:"#ffe9a8"}}>{rank} 認定証</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.6)",fontWeight:700}}>がんばりの証。おうちの人とシェアしよう</div>
+          </div>
+          <button onClick={()=>shareCertificate({name:child.name,rank,date:`${new Date().getFullYear()}年${new Date().getMonth()+1}月${new Date().getDate()}日`,supervisor:SUPERVISOR.name?`${SUPERVISOR.title} ${SUPERVISOR.name}`.trim():""})}
+            style={{flexShrink:0,background:"#ffd966",border:"none",borderRadius:10,padding:"8px 12px",color:"#5a4300",fontWeight:900,fontSize:11.5,cursor:"pointer",fontFamily:F}}>認定証を出す 📤</button>
+        </div>
+      )}
+      {SUPERVISOR.name&&<div style={{marginTop:8,fontSize:10,color:"rgba(255,255,255,.72)",fontWeight:700,textAlign:"center"}}>🎓 {`${SUPERVISOR.title} ${SUPERVISOR.name}`.trim()} 監修</div>}
     </div>
     {/* 📈 成長レポート（保護者向け・¥980のROIを見せる Before/After） */}
     <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
