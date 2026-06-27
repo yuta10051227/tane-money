@@ -744,6 +744,10 @@ const MONSTER_TREE = {
 // 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
 const MON_FRAMES6 = { egg:1, m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09:1,m10:1 };
 
+// ✨ ひみつ系統「スラリル」: 進化系統(スラっこ以降)はまだ表に出さない＝卵だけ公開。
+//   進化アートが揃ったら true にすると、srimu_egg→srimu1→…→srimu_u の全進化が解禁される。
+const SLIME_EVOLVE_ENABLED = false;
+
 // ═══════════════════════════════════════════════════════
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
 const BG_THEMES = [
@@ -7688,7 +7692,9 @@ function SeedMonster({ child, data, size=90, update }) {
   const curStage       = mon.stage;
   const isFinal        = mon.isFinal;
   const isEgg          = monsterId==="egg" || /_egg$/.test(String(monsterId));  // 卵は「しんか」でなく「うまれる」
-  const canEvolve      = mon.canEvolve && !!update;
+  // ✨ スラリル系統は「卵だけ公開」中。進化解禁フラグがOFFの間は孵化・転生・やり直しを止め、卵のまま保つ。
+  const slimeLocked    = !SLIME_EVOLVE_ENABLED && /^srimu/.test(String(monsterId));
+  const canEvolve      = mon.canEvolve && !!update && !slimeLocked;
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
@@ -7749,7 +7755,7 @@ function SeedMonster({ child, data, size=90, update }) {
 
   // 転生（究極体の4日後に可能）
   const reincCount     = (data.reincarnationCount||{})[child.id] || 0;
-  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update;
+  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update && !slimeLocked;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -8038,7 +8044,7 @@ function SeedMonster({ child, data, size=90, update }) {
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
       )}
       {/* タマゴからやり直す(別の進化を試せる) */}
-      {evolved && !evolving && update && (
+      {evolved && !evolving && update && !slimeLocked && (
         <button onClick={()=>{ if(typeof window!=="undefined" && window.confirm("タマゴからやり直す？\nずかんはそのまま。ちがう進化を試せるよ！")) doRehatch(); }}
           style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
           🥚 タマゴからやり直す
