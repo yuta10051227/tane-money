@@ -9507,7 +9507,7 @@ function InvestTab({child,data,update}){
           )}
 
           {/* 売買パネル */}
-          {isSel&&selStock&&<div style={{background:"#1a1a2e",borderRadius:18,padding:16,border:"2px solid #4a9eff",marginTop:-2}}>
+          {isSel&&selStock&&<div style={{background:"#1a1a2e",borderRadius:18,padding:16,border:"2px solid #4a9eff",marginTop:-2,boxSizing:"border-box",maxWidth:"100%",overflow:"hidden"}}>
             {/* チャート */}
             {selStock.history&&selStock.history.length>1&&(
               <div style={{marginBottom:12}}>
@@ -9530,7 +9530,7 @@ function InvestTab({child,data,update}){
             </div>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
               <button onClick={()=>setQty(q=>String(Math.max(0.1,Math.round((parseFloat(q||0.1)-0.1)*10)/10)))} style={{width:40,height:40,borderRadius:"50%",border:"1px solid #333",background:"#0d0d1a",color:"#fff",fontSize:20,cursor:"pointer"}}>−</button>
-              <input value={qty} onChange={e=>setQty(e.target.value.replace(/[^0-9.]/g,""))} type="number" min="0.1" step="0.1" style={{flex:1,textAlign:"center",fontSize:22,fontWeight:900,background:"#0d0d1a",border:"1px solid #333",borderRadius:10,padding:"7px 0",color:"#fff",fontFamily:F}}/>
+              <input value={qty} onChange={e=>setQty(e.target.value.replace(/[^0-9.]/g,""))} type="text" inputMode="decimal" style={{flex:1,minWidth:0,boxSizing:"border-box",width:"100%",textAlign:"center",fontSize:22,fontWeight:900,background:"#0d0d1a",border:"1px solid #333",borderRadius:10,padding:"7px 0",color:"#fff",fontFamily:F}}/>
               <button onClick={()=>setQty(q=>String(Math.round((parseFloat(q||0.1)+0.1)*10)/10))} style={{width:40,height:40,borderRadius:"50%",border:"none",background:"#4a9eff",color:"#fff",fontSize:20,cursor:"pointer"}}>+</button>
             </div>
             <div style={{display:"flex",gap:6,marginBottom:12}}>
