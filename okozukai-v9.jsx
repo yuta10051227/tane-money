@@ -8679,6 +8679,8 @@ function InvestTab({child,data,update}){
   const [shareCopied,setShareCopied]=useState(false);
   const [showTrade,setShowTrade]=useState(false);   // ゲームホーム ⇄ とりひき/くら（数字はここ）
   const [showDeco,setShowDeco]=useState(false);     // 🏡 模様替え
+  const [showAllStocks,setShowAllStocks]=useState(false); // 銘柄リストの「もっと見る」（既定は厳選＝スクロール短縮）
+  const FARM_FAV=new Set(["f1","f2","f3","f4","f5","s1","s7","s4","s6","s11","s21","s5","s10"]); // 架空5＋子ども定番
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
   // 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
@@ -8997,7 +8999,7 @@ function InvestTab({child,data,update}){
             <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"#fff",borderRadius:RAD_PILL,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap",boxShadow:SHADOW_SM}}><FIcon name="palette" size={12}/>もようがえ</span>
           </div>}
           <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
-            {stocks.map(s=>{
+            {(showAllStocks?stocks:stocks.filter(s=>s.fake||FARM_FAV.has(s.id)||myHoldings.some(h=>h.stockId===s.id))).map(s=>{
               const h=myHoldings.find(x=>x.stockId===s.id);
               const held=!!h; const d=holdDaysOf(h); const stage=cropStageDays(d);
               const ripe=held&&stage>=3;
@@ -9019,6 +9021,10 @@ function InvestTab({child,data,update}){
                 </button>
               );
             })}
+            <button onClick={()=>setShowAllStocks(v=>!v)} style={{flex:"0 0 auto",width:64,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:3}}>
+              <div style={{width:58,height:58,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,background:"rgba(255,255,255,.55)",borderRadius:12,marginBottom:8}}>{showAllStocks?"➖":"➕"}</div>
+              <span style={{fontSize:10,fontWeight:900,color:"#2f5a22",whiteSpace:"nowrap"}}>{showAllStocks?"とじる":"もっと見る"}</span>
+            </button>
           </div>
           <div style={{background:"rgba(24,122,78,.92)",padding:"5px 8px",display:"flex",alignItems:"center",gap:6}}>
             {!studyMode&&<button onClick={patMon} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"3px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,fontFamily:F,flexShrink:0}}>
