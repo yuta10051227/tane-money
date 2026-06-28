@@ -3212,6 +3212,18 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                           </div>
                         );
                       })()}
+                      {/* 🎟 ガチャチケットを1枚プレゼント(その日のガチャをもう1回引ける) */}
+                      <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
+                        <button
+                          onClick={()=>{ if(!txGuard("giftticket_"+member.id)) return;
+                            if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ガチャチケット」を1枚プレゼントする？\nその日のガチャを もう1回 引けるよ🎟`)) return;
+                            update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[member.id]:((d.battleTickets?.[member.id])||0)+1}}));
+                            setGrantChild(null); }}
+                          style={{width:"100%",padding:"9px 0",borderRadius:10,border:`1.5px solid ${GOLD}`,cursor:"pointer",fontFamily:F,fontWeight:800,fontSize:12,background:GOLDS,color:"#9a7000"}}>
+                          🎟 ガチャチケットを1枚プレゼント{(data.battleTickets?.[member.id])>0?`（所持${data.battleTickets[member.id]}枚）`:""}
+                        </button>
+                        <div style={{fontSize:10.5,color:MUTED,marginTop:5,lineHeight:1.5}}>その日のガチャを もう1回 引けるチケット。がんばったご褒美に🎁</div>
+                      </div>
                     </div>
                   )}
                 </div>
