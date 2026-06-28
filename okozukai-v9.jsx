@@ -8939,6 +8939,9 @@ function InvestTab({child,data,update}){
       const has=myHoldings.length>0;
       const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
       const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
+      // 🏙 推しカンパニーの街シーン：保有・損益で「場面まるごと」切替（未描画の段階は town_empty に自動フォールバック）
+      const townScene=!has?"town_empty":gp>=10?"town_full":"town_small";
+      const townLabel=!has?"🏗 まちを つくろう":gp>=10?"🎆 街が 大さかえ！":gp>=0?"🏙 にぎやかな 街":"🌧 しずかだけど 街は元気";
       const NEXT=[3,10,30];
       const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
@@ -8952,6 +8955,12 @@ function InvestTab({child,data,update}){
               {loginStreak>0&&<div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:GP,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:G}}/><FIcon name="streak" size={14}/>{loginStreak}</div>}
               <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:B,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:B}}/><FIcon name="water" size={14}/>{waterReserve}</div></>}
           <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:GOLD}}/><FIcon name="coin" size={14}/>{myBal.toLocaleString()}</div>
+        </div>
+        {/* 🏙 推しカンパニーの街（場面まるごと差し替え・損益連動）。アート未配置でも onError で消える */}
+        <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD,background:"linear-gradient(180deg,#dbeede,#eaf7ec)"}}>
+          <img src={`/assets/${townScene}.png`} alt="推しカンパニーの街" style={{display:"block",width:"100%",height:"auto",imageRendering:"pixelated"}}
+            onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/town_empty.png"; } else { const w=e.target.closest("div"); if(w) w.style.display="none"; } }}/>
+          <span style={{position:"absolute",left:8,top:8,background:"rgba(255,255,255,.92)",borderRadius:RAD_PILL,padding:"4px 11px",fontSize:11,fontWeight:900,color:GP,boxShadow:SHADOW_SM}}>{townLabel}{has?`（${gp>=0?"+":""}${gp.toFixed(1)}%）`:""}</span>
         </div>
         <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
           <div style={{position:"relative",height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 9px 0 10px"}}>
