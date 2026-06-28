@@ -3203,6 +3203,30 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     </div>
                   </div>
                 )}
+                {!fs.investOff && (
+                  <div style={{marginTop:14,borderTop:`1px dashed ${BORDER}`,paddingTop:12}}>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>🌱 架空銘柄を調整（学習用）</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:8}}>増える/下がる感覚を教える練習用。「上がりやすさ」と「ゆれ」を親が設定できます（実在企業ではありません）。</div>
+                    {(data.stocks||[]).filter(s=>s.fake).map(s=>{
+                      const setS=(patch)=>update(d=>({...d,stocks:(d.stocks||[]).map(x=>x.id===s.id?{...x,...patch}:x)}));
+                      const BIAS=[{v:-0.004,t:"下げ"},{v:0,t:"横ばい"},{v:0.004,t:"上げ"},{v:0.008,t:"急上昇"}];
+                      const VOL=[{v:0.012,t:"小"},{v:0.03,t:"中"},{v:0.05,t:"大"}];
+                      return (
+                        <div key={s.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                          <div style={{fontWeight:800,fontSize:13,marginBottom:6}}>{s.emoji} {s.name}</div>
+                          <div style={{fontSize:11,color:MUTED,marginBottom:3}}>上がりやすさ</div>
+                          <div style={{display:"flex",gap:5,marginBottom:7}}>
+                            {BIAS.map(o=>{const sel=(s.bias||0)===o.v;return <button key={o.t} onClick={()=>setS({bias:o.v})} style={{flex:1,background:sel?GP:"transparent",border:`1.5px solid ${sel?GP:BORDER}`,borderRadius:8,padding:"5px 0",color:sel?"#fff":TEXT,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{o.t}</button>;})}
+                          </div>
+                          <div style={{fontSize:11,color:MUTED,marginBottom:3}}>ゆれ（値動きの大きさ）</div>
+                          <div style={{display:"flex",gap:5}}>
+                            {VOL.map(o=>{const sel=(s.vol||0.03)===o.v;return <button key={o.t} onClick={()=>setS({vol:o.v})} style={{flex:1,background:sel?B:"transparent",border:`1.5px solid ${sel?B:BORDER}`,borderRadius:8,padding:"5px 0",color:sel?"#fff":TEXT,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{o.t}</button>;})}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {/* 学習特化モード（ゲーム要素をOFF＝学びに集中） */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
