@@ -4103,14 +4103,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const seen = data.monsterLevelSeen?.[child.id];
     if(seen===undefined){ update(d=> (d.monsterLevelSeen?.[child.id]!==undefined ? d : {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}}) ); return; }
     if(_mLv>seen){
-      let gainedHs=0, gainedHm=0;
+      // バトル撤去により回復アイテム報酬は廃止。レベルアップは「おめでとう」演出のみ。
       update(d=>{
         const cur=(d.monsterLevelSeen||{})[child.id]; if(cur!==undefined && cur>=_mLv) return d;
-        const from=(cur??seen); const cc={...(d.healCaps?.[child.id]||{})};
-        for(let L=from+1; L<=_mLv; L++){ if((cc.hs||0)<HEAL_MAX){cc.hs=(cc.hs||0)+1; gainedHs++;} if(L%5===0 && (cc.hm||0)<HEAL_MAX){ cc.hm=(cc.hm||0)+1; gainedHm++; } }
-        return {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}, healCaps:{...(d.healCaps||{}),[child.id]:cc}};
+        return {...d, monsterLevelSeen:{...(d.monsterLevelSeen||{}),[child.id]:_mLv}};
       });
-      setLvPop({to:_mLv, hs:gainedHs||(_mLv-seen), hm:gainedHm});
+      setLvPop({to:_mLv});
       setTimeout(()=>setLvPop(null),3600);
     }
   // eslint-disable-next-line
@@ -4733,17 +4731,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Gacha anim */}
       {gachaRes && <GachaAnim result={gachaRes} onClose={()=>{setGachaRes(null); gachaBusyRef.current=false;}}/>}
-      {/* 🎉 レベルアップ演出(報酬: 回復カプセル) */}
+      {/* 🎉 レベルアップ演出（おめでとうのみ・回復アイテム報酬は廃止） */}
       {lvPop && (
         <div onClick={()=>setLvPop(null)} style={{position:"fixed",inset:0,background:"#0007",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,pointerEvents:"auto"}}>
           <div style={{background:"linear-gradient(135deg,#fff7e0,#ffe9a8)",border:"3px solid #E8B83E",borderRadius:22,padding:"22px 26px",textAlign:"center",boxShadow:"0 0 40px rgba(232,184,62,.8)",animation:"lvPopIn .5s cubic-bezier(.2,1.4,.4,1)"}}>
             <div style={{fontSize:13,fontWeight:900,color:"#9a7000",letterSpacing:2}}>✨ レベルアップ！ ✨</div>
             <div style={{fontWeight:900,fontSize:42,color:"#E8B83E",lineHeight:1.1,margin:"4px 0",textShadow:"0 2px 0 #fff"}}>Lv.{lvPop.to}</div>
             <div style={{fontSize:12,fontWeight:800,color:"#7c5a00"}}>称号：{monRank(lvPop.to)}</div>
-            <div style={{marginTop:10,background:"#fff",borderRadius:12,padding:"8px 12px",fontSize:12.5,fontWeight:800,color:TEXT}}>
-              🎁 ごほうび：🟢回復カプセル小 ×{lvPop.hs}{lvPop.hm>0?` ・ 🔵中 ×${lvPop.hm}`:""}
-            </div>
-            <div style={{fontSize:11,color:MUTED,marginTop:8,lineHeight:1.5}}>つみ重ねた努力が 力に！HP・こうげき・素早さ UP</div>
+            <div style={{fontSize:12,color:"#7c5a00",marginTop:10,lineHeight:1.6,fontWeight:800}}>つみ重ねた努力が タネモンの力に🌱<br/>その ちょうしで つづけよう！</div>
             <button onClick={()=>setLvPop(null)} style={{marginTop:12,background:"#E8B83E",border:"none",borderRadius:12,padding:"9px 22px",color:"#3a2a00",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>やったー！</button>
           </div>
           <style>{`@keyframes lvPopIn{0%{transform:scale(.3) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}`}</style>
