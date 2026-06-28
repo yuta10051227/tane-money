@@ -9048,15 +9048,15 @@ function InvestTab({child,data,update}){
           style={{background:"#ffffff20",border:`1px solid ${BORDER}`,borderRadius:8,padding:"3px 9px",color:MUTED,fontSize:11,cursor:"pointer",fontFamily:F}}>更新</button>
       </div>
 
-      {/* ポートフォリオ＝きみの畑。損益で「天気/季節」が変わる */}
+      {/* ポートフォリオ＝きみの「推しカンパニーの街」。損益で 街が栄える/さびれる（株価に連動） */}
       <div style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",borderRadius:20,padding:18,marginBottom:14,color:"#fff"}}>
-        {(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const has=myHoldings.length>0;const se=!has?{sky:"linear-gradient(180deg,#8a6a2a,#a8843a)",ic:"🌱",t:"たねを まこう",c:"#ffe9b0"}:gp>=10?{sky:"linear-gradient(180deg,#1a6b2e,#2e7d44)",ic:"☀",t:"豊作！晴れ",c:"#bff0c8"}:gp>=3?{sky:"linear-gradient(180deg,#3a7fb0,#4a9e7a)",ic:"🌸",t:"春・すくすく育ち中",c:"#d9f0e4"}:gp>=-3?{sky:"linear-gradient(180deg,#8a6a2a,#a8843a)",ic:"🍂",t:"秋・ようすを見よう",c:"#ffe9b0"}:gp>=-10?{sky:"linear-gradient(180deg,#4a5a72,#6b7280)",ic:"❄",t:"冬・たいせつに待とう",c:"#cdd9e6"}:{sky:"linear-gradient(180deg,#2d3748,#553c2a)",ic:"⛈",t:"嵐の日。でも畑は 枯れてないよ",c:"#e6d2c4"};return(
+        {(()=>{const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const has=myHoldings.length>0;const se=!has?{sky:"linear-gradient(180deg,#3a4a6a,#4a5a78)",ic:"🏗",t:"まちを つくろう（会社を おうえんしよう）",c:"#cdd9e6"}:gp>=10?{sky:"linear-gradient(180deg,#1a6b2e,#2e7d44)",ic:"🎆",t:"大にぎわい！街が さかえてる",c:"#bff0c8"}:gp>=3?{sky:"linear-gradient(180deg,#3a7fb0,#4a9e7a)",ic:"🏙",t:"にぎやか。お店が ふえてきた",c:"#d9f0e4"}:gp>=-3?{sky:"linear-gradient(180deg,#5a6a8a,#6b7a96)",ic:"🏘",t:"おだやか。ようすを 見よう",c:"#dfe6f0"}:gp>=-10?{sky:"linear-gradient(180deg,#4a5a72,#6b7280)",ic:"🌧",t:"すこし しずか。でも 街は 元気だよ",c:"#cdd9e6"}:{sky:"linear-gradient(180deg,#2d3748,#553c2a)",ic:"⛈",t:"嵐の日。でも 街は なくならないよ",c:"#e6d2c4"};return(
           <div style={{margin:"-18px -18px 12px",padding:"12px 16px 10px",background:se.sky,borderRadius:"20px 20px 0 0",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:26}}>{se.ic}</span>
-            <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:900,color:"#fff"}}>きょうの 畑の天気</div><div style={{fontSize:11,fontWeight:800,color:se.c}}>{se.t}{has?`（${gp>=0?"+":""}${gp.toFixed(1)}%）`:""}</div></div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:900,color:"#fff"}}>きみの 推しカンパニーの街</div><div style={{fontSize:11,fontWeight:800,color:se.c}}>{se.t}{has?`（${gp>=0?"+":""}${gp.toFixed(1)}%）`:""}</div></div>
             <button onClick={()=>setShowShare(true)} style={{background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"4px 10px",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>📸</button>
           </div>);})()}
-        <div style={{fontSize:11,color:"#aaa",fontWeight:700,marginBottom:2}}>🌾 きみの畑（ポートフォリオ）</div>
+        <div style={{fontSize:11,color:"#aaa",fontWeight:700,marginBottom:2}}>🏙 きみの街（おうえん中の会社・ポートフォリオ）</div>
         <div style={{fontSize:28,fontWeight:900,marginBottom:4}}>{portfolioVal.toLocaleString()}pt</div>
         <div style={{display:"flex",gap:16,marginBottom:myHoldings.length>0?12:0}}>
           <div><span style={{color:"#aaa",fontSize:11}}>投資額 </span><span style={{fontWeight:700,fontSize:13}}>{portfolioCost.toLocaleString()}pt</span></div>
@@ -9081,8 +9081,8 @@ function InvestTab({child,data,update}){
             <div style={{height:7,background:"rgba(255,255,255,.12)",borderRadius:4,overflow:"hidden"}}><div style={{width:`${lab.pct}%`,height:"100%",background:lab.c,borderRadius:4,transition:"width .4s"}}/></div>
           </div>);
         })()}
-        {/* 🌱 ポートフォリオが育つ畑(保有数・含み益で 土→芽→葉→花) */}
-        {(()=>{const cnt=myHoldings.length;const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const st=cnt===0?{e:"🟫",t:"タネをまこう（株を買ってみよう）"}:gp>=10?{e:"🌸",t:"含み益で 花が さいた！"}:cnt>=3?{e:"🌿",t:`${cnt}銘柄を そだて中！`}:{e:"🌱",t:`${cnt}銘柄を そだて中`};return(<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:myHoldings.length>0?12:0,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"7px 11px"}}><span style={{fontSize:24}}>{st.e}</span><span style={{fontSize:11.5,color:"#cfe9d6",fontWeight:700}}>{st.t}</span></div>);})()}
+        {/* 🏙 おうえん中の会社数・含み益で 街が育つ(更地→建物→にぎわい) */}
+        {(()=>{const cnt=myHoldings.length;const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;const st=cnt===0?{e:"🏗",t:"会社を おうえんして 街を つくろう"}:gp>=10?{e:"🌇",t:"含み益で 街が 大さかえ！"}:cnt>=3?{e:"🏙",t:`${cnt}社を おうえん中！街が にぎやか`}:{e:"🏢",t:`${cnt}社を おうえん中`};return(<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:myHoldings.length>0?12:0,background:"rgba(255,255,255,.05)",borderRadius:12,padding:"7px 11px"}}><span style={{fontSize:24}}>{st.e}</span><span style={{fontSize:11.5,color:"#cfe9d6",fontWeight:700}}>{st.t}</span></div>);})()}
         {myHoldings.length>0&&(()=>{
           const total=portfolioVal||1;
           const colors={"7974.T":"#e4002b","6758.T":"#003087","7203.T":"#eb0a1e","MCD":"#ffc72c","AAPL":"#999"};
@@ -9115,7 +9115,7 @@ function InvestTab({child,data,update}){
       )}
 
       {/* 銘柄一覧 */}
-      <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>🌾 畑にまける タネ（銘柄・毎日更新）</p>
+      <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>🏢 おうえんできる会社（銘柄・毎日更新）</p>
       {stocks.map(s=>{
         const h=myHoldings.find(x=>x.stockId===s.id);
         const isUp=(s.lastChange||0)>=0;
