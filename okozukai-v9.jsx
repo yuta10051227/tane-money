@@ -3642,19 +3642,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <div style={{position:"absolute",top:3,left:(!fs.investOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                   </button>
                 </div>
-                {/* 為替だけ OFF (株はOKだが値動きの激しい為替は隠す) */}
-                {!fs.investOff && (
-                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:13,color:TEXT}}>為替（かわせ）を見せる</div>
-                      <div style={{color:MUTED,fontSize:11,marginTop:2}}>為替は値動きが激しめ。株だけにしたいときはOFFに</div>
-                    </div>
-                    <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),forexOff:!(d.familySettings?.forexOff)}}))}
-                      style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.forexOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
-                      <div style={{position:"absolute",top:3,left:(!fs.forexOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
-                    </button>
-                  </div>
-                )}
+                {/* 為替は株に一本化したため、為替トグルは撤去 */}
                 {/* 1日の売買回数(張り付き・回転売買の防止) */}
                 {!fs.investOff && (
                   <div style={{marginTop:10}}>
@@ -4102,7 +4090,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const gameMode    = (data.familySettings?.gameMode) || "full";
   const showGacha   = gameMode !== "money";   // デイリーガチャ
   const showBattleF = false;    // モンスターバトルは撤去（別アプリ化のため docs/battle_system_spec.md に保存）。gameModeは他UIで使用
-  const showExpedF  = gameMode === "full";    // とっくんの旅
+  const showExpedF  = false;    // とっくんの旅は撤去（純化）。gameModeは他UIで使用
   const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
