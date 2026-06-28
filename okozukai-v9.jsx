@@ -1331,6 +1331,9 @@ function migrate(d) {
 const todayKey = () => { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 // 期間(startDate/endDate)はtype="date"のゼロ埋め"YYYY-MM-DD"。比較はこちらで揃える(todayKeyはゼロ埋め無しなので文字列比較が壊れる)
 const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+// ログのdateはUTCのISO文字列。startsWith(todayISO())だと端末ローカルの早朝(JSTの0〜9時など)はUTC日付が前日になり「今日」判定が崩れる。
+// 必ずローカル日付に変換してから「今日かどうか」を比較する。
+const isTodayLocal = (iso) => { if(!iso) return false; const d=new Date(iso); if(isNaN(d)) return String(iso).startsWith(todayISO()); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` === todayISO(); };
 // 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
 const _txLocks={};
 function txGuard(key, ms=800){ const now=Date.now(); if(_txLocks[key] && now-_txLocks[key]<ms) return false; _txLocks[key]=now; return true; }
@@ -4035,8 +4038,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayDone= data.gachaDate?.[child.id] === todayKey();
   const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
-  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayISO())).map(l=>l.rid));
-  const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayISO()));
+  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&isTodayLocal(l.date)).map(l=>l.rid));
+  const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
   // Apply interest on open
   useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
@@ -4076,7 +4079,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       update(d=>{
         const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
         const withLog={...d, logs:[e, ...d.logs]};
-        if(pts>0){ const doneToday=(d.logs||[]).filter(l=>l.rid===task.id&&(l.date||"").startsWith(todayISO())).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; return careCap(withLog,child.id,0.25,Math.max(1,pts*factor)); }
+        if(pts>0){ const doneToday=(d.logs||[]).filter(l=>l.rid===task.id&&isTodayLocal(l.date)).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; return careCap(withLog,child.id,0.25,Math.max(1,pts*factor)); }
         return withLog;
       });
     }
@@ -4113,7 +4116,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const theme = getMonthTheme();
     const bonusPts = 0;   // ストリークボーナスは廃止
     const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
-    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
+    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
     const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
@@ -4801,7 +4804,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
-            const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
+            const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
@@ -4957,7 +4960,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&(l.date||"").startsWith(todayISO())).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&isTodayLocal(l.date)).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
