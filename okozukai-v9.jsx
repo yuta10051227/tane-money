@@ -5100,7 +5100,18 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
       {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
       {effectiveTab==="money" && monTab==="hatake" && (isJunior||!young) && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
-      {effectiveTab==="money" && monTab==="kakeibo" && (
+      {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
+        // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
+        const _spend=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="reward"&&(l.pts||0)<0);
+        const _mSpend=_spend.filter(l=>(l.date||"").startsWith(kMonth));
+        const _total=_mSpend.reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _life=_spend.reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _inv=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="invest_buy"&&(l.date||"").startsWith(kMonth)).reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _by={}; _mSpend.forEach(l=>{const k=String(l.label||"そのほか").replace(/（.*$/,"").trim()||"そのほか"; _by[k]=(_by[k]||0)+Math.abs(l.pts||0);});
+        const _PAL=[G,GOLD,B,P,R,"#E8855C","#5BBF9E","#9B7BD4"];
+        const _items=Object.keys(_by).map((k,i)=>({id:k,label:k,v:_by[k],color:_PAL[i%_PAL.length]})).sort((a,b)=>b.v-a.v);
+        const _max=_items.length?_items[0].v:1;
+        return (
         <div>
           {/* month nav */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:CARD,borderBottom:`1px solid ${BORDER}`}}>
@@ -5108,88 +5119,51 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <span style={{fontWeight:800,fontSize:15}}>{(()=>{const d=new Date(kMonth+"-01");return `${d.getFullYear()}年${d.getMonth()+1}月`;})()}</span>
             <button onClick={()=>{const d=new Date(kMonth+"-01");d.setMonth(d.getMonth()+1);if(monthKey(d)<=monthKey())setKMonth(monthKey(d));}} disabled={kMonth>=monthKey()} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:kMonth>=monthKey()?BORDER:MUTED}}>›</button>
           </div>
+          <p style={{color:MUTED,fontSize:11,fontWeight:700,textAlign:"center",padding:"8px 16px 0"}}>🌱 ごほうび交換から じどうで まとめてるよ（記録の手間ゼロ）</p>
           {/* summary */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"12px 16px"}}>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 13px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>今月の支出</div><div style={{color:R,fontWeight:900,fontSize:20}}>{kTotal.toLocaleString()}pt</div></div>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 13px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>生涯の支出</div><div style={{color:TEXT,fontWeight:900,fontSize:20}}>{kLife.toLocaleString()}pt</div></div>
+          <div style={{display:"grid",gridTemplateColumns:_inv>0?"1fr 1fr 1fr":"1fr 1fr",gap:8,padding:"10px 16px 12px"}}>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>今月 つかった</div><div style={{color:R,fontWeight:900,fontSize:19}}>{_total.toLocaleString()}pt</div></div>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>これまで 合計</div><div style={{color:TEXT,fontWeight:900,fontSize:19}}>{_life.toLocaleString()}pt</div></div>
+            {_inv>0&&<div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>投資にまわした</div><div style={{color:GP,fontWeight:900,fontSize:19}}>{_inv.toLocaleString()}pt</div></div>}
           </div>
-          {/* controls */}
-          <div style={{display:"flex",gap:8,padding:"0 16px 12px",alignItems:"center"}}>
-            <div style={{display:"flex",flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:10,overflow:"hidden"}}>
-              {[["graph","📊 グラフ"],["list","📋 一覧"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setKTab(v)} style={{flex:1,padding:"8px 0",border:"none",background:kTab===v?TEXT:"transparent",color:kTab===v?"#fff":MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{l}</button>
-              ))}
-            </div>
-            <Btn c={R} label="＋ 記録" onClick={()=>setKAdd(s=>!s)}/>
-          </div>
-          {/* add form */}
-          {kAdd && (
-            <div style={{margin:"0 16px 14px",background:`${R}10`,border:`2px dashed ${R}`,borderRadius:16,padding:14}}>
-              <p style={{fontWeight:800,fontSize:13,color:R,margin:"0 0 10px"}}>💸 支出を記録</p>
-              <select value={kForm.catId} onChange={e=>setKForm(f=>({...f,catId:e.target.value}))} style={{...INP,marginBottom:8}}>
-                {(data.cats||[]).map(c=><option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
-              </select>
-              <input value={kForm.label} onChange={e=>setKForm(f=>({...f,label:e.target.value}))} placeholder="内容（例: マックのハンバーガー）" style={{...INP,marginBottom:8}}/>
-              <input value={kForm.amt} onChange={e=>setKForm(f=>({...f,amt:e.target.value}))} type="number" placeholder="金額（pt）" style={{...INP,marginBottom:10}}/>
-              <div style={{display:"flex",gap:8}}><Btn c={R} label="記録する" onClick={addExpense} disabled={!kForm.label||!kForm.amt}/><Btn c={MUTED} label="キャンセル" onClick={()=>setKAdd(false)}/></div>
-            </div>
-          )}
-          {/* graph */}
-          {kTab==="graph" && (
-            <div style={{padding:"0 16px"}}>
-              {kCatData.length===0
-                ? <p style={{color:MUTED,textAlign:"center",marginTop:32,fontSize:13}}>この月はまだ記録がないよ</p>
-                : <>
-                    <div style={{display:"flex",gap:14,alignItems:"center",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
-                      <Pie data={kCatData} size={130}/>
-                      <div style={{flex:1}}>
-                        {kCatData.map(c=>(
-                          <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
-                            <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
-                            <span style={{fontSize:11,fontWeight:700,flex:1}}>{c.emoji} {c.label}</span>
-                            <span style={{fontSize:11,color:c.color,fontWeight:800}}>{Math.round(c.v/kTotal*100)}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
-                      <p style={{fontWeight:800,fontSize:12,color:MUTED,margin:"0 0 10px"}}>カテゴリ別</p>
-                      {kCatData.map(c=>(
-                        <div key={c.id} style={{marginBottom:9}}>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:3}}><span>{c.emoji} {c.label}</span><span style={{color:c.color}}>{c.v.toLocaleString()}pt</span></div>
-                          <div style={{height:9,background:BORDER,borderRadius:5,overflow:"hidden"}}><div style={{height:"100%",width:`${c.v/kMax*100}%`,background:c.color,borderRadius:5,transition:"width .5s"}}/></div>
+          {/* 使い道 自動グラフ */}
+          <div style={{padding:"0 16px"}}>
+            {_items.length===0
+              ? <p style={{color:MUTED,textAlign:"center",marginTop:28,fontSize:13,lineHeight:1.7}}>この月は まだ つかってないよ🌱<br/><span style={{fontSize:11}}>ごほうびと こうかんすると、ここに 使い道が でるよ</span></p>
+              : <>
+                  <div style={{display:"flex",gap:14,alignItems:"center",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
+                    <Pie data={_items} size={130}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      {_items.map(c=>(
+                        <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                          <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
+                          <span style={{fontSize:11,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.label}</span>
+                          <span style={{fontSize:11,color:c.color,fontWeight:800,flexShrink:0}}>{Math.round(c.v/_total*100)}%</span>
                         </div>
                       ))}
                     </div>
-                    <div style={{background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:14,marginBottom:12}}>
-                      <p style={{margin:0,fontSize:13,fontWeight:700,lineHeight:1.6}}>
-                        💡 今月は <span style={{color:kCatData[0].color,fontWeight:900}}>「{kCatData[0].label}」</span> に一番使ったよ！（{kCatData[0].total||kCatData[0].v}pt）
-                        {kCatData[0].v/kTotal>0.5 && <><br/><span style={{color:R}}>⚠ 支出の半分以上が集中してるよ！</span></>}
-                      </p>
-                    </div>
-                  </>
-              }
-            </div>
-          )}
-          {/* list */}
-          {kTab==="list" && (
-            <div style={{padding:"0 16px"}}>
-              {[...kExps].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
-                const cat=(data.cats||[]).find(c=>c.id===e.catId)||INIT.cats[5];
-                return (
-                  <div key={e.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:34,height:34,borderRadius:9,background:`${cat.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{cat.emoji}</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</div><div style={{color:MUTED,fontSize:11}}>{cat.label} · {fmtDate(e.date)}</div></div>
-                    <span style={{fontWeight:900,fontSize:14,color:R,flexShrink:0}}>-{e.amt.toLocaleString()}pt</span>
-                    <button onClick={()=>delExpense(e.id)} style={{background:"none",border:"none",color:MUTED,fontSize:15,cursor:"pointer",flexShrink:0}}>✕</button>
                   </div>
-                );
-              })}
-              {kExps.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:32}}>記録がないよ</p>}
-            </div>
-          )}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
+                    <p style={{fontWeight:800,fontSize:12,color:MUTED,margin:"0 0 10px"}}>なにに つかった？</p>
+                    {_items.map(c=>(
+                      <div key={c.id} style={{marginBottom:9}}>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:3,gap:8}}><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.label}</span><span style={{color:c.color,flexShrink:0}}>{c.v.toLocaleString()}pt</span></div>
+                        <div style={{height:9,background:BORDER,borderRadius:5,overflow:"hidden"}}><div style={{height:"100%",width:`${c.v/_max*100}%`,background:c.color,borderRadius:5,transition:"width .5s"}}/></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:14,marginBottom:12}}>
+                    <p style={{margin:0,fontSize:13,fontWeight:700,lineHeight:1.6}}>
+                      💡 今月は <span style={{color:_items[0].color,fontWeight:900}}>「{_items[0].label}」</span> に いちばん つかったよ！（{_items[0].v.toLocaleString()}pt）
+                      {_items[0].v/_total>0.5 && <><br/><span style={{color:R}}>⚠ つかったお金の 半分いじょうが ここに あつまってるよ</span></>}
+                    </p>
+                  </div>
+                </>
+            }
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── GOALS ── */}
       {effectiveTab==="money" && monTab==="goals" && (
