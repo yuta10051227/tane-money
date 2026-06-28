@@ -1122,6 +1122,12 @@ const INIT = {
   weeklyReportSeen: {},
   stocks: [
     {id:"s1",emoji:"🎮",name:"任天堂",ticker:"7974.T",sector:"ゲーム",price:8000,history:[8000],currency:"JPY"},
+    // ── 架空の学習用銘柄（親が設定できる・リアル取得せずシミュレーションで動く。bias=日次ドリフト/vol=ゆれ幅/floor=下限）──
+    {id:"f1",emoji:"🌱",name:"タネのめ食品",fake:true,sector:"架空・学習用",price:1000,currency:"JPY",bias:0.004,vol:0.012,floor:300,history:[840,855,870,885,905,925,950,970,990,1000]},
+    {id:"f2",emoji:"🚀",name:"ロケットゲームズ",fake:true,sector:"架空・学習用",price:1500,currency:"JPY",bias:0.006,vol:0.05,floor:300,history:[900,1100,950,1300,1150,1500,1250,1600,1400,1500]},
+    {id:"f3",emoji:"🎈",name:"バブルソーダ",fake:true,sector:"架空・学習用",price:600,currency:"JPY",bias:-0.004,vol:0.045,floor:100,history:[400,520,640,780,900,820,720,640,610,600]},
+    {id:"f4",emoji:"⛅",name:"おてんき牧場",fake:true,sector:"架空・学習用",price:800,currency:"JPY",bias:0,vol:0.02,floor:200,history:[800,820,790,810,785,805,815,790,800,800]},
+    {id:"f5",emoji:"💎",name:"きらめき鉱山",fake:true,sector:"架空・学習用",price:2000,currency:"JPY",bias:0.002,vol:0.03,floor:500,history:[1850,1900,1870,1950,1980,1940,2010,1990,2030,2000]},
     {id:"s2",emoji:"🎵",name:"ソニー",ticker:"6758.T",sector:"エンタメ",price:2800,history:[2800],currency:"JPY"},
     {id:"s3",emoji:"🚗",name:"トヨタ",ticker:"7203.T",sector:"自動車",price:3000,history:[3000],currency:"JPY"},
     {id:"s4",emoji:"🍔",name:"マクドナルド",ticker:"MCD",sector:"食品",price:380,history:[380],currency:"USD"},
@@ -1281,6 +1287,8 @@ function migrate(d) {
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
   if(!d.stocks||d.stocks.length===0) d.stocks=INIT.stocks;
   if(d.stocks&&d.stocks[0]&&!d.stocks[0].ticker) d.stocks=INIT.stocks;
+  // 架空の学習用銘柄を既存ユーザーにも追加（増える/下がる感覚の教材）
+  if(d.stocks && !d.stocks.some(s=>s.fake)) d.stocks=[...d.stocks, ...INIT.stocks.filter(s=>s.fake)];
   // 銘柄拡充マイグレーション: 既存ユーザーのstocksにINITの新銘柄を追加し、株価取得を強制再実行(チャート用の30日履歴を入れる)
   if(d.stocks){ const have=new Set(d.stocks.map(s=>s.id)); const add=INIT.stocks.filter(s=>!have.has(s.id)); if(add.length){ d.stocks=[...d.stocks,...add]; d.stockLastUpdate=""; d.stockFetchStatus="idle"; } }
   if(!d.forex||Object.keys(d.forex).length===0) d.forex={
@@ -7048,6 +7056,15 @@ async function fetchRealStockPrices(data,update){
   // 並列ではなく少し間隔をあけて取得（レート制限対策）
   for(let i=0;i<stocks.length;i++){
     const s = stocks[i];
+    if(s.fake){
+      // 架空銘柄: リアル取得せず、1日1回シミュレーションで価格を動かす（増える/下がる感覚の教材）
+      const _h=(s.history&&s.history.length)?s.history.slice(-30):[s.price];
+      const _last=_h[_h.length-1]||s.price;
+      let _nv=_last*(1+(s.bias||0)+(Math.random()*2-1)*(s.vol||0.03));
+      if(s.floor&&_nv<s.floor) _nv=s.floor*(1+Math.random()*0.06);   // 下限で反発（0にしない）
+      _nv=Math.max(1,Math.round(_nv));
+      stockResults[s.id]={price:_nv,history:[..._h,_nv].slice(-30),changePct:((_nv-_last)/(_last||1))*100,currency:s.currency||"JPY",realData:false};
+    } else {
     if(i>0) await new Promise(res=>setTimeout(res,500)); // 500ms待機
     try{
       const json = await fetchWithProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${s.ticker}?interval=1d&range=30d`);
@@ -7068,6 +7085,7 @@ async function fetchRealStockPrices(data,update){
       // 取得失敗: 履歴が無い/短い銘柄(新銘柄など)はダミー30日履歴を作ってチャートを出せるように。既存銘柄は前回値を維持
       if(!s.history||s.history.length<2){ stockResults[s.id]={price:s.price,history:makeFallbackHistory(s.price),changePct:0,currency:s.currency,realData:false}; }
       else stockResults[s.id]=null;
+    }
     }
     // 取得できたものから随時update
     const currentResults = {...stockResults};
