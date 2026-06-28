@@ -4141,7 +4141,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const newCur = prev.last===yesterday ? prev.cur+1 : 1;
     update(d => ({
       ...d,
-      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
+      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）${useTicket?" 🎟チケット":""}`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id, ticket:useTicket }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
       // チケット使用時は当日記録(gachaDate/streak)を変えず、チケットを1枚消費
       ...(useTicket
         ? { battleTickets: {...(d.battleTickets||{}), [child.id]: Math.max(0,(d.battleTickets?.[child.id]||0)-1)} }
