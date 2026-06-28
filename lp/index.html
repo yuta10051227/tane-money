@@ -299,6 +299,84 @@ footer .logo{font-size:20px;font-weight:900;color:#fff;margin-bottom:8px}
   </div>
 </section>
 
+<!-- 08.5 ROI / 将来リターン -->
+<section style="background:linear-gradient(180deg,#eef7e8,#f7f5ef)">
+  <style>
+    .roi-frame{display:flex;gap:12px;max-width:680px;margin:18px auto 0;flex-wrap:wrap}
+    .roi-frame .f{flex:1;min-width:170px;background:var(--CARD);border:1px solid var(--BORDER);border-radius:16px;padding:14px 16px;text-align:left}
+    .roi-frame .f .t{font-size:12px;font-weight:900;color:var(--MUTED)}
+    .roi-frame .f .m{font-size:16px;font-weight:900;margin-top:5px;line-height:1.4}
+    .roi{max-width:680px;margin:20px auto 0;background:var(--CARD);border:1px solid var(--BORDER);border-radius:20px;box-shadow:var(--SHADOW);padding:22px 20px;text-align:left}
+    .roi .ctrl{margin:0 0 14px}
+    .roi .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-weight:900;font-size:14px;margin-bottom:6px}
+    .roi .ctrl label b{color:var(--GP);font-size:16px}
+    .roi input[type=range]{width:100%;accent-color:var(--GP);height:26px}
+    .roi .bars{display:flex;align-items:flex-end;gap:18px;height:130px;margin:18px 6px 6px;justify-content:center}
+    .roi .bar{width:64px;border-radius:9px 9px 0 0;position:relative;transition:height .5s cubic-bezier(.2,.7,.2,1)}
+    .roi .bar.p{background:var(--G)}
+    .roi .bar.c{background:var(--GOLD)}
+    .roi .bar span{position:absolute;top:-21px;left:-12px;right:-12px;text-align:center;font-size:11.5px;font-weight:900}
+    .roi .out{display:flex;gap:10px;margin-top:8px}
+    .roi .box{flex:1;border-radius:14px;padding:11px 10px;text-align:center}
+    .roi .box.p{background:var(--GS)}
+    .roi .box.c{background:var(--GOLDS)}
+    .roi .box .lab{font-size:11.5px;font-weight:800;color:var(--TEXTS)}
+    .roi .box .v{font-size:clamp(19px,4.6vw,25px);font-weight:900;line-height:1.25}
+    .roi .box.c .v{color:#8a6a00}
+    .roi .disc{font-size:11px;color:var(--MUTED);font-weight:700;margin-top:14px;line-height:1.65}
+  </style>
+  <div class="wrap">
+    <div class="eyebrow" data-reveal>投資対効果（ROI）</div>
+    <h2 data-reveal data-d="1" style="font-size:clamp(26px,6vw,42px)">いちばんの利益は、<br>お金じゃない。</h2>
+    <p class="lead" data-reveal data-d="2">月¥1,100ではじまり、続けるほど¥880へ。払うのは中学卒業までの数年だけ。<br>受け取るのは、一生効く「お金の考え方」と「毎月コツコツの習慣」。</p>
+    <div class="roi-frame" data-reveal data-d="2">
+      <div class="f"><div class="t">払うもの（有限）</div><div class="m">月¥1,100 → ¥880<br><span style="font-weight:800;color:var(--TEXTS);font-size:12px">続けるほどおトク。中学卒業で、おわり。</span></div></div>
+      <div class="f"><div class="t">受け取るもの（一生）</div><div class="m">時間を味方にする力<br><span style="font-weight:800;color:var(--TEXTS);font-size:12px">何十年も効く、判断のクセ。</span></div></div>
+    </div>
+    <div class="roi" data-reveal data-d="2">
+      <p style="font-weight:900;font-size:15px;margin-bottom:14px">ここで身につく「毎月コツコツ」を、<span style="color:var(--GP)">大人になっても続けたら？</span></p>
+      <div class="ctrl">
+        <label>毎月のつみたて <b id="roiAmt">¥5,000</b></label>
+        <input id="roiAmtR" type="range" min="1000" max="30000" step="1000" value="5000" aria-label="毎月のつみたて額">
+      </div>
+      <div class="ctrl">
+        <label>つづける年数 <b id="roiYr">30年</b></label>
+        <input id="roiYrR" type="range" min="10" max="40" step="1" value="30" aria-label="つづける年数">
+      </div>
+      <div class="bars" aria-hidden="true">
+        <div class="bar p" id="roiBarP" style="height:43%"><span id="roiPv">¥0</span></div>
+        <div class="bar c" id="roiBarC" style="height:100%"><span id="roiCv">¥0</span></div>
+      </div>
+      <div class="out">
+        <div class="box p"><div class="lab">つみたてた元本</div><div class="v" id="roiP">¥0</div></div>
+        <div class="box c"><div class="lab">複利だと（年5%想定）</div><div class="v" id="roiC">¥0</div></div>
+      </div>
+      <p class="disc">※ これは「時間と複利」を伝える<b>教育用シミュレーション</b>です。年5%は仮定で、<b>将来の利益を保証するものではありません</b>。タネマネー内のお金はすべてポイントで、実際の取引は行いません。</p>
+    </div>
+    <p class="lead" data-reveal data-d="3" style="margin-top:22px">儲け方ではなく、<b style="color:var(--GP)">時間と複利という“原理”</b>を、痛くない畑で。<br>それが、月¥1,100のいちばんのリターンです。</p>
+  </div>
+</section>
+<script>
+(function(){
+  var aR=document.getElementById('roiAmtR'),yR=document.getElementById('roiYrR');
+  if(!aR)return;
+  var yen=function(n){return '¥'+Math.round(n).toLocaleString('ja-JP');};
+  function calc(){
+    var a=+aR.value,y=+yR.value,r=0.05/12,n=y*12;
+    var principal=a*n, fv=a*((Math.pow(1+r,n)-1)/r);
+    document.getElementById('roiAmt').textContent=yen(a);
+    document.getElementById('roiYr').textContent=y+'年';
+    document.getElementById('roiP').textContent=yen(principal);
+    document.getElementById('roiC').textContent=yen(fv);
+    document.getElementById('roiPv').textContent=yen(principal);
+    document.getElementById('roiCv').textContent=yen(fv);
+    document.getElementById('roiBarP').style.height=Math.max(8,principal/fv*100)+'%';
+    document.getElementById('roiBarC').style.height='100%';
+  }
+  aR.addEventListener('input',calc); yR.addEventListener('input',calc); calc();
+})();
+</script>
+
 <!-- 09 PRICING -->
 <section>
   <div class="wrap">
