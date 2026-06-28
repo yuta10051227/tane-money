@@ -716,10 +716,37 @@ const MONSTER_TREE = {
           desc:"究極体・天使のシー。", edu:"コツコツ続けた先に、いちばん輝くすがたが待っている。" },
   cshi_ultB:   { id:"cshi_ultB",   name:"星界神シーゾーン", rarity:5, line:"cat", stage:5, evolveTo:null,
           desc:"究極体・星界の神シー。", edu:"目標をかなえ続けた者だけが届く伝説のすがた。" },
+  // ── ✨ひみつ系統「スラリル」(隠し・保護者がプレゼントで配布。表には出さない特別枠) ──
+  // 異世界転生スライム風: しずく→転生スライム→名付け→嵐竜の友→あおの魔人→竜魔王。直線進化(yami式)。
+  srimu_egg: { id:"srimu_egg", name:"ひかるしずく", rarity:5, line:"srimu", stage:0, evolveTo:"srimu1",
+          desc:"どこかから ころんと あらわれた、ふしぎに ひかる しずくの タマゴ。なかで なにかが ねむっている。",
+          edu:"小さな 一しずくも、たいせつに 育てれば 大きくなる。お金も 育成も、はじまりは いつも ちいさい。" },
+  srimu1:    { id:"srimu1", name:"スラっこ", rarity:5, line:"srimu", stage:1, evolveTo:"srimu2",
+          desc:"べつの せかいから 生まれかわった ちいさな スライム。よわいけど、だれより げんきで すなお。",
+          edu:"いちばん よわい スタートでも、まいにちの つみ重ねで だれでも 強くなれる。コツコツが 才能だよ。" },
+  srimu2:    { id:"srimu2", name:"うつしスライム", rarity:5, line:"srimu", stage:2, evolveTo:"srimu3",
+          desc:"見たものの かたちや わざを 「うつして」 おぼえる スライム。まねっこ 名人。",
+          edu:"上手な人の まねから 学ぶのが いちばんの 近道。お金の つかい方も、上手な人を まねしてみよう。" },
+  srimu3:    { id:"srimu3", name:"なまえスライム", rarity:5, line:"srimu", stage:3, evolveTo:"srimu4",
+          desc:"友だちに 「名前」を もらって ぐんと 成長した すがた。名前は こころの きずな。",
+          edu:"だいじに されると 力が わく。お金も「なんの ための お金か」名前(目的)を つけると 大切にできる。" },
+  srimu4:    { id:"srimu4", name:"あらし竜の友", rarity:5, line:"srimu", stage:4, evolveTo:"srimu5",
+          desc:"ちいさな 嵐の子竜と 仲よくなり、ツノと 風の翼を 手に入れた。竜の力が めばえはじめた。",
+          edu:"いい 仲間と つながると、ひとりでは できない 力が 出る。たすけ合いも 大きな『たから』。" },
+  srimu5:    { id:"srimu5", name:"あおの魔人", rarity:5, line:"srimu", stage:5, evolveTo:"srimu_u",
+          desc:"人の すがたも とれるようになった、あおく かがやく 魔人。やさしくて たよれる リーダー。",
+          edu:"強くなるほど、まわりを たすける 力にも なる。お金も 同じで、ふやした力で 人を しあわせにできる。" },
+  srimu_u:   { id:"srimu_u", name:"竜魔王スラリル", rarity:5, line:"srimu", stage:6, evolveTo:null,
+          desc:"竜と 魔の 力を あわせもつ やさしき 王・究極体。みんなの 国を まもる、せかいに ひとつの あいぼう。",
+          edu:"いちばん つよい 王は、ちからを みんなの ために つかう。育てる力・まもる力こそ 本物の つよさ。" },
 };
 
 // 6フレームアニメ素材を持つモンスター(IDLE/BOUNCE/WOBBLE等のコマをf0..f5で順送り)
 const MON_FRAMES6 = { egg:1, m01:1,m02:1,m03:1,m04:1,m05:1,m06:1,m07:1,m08:1,m09:1,m10:1 };
+
+// ✨ ひみつ系統「スラリル」: 進化系統(スラっこ以降)はまだ表に出さない＝卵だけ公開。
+//   進化アートが揃ったら true にすると、srimu_egg→srimu1→…→srimu_u の全進化が解禁される。
+const SLIME_EVOLVE_ENABLED = false;
 
 // ═══════════════════════════════════════════════════════
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
@@ -1304,6 +1331,9 @@ function migrate(d) {
 const todayKey = () => { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
 // 期間(startDate/endDate)はtype="date"のゼロ埋め"YYYY-MM-DD"。比較はこちらで揃える(todayKeyはゼロ埋め無しなので文字列比較が壊れる)
 const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+// ログのdateはUTCのISO文字列。startsWith(todayISO())だと端末ローカルの早朝(JSTの0〜9時など)はUTC日付が前日になり「今日」判定が崩れる。
+// 必ずローカル日付に変換してから「今日かどうか」を比較する。
+const isTodayLocal = (iso) => { if(!iso) return false; const d=new Date(iso); if(isNaN(d)) return String(iso).startsWith(todayISO()); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` === todayISO(); };
 // 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
 const _txLocks={};
 function txGuard(key, ms=800){ const now=Date.now(); if(_txLocks[key] && now-_txLocks[key]<ms) return false; _txLocks[key]=now; return true; }
@@ -2739,7 +2769,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts*1.5)));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts)));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -2751,7 +2781,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts*(nxt===1?1.5:nxt===2?0.6:0.2))));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts)));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -3165,6 +3195,34 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                         }} style={{flex:1,padding:"8px 0",background:`${R}15`,border:`1.5px solid ${R}`,borderRadius:10,color:R,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F}}>
                           −減算
                         </button>
+                      </div>
+                      {/* ✨ ひみつのプレゼント: スラリルのタマゴを贈る(表に出さない特別枠) */}
+                      {(()=>{
+                        const hasEgg=!!(data.slimeEgg?.[member.id]);
+                        const owned=((data.monsterDiscovered?.[member.id]||[]).some(x=>String(x).startsWith("srimu")))||((data.collectedMons?.[member.id]||[]).some(m=>String(m.id||"").startsWith("srimu")));
+                        return (
+                          <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
+                            <button disabled={hasEgg||owned}
+                              onClick={()=>{ if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ひかるしずく(ひみつのタマゴ)」をプレゼントする？\nそだてる画面に「育てはじめる」が出るよ。`)) return;
+                                update(d=>({...d,slimeEgg:{...(d.slimeEgg||{}),[member.id]:true}})); setGrantChild(null); }}
+                              style={{width:"100%",padding:"9px 0",borderRadius:10,border:"none",cursor:hasEgg||owned?"default":"pointer",fontFamily:F,fontWeight:800,fontSize:12,
+                                background:hasEgg||owned?"#eceae3":"linear-gradient(135deg,#6db8ff,#7b61c9)",color:hasEgg||owned?MUTED:"#fff"}}>
+                              {owned?"✨ もう持っているよ":hasEgg?"✨ タマゴをプレゼント済み":"✨ ひみつのタマゴをプレゼント"}
+                            </button>
+                          </div>
+                        );
+                      })()}
+                      {/* 🎟 ガチャチケットを1枚プレゼント(その日のガチャをもう1回引ける) */}
+                      <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
+                        <button
+                          onClick={()=>{ if(!txGuard("giftticket_"+member.id)) return;
+                            if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ガチャチケット」を1枚プレゼントする？\nその日のガチャを もう1回 引けるよ🎟`)) return;
+                            update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[member.id]:((d.battleTickets?.[member.id])||0)+1}}));
+                            setGrantChild(null); }}
+                          style={{width:"100%",padding:"9px 0",borderRadius:10,border:`1.5px solid ${GOLD}`,cursor:"pointer",fontFamily:F,fontWeight:800,fontSize:12,background:GOLDS,color:"#9a7000"}}>
+                          🎟 ガチャチケットを1枚プレゼント{(data.battleTickets?.[member.id])>0?`（所持${data.battleTickets[member.id]}枚）`:""}
+                        </button>
+                        <div style={{fontSize:10.5,color:MUTED,marginTop:5,lineHeight:1.5}}>その日のガチャを もう1回 引けるチケット。がんばったご褒美に🎁</div>
                       </div>
                     </div>
                   )}
@@ -3992,8 +4050,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayDone= data.gachaDate?.[child.id] === todayKey();
   const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
-  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&(l.date||"").startsWith(todayISO())).map(l=>l.rid));
-  const todayTaskDone = myLogs.some(l=>l.type==="good"&&(l.date||"").startsWith(todayISO()));
+  const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&isTodayLocal(l.date)).map(l=>l.rid));
+  const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
   // Apply interest on open
   useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
@@ -4029,11 +4087,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       }
     } else {
       showFlash(pts, task.emoji);
-      // ログ追加＋お手伝いEXP(初回pt×1.5・連打逓減・日次上限)を1回のupdateに統合(再描画を半減)
+      // ログ追加＋お手伝いEXP(毎回フラット・日次上限のみ)を1回のupdateに統合(再描画を半減)
       update(d=>{
         const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
         const withLog={...d, logs:[e, ...d.logs]};
-        if(pts>0){ const doneToday=(d.logs||[]).filter(l=>l.rid===task.id&&(l.date||"").startsWith(todayISO())).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; return careCap(withLog,child.id,0.25,Math.max(1,pts*factor)); }
+        if(pts>0){ return careCap(withLog,child.id,0.25,Math.max(1,pts)); }
         return withLog;
       });
     }
@@ -4070,7 +4128,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const theme = getMonthTheme();
     const bonusPts = 0;   // ストリークボーナスは廃止
     const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
-    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
+    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
     const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
     const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
@@ -4482,6 +4540,35 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         );
       })()}
 
+      {/* ✨ ひみつ：スラリルのタマゴ(親からのプレゼント)を持っているとき */}
+      {effectiveTab==="rpg" && data.slimeEgg?.[child.id] && (()=>{
+        const startSlime=()=>{ if(typeof window!=="undefined" && !window.confirm("ひかるしずく（ひみつのタマゴ）を 育てはじめる？\n今の あいぼうは 図鑑(うちのこ)へ 卒業して、しずくが 新しい あいぼうに なるよ。")) return;
+          update(d=>{ const curId=(d.monsterEvolved||{})[child.id]; const curDef=curId?MONSTER_TREE[curId]:null;
+            const coll=(curId && curDef)?[...((d.collectedMons||{})[child.id]||[]),{species:String(curId).split("_")[0],id:curId,name:curDef.name,rarity:curDef.rarity||1,date:new Date().toISOString()}]:((d.collectedMons||{})[child.id]||[]);
+            return {...d, collectedMons:{...(d.collectedMons||{}),[child.id]:coll},
+              monsterEvolved:{...(d.monsterEvolved||{}),[child.id]:"srimu_egg"},
+              monsterEvolvedAt:{...(d.monsterEvolvedAt||{}),[child.id]:null},
+              monsterStageAt:{...(d.monsterStageAt||{}),[child.id]:new Date().toISOString()},
+              monsterIV:{...(d.monsterIV||{}),[child.id]:{hp:8,atk:8,def:8,spd:8}},
+              monsterDiscovered:{...(d.monsterDiscovered||{}),[child.id]:[...new Set([...((d.monsterDiscovered||{})[child.id]||[]),"srimu_egg"])]},
+              slimeEgg:{...(d.slimeEgg||{}),[child.id]:false} }; });
+        };
+        return (
+          <div style={{padding:"0 16px 8px"}}>
+            <div style={{position:"relative",overflow:"hidden",background:"linear-gradient(135deg,#15324f,#243b66)",border:"1.5px solid #6db8ff",borderRadius:16,padding:"13px 15px",color:"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <img src="/assets/monster_srimu_egg_f0.png" alt="" style={{width:46,height:46,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:"💧",style:"font-size:34px"}));}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:900,fontSize:14}}>✨ ひみつの「ひかるしずく」を もらった！</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.78)",marginTop:2,lineHeight:1.5}}>育てると あいぼうに なるよ。お手伝い・なでなで・時間で 進化して、究極体「竜魔王スラリル」を めざそう！</div>
+                </div>
+              </div>
+              <button onClick={startSlime} style={{marginTop:10,width:"100%",background:"linear-gradient(135deg,#6db8ff,#7b61c9)",border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>💧 このタマゴを 育てる（今の あいぼうは 卒業）</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 🧭 とっくんの旅(旅先を選択・遠いほどEXP大・放置系) */}
       {effectiveTab==="rpg" && showExpedF && (()=>{
         const exp=data.expedition?.[child.id];
@@ -4729,7 +4816,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
-            const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(todayISO())).length;
+            const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
@@ -4885,7 +4972,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {filtGood.length>0&&<>
             <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&(l.date||"").startsWith(todayISO())).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&isTodayLocal(l.date)).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
@@ -7620,14 +7707,16 @@ function SeedMonster({ child, data, size=90, update }) {
   const curStage       = mon.stage;
   const isFinal        = mon.isFinal;
   const isEgg          = monsterId==="egg" || /_egg$/.test(String(monsterId));  // 卵は「しんか」でなく「うまれる」
-  const canEvolve      = mon.canEvolve && !!update;
+  // ✨ スラリル系統は「卵だけ公開」中。進化解禁フラグがOFFの間は孵化・転生・やり直しを止め、卵のまま保つ。
+  const slimeLocked    = !SLIME_EVOLVE_ENABLED && /^srimu/.test(String(monsterId));
+  const canEvolve      = mon.canEvolve && !!update && !slimeLocked;
   // 隠しモンスターの「すがた(スキン)」を装備していれば表示を上書き(進化は裏で継続)
   const skinId         = (data.monsterSkin||{})[child.id] || null;
   const skinDef        = skinId ? HIDDEN_MONSTERS.find(h=>h.id===skinId) : null;
   const skinActive     = !!(skinDef && hiddenUnlocked(skinDef,data,child,totalTasksDone) && child.displayMode !== "junior");
   const dispId         = skinActive ? skinId : monsterId;
   // 前向き多コマアニメ: m系=6コマ, 猫=4コマ(ぴょこぴょこ)。それ以外は従来の横向き2コマ
-  const isCat          = /^(cpurin|cku|cshi)_/.test(String(dispId));
+  const isCat          = /^(cpurin|cku|cshi|srimu)/.test(String(dispId));
   const frontFrames    = MON_FRAMES6[dispId] ? 6 : isCat ? 4 : 0;
   const multiFront     = frontFrames > 0;   // 前向き多コマ(歩行はするが左右反転しない)
   // タマゴの進化中は「ハッチ演出」: 自身のコマ(バウンド→光る→ヒビ)を高速再生
@@ -7681,7 +7770,7 @@ function SeedMonster({ child, data, size=90, update }) {
 
   // 転生（究極体の4日後に可能）
   const reincCount     = (data.reincarnationCount||{})[child.id] || 0;
-  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update;
+  const canReincarnate = mon.canReincarnate && evolved && !evolving && !!update && !slimeLocked;
 
   const happyScore = Math.min(10,
     (curStreak>=7?3:curStreak>=3?2:curStreak>=1?1:0) +
@@ -7970,7 +8059,7 @@ function SeedMonster({ child, data, size=90, update }) {
         <div style={{marginTop:8,fontSize:11,fontWeight:800,color:"#fde68a",animation:"evoFlash 0.35s ease-in-out infinite"}}>しんかちゅう…✨</div>
       )}
       {/* タマゴからやり直す(別の進化を試せる) */}
-      {evolved && !evolving && update && (
+      {evolved && !evolving && update && !slimeLocked && (
         <button onClick={()=>{ if(typeof window!=="undefined" && window.confirm("タマゴからやり直す？\nずかんはそのまま。ちがう進化を試せるよ！")) doRehatch(); }}
           style={{display:"block",margin:"7px auto 0",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:999,padding:"4px 12px",color:"rgba(255,255,255,0.78)",fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
           🥚 タマゴからやり直す
