@@ -1334,6 +1334,16 @@ const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String
 // ログのdateはUTCのISO文字列。startsWith(todayISO())だと端末ローカルの早朝(JSTの0〜9時など)はUTC日付が前日になり「今日」判定が崩れる。
 // 必ずローカル日付に変換してから「今日かどうか」を比較する。
 const isTodayLocal = (iso) => { if(!iso) return false; const d=new Date(iso); if(isNaN(d)) return String(iso).startsWith(todayISO()); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` === todayISO(); };
+// 触覚フィードバック(マイクロインタラクション)。対応端末(主にAndroid)は振動、iOS Safari等は安全にno-op。
+// reduced-motion時は鳴らさない。種類: tap/success/strong/warn。
+function taneHaptic(kind){
+  try{
+    if(typeof navigator==="undefined" || typeof navigator.vibrate!=="function") return;
+    if(typeof window!=="undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const P={ tap:10, success:[14,40,24], strong:[20,55,30,55,45], warn:30 };
+    navigator.vibrate(P[kind]||10);
+  }catch(e){}
+}
 // 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
 const _txLocks={};
 function txGuard(key, ms=800){ const now=Date.now(); if(_txLocks[key] && now-_txLocks[key]<ms) return false; _txLocks[key]=now; return true; }
@@ -2718,7 +2728,7 @@ function DailyTasks({ child, data, update }) {
   const heroImg  = (_bgUnlocked && _bgTheme.img) ? _bgTheme.img : null;
   const heroStars = _bgUnlocked && _bgTheme.stars;
 
-  const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
+  const showFlash = (pts, emoji) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
     setJustDone(p=>({...p,[id]:true}));
     setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550);
@@ -4087,6 +4097,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
 
   const showFlash = (pts, emoji) => {
+    taneHaptic(pts>=0?"success":"warn");
     setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1200);
   };
 
@@ -4164,6 +4175,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
     const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks, simpleAnim:!!(data.familySettings?.gachaSimple)};
     setGachaRes(finalRes);
+    taneHaptic(res.rate<=3?"strong":"success");
     if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
