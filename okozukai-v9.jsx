@@ -6070,7 +6070,7 @@ function InvestLearnTab({child, data, update, onRanking}){
         📊 これは実際のお金を使わない投資シミュレーションです。価格は上下し、増えることも減ることもあります。
       </div>
       <div style={{display:"flex",gap:6,marginBottom:14}}>
-        {[["stocks","株式"],["forex","為替"]].map(([k,l])=>(
+        {[["stocks","株式"]].map(([k,l])=>(
           <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,background:sub===k?GP:"transparent",color:sub===k?"#fff":MUTED,fontWeight:sub===k?700:400,fontSize:12,cursor:"pointer",fontFamily:F}}>{l}</button>
         ))}
       </div>
@@ -6237,7 +6237,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
             </div>
             {/* サブタブ */}
             <div style={{display:"flex",gap:6,marginBottom:12}}>
-              {[["total","総合"],["stocks","株式"],["forex","為替"]].map(([k,l])=>(
+              {[["total","総合"],["stocks","株式"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setOpTab(k)} style={{flex:1,padding:"6px 0",border:"none",borderRadius:8,background:opTab===k?"#3478D4":"transparent",color:opTab===k?"#fff":MUTED,fontWeight:opTab===k?700:400,fontSize:11,cursor:"pointer",fontFamily:F}}>{l}</button>
               ))}
             </div>
@@ -9496,21 +9496,8 @@ function InvestTab({child,data,update}){
         {tradeLimitReached?"🌙 きょうの 売り買いは ここまで！また あした":`🌱 きょうの 売り買い のこり ${Math.max(0,tradeLimit-tradesToday)}回（保護者せってい）`}
       </div>
     )}
-    {/* タブ切替：株 / 為替（為替は保護者設定でOFFにできる） */}
-    {!forexOff && (
-    <div style={{display:"flex",gap:0,background:"#1a1a2e",borderRadius:14,overflow:"hidden",marginBottom:14}}>
-      {[["stocks","📈 株"],["forex","💱 為替"]].map(([v,l])=>(
-        <button key={v} onClick={()=>setInvestTab(v)}
-          style={{flex:1,padding:"10px 0",border:"none",background:investTab===v?"#4a9eff":"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>
-          {l}
-        </button>
-      ))}
-    </div>
-    )}
-
-    {!forexOff&&investTab==="forex"&&<ForexSection data={data} update={update} child={child}/>}
-
-    {(forexOff||investTab==="stocks")&&<>
+    {/* 為替は株に一本化（撤去）。投資は株のみ。 */}
+    {<>
       {/* ステータスバー */}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         <div style={{flex:1,fontSize:11,color:fetchStatus==="ok"?"#4ade80":fetchStatus==="error"?"#f87171":MUTED,fontWeight:700}}>
