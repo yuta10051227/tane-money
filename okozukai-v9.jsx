@@ -2769,7 +2769,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts*1.5)));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts)));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -2781,7 +2781,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts*(nxt===1?1.5:nxt===2?0.6:0.2))));
+    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts)));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -4075,11 +4075,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       }
     } else {
       showFlash(pts, task.emoji);
-      // ログ追加＋お手伝いEXP(初回pt×1.5・連打逓減・日次上限)を1回のupdateに統合(再描画を半減)
+      // ログ追加＋お手伝いEXP(毎回フラット・日次上限のみ)を1回のupdateに統合(再描画を半減)
       update(d=>{
         const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
         const withLog={...d, logs:[e, ...d.logs]};
-        if(pts>0){ const doneToday=(d.logs||[]).filter(l=>l.rid===task.id&&isTodayLocal(l.date)).length; const factor=doneToday===0?1.5:doneToday===1?0.6:0.2; return careCap(withLog,child.id,0.25,Math.max(1,pts*factor)); }
+        if(pts>0){ return careCap(withLog,child.id,0.25,Math.max(1,pts)); }
         return withLog;
       });
     }
