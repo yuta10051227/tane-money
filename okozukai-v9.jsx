@@ -1334,6 +1334,56 @@ const todayISO = () => { const d=new Date(); return `${d.getFullYear()}-${String
 // ログのdateはUTCのISO文字列。startsWith(todayISO())だと端末ローカルの早朝(JSTの0〜9時など)はUTC日付が前日になり「今日」判定が崩れる。
 // 必ずローカル日付に変換してから「今日かどうか」を比較する。
 const isTodayLocal = (iso) => { if(!iso) return false; const d=new Date(iso); if(isNaN(d)) return String(iso).startsWith(todayISO()); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` === todayISO(); };
+// 触覚フィードバック(マイクロインタラクション)。対応端末(主にAndroid)は振動、iOS Safari等は安全にno-op。
+// reduced-motion時は鳴らさない。種類: tap/success/strong/warn。
+function taneHaptic(kind){
+  try{
+    if(typeof navigator==="undefined" || typeof navigator.vibrate!=="function") return;
+    if(typeof window!=="undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const P={ tap:10, success:[14,40,24], strong:[20,55,30,55,45], warn:30 };
+    navigator.vibrate(P[kind]||10);
+  }catch(e){}
+}
+// タネモンの励まし一言(compassionate)。結果より「続けたこと・自分のペース」を肯定する＝Finch流のやさしさ。
+const _TANE_CHEERS=[
+  "えらい！つづけるの、さいこう🌱","ナイス！コツコツが ちからに なるよ","やったね！きみの ペースで いいんだよ",
+  "グッジョブ！タネモンも よろこんでる🌿","いい かんじ！すこしずつで だいじょうぶ","おつかれさま！がんばったね",
+  "まいにちの 一歩が、大きな めに なるよ","うれしい！きみが つづけてくれて","その ちょうし！むりせず いこうね",
+  "ありがとう！タネモンが げんきに なったよ"
+];
+function taneCheer(){ return _TANE_CHEERS[Math.floor(Math.random()*_TANE_CHEERS.length)]; }
+// 押し心地(マイクロインタラクション): 全ボタンに「スプリングの押下」＋「タップ・リップル」を一括付与。
+// リップルは画面直付け(position:fixed)なので、ボタンのoverflowや外側バッジ(達成!等)を壊さない。
+// reduced-motion では押下アニメ・リップルとも無効。1回だけ自己インストール。
+(function installTapFeel(){
+  if(typeof document==="undefined" || document.__taneTapFeel) return;
+  try{
+    document.__taneTapFeel = true;
+    const st=document.createElement("style");
+    st.textContent =
+      "@media (prefers-reduced-motion: no-preference){"+
+      " button{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s ease; -webkit-tap-highlight-color: transparent; }"+
+      " button:not(:disabled):active{ transform: scale(.95); }"+
+      "}"+
+      "@keyframes taneRipple{ from{ transform:translate(-50%,-50%) scale(.2); opacity:.5 } to{ transform:translate(-50%,-50%) scale(1); opacity:0 } }"+
+      ".tane-ripple{ position:fixed; z-index:99999; pointer-events:none; width:120px; height:120px; border-radius:50%;"+
+      " background:radial-gradient(circle, rgba(255,255,255,.7) 0%, rgba(232,184,62,.38) 45%, rgba(232,184,62,0) 70%);"+
+      " animation:taneRipple .5s ease-out forwards; }";
+    (document.head||document.documentElement).appendChild(st);
+    const reduce=()=> !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    document.addEventListener("pointerdown", function(e){
+      try{
+        const btn = e.target && e.target.closest && e.target.closest("button");
+        if(!btn || btn.disabled || reduce()) return;
+        const r=document.createElement("span");
+        r.className="tane-ripple";
+        r.style.left=e.clientX+"px"; r.style.top=e.clientY+"px";
+        document.body.appendChild(r);
+        setTimeout(function(){ if(r&&r.parentNode) r.parentNode.removeChild(r); }, 520);
+      }catch(_e){}
+    }, {passive:true});
+  }catch(e){}
+})();
 // 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
 const _txLocks={};
 function txGuard(key, ms=800){ const now=Date.now(); if(_txLocks[key] && now-_txLocks[key]<ms) return false; _txLocks[key]=now; return true; }
@@ -2718,7 +2768,7 @@ function DailyTasks({ child, data, update }) {
   const heroImg  = (_bgUnlocked && _bgTheme.img) ? _bgTheme.img : null;
   const heroStars = _bgUnlocked && _bgTheme.stars;
 
-  const showFlash = (pts, emoji) => { setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
+  const showFlash = (pts, emoji) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
     setJustDone(p=>({...p,[id]:true}));
     setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550);
@@ -2794,7 +2844,7 @@ function DailyTasks({ child, data, update }) {
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
             <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ なかまがよろこんだ！</div>
+            <div style={{fontSize:11.5,fontWeight:800,color:"rgba(255,255,255,0.95)",maxWidth:210,lineHeight:1.45,margin:"0 auto"}}>{flash.cheer||"✨ なかまがよろこんだ！"}</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
@@ -3592,19 +3642,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <div style={{position:"absolute",top:3,left:(!fs.investOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                   </button>
                 </div>
-                {/* 為替だけ OFF (株はOKだが値動きの激しい為替は隠す) */}
-                {!fs.investOff && (
-                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:800,fontSize:13,color:TEXT}}>為替（かわせ）を見せる</div>
-                      <div style={{color:MUTED,fontSize:11,marginTop:2}}>為替は値動きが激しめ。株だけにしたいときはOFFに</div>
-                    </div>
-                    <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),forexOff:!(d.familySettings?.forexOff)}}))}
-                      style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.forexOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
-                      <div style={{position:"absolute",top:3,left:(!fs.forexOff)?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
-                    </button>
-                  </div>
-                )}
+                {/* 為替は株に一本化したため、為替トグルは撤去 */}
                 {/* 1日の売買回数(張り付き・回転売買の防止) */}
                 {!fs.investOff && (
                   <div style={{marginTop:10}}>
@@ -3794,11 +3832,16 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             const trialDaysLeft=trialStart?Math.max(0,14-Math.floor((Date.now()-trialStart)/DAY)):null;
             const inTrial=trialDaysLeft!==null&&trialDaysLeft>0&&!sub.active;
             const PLANS=[
-              {id:"single",e:"🌱",name:"1人プラン",price:"¥980",unit:"/月",sub:"お子さま1人",rec:nKids===1},
-              {id:"sibling",e:"👧👦",name:"きょうだいプラン",price:"¥1,460",unit:"/月",sub:"1人目¥980＋2人目以降 各¥480",rec:nKids===2},
-              {id:"family",e:"👨‍👩‍👧‍👦",name:"家族プラン",price:"¥1,480",unit:"/月",sub:"最大4人・3人目以降ずっと無料",rec:nKids>=3},
-              {id:"annual",e:"🎁",name:"年額プラン",price:"¥9,800",unit:"/年",sub:"2ヶ月分おトク（実質月¥817）",rec:false},
+              {id:"single",e:"🌱",name:"月額プラン",price:"¥1,100",unit:"/月",sub:"お子さま1人・続けるほどおトク",rec:nKids===1},
+              {id:"annual",e:"📅",name:"年額プラン",price:"¥10,560",unit:"/年",sub:"実質 月¥880・2ヶ月分以上おトク",rec:nKids===1},
+              {id:"family",e:"👨‍👩‍👧‍👦",name:"ファミリー年額",price:"¥21,120",unit:"/年",sub:"最大4人・4人なら1人1日 約14円",rec:nKids>=2},
             ];
+            // 継続割(ロイヤリティ): 利用月数で月額が段階的に下がる。下限¥880。解約でリセット。
+            const LOYAL=[{from:0,p:1100},{from:6,p:1000},{from:12,p:940},{from:24,p:880}];
+            const subSince=sub.since?new Date(sub.since).getTime():(trialStart||null);
+            const loyMonths=subSince?Math.max(0,Math.floor((Date.now()-subSince)/(DAY*30.44))):0;
+            let loyCur=LOYAL[0],loyNext=null;
+            for(let i=0;i<LOYAL.length;i++){ if(loyMonths>=LOYAL[i].from){ loyCur=LOYAL[i]; loyNext=LOYAL[i+1]||null; } }
             const setPlan=(id)=>update(d=>({...d,subscription:{...(d.subscription||{}),plan:id}}));
             const startTrial=()=>update(d=>(d.subscription?.trialStart?d:{...d,subscription:{...(d.subscription||{}),trialStart:new Date().toISOString()}}));
             return(<div>
@@ -3817,6 +3860,31 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{fontSize:11,color:MUTED,marginBottom:12}}>クレジットカード登録不要・自動課金なし。お子さまが続くか見てから決められます。</div>
                   <button onClick={startTrial} style={{background:GP,border:"none",borderRadius:12,padding:"11px 28px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>14日間の無料体験を始める</button>
                 </>)}
+              </div>
+              {/* 継続割（ロイヤリティ）: 続けるほど安くなる＝解約すると定価に戻る（損失回避を可視化） */}
+              <div style={{background:`linear-gradient(135deg,${GOLDS},#fff)`,border:`2px solid ${GOLD}`,borderRadius:16,padding:"14px 16px",marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                  <span style={{fontSize:12,fontWeight:900,color:"#7a5a00"}}>🌱 継続割（つづけるほどおトク）</span>
+                  <span style={{fontSize:11,color:MUTED,fontWeight:800}}>継続 {loyMonths}ヶ月</span>
+                </div>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:11,color:MUTED,fontWeight:700}}>いまの月額</span>
+                  <span style={{fontSize:24,fontWeight:900,color:GP}}>¥{loyCur.p.toLocaleString()}</span>
+                  {loyCur.p<1100&&<span style={{fontSize:11,color:GP,fontWeight:800}}>定価より¥{(1100-loyCur.p).toLocaleString()}オフ</span>}
+                </div>
+                <div style={{display:"flex",gap:4,marginBottom:9}}>
+                  {LOYAL.map((t,i)=>{const on=loyMonths>=t.from;return(
+                    <div key={i} style={{flex:1,textAlign:"center"}}>
+                      <div style={{height:6,borderRadius:3,background:on?GOLD:BORDER,marginBottom:3}}/>
+                      <div style={{fontSize:9.5,fontWeight:800,color:on?"#7a5a00":MUTED}}>¥{t.p.toLocaleString()}</div>
+                      <div style={{fontSize:8.5,color:MUTED}}>{t.from===0?"開始":`${t.from}ヶ月`}</div>
+                    </div>
+                  );})}
+                </div>
+                <div style={{fontSize:11,fontWeight:800,color:"#7a5a00"}}>
+                  {loyNext?`あと ${loyNext.from-loyMonths}ヶ月 つづけると ¥${loyNext.p.toLocaleString()} に。`:"最安¥880に到達！ありがとうございます。"}
+                </div>
+                <div style={{fontSize:10,color:R,fontWeight:800,marginTop:5}}>※ 解約すると継続はリセットされ、再開は定価¥1,100からになります。</div>
               </div>
               {/* おすすめバッジ付きプラン一覧 */}
               <div style={{fontSize:11,fontWeight:800,color:TEXTS,margin:"0 0 8px"}}>お子さま{nKids}人のご家庭におすすめのプラン</div>
@@ -4021,8 +4089,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // 保護者のゲーム強度設定(familySettings.gameMode): full=全部 / light=ガチャ育成はOKだがバトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
   const gameMode    = (data.familySettings?.gameMode) || "full";
   const showGacha   = gameMode !== "money";   // デイリーガチャ
-  const showBattleF = gameMode === "full";    // モンスターバトル・ボス
-  const showExpedF  = gameMode === "full";    // とっくんの旅
+  const showBattleF = false;    // モンスターバトルは撤去（別アプリ化のため docs/battle_system_spec.md に保存）。gameModeは他UIで使用
+  const showExpedF  = false;    // とっくんの旅は撤去（純化）。gameModeは他UIで使用
   const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
@@ -4057,7 +4125,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
 
   const showFlash = (pts, emoji) => {
-    setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1200);
+    taneHaptic(pts>=0?"success":"warn");
+    setFlash({pts,emoji,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1200);
   };
 
   const addLog = (entry) => {
@@ -4134,6 +4203,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
     const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks, simpleAnim:!!(data.familySettings?.gachaSimple)};
     setGachaRes(finalRes);
+    taneHaptic(res.rate<=3?"strong":"success");
     if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
@@ -4141,7 +4211,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const newCur = prev.last===yesterday ? prev.cur+1 : 1;
     update(d => ({
       ...d,
-      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
+      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）${useTicket?" 🎟チケット":""}`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id, ticket:useTicket }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
       // チケット使用時は当日記録(gachaDate/streak)を変えず、チケットを1枚消費
       ...(useTicket
         ? { battleTickets: {...(d.battleTickets||{}), [child.id]: Math.max(0,(d.battleTickets?.[child.id]||0)-1)} }
@@ -4506,8 +4576,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{textAlign:"center",marginBottom:6}}>
             <SeedMonster child={child} data={data} size={120} update={update}/>
           </div>
-          {showBattleF && <button onClick={()=>setShowBattle(true)} style={{width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"14px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>}
-          {!showBattleF && <div style={{textAlign:"center",fontSize:12,color:darkBG?"rgba(255,255,255,0.5)":MUTED,padding:"8px"}}>バトルは保護者設定でオフになっています</div>}
+          {/* モンスターバトルは撤去（別アプリ化のため docs/battle_system_spec.md に仕様保存） */}
         </div>
       )}
 
@@ -4658,6 +4727,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             ? <div style={{fontSize:12,fontWeight:700,marginTop:4}}>おうちの人に確認するね</div>
             : <Pt v={flash.pts} sz={22}/>
           }
+          {flash.cheer&&<div style={{fontSize:11.5,fontWeight:800,color:"rgba(255,255,255,0.95)",maxWidth:210,lineHeight:1.45,margin:"4px auto 0"}}>{flash.cheer}</div>}
         </div>
       )}
 
@@ -5017,7 +5087,18 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
       {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
       {effectiveTab==="money" && monTab==="hatake" && (isJunior||!young) && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
-      {effectiveTab==="money" && monTab==="kakeibo" && (
+      {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
+        // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
+        const _spend=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="reward"&&(l.pts||0)<0);
+        const _mSpend=_spend.filter(l=>(l.date||"").startsWith(kMonth));
+        const _total=_mSpend.reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _life=_spend.reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _inv=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="invest_buy"&&(l.date||"").startsWith(kMonth)).reduce((s,l)=>s+Math.abs(l.pts||0),0);
+        const _by={}; _mSpend.forEach(l=>{const k=String(l.label||"そのほか").replace(/（.*$/,"").trim()||"そのほか"; _by[k]=(_by[k]||0)+Math.abs(l.pts||0);});
+        const _PAL=[G,GOLD,B,P,R,"#E8855C","#5BBF9E","#9B7BD4"];
+        const _items=Object.keys(_by).map((k,i)=>({id:k,label:k,v:_by[k],color:_PAL[i%_PAL.length]})).sort((a,b)=>b.v-a.v);
+        const _max=_items.length?_items[0].v:1;
+        return (
         <div>
           {/* month nav */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:CARD,borderBottom:`1px solid ${BORDER}`}}>
@@ -5025,88 +5106,51 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <span style={{fontWeight:800,fontSize:15}}>{(()=>{const d=new Date(kMonth+"-01");return `${d.getFullYear()}年${d.getMonth()+1}月`;})()}</span>
             <button onClick={()=>{const d=new Date(kMonth+"-01");d.setMonth(d.getMonth()+1);if(monthKey(d)<=monthKey())setKMonth(monthKey(d));}} disabled={kMonth>=monthKey()} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:kMonth>=monthKey()?BORDER:MUTED}}>›</button>
           </div>
+          <p style={{color:MUTED,fontSize:11,fontWeight:700,textAlign:"center",padding:"8px 16px 0"}}>🌱 ごほうび交換から じどうで まとめてるよ（記録の手間ゼロ）</p>
           {/* summary */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,padding:"12px 16px"}}>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 13px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>今月の支出</div><div style={{color:R,fontWeight:900,fontSize:20}}>{kTotal.toLocaleString()}pt</div></div>
-            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 13px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>生涯の支出</div><div style={{color:TEXT,fontWeight:900,fontSize:20}}>{kLife.toLocaleString()}pt</div></div>
+          <div style={{display:"grid",gridTemplateColumns:_inv>0?"1fr 1fr 1fr":"1fr 1fr",gap:8,padding:"10px 16px 12px"}}>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>今月 つかった</div><div style={{color:R,fontWeight:900,fontSize:19}}>{_total.toLocaleString()}pt</div></div>
+            <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>これまで 合計</div><div style={{color:TEXT,fontWeight:900,fontSize:19}}>{_life.toLocaleString()}pt</div></div>
+            {_inv>0&&<div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 12px"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>投資にまわした</div><div style={{color:GP,fontWeight:900,fontSize:19}}>{_inv.toLocaleString()}pt</div></div>}
           </div>
-          {/* controls */}
-          <div style={{display:"flex",gap:8,padding:"0 16px 12px",alignItems:"center"}}>
-            <div style={{display:"flex",flex:1,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:10,overflow:"hidden"}}>
-              {[["graph","📊 グラフ"],["list","📋 一覧"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setKTab(v)} style={{flex:1,padding:"8px 0",border:"none",background:kTab===v?TEXT:"transparent",color:kTab===v?"#fff":MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{l}</button>
-              ))}
-            </div>
-            <Btn c={R} label="＋ 記録" onClick={()=>setKAdd(s=>!s)}/>
-          </div>
-          {/* add form */}
-          {kAdd && (
-            <div style={{margin:"0 16px 14px",background:`${R}10`,border:`2px dashed ${R}`,borderRadius:16,padding:14}}>
-              <p style={{fontWeight:800,fontSize:13,color:R,margin:"0 0 10px"}}>💸 支出を記録</p>
-              <select value={kForm.catId} onChange={e=>setKForm(f=>({...f,catId:e.target.value}))} style={{...INP,marginBottom:8}}>
-                {(data.cats||[]).map(c=><option key={c.id} value={c.id}>{c.emoji} {c.label}</option>)}
-              </select>
-              <input value={kForm.label} onChange={e=>setKForm(f=>({...f,label:e.target.value}))} placeholder="内容（例: マックのハンバーガー）" style={{...INP,marginBottom:8}}/>
-              <input value={kForm.amt} onChange={e=>setKForm(f=>({...f,amt:e.target.value}))} type="number" placeholder="金額（pt）" style={{...INP,marginBottom:10}}/>
-              <div style={{display:"flex",gap:8}}><Btn c={R} label="記録する" onClick={addExpense} disabled={!kForm.label||!kForm.amt}/><Btn c={MUTED} label="キャンセル" onClick={()=>setKAdd(false)}/></div>
-            </div>
-          )}
-          {/* graph */}
-          {kTab==="graph" && (
-            <div style={{padding:"0 16px"}}>
-              {kCatData.length===0
-                ? <p style={{color:MUTED,textAlign:"center",marginTop:32,fontSize:13}}>この月はまだ記録がないよ</p>
-                : <>
-                    <div style={{display:"flex",gap:14,alignItems:"center",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
-                      <Pie data={kCatData} size={130}/>
-                      <div style={{flex:1}}>
-                        {kCatData.map(c=>(
-                          <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
-                            <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
-                            <span style={{fontSize:11,fontWeight:700,flex:1}}>{c.emoji} {c.label}</span>
-                            <span style={{fontSize:11,color:c.color,fontWeight:800}}>{Math.round(c.v/kTotal*100)}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
-                      <p style={{fontWeight:800,fontSize:12,color:MUTED,margin:"0 0 10px"}}>カテゴリ別</p>
-                      {kCatData.map(c=>(
-                        <div key={c.id} style={{marginBottom:9}}>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:3}}><span>{c.emoji} {c.label}</span><span style={{color:c.color}}>{c.v.toLocaleString()}pt</span></div>
-                          <div style={{height:9,background:BORDER,borderRadius:5,overflow:"hidden"}}><div style={{height:"100%",width:`${c.v/kMax*100}%`,background:c.color,borderRadius:5,transition:"width .5s"}}/></div>
+          {/* 使い道 自動グラフ */}
+          <div style={{padding:"0 16px"}}>
+            {_items.length===0
+              ? <p style={{color:MUTED,textAlign:"center",marginTop:28,fontSize:13,lineHeight:1.7}}>この月は まだ つかってないよ🌱<br/><span style={{fontSize:11}}>ごほうびと こうかんすると、ここに 使い道が でるよ</span></p>
+              : <>
+                  <div style={{display:"flex",gap:14,alignItems:"center",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
+                    <Pie data={_items} size={130}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      {_items.map(c=>(
+                        <div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
+                          <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
+                          <span style={{fontSize:11,fontWeight:700,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.label}</span>
+                          <span style={{fontSize:11,color:c.color,fontWeight:800,flexShrink:0}}>{Math.round(c.v/_total*100)}%</span>
                         </div>
                       ))}
                     </div>
-                    <div style={{background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:14,marginBottom:12}}>
-                      <p style={{margin:0,fontSize:13,fontWeight:700,lineHeight:1.6}}>
-                        💡 今月は <span style={{color:kCatData[0].color,fontWeight:900}}>「{kCatData[0].label}」</span> に一番使ったよ！（{kCatData[0].total||kCatData[0].v}pt）
-                        {kCatData[0].v/kTotal>0.5 && <><br/><span style={{color:R}}>⚠ 支出の半分以上が集中してるよ！</span></>}
-                      </p>
-                    </div>
-                  </>
-              }
-            </div>
-          )}
-          {/* list */}
-          {kTab==="list" && (
-            <div style={{padding:"0 16px"}}>
-              {[...kExps].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
-                const cat=(data.cats||[]).find(c=>c.id===e.catId)||INIT.cats[5];
-                return (
-                  <div key={e.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:34,height:34,borderRadius:9,background:`${cat.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{cat.emoji}</div>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</div><div style={{color:MUTED,fontSize:11}}>{cat.label} · {fmtDate(e.date)}</div></div>
-                    <span style={{fontWeight:900,fontSize:14,color:R,flexShrink:0}}>-{e.amt.toLocaleString()}pt</span>
-                    <button onClick={()=>delExpense(e.id)} style={{background:"none",border:"none",color:MUTED,fontSize:15,cursor:"pointer",flexShrink:0}}>✕</button>
                   </div>
-                );
-              })}
-              {kExps.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:32}}>記録がないよ</p>}
-            </div>
-          )}
+                  <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:12}}>
+                    <p style={{fontWeight:800,fontSize:12,color:MUTED,margin:"0 0 10px"}}>なにに つかった？</p>
+                    {_items.map(c=>(
+                      <div key={c.id} style={{marginBottom:9}}>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,marginBottom:3,gap:8}}><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.label}</span><span style={{color:c.color,flexShrink:0}}>{c.v.toLocaleString()}pt</span></div>
+                        <div style={{height:9,background:BORDER,borderRadius:5,overflow:"hidden"}}><div style={{height:"100%",width:`${c.v/_max*100}%`,background:c.color,borderRadius:5,transition:"width .5s"}}/></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:14,marginBottom:12}}>
+                    <p style={{margin:0,fontSize:13,fontWeight:700,lineHeight:1.6}}>
+                      💡 今月は <span style={{color:_items[0].color,fontWeight:900}}>「{_items[0].label}」</span> に いちばん つかったよ！（{_items[0].v.toLocaleString()}pt）
+                      {_items[0].v/_total>0.5 && <><br/><span style={{color:R}}>⚠ つかったお金の 半分いじょうが ここに あつまってるよ</span></>}
+                    </p>
+                  </div>
+                </>
+            }
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── GOALS ── */}
       {effectiveTab==="money" && monTab==="goals" && (
@@ -6013,7 +6057,7 @@ function InvestLearnTab({child, data, update, onRanking}){
         📊 これは実際のお金を使わない投資シミュレーションです。価格は上下し、増えることも減ることもあります。
       </div>
       <div style={{display:"flex",gap:6,marginBottom:14}}>
-        {[["stocks","株式"],["forex","為替"]].map(([k,l])=>(
+        {[["stocks","株式"]].map(([k,l])=>(
           <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,background:sub===k?GP:"transparent",color:sub===k?"#fff":MUTED,fontWeight:sub===k?700:400,fontSize:12,cursor:"pointer",fontFamily:F}}>{l}</button>
         ))}
       </div>
@@ -6180,7 +6224,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
             </div>
             {/* サブタブ */}
             <div style={{display:"flex",gap:6,marginBottom:12}}>
-              {[["total","総合"],["stocks","株式"],["forex","為替"]].map(([k,l])=>(
+              {[["total","総合"],["stocks","株式"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setOpTab(k)} style={{flex:1,padding:"6px 0",border:"none",borderRadius:8,background:opTab===k?"#3478D4":"transparent",color:opTab===k?"#fff":MUTED,fontWeight:opTab===k?700:400,fontSize:11,cursor:"pointer",fontFamily:F}}>{l}</button>
               ))}
             </div>
@@ -9439,21 +9483,8 @@ function InvestTab({child,data,update}){
         {tradeLimitReached?"🌙 きょうの 売り買いは ここまで！また あした":`🌱 きょうの 売り買い のこり ${Math.max(0,tradeLimit-tradesToday)}回（保護者せってい）`}
       </div>
     )}
-    {/* タブ切替：株 / 為替（為替は保護者設定でOFFにできる） */}
-    {!forexOff && (
-    <div style={{display:"flex",gap:0,background:"#1a1a2e",borderRadius:14,overflow:"hidden",marginBottom:14}}>
-      {[["stocks","📈 株"],["forex","💱 為替"]].map(([v,l])=>(
-        <button key={v} onClick={()=>setInvestTab(v)}
-          style={{flex:1,padding:"10px 0",border:"none",background:investTab===v?"#4a9eff":"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>
-          {l}
-        </button>
-      ))}
-    </div>
-    )}
-
-    {!forexOff&&investTab==="forex"&&<ForexSection data={data} update={update} child={child}/>}
-
-    {(forexOff||investTab==="stocks")&&<>
+    {/* 為替は株に一本化（撤去）。投資は株のみ。 */}
+    {<>
       {/* ステータスバー */}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
         <div style={{flex:1,fontSize:11,color:fetchStatus==="ok"?"#4ade80":fetchStatus==="error"?"#f87171":MUTED,fontWeight:700}}>
