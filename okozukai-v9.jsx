@@ -3794,11 +3794,16 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             const trialDaysLeft=trialStart?Math.max(0,14-Math.floor((Date.now()-trialStart)/DAY)):null;
             const inTrial=trialDaysLeft!==null&&trialDaysLeft>0&&!sub.active;
             const PLANS=[
-              {id:"single",e:"🌱",name:"1人プラン",price:"¥980",unit:"/月",sub:"お子さま1人",rec:nKids===1},
-              {id:"sibling",e:"👧👦",name:"きょうだいプラン",price:"¥1,460",unit:"/月",sub:"1人目¥980＋2人目以降 各¥480",rec:nKids===2},
-              {id:"family",e:"👨‍👩‍👧‍👦",name:"家族プラン",price:"¥1,480",unit:"/月",sub:"最大4人・3人目以降ずっと無料",rec:nKids>=3},
-              {id:"annual",e:"🎁",name:"年額プラン",price:"¥9,800",unit:"/年",sub:"2ヶ月分おトク（実質月¥817）",rec:false},
+              {id:"single",e:"🌱",name:"月額プラン",price:"¥1,100",unit:"/月",sub:"お子さま1人・続けるほどおトク",rec:nKids===1},
+              {id:"annual",e:"📅",name:"年額プラン",price:"¥10,560",unit:"/年",sub:"実質 月¥880・2ヶ月分以上おトク",rec:nKids===1},
+              {id:"family",e:"👨‍👩‍👧‍👦",name:"ファミリー年額",price:"¥21,120",unit:"/年",sub:"最大4人・4人なら1人1日 約14円",rec:nKids>=2},
             ];
+            // 継続割(ロイヤリティ): 利用月数で月額が段階的に下がる。下限¥880。解約でリセット。
+            const LOYAL=[{from:0,p:1100},{from:6,p:1000},{from:12,p:940},{from:24,p:880}];
+            const subSince=sub.since?new Date(sub.since).getTime():(trialStart||null);
+            const loyMonths=subSince?Math.max(0,Math.floor((Date.now()-subSince)/(DAY*30.44))):0;
+            let loyCur=LOYAL[0],loyNext=null;
+            for(let i=0;i<LOYAL.length;i++){ if(loyMonths>=LOYAL[i].from){ loyCur=LOYAL[i]; loyNext=LOYAL[i+1]||null; } }
             const setPlan=(id)=>update(d=>({...d,subscription:{...(d.subscription||{}),plan:id}}));
             const startTrial=()=>update(d=>(d.subscription?.trialStart?d:{...d,subscription:{...(d.subscription||{}),trialStart:new Date().toISOString()}}));
             return(<div>
@@ -3817,6 +3822,31 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{fontSize:11,color:MUTED,marginBottom:12}}>クレジットカード登録不要・自動課金なし。お子さまが続くか見てから決められます。</div>
                   <button onClick={startTrial} style={{background:GP,border:"none",borderRadius:12,padding:"11px 28px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>14日間の無料体験を始める</button>
                 </>)}
+              </div>
+              {/* 継続割（ロイヤリティ）: 続けるほど安くなる＝解約すると定価に戻る（損失回避を可視化） */}
+              <div style={{background:`linear-gradient(135deg,${GOLDS},#fff)`,border:`2px solid ${GOLD}`,borderRadius:16,padding:"14px 16px",marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                  <span style={{fontSize:12,fontWeight:900,color:"#7a5a00"}}>🌱 継続割（つづけるほどおトク）</span>
+                  <span style={{fontSize:11,color:MUTED,fontWeight:800}}>継続 {loyMonths}ヶ月</span>
+                </div>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:11,color:MUTED,fontWeight:700}}>いまの月額</span>
+                  <span style={{fontSize:24,fontWeight:900,color:GP}}>¥{loyCur.p.toLocaleString()}</span>
+                  {loyCur.p<1100&&<span style={{fontSize:11,color:GP,fontWeight:800}}>定価より¥{(1100-loyCur.p).toLocaleString()}オフ</span>}
+                </div>
+                <div style={{display:"flex",gap:4,marginBottom:9}}>
+                  {LOYAL.map((t,i)=>{const on=loyMonths>=t.from;return(
+                    <div key={i} style={{flex:1,textAlign:"center"}}>
+                      <div style={{height:6,borderRadius:3,background:on?GOLD:BORDER,marginBottom:3}}/>
+                      <div style={{fontSize:9.5,fontWeight:800,color:on?"#7a5a00":MUTED}}>¥{t.p.toLocaleString()}</div>
+                      <div style={{fontSize:8.5,color:MUTED}}>{t.from===0?"開始":`${t.from}ヶ月`}</div>
+                    </div>
+                  );})}
+                </div>
+                <div style={{fontSize:11,fontWeight:800,color:"#7a5a00"}}>
+                  {loyNext?`あと ${loyNext.from-loyMonths}ヶ月 つづけると ¥${loyNext.p.toLocaleString()} に。`:"最安¥880に到達！ありがとうございます。"}
+                </div>
+                <div style={{fontSize:10,color:R,fontWeight:800,marginTop:5}}>※ 解約すると継続はリセットされ、再開は定価¥1,100からになります。</div>
               </div>
               {/* おすすめバッジ付きプラン一覧 */}
               <div style={{fontSize:11,fontWeight:800,color:TEXTS,margin:"0 0 8px"}}>お子さま{nKids}人のご家庭におすすめのプラン</div>
