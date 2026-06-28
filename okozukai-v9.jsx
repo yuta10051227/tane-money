@@ -4633,8 +4633,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
           {(isJunior
-            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🌱 はたけ"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📒 家計簿"],...(!data.familySettings?.investOff&&!young?[["hatake","🌱 はたけ"]]:[])]
+            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🏢 推しカンパニー"]]:[])]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["hatake","🏢 推しカンパニー"]]:[])]
           ).map(([k,l])=>(
             <button key={k} onClick={()=>setMonTab(k)}
               style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
@@ -9017,6 +9017,10 @@ function InvestTab({child,data,update}){
                   </div>
                   <span style={{fontSize:9.5,fontWeight:900,whiteSpace:"nowrap",borderRadius:999,padding:"2px 7px",...(ripe?{background:GOLD,color:"#fff"}:held?{background:"rgba(255,255,255,.9)",color:GP}:{background:"rgba(255,255,255,.78)",color:"#7a6a3a"})}}>
                     {ripe?"🌟しゅうかく":held?`あと${nextIn}日`:"＋まく"}
+                  </span>
+                  {/* 株価との連動を一目で（元気=上がった/ひと休み=下がった）＝推しカンパニーの正直な値動き */}
+                  <span style={{fontSize:9,fontWeight:900,whiteSpace:"nowrap",marginTop:1,color:(s.lastChange||0)>0.3?GP:(s.lastChange||0)<-0.3?R:MUTED}}>
+                    {(s.lastChange||0)>0.3?"😊":(s.lastChange||0)<-0.3?"😴":"😐"}{(s.lastChange||0)>=0?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%
                   </span>
                 </button>
               );
