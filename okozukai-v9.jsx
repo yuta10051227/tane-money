@@ -3909,10 +3909,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const medals=["🥇","🥈","🥉"];
             return(
               <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>今月ランキング</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>今月のがんばり</span>
                 <button onClick={()=>{setTab("more");setMoreOpen("ranking");}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5,padding:0}}>
-                  <span style={{fontSize:16}}>{medals[rIdx]||"🏅"}</span>
-                  <span style={{fontSize:14,fontWeight:900,color:rIdx===0?"#fde68a":rIdx===1?"#e2e8f0":rIdx===2?"#fed7aa":"rgba(255,255,255,0.8)"}}>{rIdx+1}位</span>
+                  <span style={{fontSize:16}}>🌱</span>
+                  <span style={{fontSize:13,fontWeight:900,color:"#bff0c8"}}>がんばってる</span>
                   <span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>›</span>
                 </button>
               </div>
@@ -5098,14 +5098,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{padding:16}}>
             <div style={{background:CARD,borderRadius:16,padding:"16px",border:`1px solid ${BORDER}`,boxShadow:"0 4px 16px rgba(24,35,29,0.06)"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-                <Ico name="trophy" fb="🏆" size={16}/>
-                <span style={{fontSize:12,fontWeight:700,color:TEXT}}>今月の活動ランキング</span>
+                <span style={{fontSize:16}}>🌱</span>
+                <span style={{fontSize:12,fontWeight:700,color:TEXT}}>今月、みんな がんばってる</span>
               </div>
-              <div style={{fontSize:11,color:MUTED,marginBottom:12}}>残高・投資損益は含みません。今月の活動ptで比較</div>
+              <div style={{fontSize:11,color:MUTED,marginBottom:12}}>くらべっこじゃないよ。おたがいの がんばりを おうえんしよう🌿</div>
               {rank.length===0&&<p style={{color:MUTED,textAlign:"center",padding:"16px 0"}}>参加メンバーがいません</p>}
               {rank.map((r,i)=>(
                 <div key={r.member.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<rank.length-1?`1px solid ${BORDER}`:"none"}}>
-                  <div style={{width:26,height:26,borderRadius:8,background:i===0?GOLDS:i===1?CARDS:BG,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,flexShrink:0}}>{MEDAL[i]||r.rank}</div>
+                  <div style={{width:26,height:26,borderRadius:8,background:GS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>🌱</div>
                   <ChildAvatar child={r.member} size={32}/>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:13,color:TEXT}}>{r.member.name}</div>
@@ -5117,6 +5117,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   </div>
                 </div>
               ))}
+              {rank.length>0&&<div style={{fontSize:11.5,color:GP,fontWeight:800,textAlign:"center",marginTop:12,lineHeight:1.6}}>🌿 つづけてることが、いちばんの たからもの。<br/>きょうも おたがいを おうえんしよう！</div>}
             </div>
             {onFamily&&(
               <button onClick={onFamily} style={{width:"100%",marginTop:12,padding:"11px",background:GP,border:"none",borderRadius:12,color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
