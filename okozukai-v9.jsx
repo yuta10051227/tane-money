@@ -1344,6 +1344,14 @@ function taneHaptic(kind){
     navigator.vibrate(P[kind]||10);
   }catch(e){}
 }
+// タネモンの励まし一言(compassionate)。結果より「続けたこと・自分のペース」を肯定する＝Finch流のやさしさ。
+const _TANE_CHEERS=[
+  "えらい！つづけるの、さいこう🌱","ナイス！コツコツが ちからに なるよ","やったね！きみの ペースで いいんだよ",
+  "グッジョブ！タネモンも よろこんでる🌿","いい かんじ！すこしずつで だいじょうぶ","おつかれさま！がんばったね",
+  "まいにちの 一歩が、大きな めに なるよ","うれしい！きみが つづけてくれて","その ちょうし！むりせず いこうね",
+  "ありがとう！タネモンが げんきに なったよ"
+];
+function taneCheer(){ return _TANE_CHEERS[Math.floor(Math.random()*_TANE_CHEERS.length)]; }
 // 押し心地(マイクロインタラクション): 全ボタンに「スプリングの押下」＋「タップ・リップル」を一括付与。
 // リップルは画面直付け(position:fixed)なので、ボタンのoverflowや外側バッジ(達成!等)を壊さない。
 // reduced-motion では押下アニメ・リップルとも無効。1回だけ自己インストール。
@@ -2760,7 +2768,7 @@ function DailyTasks({ child, data, update }) {
   const heroImg  = (_bgUnlocked && _bgTheme.img) ? _bgTheme.img : null;
   const heroStars = _bgUnlocked && _bgTheme.stars;
 
-  const showFlash = (pts, emoji) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1100); };
+  const showFlash = (pts, emoji) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
     setJustDone(p=>({...p,[id]:true}));
     setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550);
@@ -2836,7 +2844,7 @@ function DailyTasks({ child, data, update }) {
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
             <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.9)"}}>✨ なかまがよろこんだ！</div>
+            <div style={{fontSize:11.5,fontWeight:800,color:"rgba(255,255,255,0.95)",maxWidth:210,lineHeight:1.45,margin:"0 auto"}}>{flash.cheer||"✨ なかまがよろこんだ！"}</div>
           </>}
           {combo>=3&&<div style={{fontSize:13,fontWeight:900,color:"#fde68a",marginTop:4}}>🔥 {combo}コンボ！</div>}
         </div>
@@ -4130,7 +4138,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const showFlash = (pts, emoji) => {
     taneHaptic(pts>=0?"success":"warn");
-    setFlash({pts,emoji}); setTimeout(()=>setFlash(null),1200);
+    setFlash({pts,emoji,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1200);
   };
 
   const addLog = (entry) => {
@@ -4732,6 +4740,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             ? <div style={{fontSize:12,fontWeight:700,marginTop:4}}>おうちの人に確認するね</div>
             : <Pt v={flash.pts} sz={22}/>
           }
+          {flash.cheer&&<div style={{fontSize:11.5,fontWeight:800,color:"rgba(255,255,255,0.95)",maxWidth:210,lineHeight:1.45,margin:"4px auto 0"}}>{flash.cheer}</div>}
         </div>
       )}
 
