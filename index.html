@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="3fb0347">
+<meta name="tane-version" content="0304025">
 </head>
 <body>
   <div id="root"></div>
@@ -211,7 +211,10 @@ const todayISO=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getM
 // 必ずローカル日付に変換してから「今日かどうか」を比較する。
 const isTodayLocal=iso=>{if(!iso)return false;const d=new Date(iso);if(isNaN(d))return String(iso).startsWith(todayISO());return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`===todayISO();};// 触覚フィードバック(マイクロインタラクション)。対応端末(主にAndroid)は振動、iOS Safari等は安全にno-op。
 // reduced-motion時は鳴らさない。種類: tap/success/strong/warn。
-function taneHaptic(kind){try{if(typeof navigator==="undefined"||typeof navigator.vibrate!=="function")return;if(typeof window!=="undefined"&&window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;const P={tap:10,success:[14,40,24],strong:[20,55,30,55,45],warn:30};navigator.vibrate(P[kind]||10);}catch(e){}}// 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
+function taneHaptic(kind){try{if(typeof navigator==="undefined"||typeof navigator.vibrate!=="function")return;if(typeof window!=="undefined"&&window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;const P={tap:10,success:[14,40,24],strong:[20,55,30,55,45],warn:30};navigator.vibrate(P[kind]||10);}catch(e){}}// 押し心地(マイクロインタラクション): 全ボタンに「スプリングの押下」＋「タップ・リップル」を一括付与。
+// リップルは画面直付け(position:fixed)なので、ボタンのoverflowや外側バッジ(達成!等)を壊さない。
+// reduced-motion では押下アニメ・リップルとも無効。1回だけ自己インストール。
+(function installTapFeel(){if(typeof document==="undefined"||document.__taneTapFeel)return;try{document.__taneTapFeel=true;const st=document.createElement("style");st.textContent="@media (prefers-reduced-motion: no-preference){"+" button{ transition: transform .12s cubic-bezier(.34,1.56,.64,1), box-shadow .12s ease; -webkit-tap-highlight-color: transparent; }"+" button:not(:disabled):active{ transform: scale(.95); }"+"}"+"@keyframes taneRipple{ from{ transform:translate(-50%,-50%) scale(.2); opacity:.5 } to{ transform:translate(-50%,-50%) scale(1); opacity:0 } }"+".tane-ripple{ position:fixed; z-index:99999; pointer-events:none; width:120px; height:120px; border-radius:50%;"+" background:radial-gradient(circle, rgba(255,255,255,.7) 0%, rgba(232,184,62,.38) 45%, rgba(232,184,62,0) 70%);"+" animation:taneRipple .5s ease-out forwards; }";(document.head||document.documentElement).appendChild(st);const reduce=()=>!!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);document.addEventListener("pointerdown",function(e){try{const btn=e.target&&e.target.closest&&e.target.closest("button");if(!btn||btn.disabled||reduce())return;const r=document.createElement("span");r.className="tane-ripple";r.style.left=e.clientX+"px";r.style.top=e.clientY+"px";document.body.appendChild(r);setTimeout(function(){if(r&&r.parentNode)r.parentNode.removeChild(r);},520);}catch(_e){}},{passive:true});}catch(e){}})();// 連打/二重実行ガード(モジュール共通)。同じkeyはms以内の2回目を弾く＝お金系操作の二重実行を防止
 const _txLocks={};function txGuard(key,ms=800){const now=Date.now();if(_txLocks[key]&&now-_txLocks[key]<ms)return false;_txLocks[key]=now;return true;}// ── 運用損益計算ヘルパー ──────────────────────────────
 // 手数料込みの実質損益率を計算
 const calcReturnRate=(totalCost,currentNetValue)=>{if(!totalCost||totalCost<=0)return null;return(currentNetValue-totalCost)/totalCost*100;};// メンバーの運用成績を計算（株・為替・総合）
