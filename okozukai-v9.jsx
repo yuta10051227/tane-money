@@ -4101,7 +4101,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // 保護者のゲーム強度設定(familySettings.gameMode): full=全部 / light=ガチャ育成はOKだがバトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
   const gameMode    = (data.familySettings?.gameMode) || "full";
   const showGacha   = gameMode !== "money";   // デイリーガチャ
-  const showBattleF = gameMode === "full";    // モンスターバトル・ボス
+  const showBattleF = false;    // モンスターバトルは撤去（別アプリ化のため docs/battle_system_spec.md に保存）。gameModeは他UIで使用
   const showExpedF  = gameMode === "full";    // とっくんの旅
   const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
@@ -4588,8 +4588,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{textAlign:"center",marginBottom:6}}>
             <SeedMonster child={child} data={data} size={120} update={update}/>
           </div>
-          {showBattleF && <button onClick={()=>setShowBattle(true)} style={{width:"100%",background:"linear-gradient(135deg,#7b61c9,#5a3fb0)",border:"none",borderRadius:16,padding:"14px",color:"#fff",fontWeight:900,fontSize:16,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:8,boxShadow:"0 4px 16px rgba(123,97,201,.4)"}}>⚔ モンスターバトル</button>}
-          {!showBattleF && <div style={{textAlign:"center",fontSize:12,color:darkBG?"rgba(255,255,255,0.5)":MUTED,padding:"8px"}}>バトルは保護者設定でオフになっています</div>}
+          {/* モンスターバトルは撤去（別アプリ化のため docs/battle_system_spec.md に仕様保存） */}
         </div>
       )}
 
