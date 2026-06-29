@@ -8594,6 +8594,8 @@ function ForexSection({data, update, child}){
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
 const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
+// 🏙 推しカンパニーの街：会社→建物アート。配列は成長段階[ふつう, 栄えた(含み益)]。未配置は絵文字ビルにフォールバック
+const CITY_ART = { s1:["bld_game","bld_game_big"] };
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
 const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu", "⚡":"navi_chale", "🌧":"navi_amefuri" };
 // 🏡 模様替えデコ(あつ森型・自己表現)。lv=はたけレベルで解放。現状は絵文字プレースホルダ
@@ -8939,8 +8941,7 @@ function InvestTab({child,data,update}){
       const has=myHoldings.length>0;
       const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
       const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
-      // 🏙 推しカンパニーの街シーン：保有・損益で「場面まるごと」切替（未描画の段階は town_empty に自動フォールバック）
-      const townScene=!has?"town_empty":gp>=10?"town_full":"town_small";
+      // 🏙 推しカンパニーの街：更地(town_empty)の上に「おうえん中の会社」の建物が建つ
       const townLabel=!has?"🏗 まちを つくろう":gp>=10?"🎆 街が 大さかえ！":gp>=0?"🏙 にぎやかな 街":"🌧 しずかだけど 街は元気";
       const NEXT=[3,10,30];
       const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
@@ -8956,10 +8957,26 @@ function InvestTab({child,data,update}){
               <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:B,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:B}}/><FIcon name="water" size={14}/>{waterReserve}</div></>}
           <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:GOLD}}/><FIcon name="coin" size={14}/>{myBal.toLocaleString()}</div>
         </div>
-        {/* 🏙 推しカンパニーの街（場面まるごと差し替え・損益連動）。アート未配置でも onError で消える */}
+        {/* 🏙 推しカンパニーの街：更地の上に おうえん中の会社の建物が建つ（タップで取引・下がると さびれる） */}
         <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD,background:"linear-gradient(180deg,#dbeede,#eaf7ec)"}}>
-          <img src={`/assets/${townScene}.png`} alt="推しカンパニーの街" style={{display:"block",width:"100%",height:"auto",imageRendering:"pixelated"}}
-            onError={e=>{ if(!e.target.dataset.fb){ e.target.dataset.fb="1"; e.target.src="/assets/town_empty.png"; } else { const w=e.target.closest("div"); if(w) w.style.display="none"; } }}/>
+          <img src="/assets/town_empty.png" alt="推しカンパニーの街" style={{display:"block",width:"100%",height:"auto",imageRendering:"pixelated"}}
+            onError={e=>{const w=e.target.closest("div"); if(w) w.style.display="none";}}/>
+          {/* 区画（土の上）に建物を並べる。最大4社まで表示 */}
+          <div style={{position:"absolute",left:"15%",right:"15%",top:"46%",bottom:"19%",display:"flex",alignItems:"flex-end",justifyContent:"center",gap:"2%"}}>
+            {myHoldings.slice(0,4).map(h=>{
+              const s=stocks.find(x=>x.id===h.stockId); if(!s) return null;
+              const art=CITY_ART[s.id]; const down=(s.lastChange||0)<-0.3;
+              const gainPct=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;
+              const file=Array.isArray(art)?(gainPct>=3?art[art.length-1]:art[0]):art;  // 含み益+3%以上で「栄えた建物」に
+              return(<button key={h.stockId} onClick={()=>{setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);}}
+                style={{background:"none",border:"none",padding:0,cursor:"pointer",flex:"0 1 auto",maxWidth:`${Math.floor(96/Math.min(4,myHoldings.length))}%`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:0}}>
+                {file
+                  ? <img src={`/assets/${file}.png`} alt={s.name} style={{width:"100%",height:"auto",imageRendering:"pixelated",filter:down?"saturate(.45) brightness(.93)":"none",transition:"filter .4s"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🏢";sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
+                  : <span style={{fontSize:"min(12vw,46px)",filter:down?"saturate(.45)":"none"}}>🏢</span>}
+              </button>);
+            })}
+          </div>
+          {!has&&<button onClick={()=>setShowTrade(true)} style={{position:"absolute",left:"50%",top:"60%",transform:"translate(-50%,-50%)",background:"rgba(255,255,255,.92)",border:`2px dashed ${G}`,borderRadius:14,padding:"8px 16px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,boxShadow:SHADOW_SM}}>＋ 会社を おうえん</button>}
           <span style={{position:"absolute",left:8,top:8,background:"rgba(255,255,255,.92)",borderRadius:RAD_PILL,padding:"4px 11px",fontSize:11,fontWeight:900,color:GP,boxShadow:SHADOW_SM}}>{townLabel}{has?`（${gp>=0?"+":""}${gp.toFixed(1)}%）`:""}</span>
         </div>
         <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
