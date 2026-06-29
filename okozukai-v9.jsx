@@ -3208,7 +3208,18 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <div style={{fontWeight:800,fontSize:13,color:TEXT}}>🌱 架空銘柄を調整（学習用）</div>
                     <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:8}}>増える/下がる感覚を教える練習用。「上がりやすさ」と「ゆれ」を親が設定できます（実在企業ではありません）。</div>
                     {(data.stocks||[]).filter(s=>s.fake).map(s=>{
-                      const setS=(patch)=>update(d=>({...d,stocks:(d.stocks||[]).map(x=>x.id===s.id?{...x,...patch}:x)}));
+                      const setS=(patch)=>update(d=>({...d,stocks:(d.stocks||[]).map(x=>{
+                        if(x.id!==s.id) return x;
+                        let nx={...x,...patch};
+                        if("bias" in patch){
+                          // 設定した方向が すぐ見えるよう、その場で価格を動かす（学習用の即時フィードバック）
+                          let h=(nx.history&&nx.history.length)?nx.history.slice(-30):[nx.price];
+                          let last=h[h.length-1]||nx.price; const prev=last;
+                          for(let k=0;k<6;k++){ let nv=Math.max(1,Math.round(last*(1+(patch.bias||0)*3))); if(nx.floor&&nv<nx.floor) nv=nx.floor; last=nv; h=[...h,last].slice(-30); }
+                          nx={...nx,price:last,history:h,lastChange:Math.round((last-prev)/(prev||1)*1000)/10};
+                        }
+                        return nx;
+                      })}));
                       const BIAS=[{v:-0.004,t:"下げ"},{v:0,t:"横ばい"},{v:0.004,t:"上げ"},{v:0.008,t:"急上昇"}];
                       const VOL=[{v:0.012,t:"小"},{v:0.03,t:"中"},{v:0.05,t:"大"}];
                       return (
@@ -7040,8 +7051,21 @@ async function fetchRealStockPrices(data,update){
   // ── 株価取得（1銘柄ずつ順番・1日1回）──
   const stocks = data.stocks||[];
 
+  // 架空銘柄は毎セッション1回シミュレーション（リアル取得の「1日1回」ゲートとは独立に動かす＝親の設定が次の起動で必ず効く）
+  if(stocks.some(s=>s.fake)){
+    update(d=>({...d,stocks:(d.stocks||[]).map(st=>{
+      if(!st.fake) return st;
+      const _h=(st.history&&st.history.length)?st.history.slice(-30):[st.price];
+      const _last=_h[_h.length-1]||st.price;
+      let _nv=_last*(1+(st.bias||0)+(Math.random()*2-1)*(st.vol||0.03));
+      if(st.floor&&_nv<st.floor)_nv=st.floor*(1+Math.random()*0.06);
+      _nv=Math.max(1,Math.round(_nv));
+      return {...st,price:_nv,history:[..._h,_nv].slice(-30),lastChange:Math.round((_nv-_last)/(_last||1)*1000)/10,realData:false};
+    })}));
+  }
+
   if(stockAlreadyFetched){
-    // 株はスキップ（為替は上のループで既に随時更新済み）
+    // リアル株はスキップ（為替＋架空銘柄は上で更新済み）
     return;
   }
   const stockResults = {};
@@ -7050,13 +7074,7 @@ async function fetchRealStockPrices(data,update){
   for(let i=0;i<stocks.length;i++){
     const s = stocks[i];
     if(s.fake){
-      // 架空銘柄: リアル取得せず、1日1回シミュレーションで価格を動かす（増える/下がる感覚の教材）
-      const _h=(s.history&&s.history.length)?s.history.slice(-30):[s.price];
-      const _last=_h[_h.length-1]||s.price;
-      let _nv=_last*(1+(s.bias||0)+(Math.random()*2-1)*(s.vol||0.03));
-      if(s.floor&&_nv<s.floor) _nv=s.floor*(1+Math.random()*0.06);   // 下限で反発（0にしない）
-      _nv=Math.max(1,Math.round(_nv));
-      stockResults[s.id]={price:_nv,history:[..._h,_nv].slice(-30),changePct:((_nv-_last)/(_last||1))*100,currency:s.currency||"JPY",realData:false};
+      // 架空銘柄は上の「毎セッション」パスで更新済み。ここではスキップ（二重適用防止）
     } else {
     if(i>0) await new Promise(res=>setTimeout(res,500)); // 500ms待機
     try{
