@@ -1,4 +1,4 @@
-const CACHE = 'tane-money-c9335dc';
+const CACHE = 'tane-money-c8a9e42';
 // バージョン固定のCDN資産(React/Firebase/フォントCSS)はimmutable扱いでprecache。
 // install時に取りに行き、以降のリピート起動はネットワーク無しで即起動できる。
 const CDN_PRECACHE = [
