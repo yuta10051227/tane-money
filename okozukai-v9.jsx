@@ -3211,20 +3211,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       const setS=(patch)=>update(d=>({...d,stocks:(d.stocks||[]).map(x=>{
                         if(x.id!==s.id) return x;
                         let nx={...x,...patch};
-<<<<<<< HEAD
                         if(("bias" in patch)||("power" in patch)){
                           // 設定した方向＆倍率が すぐ見えるよう、その場で価格を動かす（学習用の即時フィードバック）
                           const pw=nx.power||1;
                           let h=(nx.history&&nx.history.length)?nx.history.slice(-30):[nx.price];
                           let last=h[h.length-1]||nx.price; const prev=last;
                           for(let k=0;k<6;k++){ let nv=Math.max(1,Math.round(last*(1+(nx.bias||0)*3*pw))); if(nx.floor&&nv<nx.floor) nv=nx.floor; last=nv; h=[...h,last].slice(-30); }
-=======
-                        if("bias" in patch){
-                          // 設定した方向が すぐ見えるよう、その場で価格を動かす（学習用の即時フィードバック）
-                          let h=(nx.history&&nx.history.length)?nx.history.slice(-30):[nx.price];
-                          let last=h[h.length-1]||nx.price; const prev=last;
-                          for(let k=0;k<6;k++){ let nv=Math.max(1,Math.round(last*(1+(patch.bias||0)*3))); if(nx.floor&&nv<nx.floor) nv=nx.floor; last=nv; h=[...h,last].slice(-30); }
->>>>>>> origin/main
                           nx={...nx,price:last,history:h,lastChange:Math.round((last-prev)/(prev||1)*1000)/10};
                         }
                         return nx;
@@ -7071,11 +7063,7 @@ async function fetchRealStockPrices(data,update){
       if(!st.fake) return st;
       const _h=(st.history&&st.history.length)?st.history.slice(-30):[st.price];
       const _last=_h[_h.length-1]||st.price;
-<<<<<<< HEAD
       let _nv=_last*(1+(st.bias||0)*(st.power||1)+(Math.random()*2-1)*(st.vol||0.03));
-=======
-      let _nv=_last*(1+(st.bias||0)+(Math.random()*2-1)*(st.vol||0.03));
->>>>>>> origin/main
       if(st.floor&&_nv<st.floor)_nv=st.floor*(1+Math.random()*0.06);
       _nv=Math.max(1,Math.round(_nv));
       return {...st,price:_nv,history:[..._h,_nv].slice(-30),lastChange:Math.round((_nv-_last)/(_last||1)*1000)/10,realData:false};
