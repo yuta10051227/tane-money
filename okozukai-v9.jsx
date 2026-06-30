@@ -3211,17 +3211,19 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       const setS=(patch)=>update(d=>({...d,stocks:(d.stocks||[]).map(x=>{
                         if(x.id!==s.id) return x;
                         let nx={...x,...patch};
-                        if("bias" in patch){
-                          // 設定した方向が すぐ見えるよう、その場で価格を動かす（学習用の即時フィードバック）
+                        if(("bias" in patch)||("power" in patch)){
+                          // 設定した方向＆倍率が すぐ見えるよう、その場で価格を動かす（学習用の即時フィードバック）
+                          const pw=nx.power||1;
                           let h=(nx.history&&nx.history.length)?nx.history.slice(-30):[nx.price];
                           let last=h[h.length-1]||nx.price; const prev=last;
-                          for(let k=0;k<6;k++){ let nv=Math.max(1,Math.round(last*(1+(patch.bias||0)*3))); if(nx.floor&&nv<nx.floor) nv=nx.floor; last=nv; h=[...h,last].slice(-30); }
+                          for(let k=0;k<6;k++){ let nv=Math.max(1,Math.round(last*(1+(nx.bias||0)*3*pw))); if(nx.floor&&nv<nx.floor) nv=nx.floor; last=nv; h=[...h,last].slice(-30); }
                           nx={...nx,price:last,history:h,lastChange:Math.round((last-prev)/(prev||1)*1000)/10};
                         }
                         return nx;
                       })}));
                       const BIAS=[{v:-0.004,t:"下げ"},{v:0,t:"横ばい"},{v:0.004,t:"上げ"},{v:0.008,t:"急上昇"}];
                       const VOL=[{v:0.012,t:"小"},{v:0.03,t:"中"},{v:0.05,t:"大"}];
+                      const POWER=[{v:1,t:"ふつう"},{v:2,t:"強め"},{v:3,t:"最強"}];
                       return (
                         <div key={s.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 12px",marginBottom:8}}>
                           <div style={{fontWeight:800,fontSize:13,marginBottom:6}}>{s.emoji} {s.name}</div>
@@ -3230,8 +3232,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                             {BIAS.map(o=>{const sel=(s.bias||0)===o.v;return <button key={o.t} onClick={()=>setS({bias:o.v})} style={{flex:1,background:sel?GP:"transparent",border:`1.5px solid ${sel?GP:BORDER}`,borderRadius:8,padding:"5px 0",color:sel?"#fff":TEXT,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{o.t}</button>;})}
                           </div>
                           <div style={{fontSize:11,color:MUTED,marginBottom:3}}>ゆれ（値動きの大きさ）</div>
-                          <div style={{display:"flex",gap:5}}>
+                          <div style={{display:"flex",gap:5,marginBottom:7}}>
                             {VOL.map(o=>{const sel=(s.vol||0.03)===o.v;return <button key={o.t} onClick={()=>setS({vol:o.v})} style={{flex:1,background:sel?B:"transparent",border:`1.5px solid ${sel?B:BORDER}`,borderRadius:8,padding:"5px 0",color:sel?"#fff":TEXT,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{o.t}</button>;})}
+                          </div>
+                          <div style={{fontSize:11,color:MUTED,marginBottom:3}}>強さ（倍率）— 大きいほど ドカンと動く</div>
+                          <div style={{display:"flex",gap:5}}>
+                            {POWER.map(o=>{const sel=(s.power||1)===o.v;return <button key={o.t} onClick={()=>setS({power:o.v})} style={{flex:1,background:sel?GOLD:"transparent",border:`1.5px solid ${sel?GOLD:BORDER}`,borderRadius:8,padding:"5px 0",color:sel?"#fff":TEXT,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{o.t}{o.v>1?`×${o.v}`:""}</button>;})}
                           </div>
                         </div>
                       );
@@ -7057,7 +7063,7 @@ async function fetchRealStockPrices(data,update){
       if(!st.fake) return st;
       const _h=(st.history&&st.history.length)?st.history.slice(-30):[st.price];
       const _last=_h[_h.length-1]||st.price;
-      let _nv=_last*(1+(st.bias||0)+(Math.random()*2-1)*(st.vol||0.03));
+      let _nv=_last*(1+(st.bias||0)*(st.power||1)+(Math.random()*2-1)*(st.vol||0.03));
       if(st.floor&&_nv<st.floor)_nv=st.floor*(1+Math.random()*0.06);
       _nv=Math.max(1,Math.round(_nv));
       return {...st,price:_nv,history:[..._h,_nv].slice(-30),lastChange:Math.round((_nv-_last)/(_last||1)*1000)/10,realData:false};
