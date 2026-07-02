@@ -8630,10 +8630,14 @@ function ForexSection({data, update, child}){
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
 const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
 // 🏙 推しカンパニーの街：会社→建物アート。配列は成長段階（含み益%で 0→3→10→20 と昇格＝株価連動で栄える）。未配置は絵文字ビルにフォールバック
+<<<<<<< HEAD
 const CITY_ART = {
   s1:["bld_game","bld_game_big","bld_game_2","bld_game_3"],       // 🎮 ゲーム会社
   f1:["bld_food_1","bld_food_2","bld_food_3","bld_food_4"],       // 🍙 タネのめ食品（架空・学習用）
 };
+=======
+const CITY_ART = { s1:["bld_game","bld_game_big","bld_game_2","bld_game_3"] };
+>>>>>>> origin/main
 // 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）
 function cityStage(art, gainPct){ if(!Array.isArray(art)) return art||null; const i=gainPct>=20?3:gainPct>=10?2:gainPct>=3?1:0; return art[Math.min(i,art.length-1)]; }
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
