@@ -752,6 +752,11 @@ const SLIME_EVOLVE_ENABLED = false;
 // 背景テーマ（累計タスク数で解放。暗色なので白文字でも読みやすい）
 const BG_THEMES = [
   { id:"auto",   name:"じかんたい", emoji:"🕒", need:0,   grad:null, stars:false },
+  // 🌸 きせかえ背景（オリジナルのドット絵シーン）。すぐ使える春＋少しずつ解放
+  { id:"harumachi", name:"はるのまち", emoji:"🌸", need:0,  grad:"linear-gradient(180deg,#123a2a 0%,#1e5a3e 45%,#2a3a6a 100%)", stars:false, img:"/assets/bg_spring.jpg" },
+  { id:"umibe",     name:"なつのうみ", emoji:"🏖", need:5,  grad:"linear-gradient(180deg,#083a5a 0%,#0e5a7a 45%,#0a6a5a 100%)", stars:false, img:"/assets/bg_summer.jpg" },
+  { id:"akimori",   name:"あきのもり", emoji:"🍂", need:10, grad:"linear-gradient(180deg,#3a2410 0%,#5a3a1a 45%,#6a4a20 100%)", stars:false, img:"/assets/bg_autumn.jpg" },
+  { id:"yorumachi", name:"よるのまち", emoji:"🌙", need:18, grad:"linear-gradient(180deg,#040820 0%,#0a1440 45%,#101a4a 100%)", stars:true,  img:"/assets/bg_night.jpg" },
   { id:"forest", name:"もり",       emoji:"🌲", need:8,   grad:"linear-gradient(180deg,#0a1a12 0%,#0e2b1a 45%,#103a22 100%)", stars:false, img:"/assets/bg_forest.jpg" },
   { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false, img:"/assets/bg_ocean.jpg" },
   { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false, img:"/assets/bg_sunset.jpg" },
@@ -8634,8 +8639,10 @@ const CITY_ART = {
   s1:["bld_game","bld_game_big","bld_game_2","bld_game_3"],       // 🎮 ゲーム会社
   f1:["bld_food_1","bld_food_2","bld_food_3","bld_food_4"],       // 🍙 タネのめ食品（架空・学習用）
 };
-// 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）
+// 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）※後方互換で残置
 function cityStage(art, gainPct){ if(!Array.isArray(art)) return art||null; const i=gainPct>=20?3:gainPct>=10?2:gainPct>=3?1:0; return art[Math.min(i,art.length-1)]; }
+// 🏙 建物の成長は「おうえんし続けた日数」で（＝減らない安心。株価は😊▲/😴▼と数字で正直に別表示）
+function cityStageByDays(art, days){ if(!Array.isArray(art)) return art||null; const i=days>=45?3:days>=21?2:days>=7?1:0; return art[Math.min(i,art.length-1)]; }
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
 const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu", "⚡":"navi_chale", "🌧":"navi_amefuri" };
 // 🏡 模様替えデコ(あつ森型・自己表現)。lv=はたけレベルで解放。現状は絵文字プレースホルダ
@@ -8980,11 +8987,6 @@ function InvestTab({child,data,update}){
     {!showTrade && (()=>{
       const has=myHoldings.length>0;
       const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
-      const skyImg=!has?"sky_morning":gp>=0?"sky_noon":"sky_sunset";
-      // 🏙 推しカンパニーの街：更地(town_empty)の上に「おうえん中の会社」の建物が建つ
-      const townLabel=!has?"🏗 まちを つくろう":gp>=10?"🎆 街が 大さかえ！":gp>=0?"🏙 にぎやかな 街":"🌧 しずかだけど 街は元気";
-      const NEXT=[3,10,30];
-      const ripeCount=myHoldings.filter(h=>cropStageDays(holdDaysOf(h))>=3).length;
       return(<div>
         <div style={{display:"flex",gap:SP.sm,alignItems:"center",marginBottom:SP.md}}>
           {studyMode
@@ -9001,100 +9003,32 @@ function InvestTab({child,data,update}){
         <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD,background:"linear-gradient(180deg,#dbeede,#eaf7ec)"}}>
           <img src="/assets/town_empty.png" alt="推しカンパニーの街" style={{display:"block",width:"100%",height:"auto",imageRendering:"pixelated"}}
             onError={e=>{const w=e.target.closest("div"); if(w) w.style.display="none";}}/>
-          {/* 区画（土の上）に建物を並べる。最大4社まで表示 */}
+          {/* 区画（土の上）に建物を並べる。建物は「おうえんし続けた日数」で育つ＝減らない安心 */}
           <div style={{position:"absolute",left:"15%",right:"15%",top:"46%",bottom:"19%",display:"flex",alignItems:"flex-end",justifyContent:"center",gap:"2%"}}>
             {myHoldings.slice(0,4).map(h=>{
               const s=stocks.find(x=>x.id===h.stockId); if(!s) return null;
-              const art=CITY_ART[s.id]; const down=(s.lastChange||0)<-0.3;
-              const gainPct=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;
-              const file=cityStage(art,gainPct);  // 含み益で お店→本社→庭園オフィス→宮殿 と栄える
+              const art=CITY_ART[s.id]; const up=(s.lastChange||0)>0.3, down=(s.lastChange||0)<-0.3;
+              const file=cityStageByDays(art, holdDaysOf(h));
               return(<button key={h.stockId} onClick={()=>{setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);}}
                 style={{background:"none",border:"none",padding:0,cursor:"pointer",flex:"0 1 auto",maxWidth:`${Math.floor(96/Math.max(2,Math.min(4,myHoldings.length)))}%`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:0}}>
                 {file
-                  ? <img src={`/assets/${file}.png`} alt={s.name} style={{width:"100%",height:"auto",imageRendering:"pixelated",filter:down?"saturate(.45) brightness(.93)":"none",transition:"filter .4s"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🏢";sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
-                  : <span style={{fontSize:"min(12vw,46px)",filter:down?"saturate(.45)":"none"}}>🏢</span>}
-                {/* 会社名＋値動きのミニラベル（😊▲=上がった/😴▼=下がった） */}
-                <span style={{marginTop:2,fontSize:9,fontWeight:900,whiteSpace:"nowrap",lineHeight:1.3,background:"rgba(255,255,255,.92)",borderRadius:999,padding:"2px 7px",boxShadow:SHADOW_SM,color:(s.lastChange||0)>0.3?GP:(s.lastChange||0)<-0.3?R:MUTED}}>{s.emoji}{(s.lastChange||0)>0.3?"😊":(s.lastChange||0)<-0.3?"😴":"😐"}{(s.lastChange||0)>=0?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</span>
+                  ? <img src={`/assets/${file}.png`} alt={s.name} style={{width:"100%",height:"auto",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🏢";sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
+                  : <span style={{fontSize:"min(12vw,46px)"}}>🏢</span>}
+                {/* 会社名＋今日の値動き（😊▲=上がった/😴▼=下がった）＝株価はここで正直に */}
+                <span style={{marginTop:2,fontSize:9,fontWeight:900,whiteSpace:"nowrap",lineHeight:1.3,background:"rgba(255,255,255,.92)",borderRadius:999,padding:"2px 7px",boxShadow:SHADOW_SM,color:up?GP:down?R:MUTED}}>{s.emoji}{up?"😊":down?"😴":"😐"}{(s.lastChange||0)>=0?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</span>
               </button>);
             })}
           </div>
           {!has&&<button onClick={()=>setShowTrade(true)} style={{position:"absolute",left:"50%",top:"60%",transform:"translate(-50%,-50%)",background:"rgba(255,255,255,.92)",border:`2px dashed ${G}`,borderRadius:14,padding:"8px 16px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,boxShadow:SHADOW_SM}}>＋ 会社を おうえん</button>}
-          <span style={{position:"absolute",left:8,top:8,background:"rgba(255,255,255,.92)",borderRadius:RAD_PILL,padding:"4px 11px",fontSize:11,fontWeight:900,color:GP,boxShadow:SHADOW_SM}}>{townLabel}{has?`（${gp>=0?"+":""}${gp.toFixed(1)}%）`:""}</span>
+          <span style={{position:"absolute",left:8,top:8,background:"rgba(255,255,255,.92)",borderRadius:RAD_PILL,padding:"4px 11px",fontSize:11,fontWeight:900,color:has?(gp>=0?GP:R):GP,boxShadow:SHADOW_SM}}>{has?`街の成績 ${gp>=0?"+":""}${gp.toFixed(1)}%`:"🏙 きみの 街"}</span>
         </div>
-        <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
-          <div style={{position:"relative",height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 9px 0 10px"}}>
-            <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.16))"}}/>
-            <span style={{position:"relative",fontSize:12,fontWeight:900,color:TEXT,background:"#fff",borderRadius:RAD_PILL,padding:"4px 11px",boxShadow:SHADOW_SM}}>🏙 きみの 街</span>
-            <button onClick={()=>setShowDex(true)} style={{position:"relative",display:"flex",alignItems:"center",gap:5,background:"#fff",border:"none",borderRadius:RAD_PILL,padding:"5px 11px",cursor:"pointer",fontFamily:F,boxShadow:SHADOW_SM,color:GP}}>
-              <FIcon name="book" size={14}/>
-              <span style={{fontSize:11,fontWeight:900,color:GP}}>ずかん</span>
-            </button>
-          </div>
-          {/* 🏡 かざり棚（模様替え）。置ける数は はたけレベルで増える（学習モードでは非表示） */}
-          {!studyMode&&<div onClick={()=>setShowDeco(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(180deg,#d2e8c6,#c0dcae)",padding:"5px 8px",cursor:"pointer",overflowX:"auto",borderBottom:"1px solid #aacf95"}}>
-            {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.4}}>{it?it.e:"・"}</span>; })}
-            <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"#fff",borderRadius:RAD_PILL,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap",boxShadow:SHADOW_SM}}><FIcon name="palette" size={12}/>もようがえ</span>
-          </div>}
-          <div style={{backgroundImage:"url(/assets/street_tile.png)",backgroundSize:"96px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
-            {(showAllStocks?stocks:stocks.filter(s=>s.fake||FARM_FAV.has(s.id)||myHoldings.some(h=>h.stockId===s.id))).map(s=>{
-              const h=myHoldings.find(x=>x.stockId===s.id);
-              const held=!!h; const d=holdDaysOf(h); const stage=cropStageDays(d);
-              const ripe=held&&stage>=3;
-              const nextIn=(held&&stage<3)?Math.max(1,Math.ceil(NEXT[stage]-d)):0;
-              return(
-                <button key={s.id} onClick={()=>{ if(ripe){setSelected(s.id);setMode("sell");setQty("0.1");setShowTrade(true);} else if(held){waterCrop(s,h);} else {setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);} }}
-                  style={{flex:"0 0 auto",width:74,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                  <div style={{position:"relative",width:66,height:66,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                    <img src="/assets/lot_empty.png" alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
-                    {held
-                      ? (()=>{const _bA=CITY_ART[s.id];const _g=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;const _bF=cityStage(_bA,_g);
-                          return <div style={{position:"relative",zIndex:1,marginBottom:8,transformOrigin:"bottom center",...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:_bF?{}:{animation:`growSway ${2.2+(s.id.charCodeAt(s.id.length-1)%5)*0.18}s ease-in-out infinite`})}}>
-                            {_bF
-                              ? <img src={`/assets/${_bF}.png`} alt="" style={{width:54,height:54,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent=s.emoji;sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
-                              : <CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/>}
-                          </div>;})()
-                      : <span style={{position:"relative",zIndex:1,marginBottom:16,fontSize:20,opacity:.85,animation:"plantPulse 1.6s ease-in-out infinite"}}>➕</span>}
-                    {ripe&&<span style={{position:"absolute",top:-2,right:4,fontSize:15,animation:"ripeBounce 1s ease-in-out infinite",zIndex:2}}>🌟</span>}
-                    {held&&!ripe&&<span style={{position:"absolute",top:0,right:2,fontSize:12,zIndex:2}}>💧</span>}
-                  </div>
-                  <span style={{fontSize:9.5,fontWeight:900,whiteSpace:"nowrap",borderRadius:999,padding:"2px 7px",...(ripe?{background:GOLD,color:"#fff"}:held?{background:"rgba(255,255,255,.9)",color:GP}:{background:"rgba(255,255,255,.78)",color:"#7a6a3a"})}}>
-                    {ripe?"🌟そだった！":held?`あと${nextIn}日`:"＋たてる"}
-                  </span>
-                  {/* 株価との連動を一目で（元気=上がった/ひと休み=下がった）＝推しカンパニーの正直な値動き */}
-                  <span style={{fontSize:9,fontWeight:900,whiteSpace:"nowrap",marginTop:1,color:(s.lastChange||0)>0.3?GP:(s.lastChange||0)<-0.3?R:MUTED}}>
-                    {(s.lastChange||0)>0.3?"😊":(s.lastChange||0)<-0.3?"😴":"😐"}{(s.lastChange||0)>=0?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%
-                  </span>
-                </button>
-              );
-            })}
-            <button onClick={()=>setShowAllStocks(v=>!v)} style={{flex:"0 0 auto",width:64,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",gap:3}}>
-              <div style={{width:58,height:58,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,background:"rgba(255,255,255,.55)",borderRadius:12,marginBottom:8}}>{showAllStocks?"➖":"➕"}</div>
-              <span style={{fontSize:10,fontWeight:900,color:"#2f5a22",whiteSpace:"nowrap"}}>{showAllStocks?"とじる":"もっと見る"}</span>
-            </button>
-          </div>
-          <div style={{background:"rgba(24,122,78,.92)",padding:"5px 8px",display:"flex",alignItems:"center",gap:6}}>
-            {!studyMode&&<button onClick={patMon} style={{background:"rgba(255,255,255,.2)",border:"none",borderRadius:10,padding:"3px 7px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,fontFamily:F,flexShrink:0}}>
-              <img src="/assets/tanemon_water.png" alt="" style={{width:24,height:24,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
-              <span style={{fontSize:9,fontWeight:900,color:"#fff"}}>なでる</span>
-            </button>}
-            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ そだった！タップで うってもいい ころ`:has?(studyMode?"たてものを タップで 売買。コツコツ 長く持とう":"たてものを タップで 💧おせわ。タネモンも なでてあげよう"):"あいてる区画を タップで 会社を おうえん！"}</span>
-          </div>
-          <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
-        </div>
-        <div style={{display:"flex",gap:SP.sm}}>
-          {!studyMode&&<button onClick={drawWater}
-            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
-            style={{flex:1,background:CARD,border:BD_ACCENT(B),borderRadius:RAD_CARD,boxShadow:SHADOW_SM,padding:"10px 10px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:9,color:B,transition:"transform .08s"}}>
-            <FIcon name="bucket" size={22}/>
-            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:12.5,fontWeight:900,color:B}}>みずをくむ</span><span style={{fontSize:9.5,fontWeight:800,color:MUTED}}>{Math.floor(bucketG)}g たまってる</span></span>
-          </button>}
-          <button onClick={()=>setShowTrade(true)}
-            onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
-            style={{flex:1.5,background:GP,border:"none",borderRadius:RAD_CARD,boxShadow:SHADOW_MD,padding:"10px 12px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:10,color:"#fff",transition:"transform .08s"}}>
-            <FIcon name="vault" size={22}/>
-            <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:13,fontWeight:900,color:"#fff"}}>とりひき / くら</span><span style={{fontSize:9.5,fontWeight:800,color:"#cdeedd"}}>買う・売る・成績を見る</span></span>
-          </button>
-        </div>
+        {/* とりひき（1つに集約。畑ミニゲームは引退＝二重表示を解消） */}
+        <button onClick={()=>setShowTrade(true)}
+          onPointerDown={e=>{e.currentTarget.style.transform="translateY(1px)";}} onPointerUp={e=>{e.currentTarget.style.transform="";}} onPointerLeave={e=>{e.currentTarget.style.transform="";}}
+          style={{width:"100%",background:GP,border:"none",borderRadius:RAD_CARD,boxShadow:SHADOW_MD,padding:"14px 12px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",gap:10,color:"#fff",transition:"transform .08s"}}>
+          <FIcon name="vault" size={22}/>
+          <span style={{display:"flex",flexDirection:"column",alignItems:"flex-start",lineHeight:1.2}}><span style={{fontSize:14,fontWeight:900,color:"#fff"}}>🏢 とりひき / くら</span><span style={{fontSize:10,fontWeight:800,color:"#cdeedd"}}>会社を おうえん・手ばなす・成績を見る</span></span>
+        </button>
       </div>);
     })()}
 
