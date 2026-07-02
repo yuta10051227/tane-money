@@ -1469,9 +1469,6 @@ const parentBal= (pLogs, pid) => ((pLogs||{})[pid]||[]).reduce((s,l)=>s+(l.pts||
 const weekKey  = (d=new Date())=>{const jan1=new Date(d.getFullYear(),0,1);const w=Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);return `${d.getFullYear()}-${String(w).padStart(2,"0")}`;};
 const taskPts  = (task, cid) => task.over?.[cid] ?? task.pts;
 
-// 【一時テスト】この時刻まではガチャ回し放題（保存なし＝データを汚さない）。過ぎたら自動で通常の1日1回に戻る
-const GACHA_TEST_UNTIL = 1781454600000; // テスト回し放題 〜JST 01:30
-
 function rollGacha(gacha) {
   const total = gacha.reduce((s,g)=>s+g.rate,0);
   let r = Math.random()*total;
@@ -3108,7 +3105,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       <span style={{fontWeight:900,fontSize:12,color:R}}>{r.ever?`${r.days}日 ログインなし`:"まだ未ログイン"}</span>
                     </div>
                   ))}
-                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や畑のお世話に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
+                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や推しカンパニーの街を 見に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
                 </div>);
               })()}
               {/* 承認モード切り替え */}
@@ -3173,13 +3170,13 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               </div>
               {/* 投資ワールド設定: 投資のON/OFF・為替だけOFF・1日の売買回数(小中向けに親が手綱を握れる) */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
-                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>投資ワールド（畑）</div>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>投資ワールド（推しカンパニーの街）</div>
                 <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>株や為替の体験を どこまで見せるか。お金はポイントで、実際のお金は動きません。</div>
                 {/* 投資ワールド ON/OFF */}
                 <div style={{display:"flex",alignItems:"center",gap:12,paddingBottom:10,borderBottom:`1px solid ${BORDER}`}}>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:800,fontSize:13,color:TEXT}}>投資ワールドを見せる</div>
-                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>OFFにすると 畑（株・為替）を まるごと非表示に</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>OFFにすると 投資ワールド（株）を まるごと非表示に</div>
                   </div>
                   <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),investOff:!(d.familySettings?.investOff)}}))}
                     style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.investOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
@@ -3668,7 +3665,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // eslint-disable-next-line
   },[_mLv]);
   const todayDone= data.gachaDate?.[child.id] === todayKey();
-  const gachaTest = Date.now() < GACHA_TEST_UNTIL; // テスト中フラグ
   const curStreak= data.streak?.[child.id]?.cur || 0;
   const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&isTodayLocal(l.date)).map(l=>l.rid));
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
@@ -3736,8 +3732,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const hasTicket = (data.battleTickets?.[child.id]||0) > 0;
   const doGacha = () => {
     if (gachaBusyRef.current) return;   // 連打ガード: 結果表示を閉じるまで二重に回せない
-    const useTicket = todayDone && !gachaTest && hasTicket;
-    if (todayDone && !gachaTest && !hasTicket) return;
+    const useTicket = todayDone && hasTicket;
+    if (todayDone && !hasTicket) return;
     gachaBusyRef.current = true;
     let res = rollGacha(data.gacha);
     // 連続日数で「がんばりが報われる」確定演出（7日でSR以上・30日で激レア確定）
@@ -3756,7 +3752,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks, simpleAnim:!!(data.familySettings?.gachaSimple)};
     setGachaRes(finalRes);
     taneHaptic(res.rate<=3?"strong":"success");
-    if (gachaTest) return; // テスト中は演出だけ。ポイント/ログ/1日制限を保存しない
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
     const yesterday = (()=>{ const d=new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; })();
@@ -4021,7 +4016,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
         {MAIN_TABS.map(([v,l])=>{
           // 控えめな金色ドット: 「今日まだのおてつだい」と「今日まだのガチャ」だけ(最大2個)。やり終えたら消える。
-          const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone && !gachaTest);
+          const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone);
           return (
           <button key={v} onClick={()=>setTab(v)}
             style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4a9eff"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4a9eff"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
@@ -4051,13 +4046,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* 🌱 はたけ フローティングボタン(そだてるボタンの上に重ねて常駐・株/畑ワールドへ) */}
       {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young)
         && !(effectiveTab==="money"&&monTab==="hatake") && (
-        <button onClick={()=>{ setTab(isJunior?"goals":"money"); setMonTab("hatake"); }} aria-label="はたけ"
+        <button onClick={()=>{ setTab(isJunior?"goals":"money"); setMonTab("hatake"); }} aria-label="推しカンパニーの街"
           style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
             background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
             cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
             animation:"hatakeFab 2.1s ease-in-out infinite"}}>
-          <span style={{fontSize:26,lineHeight:1}}>🌱</span>
-          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>はたけ</span>
+          <span style={{fontSize:26,lineHeight:1}}>🏙</span>
+          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>まち</span>
           <style>{`@keyframes hatakeFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.07) translateY(-3px)}}`}</style>
         </button>
       )}
@@ -4325,7 +4320,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && showGacha && <>
         {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
         {(()=>{ const ft=getMonthTheme(); return (
-          <button onClick={()=>{ if(!todayDone||gachaTest||hasTicket) doGacha(); }} disabled={todayDone&&!gachaTest&&!hasTicket} aria-label="デイリーガチャ"
+          <button onClick={()=>{ if(!todayDone||hasTicket) doGacha(); }} disabled={todayDone&&!hasTicket} aria-label="デイリーガチャ"
             style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
               border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
               background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
@@ -4437,7 +4432,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
-                <button onClick={doGacha} disabled={todayDone&&!gachaTest&&!hasTicket}
+                <button onClick={doGacha} disabled={todayDone&&!hasTicket}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
                     fontSize:28,cursor:todayDone?"default":"pointer",
@@ -4447,13 +4442,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 </button>
                 <div style={{flex:1}}>
                   <div style={{fontSize:11,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
-                  <div style={{fontWeight:800,fontSize:14,color:darkBG?((todayDone&&!gachaTest)?"rgba(255,255,255,0.35)":"#fff"):((todayDone&&!gachaTest)?MUTED:TEXT)}}>
-                    {gachaTest?"🧪 テスト回し放題":(todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ")}
+                  <div style={{fontWeight:800,fontSize:14,color:darkBG?(todayDone?"rgba(255,255,255,0.35)":"#fff"):(todayDone?MUTED:TEXT)}}>
+                    {todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ"}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
-                    {gachaTest?"何回でもOK（記録は残りません・〜01:30）":(todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`)}
+                    {todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
                   </div>
-                  {!todayDone&&!gachaTest&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
+                  {!todayDone&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
                   {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
                   {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
                   {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:11,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</span><span onClick={(e)=>{e.stopPropagation();shareCard({emoji:"🏆",title:"ずかん コンプリート！",subtitle:`${GACHA_ITEMS.length}しゅるい ぜんぶ あつめた`,color:"#fbbf24"});}} style={{fontSize:11,color:"#4a9eff",fontWeight:800,cursor:"pointer"}}>シェア 📤</span></div>;})()}
@@ -7057,8 +7052,10 @@ async function fetchRealStockPrices(data,update){
   // ── 株価取得（1銘柄ずつ順番・1日1回）──
   const stocks = data.stocks||[];
 
-  // 架空銘柄は毎セッション1回シミュレーション（リアル取得の「1日1回」ゲートとは独立に動かす＝親の設定が次の起動で必ず効く）
-  if(stocks.some(s=>s.fake)){
+  // 架空銘柄のシミュレーション（リアル取得の「1日1回」ゲートとは独立）。
+  // 画面を開くたびに動くと1日に何歩も進む＋Firestore書き込みが増えるため、30分に1回まで（端末ごと）
+  const _fakeSimOk=(()=>{ try{ const t=+localStorage.getItem("tane_fake_sim_ts")||0; if(Date.now()-t<30*60*1000) return false; localStorage.setItem("tane_fake_sim_ts",String(Date.now())); return true; }catch(e){ return true; } })();
+  if(_fakeSimOk && stocks.some(s=>s.fake)){
     update(d=>({...d,stocks:(d.stocks||[]).map(st=>{
       if(!st.fake) return st;
       const _h=(st.history&&st.history.length)?st.history.slice(-30):[st.price];
@@ -8648,16 +8645,16 @@ const INVEST_NAVI = {
 };
 function pickInvestNavi(gp, holdDays, concentrated, has, rot){
   const pick=(arr)=>arr[rot%arr.length];
-  if(!has) return {...INVEST_NAVI.chale, line:"いこうぜ！でも“なくなってもいい分だけ”な。まずは ひとつ タネをまこう。"};
+  if(!has) return {...INVEST_NAVI.chale, line:"いこうぜ！でも“なくなってもいい分だけ”な。まずは ひとつ おうえんしよう。"};
   if(gp<=-10) return {...INVEST_NAVI.ame, line:pick(["大きな雨だね。こわいよね。でも ひとりじゃないよ、いっしょに待とう。","たくさん下がったね。でも じぶんのせいじゃないよ。みんなにふる雨だから。"])};
-  if(gp<-3) return {...INVEST_NAVI.ame, line:pick(["雨の日もあるよ。畑は枯れてないよ。","下がってるね。でもね、雨は かならず あがるよ。"])};
+  if(gp<-3) return {...INVEST_NAVI.ame, line:pick(["雨の日もあるよ。街は なくならないよ。","下がってるね。でもね、雨は かならず あがるよ。"])};
   if(gp>=20) return {...INVEST_NAVI.kotsu, line:pick(["すごいね、育ってる。でも あわてなくていいよ。","ここまで きたね。つづけてきた おかげだよ。"])};
   if(concentrated) return {...INVEST_NAVI.garu, line:"ひとつに ぜんぶ かけちゃダメ。ちらして まもろう。"};
   if(holdDays>=30) return {...INVEST_NAVI.kotsu, line:"ずっと つづけてるね。それが いちばん つよいやり方だよ。"};
   return pick([
     {...INVEST_NAVI.fukuro, line:"なんで 上がったり 下がったり するのかな？理由を 見るのが 投資だよ。"},
     {...INVEST_NAVI.garu, line:"いろんな タネを まくと、ぜんぶ いっぺんに しおれにくいよ。"},
-    {...INVEST_NAVI.kotsu, line:"ゆっくりで いいよ。畑は 1日にして ならず、だよ。"},
+    {...INVEST_NAVI.kotsu, line:"ゆっくりで いいよ。街は 1日にして ならず、だよ。"},
   ]);
 }
 function InvestTab({child,data,update}){
@@ -8776,7 +8773,7 @@ function InvestTab({child,data,update}){
       const commentPart=tradeComment?` ・ ${tradeComment}`:"";
       return{...d,holdings:{...(d.holdings||{}),[child.id]:newH},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_buy",label:`📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 購入${commentPart}`,pts:-costPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()};
     });
-    setTradeFlash({msg:`🌱 ${selStock.emoji}${selStock.name} の タネをまいた！`,color:"#22c55e"});
+    setTradeFlash({msg:`💚 ${selStock.emoji}${selStock.name} を おうえんした！`,color:"#22c55e"});
     setTimeout(()=>setTradeFlash(null),1700);
     setQty("0.1");setSelected(null);setTradeComment("");
   }
@@ -8789,8 +8786,8 @@ function InvestTab({child,data,update}){
     const _net=sellPts-_tax;                              // 手取り
     const _netGain=_profit-_tax;                          // 税引後の もうけ
     const _invHeld=selHolding?.firstBuyDate?(Date.now()-new Date(selHolding.firstBuyDate).getTime())/86400000:0; // 保有日数(辛抱の度合い)
-    if(_profit>=0){ const _taxNote=_tax>0?`（税-${_tax}pt）`:""; setTradeFlash(_invHeld>=30?{msg:`🌾 ${Math.floor(_invHeld)}日 そだてて 収穫！手取り+${_netGain.toLocaleString()}pt${_taxNote}`,color:"#E8B83E"}:{msg:`🌱 手取り+${_netGain.toLocaleString()}pt 収穫${_taxNote}。長く そだてると もっと実るよ`,color:"#34C77B"}); }
-    else { setTradeFlash({msg:`🌱 ${_profit.toLocaleString()}pt 収穫。また たねを まこう！`,color:"#D95C55"}); }
+    if(_profit>=0){ const _taxNote=_tax>0?`（税-${_tax}pt）`:""; setTradeFlash(_invHeld>=30?{msg:`🎉 ${Math.floor(_invHeld)}日 おうえんして 手ばなした！手取り+${_netGain.toLocaleString()}pt${_taxNote}`,color:"#E8B83E"}:{msg:`👋 手取り+${_netGain.toLocaleString()}pt${_taxNote}。長く おうえんすると もっと実るよ`,color:"#34C77B"}); }
+    else { setTradeFlash({msg:`👋 ${_profit.toLocaleString()}pt で 手ばなした。つぎの おうえん先を さがそう`,color:"#D95C55"}); }
     setTimeout(()=>setTradeFlash(null),1700);
     // 収穫フラッシュ(全画面)は「長く育てて勝てた=辛抱」のときだけ。短期の利確では出さない(射幸性カット)
     if(_profit>=0 && _invHeld>=30){ setHarvestBurst({pts:_netGain,days:Math.floor(_invHeld)}); setTimeout(()=>setHarvestBurst(null),1300); }
@@ -8804,8 +8801,8 @@ function InvestTab({child,data,update}){
       <div style={{display:"flex",alignItems:"center",gap:10,background:"linear-gradient(180deg,#eaf7ec,#dff0e4)",border:`2px solid ${G}`,borderRadius:18,padding:"11px 14px",marginBottom:12}}>
         <img src="/assets/tanemon.png" alt="" style={{width:40,height:40,objectFit:"contain",imageRendering:"pixelated",flexShrink:0}} onError={e=>{const s=document.createElement("span");s.textContent="🌱";s.style.fontSize="30px";e.target.replaceWith(s);}}/>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:900,fontSize:14,color:GP}}>ようこそ、きみの はたけへ！</div>
-          <div style={{fontSize:11.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginTop:1}}>たね（株）を まいて、じっくり そだてよう。あわてて うらなくて だいじょうぶ。まいにち ちょっとずつ おおきくなるよ🌾</div>
+          <div style={{fontWeight:900,fontSize:14,color:GP}}>ようこそ、きみの 街へ！</div>
+          <div style={{fontSize:11.5,color:TEXTS,fontWeight:700,lineHeight:1.5,marginTop:1}}>すきな 会社を おうえん（株を 買う）すると、街に その会社の たてものが 建つよ。あわてて うらなくて だいじょうぶ🏙</div>
         </div>
       </div>
     )}
@@ -8993,7 +8990,7 @@ function InvestTab({child,data,update}){
               const gainPct=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;
               const file=Array.isArray(art)?(gainPct>=3?art[art.length-1]:art[0]):art;  // 含み益+3%以上で「栄えた建物」に
               return(<button key={h.stockId} onClick={()=>{setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);}}
-                style={{background:"none",border:"none",padding:0,cursor:"pointer",flex:"0 1 auto",maxWidth:`${Math.floor(96/Math.min(4,myHoldings.length))}%`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:0}}>
+                style={{background:"none",border:"none",padding:0,cursor:"pointer",flex:"0 1 auto",maxWidth:`${Math.floor(96/Math.max(2,Math.min(4,myHoldings.length)))}%`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:0}}>
                 {file
                   ? <img src={`/assets/${file}.png`} alt={s.name} style={{width:"100%",height:"auto",imageRendering:"pixelated",filter:down?"saturate(.45) brightness(.93)":"none",transition:"filter .4s"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🏢";sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
                   : <span style={{fontSize:"min(12vw,46px)",filter:down?"saturate(.45)":"none"}}>🏢</span>}
@@ -9077,7 +9074,7 @@ function InvestTab({child,data,update}){
 
     {/* ===== とりひき/くら（投資の数字・売買リスト）===== */}
     {showTrade && (<>
-      <button onClick={()=>setShowTrade(false)} style={{display:"flex",alignItems:"center",gap:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:999,padding:"7px 14px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,marginBottom:12}}>‹ はたけに もどる</button>
+      <button onClick={()=>setShowTrade(false)} style={{display:"flex",alignItems:"center",gap:6,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:999,padding:"7px 14px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,marginBottom:12}}>‹ 街に もどる</button>
     {/* 1日の売り買い回数の残り（保護者設定時のみ） */}
     {tradeLimit>0 && (
       <div style={{textAlign:"center",fontSize:12,fontWeight:800,color:tradeLimitReached?"#ffb4b4":"#bff0c8",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.14)",borderRadius:10,padding:"7px 12px",marginBottom:12}}>
