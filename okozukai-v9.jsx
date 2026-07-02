@@ -8639,7 +8639,11 @@ const CITY_ART = {
   s1:["bld_game","bld_game_big","bld_game_2","bld_game_3"],       // 🎮 ゲーム会社
   f1:["bld_food_1","bld_food_2","bld_food_3","bld_food_4"],       // 🍙 タネのめ食品（架空・学習用）
 };
+<<<<<<< HEAD
 // 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）※後方互換で残置
+=======
+// 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）
+>>>>>>> origin/main
 function cityStage(art, gainPct){ if(!Array.isArray(art)) return art||null; const i=gainPct>=20?3:gainPct>=10?2:gainPct>=3?1:0; return art[Math.min(i,art.length-1)]; }
 // 🏙 建物の成長は「おうえんし続けた日数」で（＝減らない安心。株価は😊▲/😴▼と数字で正直に別表示）
 function cityStageByDays(art, days){ if(!Array.isArray(art)) return art||null; const i=days>=45?3:days>=21?2:days>=7?1:0; return art[Math.min(i,art.length-1)]; }
