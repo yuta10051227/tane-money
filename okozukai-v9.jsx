@@ -8629,8 +8629,10 @@ function ForexSection({data, update, child}){
 // ── ナビ・タネモン(性格の違う相棒が いろんな視点で投資を語る。損は責めない/煽らない) ──
 // 作物ドット絵: stockId→アセット接頭辞(現状りんご s5 のみ)。保有日数で成長段階を出す＝「育てる」可視化
 const CROP_ART = { s5:"crop_apple", s1:"crop_game", s4:"crop_potato", s3:"crop_car", s2:"crop_note" };
-// 🏙 推しカンパニーの街：会社→建物アート。配列は成長段階[ふつう, 栄えた(含み益)]。未配置は絵文字ビルにフォールバック
-const CITY_ART = { s1:["bld_game","bld_game_big"] };
+// 🏙 推しカンパニーの街：会社→建物アート。配列は成長段階（含み益%で 0→3→10→20 と昇格＝株価連動で栄える）。未配置は絵文字ビルにフォールバック
+const CITY_ART = { s1:["bld_game","bld_game_big","bld_game_2","bld_game_3"] };
+// 含み益% → 建物の段階index（配列が短ければ最後の段階で頭打ち）
+function cityStage(art, gainPct){ if(!Array.isArray(art)) return art||null; const i=gainPct>=20?3:gainPct>=10?2:gainPct>=3?1:0; return art[Math.min(i,art.length-1)]; }
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
 const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu", "⚡":"navi_chale", "🌧":"navi_amefuri" };
 // 🏡 模様替えデコ(あつ森型・自己表現)。lv=はたけレベルで解放。現状は絵文字プレースホルダ
@@ -8707,7 +8709,7 @@ function InvestTab({child,data,update}){
   const setFarm=(mut)=>update(d=>{ const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f,care:{...(f.care||{})}}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
   const drawWater=()=>{ const g=bucketG; if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;} setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()})); flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4"); };
   // 水やり＝お世話(はたけレベル＋タネモンの絆)。作物の成長/売り時には影響しない=投資は保有日数で正直に
-  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1})); flash("💧 おせわした！はたけレベルUPで かざりが ふえる🌱","#34C77B"); };
+  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1})); flash("💧 おせわした！まちレベルUPで かざりが ふえる🏙","#34C77B"); };
   const loginStreak=farmData.streak||0;
   // 📅 連続ログインボーナス(マイル型・毎日の理由。FOMOにしすぎない)
   useEffect(()=>{
@@ -8985,7 +8987,7 @@ function InvestTab({child,data,update}){
           {studyMode
             ? <div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"8px 12px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
             : <><div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 12px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>はたけ Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,fontWeight:800,color:TEXTS,marginBottom:3}}><span>まち Lv.{farmLv}</span><span>{Math.round(lvProg*100)}%</span></div>
                 <div style={{height:6,background:GS,borderRadius:RAD_PILL,overflow:"hidden"}}><div style={{width:`${Math.round(lvProg*100)}%`,height:"100%",background:G,borderRadius:RAD_PILL}}/></div>
               </div>
               {loginStreak>0&&<div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:GP,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:G}}/><FIcon name="streak" size={14}/>{loginStreak}</div>}
@@ -9002,7 +9004,7 @@ function InvestTab({child,data,update}){
               const s=stocks.find(x=>x.id===h.stockId); if(!s) return null;
               const art=CITY_ART[s.id]; const down=(s.lastChange||0)<-0.3;
               const gainPct=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;
-              const file=Array.isArray(art)?(gainPct>=3?art[art.length-1]:art[0]):art;  // 含み益+3%以上で「栄えた建物」に
+              const file=cityStage(art,gainPct);  // 含み益で お店→本社→庭園オフィス→宮殿 と栄える
               return(<button key={h.stockId} onClick={()=>{setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);}}
                 style={{background:"none",border:"none",padding:0,cursor:"pointer",flex:"0 1 auto",maxWidth:`${Math.floor(96/Math.max(2,Math.min(4,myHoldings.length)))}%`,display:"flex",flexDirection:"column",alignItems:"center",lineHeight:0}}>
                 {file
@@ -9019,7 +9021,7 @@ function InvestTab({child,data,update}){
         <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD}}>
           <div style={{position:"relative",height:46,backgroundImage:`url(/assets/${skyImg}.png)`,backgroundSize:"cover",backgroundPosition:"center",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 9px 0 10px"}}>
             <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.16))"}}/>
-            <span style={{position:"relative",fontSize:12,fontWeight:900,color:TEXT,background:"#fff",borderRadius:RAD_PILL,padding:"4px 11px",boxShadow:SHADOW_SM}}>🪵 きみの はたけ</span>
+            <span style={{position:"relative",fontSize:12,fontWeight:900,color:TEXT,background:"#fff",borderRadius:RAD_PILL,padding:"4px 11px",boxShadow:SHADOW_SM}}>🏙 きみの 街</span>
             <button onClick={()=>setShowDex(true)} style={{position:"relative",display:"flex",alignItems:"center",gap:5,background:"#fff",border:"none",borderRadius:RAD_PILL,padding:"5px 11px",cursor:"pointer",fontFamily:F,boxShadow:SHADOW_SM,color:GP}}>
               <FIcon name="book" size={14}/>
               <span style={{fontSize:11,fontWeight:900,color:GP}}>ずかん</span>
@@ -9030,7 +9032,7 @@ function InvestTab({child,data,update}){
             {Array.from({length:decoSlots}).map((_,i)=>{ const it=placedDeco[i]?DECO_ITEMS.find(d=>d.id===placedDeco[i]):null; return <span key={i} style={{fontSize:18,flexShrink:0,opacity:it?1:.4}}>{it?it.e:"・"}</span>; })}
             <span style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:4,fontSize:9.5,fontWeight:900,color:"#2f5a22",background:"#fff",borderRadius:RAD_PILL,padding:"3px 9px",flexShrink:0,whiteSpace:"nowrap",boxShadow:SHADOW_SM}}><FIcon name="palette" size={12}/>もようがえ</span>
           </div>}
-          <div style={{backgroundImage:"url(/assets/soil_tile.png)",backgroundSize:"64px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
+          <div style={{backgroundImage:"url(/assets/street_tile.png)",backgroundSize:"96px",imageRendering:"pixelated",padding:"10px 8px 12px",display:"flex",gap:7,alignItems:"flex-end",overflowX:"auto"}}>
             {(showAllStocks?stocks:stocks.filter(s=>s.fake||FARM_FAV.has(s.id)||myHoldings.some(h=>h.stockId===s.id))).map(s=>{
               const h=myHoldings.find(x=>x.stockId===s.id);
               const held=!!h; const d=holdDaysOf(h); const stage=cropStageDays(d);
@@ -9040,15 +9042,20 @@ function InvestTab({child,data,update}){
                 <button key={s.id} onClick={()=>{ if(ripe){setSelected(s.id);setMode("sell");setQty("0.1");setShowTrade(true);} else if(held){waterCrop(s,h);} else {setSelected(s.id);setMode("buy");setQty("0.1");setTradeComment("");setShowTrade(true);} }}
                   style={{flex:"0 0 auto",width:74,background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
                   <div style={{position:"relative",width:66,height:66,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                    <img src={`/assets/${ripe?"plot_ripe":"plot_empty"}.png`} alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
+                    <img src="/assets/lot_empty.png" alt="" style={{position:"absolute",bottom:0,left:3,width:60,height:60,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
                     {held
-                      ? <div style={{position:"relative",zIndex:1,marginBottom:8,transformOrigin:"bottom center",...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:{animation:`growSway ${2.2+(s.id.charCodeAt(s.id.length-1)%5)*0.18}s ease-in-out infinite`})}}><CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/></div>
+                      ? (()=>{const _bA=CITY_ART[s.id];const _g=h.avgPrice>0?(toPts(s,s.price)-h.avgPrice)/h.avgPrice*100:0;const _bF=cityStage(_bA,_g);
+                          return <div style={{position:"relative",zIndex:1,marginBottom:8,transformOrigin:"bottom center",...(ripe?{animation:"ripeBounce 1s ease-in-out infinite",filter:"drop-shadow(0 0 7px rgba(232,184,62,.95))"}:_bF?{}:{animation:`growSway ${2.2+(s.id.charCodeAt(s.id.length-1)%5)*0.18}s ease-in-out infinite`})}}>
+                            {_bF
+                              ? <img src={`/assets/${_bF}.png`} alt="" style={{width:54,height:54,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent=s.emoji;sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
+                              : <CropArt stockId={s.id} stage={stage} emoji={s.emoji} size={54}/>}
+                          </div>;})()
                       : <span style={{position:"relative",zIndex:1,marginBottom:16,fontSize:20,opacity:.85,animation:"plantPulse 1.6s ease-in-out infinite"}}>➕</span>}
                     {ripe&&<span style={{position:"absolute",top:-2,right:4,fontSize:15,animation:"ripeBounce 1s ease-in-out infinite",zIndex:2}}>🌟</span>}
                     {held&&!ripe&&<span style={{position:"absolute",top:0,right:2,fontSize:12,zIndex:2}}>💧</span>}
                   </div>
                   <span style={{fontSize:9.5,fontWeight:900,whiteSpace:"nowrap",borderRadius:999,padding:"2px 7px",...(ripe?{background:GOLD,color:"#fff"}:held?{background:"rgba(255,255,255,.9)",color:GP}:{background:"rgba(255,255,255,.78)",color:"#7a6a3a"})}}>
-                    {ripe?"🌟しゅうかく":held?`あと${nextIn}日`:"＋まく"}
+                    {ripe?"🌟そだった！":held?`あと${nextIn}日`:"＋たてる"}
                   </span>
                   {/* 株価との連動を一目で（元気=上がった/ひと休み=下がった）＝推しカンパニーの正直な値動き */}
                   <span style={{fontSize:9,fontWeight:900,whiteSpace:"nowrap",marginTop:1,color:(s.lastChange||0)>0.3?GP:(s.lastChange||0)<-0.3?R:MUTED}}>
@@ -9067,7 +9074,7 @@ function InvestTab({child,data,update}){
               <img src="/assets/tanemon_water.png" alt="" style={{width:24,height:24,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🌱";e.target.replaceWith(sp);}}/>
               <span style={{fontSize:9,fontWeight:900,color:"#fff"}}>なでる</span>
             </button>}
-            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ みのった！タップで しゅうかく`:has?(studyMode?"作物を タップで 売買。コツコツ 長く持とう":"作物を タップで 💧みずやり。タネモンも なでてあげよう"):"あいてる畑を タップで タネを まこう！"}</span>
+            <span style={{fontSize:10.5,fontWeight:800,color:"#eafff2",lineHeight:1.4}}>{ripeCount>0?`🌟 ${ripeCount}コ そだった！タップで うってもいい ころ`:has?(studyMode?"たてものを タップで 売買。コツコツ 長く持とう":"たてものを タップで 💧おせわ。タネモンも なでてあげよう"):"あいてる区画を タップで 会社を おうえん！"}</span>
           </div>
           <style>{`@keyframes ripeBounce{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes plantPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.18);opacity:1}}@keyframes growSway{0%{transform:rotate(-2.5deg) scaleY(.97)}25%{transform:rotate(0deg) scaleY(1.04)}50%{transform:rotate(2.5deg) scaleY(.99)}75%{transform:rotate(0deg) scaleY(1.05)}100%{transform:rotate(-2.5deg) scaleY(.97)}}`}</style>
         </div>
