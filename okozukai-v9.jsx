@@ -7073,15 +7073,29 @@ async function fetchRealStockPrices(data,update){
   }
   const stockResults = {};
 
-  // 並列ではなく少し間隔をあけて取得（レート制限対策）
+  // まず自前API(/api/stocks)で全銘柄を1リクエストでまとめて取得（同一オリジン=CORS不要・外部プロキシ非依存）。
+  // 失敗時(ローカル開発・API障害)は従来の外部プロキシに1銘柄ずつフォールバック
+  let batchStocks=null;
+  try{
+    const _rt=stocks.filter(s=>!s.fake&&s.ticker).map(s=>s.ticker);
+    if(_rt.length){
+      const _r=await fetch(`/api/stocks?tickers=${encodeURIComponent(_rt.join(","))}`);
+      if(_r.ok){ const _j=await _r.json(); if(_j&&typeof _j==="object"&&!_j.error) batchStocks=_j; }
+    }
+  }catch(e){}
+
+  // バッチが効かなかった銘柄だけ、少し間隔をあけて取得（レート制限対策）
   for(let i=0;i<stocks.length;i++){
     const s = stocks[i];
     if(s.fake){
       // 架空銘柄は上の「毎セッション」パスで更新済み。ここではスキップ（二重適用防止）
     } else {
-    if(i>0) await new Promise(res=>setTimeout(res,500)); // 500ms待機
     try{
-      const json = await fetchWithProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${s.ticker}?interval=1d&range=30d`);
+      let json = batchStocks ? batchStocks[s.ticker] : null;
+      if(!json){
+        if(i>0) await new Promise(res=>setTimeout(res,500)); // 外部プロキシ利用時のみ500ms待機
+        json = await fetchWithProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${s.ticker}?interval=1d&range=30d`);
+      }
       const meta=json?.chart?.result?.[0]?.meta;
       const closes=json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
       if(!meta||!closes) throw new Error("No data");
@@ -8768,8 +8782,8 @@ function InvestTab({child,data,update}){
       const existH=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
       let newH;
       const tq=Math.round(((existH?.qty||0)+qtyN)*10)/10;
-      if(existH){newH=(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:tq,avgPrice:Math.round((existH.avgPrice*existH.qty+costPts)/tq)}:h);}
-      else newH=[...(d.holdings?.[child.id]||[]),{stockId:selStock.id,qty:qtyN,avgPrice:Math.round(costPts/qtyN),firstBuyDate:new Date().toISOString()}];
+      if(existH){newH=(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:tq,avgPrice:Math.round((existH.avgPrice*existH.qty+costPts)/tq),...(tradeComment?{reason:tradeComment}:{})}:h);}
+      else newH=[...(d.holdings?.[child.id]||[]),{stockId:selStock.id,qty:qtyN,avgPrice:Math.round(costPts/qtyN),firstBuyDate:new Date().toISOString(),...(tradeComment?{reason:tradeComment}:{})}];
       const commentPart=tradeComment?` ・ ${tradeComment}`:"";
       return{...d,holdings:{...(d.holdings||{}),[child.id]:newH},logs:(()=>{const _e={id:uid(),cid:child.id,type:"invest_buy",label:`📈 ${selStock.emoji}${selStock.name} ${fmtQty(qtyN)}株 購入${commentPart}`,pts:-costPts,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})()};
     });
@@ -8994,6 +9008,8 @@ function InvestTab({child,data,update}){
                 {file
                   ? <img src={`/assets/${file}.png`} alt={s.name} style={{width:"100%",height:"auto",imageRendering:"pixelated",filter:down?"saturate(.45) brightness(.93)":"none",transition:"filter .4s"}} onError={e=>{const sp=document.createElement("span");sp.textContent="🏢";sp.style.fontSize="40px";e.target.replaceWith(sp);}}/>
                   : <span style={{fontSize:"min(12vw,46px)",filter:down?"saturate(.45)":"none"}}>🏢</span>}
+                {/* 会社名＋値動きのミニラベル（😊▲=上がった/😴▼=下がった） */}
+                <span style={{marginTop:2,fontSize:9,fontWeight:900,whiteSpace:"nowrap",lineHeight:1.3,background:"rgba(255,255,255,.92)",borderRadius:999,padding:"2px 7px",boxShadow:SHADOW_SM,color:(s.lastChange||0)>0.3?GP:(s.lastChange||0)<-0.3?R:MUTED}}>{s.emoji}{(s.lastChange||0)>0.3?"😊":(s.lastChange||0)<-0.3?"😴":"😐"}{(s.lastChange||0)>=0?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</span>
               </button>);
             })}
           </div>
@@ -9201,6 +9217,7 @@ function InvestTab({child,data,update}){
               <span style={{color:isSel?"#aaa":MUTED}}>取得単価: <span style={{fontWeight:700,color:isSel?"#fff":TEXT}}>{h.avgPrice}pt</span></span>
               <span style={{color:(toPts(s,s.price)-h.avgPrice)>=0?"#4ade80":"#f87171",fontWeight:700}}>{(toPts(s,s.price)-h.avgPrice)>=0?"+":""}{((toPts(s,s.price)-h.avgPrice)/h.avgPrice*100).toFixed(1)}%</span>
             </div>}
+            {h?.reason&&!isSel&&<div style={{marginTop:5,fontSize:10.5,fontWeight:700,color:MUTED,textAlign:"left"}}>💬 推し理由「{h.reason}」</div>}
           </button>
 
           {/* 詳細チャート（銘柄ごと） */}
@@ -9243,6 +9260,8 @@ function InvestTab({child,data,update}){
             </div>
             {/* 🌱 タネモンのひとこと(値動きに応じて問いかけ＝考える習慣) */}
             {(()=>{const lc=selStock.lastChange||0;const c=lc>3?"きょうは 元気だね！高いときの 買いすぎ 注意！":lc>0?"少し 上がってるよ。どうする？":lc>-3?"下がってるけど、長く 持てば どうなるかな？":"大きく 下がってる！チャンス？リスク？かんがえてみて";return(<div style={{display:"flex",alignItems:"flex-start",gap:7,background:"rgba(52,199,123,0.14)",border:"1px solid rgba(52,199,123,0.3)",borderRadius:12,padding:"8px 11px",marginBottom:12}}><span style={{fontSize:16,lineHeight:1.2}}>🌱</span><span style={{fontSize:12,color:"#bff0c8",fontWeight:700,lineHeight:1.5}}>{c}</span></div>);})()}
+            {/* 💬 きみの推し理由(買った時のメモ)。初心を思い出してから売買する */}
+            {selHolding?.reason&&<div style={{display:"flex",alignItems:"flex-start",gap:7,background:"rgba(123,97,201,.18)",border:"1px solid rgba(123,97,201,.4)",borderRadius:12,padding:"8px 11px",marginBottom:12}}><span style={{fontSize:14,lineHeight:1.2}}>💬</span><span style={{fontSize:12,color:"#d9ccff",fontWeight:700,lineHeight:1.5}}>きみの推し理由「{selHolding.reason}」</span></div>}
             <div style={{display:"flex",gap:0,background:"#0d0d1a",borderRadius:10,overflow:"hidden",marginBottom:12}}>
               {["buy","sell"].map(m=><button key={m} onClick={()=>{setMode(m);setQty("0.1");setTradeComment("");}} style={{flex:1,padding:"9px 0",border:"none",background:mode===m?(m==="buy"?"#22c55e":"#E8B83E"):"transparent",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>{m==="buy"?"💚 おうえん（買う）":"👋 てばなす（売る）"}</button>)}
             </div>
