@@ -756,11 +756,7 @@ const BG_THEMES = [
   { id:"harumachi", name:"はるのまち", emoji:"🌸", need:0,  grad:"linear-gradient(180deg,#123a2a 0%,#1e5a3e 45%,#2a3a6a 100%)", stars:false, img:"/assets/bg_spring.jpg" },
   { id:"umibe",     name:"なつのうみ", emoji:"🏖", need:5,  grad:"linear-gradient(180deg,#083a5a 0%,#0e5a7a 45%,#0a6a5a 100%)", stars:false, img:"/assets/bg_summer.jpg" },
   { id:"akimori",   name:"あきのもり", emoji:"🍂", need:10, grad:"linear-gradient(180deg,#3a2410 0%,#5a3a1a 45%,#6a4a20 100%)", stars:false, img:"/assets/bg_autumn.jpg" },
-<<<<<<< HEAD
   { id:"yorumachi", name:"よるのまち", emoji:"🌙", need:18, grad:"linear-gradient(180deg,#040820 0%,#0a1440 45%,#101a4a 100%)", stars:true,  img:"/assets/bg_yorumachi.jpg" },
-=======
-  { id:"yorumachi", name:"よるのまち", emoji:"🌙", need:18, grad:"linear-gradient(180deg,#040820 0%,#0a1440 45%,#101a4a 100%)", stars:true,  img:"/assets/bg_night.jpg" },
->>>>>>> origin/main
   { id:"forest", name:"もり",       emoji:"🌲", need:8,   grad:"linear-gradient(180deg,#0a1a12 0%,#0e2b1a 45%,#103a22 100%)", stars:false, img:"/assets/bg_forest.jpg" },
   { id:"ocean",  name:"ふかい海",   emoji:"🌊", need:12,  grad:"linear-gradient(180deg,#04121f 0%,#06283d 40%,#063a4a 75%,#0a4a3a 100%)", stars:false, img:"/assets/bg_ocean.jpg" },
   { id:"sunset", name:"ゆうやけ",   emoji:"🌇", need:25,  grad:"linear-gradient(180deg,#1a0a1e 0%,#5a1530 35%,#a8442a 70%,#3a1a10 100%)", stars:false, img:"/assets/bg_sunset.jpg" },
