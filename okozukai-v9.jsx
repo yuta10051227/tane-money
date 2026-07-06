@@ -8645,14 +8645,6 @@ function cityStage(art, gainPct){ if(!Array.isArray(art)) return art||null; cons
 function cityStageByDays(art, days){ if(!Array.isArray(art)) return art||null; const i=days>=45?3:days>=21?2:days>=7?1:0; return art[Math.min(i,art.length-1)]; }
 // ナビ立ち絵: ナビの絵文字→ドット絵(現状フクロ博士・ガルドのみ。他は絵文字のまま)
 const NAVI_ART = { "🦉":"navi_fukuro", "🐉":"navi_garu", "⚡":"navi_chale", "🌧":"navi_amefuri" };
-// 🏡 模様替えデコ(あつ森型・自己表現)。lv=はたけレベルで解放。現状は絵文字プレースホルダ
-const DECO_ITEMS = [
-  {id:"fence",e:"🪵",n:"フェンス",lv:1},{id:"sign",e:"🪧",n:"かんばん",lv:1},{id:"tulip",e:"🌷",n:"チューリップ",lv:1},
-  {id:"sun",e:"🌻",n:"ひまわり",lv:2},{id:"tree",e:"🌳",n:"き",lv:2},{id:"bush",e:"🌿",n:"しげみ",lv:2},
-  {id:"mush",e:"🍄",n:"きのこ",lv:3},{id:"well",e:"⛲",n:"いど",lv:3},{id:"bench",e:"🪑",n:"ベンチ",lv:3},
-  {id:"hut",e:"🏡",n:"こや",lv:4},{id:"scarecrow",e:"🧑‍🌾",n:"かかし",lv:4},{id:"butterfly",e:"🦋",n:"ちょう",lv:5},
-  {id:"tractor",e:"🚜",n:"トラクター",lv:5},{id:"pond",e:"🪷",n:"いけ",lv:6},{id:"rainbow",e:"🌈",n:"にじ",lv:7},{id:"star",e:"⭐",n:"おほしさま",lv:8},
-];
 function holdDaysOf(h){ return h&&h.firstBuyDate ? (Date.now()-new Date(h.firstBuyDate).getTime())/86400000 : 0; }
 function cropStageDays(days){ return days>=30?3 : days>=10?2 : days>=3?1 : 0; } // 0芽→1苗→2花→3実った(収穫可)
 function CropArt({stockId, stage, emoji, size}){
@@ -8693,62 +8685,25 @@ function InvestTab({child,data,update}){
   const [showShare,setShowShare]=useState(false);
   const [tradeFlash,setTradeFlash]=useState(null);   // 売買の気持ちいい完了トースト
   const [harvestBurst,setHarvestBurst]=useState(null);   // 利益確定の全画面・収穫バースト
-  const [showDex,setShowDex]=useState(false);   // 収穫シール帳・作物図鑑
   const [shareCopied,setShareCopied]=useState(false);
   const [showTrade,setShowTrade]=useState(false);   // ゲームホーム ⇄ とりひき/くら（数字はここ）
-  const [showDeco,setShowDeco]=useState(false);     // 🏡 模様替え
   const [showAllStocks,setShowAllStocks]=useState(false); // 銘柄リストの「もっと見る」（既定は厳選＝スクロール短縮）
   const FARM_FAV=new Set(["f1","f2","f3","f4","f5","s1","s7","s4","s6","s11","s21","s5","s10"]); // 架空5＋子ども定番
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
-  // 作物図鑑: 各銘柄の到達した最高成長段階(0..3)を永続記録(売っても消えない=集める楽しみ)
-  const cropDex=(data.cropDex||{})[child.id]||{};
-  useEffect(()=>{
-    const cur={};
-    myHoldings.forEach(h=>{ if(CROP_ART[h.stockId]!==undefined){ const st=cropStageDays(holdDaysOf(h)); cur[h.stockId]=Math.max(cur[h.stockId]??-1, st); }});
-    const prev=(data.cropDex||{})[child.id]||{}; let changed=false; const next={...prev};
-    Object.entries(cur).forEach(([k,v])=>{ if((next[k]??-1)<v){ next[k]=v; changed=true; }});
-    if(changed) update(d=>({...d,cropDex:{...(d.cropDex||{}),[child.id]:next}}));
-  },[]);
-  // 🌱 カウシェ型「おみず／お世話で確実に育つ」エンゲージ層（射幸性なし・努力で確実）
-  const farmData={water:0,care:{},xp:0,lastDraw:null,...((data.farm||{})[child.id]||{})};
-  const bucketG = farmData.lastDraw ? Math.min(30, Math.max(0,(Date.now()-new Date(farmData.lastDraw).getTime())/1000*0.01)) : 30;
-  const waterReserve=Math.floor(farmData.water||0);
-  const farmXp=farmData.xp||0; const farmLv=Math.floor(farmXp/12)+1; const lvProg=(farmXp%12)/12;
+  // 📅 連続ログイン（畑ミニゲームは引退。farm には streak/lastLogin だけ残す。旧フィールドは保存データに残っても無害）
+  const farmData={streak:0,lastLogin:null,...((data.farm||{})[child.id]||{})};
   const flash=(msg,color)=>{ setTradeFlash({msg,color}); setTimeout(()=>setTradeFlash(null),1600); };
-  const setFarm=(mut)=>update(d=>{ const f={water:0,care:{},xp:0,lastDraw:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f,care:{...(f.care||{})}}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
-  const drawWater=()=>{ const g=bucketG; if(g<1){flash("💧 まだ おみずが たまってないよ","#3478D4");return;} setFarm(f=>({...f,water:(f.water||0)+g,lastDraw:new Date().toISOString()})); flash(`💧 おみずを ${Math.floor(g)}g くんだ！`,"#3478D4"); };
-  // 水やり＝お世話(はたけレベル＋タネモンの絆)。作物の成長/売り時には影響しない=投資は保有日数で正直に
-  const waterCrop=(s,h)=>{ if((farmData.water||0)<5){flash("💧 おみずが たりない。井戸で くもう","#D95C55");return;} setFarm(f=>({...f,water:(f.water||0)-5,xp:(f.xp||0)+1})); flash("💧 おせわした！まちレベルUPで かざりが ふえる🏙","#34C77B"); };
+  const setFarm=(mut)=>update(d=>{ const f={streak:0,lastLogin:null,...((d.farm||{})[child.id]||{})}; const nf=mut({...f}); return {...d,farm:{...(d.farm||{}),[child.id]:nf}}; });
   const loginStreak=farmData.streak||0;
-  // 📅 連続ログインボーナス(マイル型・毎日の理由。FOMOにしすぎない)
   useEffect(()=>{
     const today=new Date().toDateString();
     if(farmData.lastLogin===today) return;
     const y=new Date(Date.now()-86400000).toDateString();
     const ns=farmData.lastLogin===y?(farmData.streak||0)+1:1;
-    const gain=8+Math.min(7,ns);
-    setFarm(f=>({...f,water:(f.water||0)+gain,lastLogin:today,streak:ns}));
-    flash(`📅 ${ns}日れんぞく ログイン！おみず +${gain}g🎁`,"#34C77B");
+    setFarm(f=>({...f,lastLogin:today,streak:ns}));
+    flash(`📅 ${ns}日れんぞく ログイン！🎁`,"#34C77B");
   },[]);
-  // 🐣 なでなで(たまごっち型お世話の入口・1日10回までxp)
-  const patMon=()=>{
-    const today=new Date().toDateString();
-    const done=farmData.patDate===today?(farmData.patN||0):0;
-    if(done>=10){ flash("🌱 タネモン ごきげん！また あした なでようね","#34C77B"); return; }
-    setFarm(f=>({...f,xp:(f.xp||0)+1,patDate:today,patN:(f.patDate===today?(f.patN||0):0)+1}));
-    flash("🌱 なでなで♪ タネモンが よろこんでる","#34C77B");
-  };
-  // 🏡 模様替え: 置けるデコ数は はたけレベルで増える(📈 畑が広がる)
-  const placedDeco=farmData.deco||[];
-  const decoSlots=Math.min(8,2+(farmLv-1));
-  const toggleDeco=(id)=>{
-    const cur=(farmData.deco||[]);
-    if(cur.includes(id)){ setFarm(f=>({...f,deco:(f.deco||[]).filter(x=>x!==id)})); return; }
-    if(cur.length>=decoSlots){ flash(`これ以上 置けないよ。レベルアップで 増えるよ🌱（Lv.${farmLv}＝${decoSlots}コ）`,"#D95C55"); return; }
-    setFarm(f=>({...f,deco:[...(f.deco||[]),id]}));
-    flash("🏡 かざりを おいたよ！","#34C77B");
-  };
   // 保護者設定: 為替OFF / 1日の売買回数上限
   const _fs=data.familySettings||{};
   const isJr=child.displayMode==="junior";        // 小学生は「株（畑）」だけ。為替は出さない
@@ -8846,73 +8801,6 @@ function InvestTab({child,data,update}){
         <div style={{marginTop:8,fontSize:13,fontWeight:800,color:"#8a6a00",textShadow:"0 1px 6px #fff",animation:"harvestBurst 1.1s .04s cubic-bezier(.2,.9,.3,1.2) forwards"}}>🌾 {harvestBurst.days}日 そだてた ごほうび</div>
         <div style={{marginTop:2,fontSize:22,fontWeight:900,color:"#187A4E",textShadow:"0 2px 8px #fff",animation:"harvestBurst 1.1s .08s cubic-bezier(.2,.9,.3,1.2) forwards"}}>+{harvestBurst.pts.toLocaleString()}pt 収穫！</div>
         <style>{`@keyframes harvestBurst{0%{transform:scale(0) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:0}}`}</style>
-      </div>
-    )}
-    {/* 📖 収穫シール帳・作物図鑑 */}
-    {showDex&&(()=>{
-      const STAGES=[{k:"seed",th:0,l:"たね"},{k:"0",th:0,l:"め"},{k:"1",th:1,l:"なえ"},{k:"2",th:2,l:"はな"},{k:"3",th:3,l:"みのり"}];
-      const dexStocks=stocks.filter(s=>CROP_ART[s.id]!==undefined);
-      let got=0,total=0;
-      dexStocks.forEach(s=>{const mx=cropDex[s.id]??-1;STAGES.forEach(st=>{total++;if(mx>=st.th&&mx>=0)got++;});});
-      return(
-      <div onClick={()=>setShowDex(false)} style={{position:"fixed",inset:0,zIndex:1450,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:BG,borderRadius:20,padding:"16px 14px",maxWidth:380,width:"100%",maxHeight:"86vh",overflowY:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.4)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-            <img src="/assets/album_icon.png" alt="" style={{width:30,height:30,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{const s=document.createElement("span");s.textContent="📖";s.style.fontSize="24px";e.target.replaceWith(s);}}/>
-            <div style={{flex:1}}><div style={{fontWeight:900,fontSize:16,color:GP}}>さくもつ ずかん</div><div style={{fontSize:11,fontWeight:800,color:TEXTS}}>そだてた さくもつを あつめよう（{got}/{total}）</div></div>
-            <button onClick={()=>setShowDex(false)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
-          </div>
-          {dexStocks.map(s=>{
-            const mx=cropDex[s.id]??-1;
-            return(
-              <div key={s.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"9px 10px",marginTop:10}}>
-                <div style={{fontWeight:800,fontSize:12,color:TEXT,marginBottom:6}}>{s.emoji} {s.name}</div>
-                <div style={{display:"flex",gap:5,justifyContent:"space-between"}}>
-                  {STAGES.map(st=>{
-                    const ok=mx>=0&&mx>=st.th;
-                    const frame=ok?(st.k==="3"?"collect_shiny":"collect_slot"):"collect_locked";
-                    return(
-                      <div key={st.k} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                        <div style={{position:"relative",width:54,height:54,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          <img src={`/assets/${frame}.png`} alt="" style={{position:"absolute",inset:0,width:54,height:54,objectFit:"contain",imageRendering:"pixelated"}} onError={e=>{e.target.style.display="none";}}/>
-                          {ok&&<div style={{position:"relative",zIndex:1}}><CropArt stockId={s.id} stage={st.k} emoji={s.emoji} size={32}/></div>}
-                        </div>
-                        <span style={{fontSize:9,fontWeight:800,color:ok?GP:MUTED}}>{ok?st.l:"？"}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-          <div style={{fontSize:10.5,color:MUTED,fontWeight:700,textAlign:"center",marginTop:12,lineHeight:1.6}}>長く そだてるほど 上の シールが もらえるよ🌱<br/>うっても シールは きえないよ</div>
-        </div>
-      </div>);
-    })()}
-    {/* 🏡 もようがえ（畑のデコ・あつ森型／レベルで増える） */}
-    {showDeco&&(
-      <div onClick={()=>setShowDeco(false)} style={{position:"fixed",inset:0,zIndex:1450,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:BG,borderRadius:20,padding:"16px 14px",maxWidth:380,width:"100%",maxHeight:"86vh",overflowY:"auto",boxShadow:"0 12px 40px rgba(0,0,0,.4)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-            <span style={{fontSize:24}}>🏡</span>
-            <div style={{flex:1}}><div style={{fontWeight:900,fontSize:16,color:GP}}>もようがえ</div><div style={{fontSize:11,fontWeight:800,color:TEXTS}}>畑を じぶんらしく かざろう（{placedDeco.length}/{decoSlots}コ・Lv.{farmLv}）</div></div>
-            <button onClick={()=>setShowDeco(false)} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-            {DECO_ITEMS.map(d=>{
-              const locked=farmLv<d.lv; const on=placedDeco.includes(d.id);
-              return(
-                <button key={d.id} disabled={locked} onClick={()=>toggleDeco(d.id)}
-                  style={{background:on?GS:CARD,border:on?`2.5px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:14,padding:"9px 2px",cursor:locked?"default":"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:2,opacity:locked?0.5:1}}>
-                  <span style={{fontSize:26,filter:locked?"grayscale(1)":"none"}}>{locked?"🔒":d.e}</span>
-                  <span style={{fontSize:9,fontWeight:800,color:locked?MUTED:on?GP:TEXT}}>{locked?`Lv.${d.lv}`:d.n}</span>
-                  {on&&<span style={{fontSize:8,fontWeight:900,color:GP}}>おいてる</span>}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{fontSize:10.5,color:MUTED,fontWeight:700,textAlign:"center",marginTop:12,lineHeight:1.6}}>はたけレベルが 上がると、置ける数と アイテムが ふえるよ🌱<br/>（水やり・なでなで・ログインで レベルアップ）</div>
-        </div>
       </div>
     )}
     {/* ポートフォリオ シェアモーダル */}
