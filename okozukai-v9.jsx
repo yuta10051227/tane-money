@@ -3870,7 +3870,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
-          <SeedMonster child={child} data={data} size={130} update={update}/>
+          <Buddy child={child} data={data} size={130} update={update}/>
         </div>
         {(()=>{
           const m=getMonState(data, child);
@@ -3981,7 +3981,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
           </div>
-          <SeedMonster child={child} data={data} size={100} update={update}/>
+          <Buddy child={child} data={data} size={100} update={update}/>
         </div>
         {/* 目標までの進捗バー(参考ゲームの進行感を健全に: 直近の未達成目標を1本だけ) */}
         {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
@@ -7275,6 +7275,61 @@ function DarkEggCard({child,data,update}){
           @keyframes deBurst{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.3)}}
         `}</style>
       </div>
+    </div>
+  );
+}
+
+// 🌱 4匹のタネモン（お金の4つのこと）＝タネマネーの看板。最初に相棒を1匹えらぶ。
+const BUDDY_DEF = {
+  tame:  {name:"ためタネ", e:"🐷", role:"ためる"},
+  nobi:  {name:"のびタネ", e:"🚀", role:"ふやす"},
+  tsukai:{name:"つかいタネ", e:"🛍", role:"つかう"},
+  wake:  {name:"わけタネ", e:"🎁", role:"わける"},
+};
+const BUDDY_ORDER = ["tame","nobi","tsukai","wake"];
+// 🐣 相棒タネモン：選んだ子を状態に応じた表情＋呼吸/タップ跳ねで表示（絵は1枚をコードで動かす）
+function Buddy({ child, data, update, size=110 }) {
+  const [bounce, setBounce] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const buddy = (data.buddy||{})[child.id] || null;
+  const myLogs = (data.logs||[]).filter(l=>l.cid===child.id);
+  // 表情を状態で出し分け（4表情を意味づけて使う）
+  const hour = new Date().getHours();
+  const doneToday = myLogs.some(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date));
+  const streak = (data.streak?.[child.id]?.cur)||0;
+  let expr = "joy";
+  if(hour>=21||hour<6) expr="sleepy";      // 夜はねむい
+  else if(!doneToday) expr="go";           // まだ今日がんばってない→がんばれ！
+  else if(streak>=3) expr="cheer";         // 連続がんばり→応援
+  else expr="joy";                          // 今日やった→よろこぶ
+  const pick = (id)=>{ update(d=>({...d,buddy:{...(d.buddy||{}),[child.id]:id}})); setPicking(false); taneHaptic("success"); };
+
+  if(!buddy || picking){
+    return (
+      <div style={{width:"100%",background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:16,padding:"12px 10px"}}>
+        <div style={{textAlign:"center",fontSize:12.5,fontWeight:900,color:"#fff",marginBottom:8}}>🌱 あいぼうの タネを えらぼう</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {BUDDY_ORDER.map(id=>{const d=BUDDY_DEF[id];return(
+            <button key={id} onClick={()=>pick(id)} style={{background:"rgba(255,255,255,0.92)",border:`2px solid ${buddy===id?G:"transparent"}`,borderRadius:14,padding:"8px 6px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:8}}>
+              <img src={`/assets/tanemon_${id}_joy.png`} alt={d.name} style={{width:44,height:44,objectFit:"contain",imageRendering:"pixelated",flexShrink:0}} onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:d.e,style:"font-size:30px"}));}}/>
+              <div style={{textAlign:"left",lineHeight:1.2}}><div style={{fontSize:12,fontWeight:900,color:TEXT}}>{d.name}</div><div style={{fontSize:9.5,fontWeight:800,color:MUTED}}>{d.e}{d.role}</div></div>
+            </button>
+          );})}
+        </div>
+        {buddy&&<button onClick={()=>setPicking(false)} style={{marginTop:8,width:"100%",background:"none",border:"none",color:"rgba(255,255,255,.7)",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>やめる</button>}
+      </div>
+    );
+  }
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+      <div onClick={()=>{ taneHaptic("tap"); setBounce(true); setTimeout(()=>setBounce(false),480); }}
+        style={{width:size,height:size,cursor:"pointer",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+        <img src={`/assets/tanemon_${buddy}_${expr}.png`} alt={BUDDY_DEF[buddy]?.name||"タネモン"}
+          style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",transformOrigin:"bottom center",animation:bounce?"buddyBounce .48s cubic-bezier(.34,1.56,.64,1)":"buddyBreath 2.8s ease-in-out infinite"}}
+          onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:BUDDY_DEF[buddy]?.e||"🌱",style:`font-size:${Math.round(size*0.6)}px`}));}}/>
+      </div>
+      <button onClick={()=>setPicking(true)} style={{background:"none",border:"none",color:"rgba(255,255,255,.55)",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F,padding:"2px 6px"}}>🔄 かえる</button>
+      <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}@keyframes buddyBounce{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.07)}62%{transform:translateY(0) scale(.93)}100%{transform:translateY(0) scale(1)}}`}</style>
     </div>
   );
 }
