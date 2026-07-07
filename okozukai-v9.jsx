@@ -8985,17 +8985,10 @@ function InvestTab({child,data,update}){
       const has=myHoldings.length>0;
       const gp=portfolioCost>0?portfolioGain/portfolioCost*100:0;
       return(<div>
-        <div style={{display:"flex",gap:SP.sm,alignItems:"center",marginBottom:SP.md}}>
-          {studyMode
-            ? <div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"8px 12px",fontSize:12,fontWeight:900,color:GP}}>📚 学習モード</div>
-            : <><div style={{flex:1,background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"8px 12px",fontSize:12,fontWeight:900,color:GP}}>🏙 とうしワールド</div>
-              {loginStreak>0&&<div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:GP,whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:G}}/><FIcon name="streak" size={14}/>{loginStreak}</div>}</>}
-          <div style={{position:"relative",background:CARD,border:BD_THIN,borderRadius:RAD_CHIP,boxShadow:SHADOW_SM,padding:"7px 9px 7px 13px",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:900,color:"#8a6a00",whiteSpace:"nowrap"}}><span style={{position:"absolute",left:5,top:7,bottom:7,width:3,borderRadius:RAD_PILL,background:GOLD}}/><FIcon name="coin" size={14}/>{myBal.toLocaleString()}</div>
-        </div>
-        {/* 🏙 推しカンパニーの街：更地の上に おうえん中の会社の建物が建つ（タップで取引・下がると さびれる） */}
-        <div style={{position:"relative",borderRadius:RAD_CARD,overflow:"hidden",marginBottom:SP.md,border:BD_THIN,boxShadow:SHADOW_MD,background:"linear-gradient(180deg,#dbeede,#eaf7ec)"}}>
+        {/* 🏙 投資ワールド（画面いっぱいの街）。更地の上に会社の建物が建つ。左右いっぱいに全画面ブリード */}
+        <div style={{position:"relative",margin:"-12px -16px 14px",overflow:"hidden",background:"linear-gradient(180deg,#dbeede,#eaf7ec)"}}>
           <img src="/assets/town_empty.png" alt="推しカンパニーの街" style={{display:"block",width:"100%",height:"auto",imageRendering:"pixelated"}}
-            onError={e=>{const w=e.target.closest("div"); if(w) w.style.display="none";}}/>
+            onError={e=>{const w=e.target.closest("div"); if(w) w.style.minHeight="220px";}}/>
           {/* 区画（土の上）に建物を並べる。建物は「おうえんし続けた日数」で育つ＝減らない安心 */}
           <div style={{position:"absolute",left:"15%",right:"15%",top:"46%",bottom:"19%",display:"flex",alignItems:"flex-end",justifyContent:"center",gap:"2%"}}>
             {myHoldings.slice(0,4).map(h=>{
@@ -9012,8 +9005,16 @@ function InvestTab({child,data,update}){
               </button>);
             })}
           </div>
-          {!has&&<button onClick={()=>setShowTrade(true)} style={{position:"absolute",left:"50%",top:"60%",transform:"translate(-50%,-50%)",background:"rgba(255,255,255,.92)",border:`2px dashed ${G}`,borderRadius:14,padding:"8px 16px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:13,boxShadow:SHADOW_SM}}>＋ 会社を おうえん</button>}
-          <span style={{position:"absolute",left:8,top:8,background:"rgba(255,255,255,.92)",borderRadius:RAD_PILL,padding:"4px 11px",fontSize:11,fontWeight:900,color:has?(gp>=0?GP:R):GP,boxShadow:SHADOW_SM}}>{has?`街の成績 ${gp>=0?"+":""}${gp.toFixed(1)}%`:"🏙 きみの 街"}</span>
+          {!has&&<button onClick={()=>setShowTrade(true)} style={{position:"absolute",left:"50%",top:"58%",transform:"translate(-50%,-50%)",background:"rgba(255,255,255,.94)",border:`2px dashed ${G}`,borderRadius:14,padding:"10px 18px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:14,boxShadow:SHADOW_SM}}>＋ 会社を おうえん</button>}
+          {/* 左上：街の成績（正直な損益%） */}
+          <span style={{position:"absolute",left:12,top:12,background:"rgba(255,255,255,.94)",borderRadius:RAD_PILL,padding:"5px 12px",fontSize:12,fontWeight:900,color:has?(gp>=0?GP:R):GP,boxShadow:SHADOW_SM}}>{has?`街の成績 ${gp>=0?"+":""}${gp.toFixed(1)}%`:"🏙 きみの 街"}</span>
+          {/* 右上：コイン残高＋連続（またはstudyモード） */}
+          <div style={{position:"absolute",right:12,top:12,display:"flex",gap:6}}>
+            {studyMode
+              ? <span style={{background:"rgba(255,255,255,.94)",borderRadius:RAD_PILL,padding:"5px 12px",fontSize:11,fontWeight:900,color:GP,boxShadow:SHADOW_SM}}>📚 学習</span>
+              : loginStreak>0&&<span style={{background:"rgba(255,255,255,.94)",borderRadius:RAD_PILL,padding:"5px 10px",fontSize:12,fontWeight:900,color:GP,boxShadow:SHADOW_SM,display:"flex",alignItems:"center",gap:3}}><FIcon name="streak" size={13}/>{loginStreak}</span>}
+            <span style={{background:"rgba(255,255,255,.94)",borderRadius:RAD_PILL,padding:"5px 11px",fontSize:12,fontWeight:900,color:"#8a6a00",boxShadow:SHADOW_SM,display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap"}}><FIcon name="coin" size={13}/>{myBal.toLocaleString()}</span>
+          </div>
         </div>
         {/* とりひき（1つに集約。畑ミニゲームは引退＝二重表示を解消） */}
         <button onClick={()=>setShowTrade(true)}
