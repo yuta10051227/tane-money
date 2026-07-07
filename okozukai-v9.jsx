@@ -4074,6 +4074,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
+      {/* 💬 かぞく会議カード（週替わり・家族の会話づくり） */}
+      {effectiveTab==="daily" && (
+        <div style={{padding:"10px 16px 0"}}>
+          <FamilyTalkCard child={child} data={data} update={update}/>
+        </div>
+      )}
+
       {/* 🎯 きょうのミッション(毎日リセット) ※ユーザー要望で非表示(falseで無効化・復活可) */}
       {false && effectiveTab==="daily" && showMissions && (()=>{
         const tISO=todayISO(), tk=todayKey();
@@ -7287,10 +7294,13 @@ const BUDDY_DEF = {
   wake:  {name:"わけタネ", e:"🎁", role:"わける"},
 };
 const BUDDY_ORDER = ["tame","nobi","tsukai","wake"];
-// 🐣 相棒タネモン：選んだ子を状態に応じた表情＋呼吸/タップ跳ねで表示（絵は1枚をコードで動かす）
+const BUDDY_HINT = { tame:"コツコツ ためる子", nobi:"チャレンジで ふやす子", tsukai:"かしこく つかう子", wake:"やさしく わける子" };
+const BUDDY_TALK = ["わ〜い！","えへへ♪","うれしい！","なでなで ありがと","きょうも がんばろ！","だいすき♡","ぷにぷに〜","いっしょに いこ！"];
+// 🐣 相棒タネモン：選んだ子を状態に応じた表情＋呼吸/タップ跳ね＋吹き出しで表示（絵は1枚をコードで動かす）
 function Buddy({ child, data, update, size=110 }) {
   const [bounce, setBounce] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [speech, setSpeech] = useState(null);
   const buddy = (data.buddy||{})[child.id] || null;
   const myLogs = (data.logs||[]).filter(l=>l.cid===child.id);
   // 表情を状態で出し分け（4表情を意味づけて使う）
@@ -7306,30 +7316,74 @@ function Buddy({ child, data, update, size=110 }) {
 
   if(!buddy || picking){
     return (
-      <div style={{width:"100%",background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:16,padding:"12px 10px"}}>
-        <div style={{textAlign:"center",fontSize:12.5,fontWeight:900,color:"#fff",marginBottom:8}}>🌱 あいぼうの タネを えらぼう</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          {BUDDY_ORDER.map(id=>{const d=BUDDY_DEF[id];return(
-            <button key={id} onClick={()=>pick(id)} style={{background:"rgba(255,255,255,0.92)",border:`2px solid ${buddy===id?G:"transparent"}`,borderRadius:14,padding:"8px 6px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:8}}>
-              <img src={`/assets/tanemon_${id}_joy.png`} alt={d.name} style={{width:44,height:44,objectFit:"contain",imageRendering:"pixelated",flexShrink:0}} onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:d.e,style:"font-size:30px"}));}}/>
-              <div style={{textAlign:"left",lineHeight:1.2}}><div style={{fontSize:12,fontWeight:900,color:TEXT}}>{d.name}</div><div style={{fontSize:9.5,fontWeight:800,color:MUTED}}>{d.e}{d.role}</div></div>
+      <div style={{width:"100%",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:18,padding:"14px 12px"}}>
+        <div style={{textAlign:"center",fontSize:14,fontWeight:900,color:"#fff",marginBottom:2}}>🌱 あいぼうの タネを えらぼう</div>
+        <div style={{textAlign:"center",fontSize:10.5,fontWeight:800,color:"rgba(255,255,255,.7)",marginBottom:10}}>すきな子を えらんでね（あとで かえられるよ）</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+          {BUDDY_ORDER.map((id,i)=>{const d=BUDDY_DEF[id];const sel=buddy===id;return(
+            <button key={id} onClick={()=>pick(id)} style={{background:"rgba(255,255,255,0.95)",border:`2.5px solid ${sel?G:"transparent"}`,borderRadius:16,padding:"10px 6px 8px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:3,boxShadow:SHADOW_SM}}>
+              <img src={`/assets/tanemon_${id}_joy.png`} alt={d.name} style={{width:60,height:60,objectFit:"contain",imageRendering:"pixelated",transformOrigin:"bottom center",animation:`buddyBreath ${2.4+i*0.22}s ease-in-out infinite`}} onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:d.e,style:"font-size:40px"}));}}/>
+              <div style={{fontSize:12.5,fontWeight:900,color:TEXT}}>{d.name}</div>
+              <div style={{fontSize:9.5,fontWeight:800,color:GP,background:GS,borderRadius:999,padding:"1px 8px"}}>{d.e}{d.role}</div>
+              <div style={{fontSize:9,fontWeight:700,color:MUTED,lineHeight:1.2,marginTop:1}}>{BUDDY_HINT[id]}</div>
             </button>
           );})}
         </div>
-        {buddy&&<button onClick={()=>setPicking(false)} style={{marginTop:8,width:"100%",background:"none",border:"none",color:"rgba(255,255,255,.7)",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>やめる</button>}
+        {buddy&&<button onClick={()=>setPicking(false)} style={{marginTop:10,width:"100%",background:"none",border:"none",color:"rgba(255,255,255,.7)",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>やめる</button>}
+        <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}`}</style>
       </div>
     );
   }
+  const onPat = ()=>{ taneHaptic("tap"); setBounce(true); setTimeout(()=>setBounce(false),480);
+    setSpeech(BUDDY_TALK[Math.floor(Math.random()*BUDDY_TALK.length)]); setTimeout(()=>setSpeech(null),1300); };
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-      <div onClick={()=>{ taneHaptic("tap"); setBounce(true); setTimeout(()=>setBounce(false),480); }}
-        style={{width:size,height:size,cursor:"pointer",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div onClick={onPat} style={{position:"relative",width:size,height:size,cursor:"pointer",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+        {/* 吹き出し（タップ時のリアクション） */}
+        {speech&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"#fff",color:GP,fontWeight:900,fontSize:11,whiteSpace:"nowrap",borderRadius:12,padding:"4px 10px",boxShadow:SHADOW_SM,zIndex:3,animation:"buddyPop .3s cubic-bezier(.34,1.56,.64,1)"}}>{speech}<span style={{position:"absolute",bottom:-4,left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"5px solid transparent",borderRight:"5px solid transparent",borderTop:"5px solid #fff"}}/></div>}
         <img src={`/assets/tanemon_${buddy}_${expr}.png`} alt={BUDDY_DEF[buddy]?.name||"タネモン"}
           style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",transformOrigin:"bottom center",animation:bounce?"buddyBounce .48s cubic-bezier(.34,1.56,.64,1)":"buddyBreath 2.8s ease-in-out infinite"}}
           onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:BUDDY_DEF[buddy]?.e||"🌱",style:`font-size:${Math.round(size*0.6)}px`}));}}/>
       </div>
       <button onClick={()=>setPicking(true)} style={{background:"none",border:"none",color:"rgba(255,255,255,.55)",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F,padding:"2px 6px"}}>🔄 かえる</button>
-      <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}@keyframes buddyBounce{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.07)}62%{transform:translateY(0) scale(.93)}100%{transform:translateY(0) scale(1)}}`}</style>
+      <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}@keyframes buddyBounce{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.07)}62%{transform:translateY(0) scale(.93)}100%{transform:translateY(0) scale(1)}}@keyframes buddyPop{0%{transform:translateX(-50%) scale(0);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}`}</style>
+    </div>
+  );
+}
+
+// 💬 かぞく会議カード：週替わりの「お金×家族の会話のタネ」。親子で話す瞬間を作る（北極星の心臓）
+const FAMILY_Q = [
+  "きみの 推しカンパニー、なんで 好き？おうちの人に 教えてあげよう",
+  "もし 1000円 もらったら、ためる？つかう？なにに する？",
+  "今週 いちばん うれしかった お金の つかいみちは？",
+  "ためる・ふやす・つかう・わける、いま いちばん 大事だと思うのは どれ？",
+  "おうちの人が 子どものころ ほしかった ものは？聞いてみよう",
+  "がんばって ためてる 目標は 何のため？家族に 話してみよう",
+  "「安いから買う」と「ほしいから買う」、どっちが 多いかな？",
+  "お金で 買えない たいせつな もの、なんだと思う？",
+];
+function weekKeyNow(){ const d=new Date(); const j=new Date(d.getFullYear(),0,1); const wk=Math.ceil((((d-j)/86400000)+j.getDay()+1)/7); return `${d.getFullYear()}w${wk}`; }
+function FamilyTalkCard({ child, data, update }){
+  const wk=weekKeyNow(); const key=`${wk}_${child.id}`;
+  const ft=data.familyTalk||{};
+  const done=!!ft[key];
+  const total=Object.keys(ft).filter(k=>k.endsWith(`_${child.id}`)).length;
+  const q=FAMILY_Q[(parseInt(wk.replace(/\D/g,""))||0)%FAMILY_Q.length];
+  const doTalk=()=>{ taneHaptic("success"); update(d=>({...d,familyTalk:{...(d.familyTalk||{}),[key]:{done:true,date:new Date().toISOString()}}})); };
+  return (
+    <div style={{background:`linear-gradient(135deg,${PS},#fff)`,border:`2px solid ${P}`,borderRadius:18,padding:"14px 16px",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:20}}>🗣</span>
+        <div style={{fontWeight:900,fontSize:14,color:P}}>今週の かぞく会議</div>
+        {total>0&&<span style={{marginLeft:"auto",fontSize:10,fontWeight:800,color:MUTED}}>つうさん {total}回</span>}
+      </div>
+      {done?(
+        <div style={{fontSize:12.5,fontWeight:800,color:GP,lineHeight:1.5}}>✅ 今週は 話せたね！えらい🎉<br/><span style={{fontSize:11,color:TEXTS,fontWeight:700}}>また来週、あたらしい おはなしが 出るよ</span></div>
+      ):(<>
+        <div style={{fontSize:13,fontWeight:800,color:TEXT,lineHeight:1.6,marginBottom:10,background:"#fff",borderRadius:12,padding:"10px 12px"}}>💬 {q}</div>
+        <button onClick={doTalk} style={{width:"100%",background:P,border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>おうちの人と 話せた！🎉</button>
+        <div style={{fontSize:10,color:MUTED,fontWeight:700,textAlign:"center",marginTop:6}}>お金の話を 家族で するのが、いちばんの 学びだよ🌱</div>
+      </>)}
     </div>
   );
 }
