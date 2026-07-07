@@ -3624,6 +3624,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [actTab, setActTab] = useState("tasks");
   const [moreOpen, setMoreOpen] = useState(false);
   const [monTab, setMonTab] = useState("goals");
+  const [worldFull, setWorldFull] = useState(false);   // 🏙 投資ワールドを別ページ(全画面)で開く
   const [taskSort, setTaskSort] = useState("default");
   const [rewardSort, setRewardSort] = useState("default");
   const [logSort, setLogSort] = useState("new");
@@ -4048,10 +4049,21 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </button>
       )}
 
-      {/* 🌱 はたけ フローティングボタン(そだてるボタンの上に重ねて常駐・株/畑ワールドへ) */}
-      {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young)
-        && !(effectiveTab==="money"&&monTab==="hatake") && (
-        <button onClick={()=>{ setTab(isJunior?"goals":"money"); setMonTab("hatake"); }} aria-label="推しカンパニーの街"
+      {/* 🏙 投資ワールド 全画面ページ（まちボタンで“別ページ”として開く） */}
+      {worldFull && !data.familySettings?.investOff && (
+        <div style={{position:"fixed",inset:0,zIndex:800,background:BG,overflowY:"auto",WebkitOverflowScrolling:"touch",animation:"worldIn .3s cubic-bezier(.22,.9,.3,1)"}}>
+          <div style={{position:"sticky",top:0,zIndex:5,display:"flex",alignItems:"center",gap:10,padding:"calc(env(safe-area-inset-top,0px) + 10px) 14px 10px",background:"rgba(247,245,239,.9)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}>
+            <button onClick={()=>{ taneHaptic("tap"); setWorldFull(false); }} style={{display:"flex",alignItems:"center",gap:5,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:999,padding:"8px 15px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:14}}>‹ もどる</button>
+            <span style={{fontWeight:900,fontSize:15,color:GP}}>🏙 とうしワールド</span>
+          </div>
+          <InvestTab child={child} data={data} update={update}/>
+          <style>{`@keyframes worldIn{0%{transform:translateY(100%);opacity:.5}100%{transform:translateY(0);opacity:1}}`}</style>
+        </div>
+      )}
+
+      {/* 🏙 まち フローティングボタン(常駐・投資ワールドを別ページで開く) */}
+      {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young) && !worldFull && (
+        <button onClick={()=>{ taneHaptic("tap"); setWorldFull(true); }} aria-label="推しカンパニーの街"
           style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
             background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
             cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
@@ -4629,7 +4641,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🏢 推しカンパニー"]]:[])]
             :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["hatake","🏢 推しカンパニー"]]:[])]
           ).map(([k,l])=>(
-            <button key={k} onClick={()=>setMonTab(k)}
+            <button key={k} onClick={()=>{ if(k==="hatake"){ taneHaptic("tap"); setWorldFull(true); } else setMonTab(k); }}
               style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
                 background:monTab===k?GP:"transparent",
                 color:monTab===k?"#fff":MUTED,
@@ -4639,8 +4651,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           ))}
         </div>
       )}
-      {/* ── はたけ（小学生むけ 株だけの投資。為替はInvestTab側で非表示） ── */}
-      {effectiveTab==="money" && monTab==="hatake" && (isJunior||!young) && !data.familySettings?.investOff && <InvestTab child={child} data={data} update={update}/>}
+      {/* 投資ワールドは全画面ページ(worldFull)で表示。タブ内インライン表示は廃止 */}
       {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
         // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
         const _spend=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="reward"&&(l.pts||0)<0);
