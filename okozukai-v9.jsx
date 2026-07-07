@@ -8808,6 +8808,7 @@ function InvestTab({child,data,update}){
   const [shareCopied,setShareCopied]=useState(false);
   const [showTrade,setShowTrade]=useState(false);   // ゲームホーム ⇄ とりひき/くら（数字はここ）
   const [showAllStocks,setShowAllStocks]=useState(false); // 銘柄リストの「もっと見る」（既定は厳選＝スクロール短縮）
+  const [sortBy,setSortBy]=useState("fav"); // 銘柄の並び替え: fav/up/down/held/name
   const FARM_FAV=new Set(["f1","f2","f3","f4","f5","s1","s7","s4","s6","s11","s21","s5","s10"]); // 架空5＋子ども定番
   const myBal=bal(data.logs,child.id);
   const myHoldings=(data.holdings||{})[child.id]||[];
@@ -9127,8 +9128,23 @@ function InvestTab({child,data,update}){
       )}
 
       {/* 銘柄一覧 */}
-      <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>🏢 おうえんできる会社（銘柄・毎日更新）</p>
-      {stocks.map(s=>{
+      <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:8}}>🏢 おうえんできる会社（銘柄・毎日更新）</p>
+      {/* 並び替え */}
+      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:10,paddingBottom:2}}>
+        {[["fav","おすすめ"],["up","上がってる↑"],["down","下がってる↓"],["held","おうえん中"],["name","名前順"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setSortBy(k)} style={{flexShrink:0,padding:"6px 12px",borderRadius:999,border:`1.5px solid ${sortBy===k?"#4a9eff":BORDER}`,background:sortBy===k?"#4a9eff":CARD,color:sortBy===k?"#fff":MUTED,fontWeight:800,fontSize:11.5,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>{l}</button>
+        ))}
+      </div>
+      {(()=>{
+        const heldIds=new Set(myHoldings.map(h=>h.stockId));
+        let listStocks=[...stocks];
+        if(sortBy==="up") listStocks.sort((a,b)=>(b.lastChange||0)-(a.lastChange||0));
+        else if(sortBy==="down") listStocks.sort((a,b)=>(a.lastChange||0)-(b.lastChange||0));
+        else if(sortBy==="name") listStocks.sort((a,b)=>String(a.name).localeCompare(String(b.name),"ja"));
+        else if(sortBy==="held") listStocks=listStocks.filter(s=>heldIds.has(s.id));
+        else { const rank=s=>heldIds.has(s.id)?0:s.fake?1:FARM_FAV.has(s.id)?2:3; listStocks.sort((a,b)=>rank(a)-rank(b)); }
+        if(sortBy==="held" && listStocks.length===0) return <p style={{color:MUTED,fontSize:12,fontWeight:700,textAlign:"center",padding:"16px 0"}}>まだ おうえんしてる会社は ないよ🌱</p>;
+        return listStocks.map(s=>{
         const h=myHoldings.find(x=>x.stockId===s.id);
         const isUp=(s.lastChange||0)>=0;
         const isSel=selected===s.id;
@@ -9251,7 +9267,8 @@ function InvestTab({child,data,update}){
             </button>
           </div>}
         </div>);
-      })}
+      });
+      })()}
     </>}
     </>)}
   </div>);
