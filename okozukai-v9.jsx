@@ -3565,24 +3565,40 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
 // 履歴の1行。取り消しは誤タップ防止のため2タップ確認制(ポイントの増減操作なので慎重に)
 function LogRow({ l, emoji, canDelete, child, update, showFlash }){
   const [confirm,setConfirm]=useState(false);
+  const [dx,setDx]=useState(0);                 // 左スワイプ量(iOS風・負値で開く)
+  const t=useRef({x:0,y:0,base:0,lock:null});
+  const OPEN=-86;
   const deleteLog=()=>{
     const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
     addLogToFirestore(rev);
     update(d=>({...d,logs:[rev,...d.logs]}));
     showFlash(-l.pts,"🗑");
-    setConfirm(false);
+    setConfirm(false); setDx(0);
   };
+  const onStart=e=>{ if(!canDelete)return; const tt=e.touches[0]; t.current={x:tt.clientX,y:tt.clientY,base:dx,lock:null}; };
+  const onMove=e=>{ if(!canDelete)return; const tt=e.touches[0]; const ddx=tt.clientX-t.current.x, ddy=tt.clientY-t.current.y;
+    if(t.current.lock===null && (Math.abs(ddx)>6||Math.abs(ddy)>6)) t.current.lock=Math.abs(ddx)>Math.abs(ddy)?"x":"y";
+    if(t.current.lock==="x") setDx(Math.max(OPEN,Math.min(0,t.current.base+ddx))); };
+  const onEnd=()=>{ if(t.current.lock==="x") setDx(dx<OPEN/2?OPEN:0); t.current.lock=null; };
   return(
-    <div style={{background:CARD,border:`1.5px solid ${confirm?R:BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-      <span style={{fontSize:20}}>{emoji}</span>
-      <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
-      <Pt v={l.pts}/>
-      {canDelete&&(confirm
-        ? <div style={{display:"flex",gap:5,flexShrink:0}}>
-            <button onClick={deleteLog} style={{background:R,border:"none",borderRadius:9,minWidth:60,height:38,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>取り消す</button>
-            <button onClick={()=>setConfirm(false)} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:9,minWidth:44,height:38,color:TEXTS,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>やめる</button>
-          </div>
-        : <button onClick={()=>setConfirm(true)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="取り消し">🗑</button>)}
+    <div style={{position:"relative",marginBottom:8,borderRadius:14,overflow:"hidden"}}>
+      {canDelete&&(
+        <div style={{position:"absolute",inset:0,display:"flex",justifyContent:"flex-end"}}>
+          <button onClick={deleteLog} style={{width:86,border:"none",background:R,color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>取り消す</button>
+        </div>
+      )}
+      <div onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd} onClick={()=>{ if(dx!==0) setDx(0); }}
+        style={{position:"relative",background:CARD,border:`1.5px solid ${(confirm||dx!==0)?R:BORDER}`,borderRadius:14,padding:"11px 13px",display:"flex",alignItems:"center",gap:10,transform:`translateX(${dx}px)`,transition:t.current.lock==="x"?"none":"transform .22s",touchAction:"pan-y"}}>
+        <span style={{fontSize:20}}>{emoji}</span>
+        <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{l.label}</div><div style={{color:MUTED,fontSize:11}}>{fmtDate(l.date)}</div></div>
+        <Pt v={l.pts}/>
+        {canDelete&&(confirm
+          ? <div style={{display:"flex",gap:5,flexShrink:0}}>
+              <button onClick={deleteLog} style={{background:R,border:"none",borderRadius:9,minWidth:60,height:38,color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>取り消す</button>
+              <button onClick={()=>setConfirm(false)} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:9,minWidth:44,height:38,color:TEXTS,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>やめる</button>
+            </div>
+          : <button onClick={()=>setConfirm(true)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:MUTED,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="取り消し">🗑</button>)}
+      </div>
     </div>
   );
 }
