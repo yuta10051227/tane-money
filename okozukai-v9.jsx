@@ -2792,22 +2792,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                           −減算
                         </button>
                       </div>
-                      {/* ✨ ひみつのプレゼント: スラリルのタマゴを贈る(表に出さない特別枠) */}
-                      {(()=>{
-                        const hasEgg=!!(data.slimeEgg?.[member.id]);
-                        const owned=((data.monsterDiscovered?.[member.id]||[]).some(x=>String(x).startsWith("srimu")))||((data.collectedMons?.[member.id]||[]).some(m=>String(m.id||"").startsWith("srimu")));
-                        return (
-                          <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
-                            <button disabled={hasEgg||owned}
-                              onClick={()=>{ if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ひかるしずく(ひみつのタマゴ)」をプレゼントする？\nそだてる画面に「育てはじめる」が出るよ。`)) return;
-                                update(d=>({...d,slimeEgg:{...(d.slimeEgg||{}),[member.id]:true}})); setGrantChild(null); }}
-                              style={{width:"100%",padding:"9px 0",borderRadius:10,border:"none",cursor:hasEgg||owned?"default":"pointer",fontFamily:F,fontWeight:800,fontSize:12,
-                                background:hasEgg||owned?"#eceae3":"linear-gradient(135deg,#6db8ff,#7b61c9)",color:hasEgg||owned?MUTED:"#fff"}}>
-                              {owned?"✨ もう持っているよ":hasEgg?"✨ タマゴをプレゼント済み":"✨ ひみつのタマゴをプレゼント"}
-                            </button>
-                          </div>
-                        );
-                      })()}
+                      {/* 育成タマゴのプレゼントは、そだてる(育成)廃止に伴い撤去 */}
                       {/* 🎟 ガチャチケットを1枚プレゼント(その日のガチャをもう1回引ける) */}
                       <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
                         <button
@@ -3110,7 +3095,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       <span style={{fontWeight:900,fontSize:12,color:R}}>{r.ever?`${r.days}日 ログインなし`:"まだ未ログイン"}</span>
                     </div>
                   ))}
-                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や推しカンパニーの街を 見に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
+                  <div style={{fontSize:10.5,color:TEXTS,fontWeight:700,marginTop:6,lineHeight:1.5}}>声かけのチャンスです。「きょうのミッション」や 推し株を 見に さそってみましょう。学習の連続が途切れる前のひと声が継続のコツです。</div>
                 </div>);
               })()}
               {/* 承認モード切り替え */}
@@ -3175,13 +3160,13 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               </div>
               {/* 投資ワールド設定: 投資のON/OFF・為替だけOFF・1日の売買回数(小中向けに親が手綱を握れる) */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
-                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>投資ワールド（推しカンパニーの街）</div>
-                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>株や為替の体験を どこまで見せるか。お金はポイントで、実際のお金は動きません。</div>
-                {/* 投資ワールド ON/OFF */}
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>🌟 推し株</div>
+                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>好きな会社を「応援」する体験。お金はポイントで、実際のお金は動きません。</div>
+                {/* 推し株 ON/OFF */}
                 <div style={{display:"flex",alignItems:"center",gap:12,paddingBottom:10,borderBottom:`1px solid ${BORDER}`}}>
                   <div style={{flex:1}}>
-                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>投資ワールドを見せる</div>
-                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>OFFにすると 投資ワールド（株）を まるごと非表示に</div>
+                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>推し株を見せる</div>
+                    <div style={{color:MUTED,fontSize:11,marginTop:2}}>OFFにすると「推し株」を まるごと非表示に</div>
                   </div>
                   <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),investOff:!(d.familySettings?.investOff)}}))}
                     style={{position:"relative",width:48,height:26,borderRadius:13,background:(!fs.investOff)?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
@@ -4005,7 +3990,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {[
             ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう","flame"],
             ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう","clipboard"],
-            ["📊","ポートフォリオ",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","activity","株を買おう","chartup"],
+            ["🌟","推し株",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","money","推しを応援","chartup"],
             ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう","medal"],
           ].map(([e,l,v,c,tabTarget,hint,ic])=>(
             <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
@@ -7358,7 +7343,7 @@ function Buddy({ child, data, update, size=110 }) {
 
 // 💬 かぞく会議カード：週替わりの「お金×家族の会話のタネ」。親子で話す瞬間を作る（北極星の心臓）
 const FAMILY_Q = [
-  "きみの 推しカンパニー、なんで 好き？おうちの人に 教えてあげよう",
+  "きみの 推し株、なんで 応援してるの？おうちの人に 教えてあげよう",
   "もし 1000円 もらったら、ためる？つかう？なにに する？",
   "今週 いちばん うれしかった お金の つかいみちは？",
   "ためる・ふやす・つかう・わける、いま いちばん 大事だと思うのは どれ？",
