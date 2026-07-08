@@ -3604,6 +3604,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
+  const [scrollY, setScrollY] = useState(0);   // iOS風 大きいタイトルのスクロール縮小用
+  useEffect(()=>{ const on=()=>setScrollY(window.scrollY||0); window.addEventListener("scroll",on,{passive:true}); return ()=>window.removeEventListener("scroll",on); },[]);
   const [gachaRes, setGachaRes] = useState(null);
   const gachaBusyRef = useRef(false);   // ガチャ連打ガード(0.1秒更新中の二重発火/多重回しを防止)
   const [rewardPop, setRewardPop] = useState(null);
@@ -4022,6 +4024,20 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           );
         })}
       </div>
+
+      {/* iOS 26風 大きいタイトル：タブバー直下・スクロールで縮んで消える */}
+      {(()=>{
+        const titleMap={daily:"きょう",activity:"かつどう",tasks:"やること",money:"ためる",goals:"ためる",learn:"まなぶ",more:"きろく"};
+        const title=titleMap[effectiveTab];
+        if(!title) return null;
+        const p=Math.min(1,scrollY/56);          // 0=上, 1=スクロール済み
+        const h=Math.round(44*(1-p));
+        return (
+          <div style={{height:h,overflow:"hidden",padding:"0 20px"}}>
+            <div style={{fontSize:28-11*p,fontWeight:900,letterSpacing:-0.5,paddingTop:8,lineHeight:1,color:darkBG?"#fff":TEXT,opacity:1-p*0.9,transform:`translateY(${-8*p}px)`}}>{title}</div>
+          </div>
+        );
+      })()}
 
       {/* 育成RPG(そだてるFAB)・投資ワールド全画面(まちFAB)は廃止。投資はmoneyタブ内「推し株」に統合。 */}
 
