@@ -5889,6 +5889,11 @@ function ParentScreen({ data, update, onBack }) {
   const [newTask,   setNewTask]   = useState(null);
   const [overModal, setOverModal] = useState(null);
   const [ntLabel, setNtLabel]=useState(""); const [ntEmoji, setNtEmoji]=useState("⭐"); const [ntPts, setNtPts]=useState("");
+  // タスクのドラッグ並び替え(iPhone風)
+  const [dragTask,setDragTask]=useState(null);   // {k,id,dy}
+  const dragRef=useRef({startY:0});
+  const rowRefs=useRef({});
+  const moveTask=(k,id,steps)=>{ if(!steps) return; update(d=>{ const arr=[...(d[k]||[])]; const i=arr.findIndex(t=>t.id===id); if(i<0) return d; const j=Math.max(0,Math.min(arr.length-1,i+steps)); if(i===j) return d; const [it]=arr.splice(i,1); arr.splice(j,0,it); return {...d,[k]:arr}; }); };
 
   // rewards
   const [editReward,    setEditReward]    = useState(null);
@@ -6280,8 +6285,15 @@ function ParentScreen({ data, update, onBack }) {
                   <p style={{color:MUTED,fontSize:13,fontWeight:800,margin:0}}>{title}</p>
                   <Btn c={color} label="＋ 追加" onClick={()=>{setNewTask({kind});setNtLabel("");setNtEmoji("⭐");setNtPts("");}} sm/>
                 </div>
-                {tasks.map(task=>(
-                  <div key={task.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:8}}>
+                {tasks.length>1&&<p style={{color:MUTED,fontSize:10.5,margin:"-4px 0 8px",fontWeight:600}}>≡ をつかんで ドラッグすると 並び替えできます</p>}
+                {tasks.map(task=>{
+                  const isDragging=dragTask&&dragTask.k===k&&dragTask.id===task.id;
+                  return (
+                  <div key={task.id} ref={el=>{rowRefs.current[task.id]=el;}}
+                    style={{background:CARD,border:`1.5px solid ${isDragging?GP:BORDER}`,borderRadius:14,padding:"10px 13px",marginBottom:8,position:"relative",
+                      transform:isDragging?`translateY(${dragTask.dy}px) scale(1.02)`:"none",
+                      boxShadow:isDragging?"0 12px 30px rgba(0,0,0,0.18)":"none",zIndex:isDragging?50:1,opacity:isDragging?0.97:1,
+                      transition:isDragging?"none":"transform .18s ease"}}>
                     {editTask?.id===task.id ? (
                       <div>
                         <div style={{display:"flex",gap:8,marginBottom:8}}>
@@ -6293,6 +6305,13 @@ function ParentScreen({ data, update, onBack }) {
                       </div>
                     ) : (
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div
+                          onTouchStart={e=>{ e.stopPropagation(); dragRef.current={startY:e.touches[0].clientY}; setDragTask({k,id:task.id,dy:0}); }}
+                          onTouchMove={e=>{ if(dragTask&&dragTask.id===task.id) setDragTask(d=>({...d,dy:e.touches[0].clientY-dragRef.current.startY})); }}
+                          onTouchEnd={()=>{ if(dragTask&&dragTask.id===task.id){ const h=(rowRefs.current[task.id]?.offsetHeight||56)+8; const steps=Math.round((dragTask.dy||0)/h); moveTask(k,task.id,steps); setDragTask(null); } }}
+                          onMouseDown={e=>e.preventDefault()}
+                          aria-label="ドラッグして並び替え"
+                          style={{touchAction:"none",cursor:"grab",padding:"6px 4px",marginLeft:-4,color:MUTED,fontSize:19,lineHeight:1,userSelect:"none",flexShrink:0}}>≡</div>
                         <span style={{fontSize:20}}>{task.emoji}</span>
                         <div style={{flex:1}}>
                           <div style={{fontWeight:700,fontSize:14}}>{task.label}</div>
@@ -6306,7 +6325,8 @@ function ParentScreen({ data, update, onBack }) {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 {newTask?.kind===kind && (
                   <div style={{background:`${color}12`,border:`2px dashed ${color}`,borderRadius:14,padding:14,marginTop:8}}>
                     <div style={{display:"flex",gap:8,marginBottom:8}}>
