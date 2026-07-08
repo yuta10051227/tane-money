@@ -4585,19 +4585,26 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* （旧）活動>投資 は廃止。はたけは「ためる>はたけ」に統一 */}
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
-        <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
+        <div style={{padding:"12px 16px 0"}}>
+          {/* iOS 26 セグメントコントロール */}
+          <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:isJunior?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
           {(isJunior
             ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
             :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
-          ).map(([k,l])=>(
+          ).map(([k,l])=>{
+            const on=monTab===k;
+            return (
             <button key={k} onClick={()=>{ taneHaptic("tap"); setMonTab(k); }}
-              style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
-                background:monTab===k?GP:"transparent",
-                color:monTab===k?"#fff":MUTED,
-                fontWeight:monTab===k?700:400,fontSize:12,cursor:"pointer",fontFamily:F}}>
+              style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,
+                background:on?(isJunior?"#fff":"rgba(255,255,255,0.18)"):"transparent",
+                color:on?(isJunior?GP:"#fff"):(isJunior?MUTED:"rgba(255,255,255,0.55)"),
+                fontWeight:on?800:600,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",
+                boxShadow:on&&isJunior?"0 1px 3px rgba(0,0,0,0.16),0 1px 1px rgba(0,0,0,0.06)":"none",transition:"background .18s,color .18s"}}>
               {l}
             </button>
-          ))}
+            );
+          })}
+          </div>
         </div>
       )}
       {/* 🌟 推し株：moneyタブ内にインライン表示（街づくり・全画面ワールドは廃止） */}
@@ -6876,14 +6883,16 @@ function PinResetScreen({ data, update, onBack }) {
 // Child avatar: photo or emoji
 
 // ── SortBar ──────────────────────────────────────────
+// iOS 26 セグメントコントロール：グラスのトラック＋白いサム(選択)＋やわらか影
 function SortBar({options,value,onChange}){
-  return(<div style={{display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none",padding:"0 0 2px"}}>
-    {options.map(([v,l])=>(
-      <button key={v} onClick={()=>onChange(v)}
-        style={{flex:"0 0 auto",padding:"5px 11px",border:`1.5px solid ${value===v?TEXT:BORDER}`,borderRadius:20,background:value===v?TEXT:"transparent",color:value===v?"#fff":MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
+  return(<div style={{display:"inline-flex",gap:3,padding:3,borderRadius:12,background:"rgba(120,120,128,0.14)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",maxWidth:"100%",overflowX:"auto",scrollbarWidth:"none"}}>
+    {options.map(([v,l])=>{
+      const on=value===v;
+      return(<button key={v} onClick={()=>onChange(v)}
+        style={{flex:"0 0 auto",padding:"6px 13px",border:"none",borderRadius:9,background:on?"#fff":"transparent",color:on?TEXT:MUTED,fontWeight:on?800:600,fontSize:11.5,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",boxShadow:on?"0 1px 3px rgba(0,0,0,0.16),0 1px 1px rgba(0,0,0,0.06)":"none",transition:"background .18s,color .18s"}}>
         {l}
-      </button>
-    ))}
+      </button>);
+    })}
   </div>);
 }
 
@@ -8776,6 +8785,9 @@ function OshiKabu({child,data,update}){
   const [reason,setReason]=useState("");
   const [toast,setToast]=useState(null);
   const [showAll,setShowAll]=useState(false);
+  const [dragY,setDragY]=useState(0);      // シートの下スワイプ量(iOS風ドラッグ閉じ)
+  const dragStart=useRef(null);
+  const closeSheet=()=>{ setSel(null); setDragY(0); };
   const myBal=bal(data.logs,child.id);
   const stocks=(data.stocks||[]);
   const myHoldings=(data.holdings||{})[child.id]||[];
@@ -8866,7 +8878,7 @@ function OshiKabu({child,data,update}){
             const val=toPts(st,st.price)*h.qty; const gain=Math.round(val*0.98)-h.avgPrice*h.qty;
             const up=(st.lastChange||0)>=0;
             return (
-              <button key={h.stockId} onClick={()=>{setSel(st.id);setQty("1");}}
+              <button key={h.stockId} onClick={()=>{setSel(st.id);setQty("1");setDragY(0);}}
                 style={{background:CARD,border:`2px solid ${G}`,borderRadius:16,padding:"11px 14px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
                 <span style={{fontSize:30}}>{st.emoji}</span>
                 <div style={{flex:1,minWidth:0}}>
@@ -8889,7 +8901,7 @@ function OshiKabu({child,data,update}){
       {listStocks.filter(s=>!heldIds.has(s.id)).map(s=>{
         const up=(s.lastChange||0)>=0;
         return (
-          <button key={s.id} onClick={()=>{setSel(s.id);setQty("1");}}
+          <button key={s.id} onClick={()=>{setSel(s.id);setQty("1");setDragY(0);}}
             style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 14px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
             <span style={{fontSize:28}}>{s.emoji}</span>
             <div style={{flex:1,minWidth:0}}>
@@ -8909,8 +8921,13 @@ function OshiKabu({child,data,update}){
     )}
     {/* 応援シート（選択時） */}
     {selStock&&(
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSel(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.9)",backdropFilter:"saturate(180%) blur(24px)",WebkitBackdropFilter:"saturate(180%) blur(24px)",borderTop:"1px solid rgba(255,255,255,0.6)",borderRadius:"28px 28px 0 0",padding:"10px 20px calc(env(safe-area-inset-bottom,0px) + 20px)",width:"100%",maxWidth:480,fontFamily:F,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+      <div style={{position:"fixed",inset:0,background:`rgba(0,0,0,${0.32*Math.max(0,1-dragY/320)})`,backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={closeSheet}>
+        <div onClick={e=>e.stopPropagation()}
+          onTouchStart={e=>{dragStart.current=e.touches[0].clientY;}}
+          onTouchMove={e=>{ if(dragStart.current!=null){ const dy=e.touches[0].clientY-dragStart.current; if(dy>0) setDragY(dy); } }}
+          onTouchEnd={()=>{ if(dragY>110) closeSheet(); else setDragY(0); dragStart.current=null; }}
+          style={{background:"rgba(255,255,255,0.9)",backdropFilter:"saturate(180%) blur(24px)",WebkitBackdropFilter:"saturate(180%) blur(24px)",borderTop:"1px solid rgba(255,255,255,0.6)",borderRadius:"28px 28px 0 0",padding:"10px 20px calc(env(safe-area-inset-bottom,0px) + 20px)",width:"100%",maxWidth:480,fontFamily:F,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)",transform:`translateY(${dragY}px)`,transition:dragY===0?"transform .34s cubic-bezier(.32,1.24,.4,1)":"none",animation:dragY===0?"oshiSheetUp .38s cubic-bezier(.32,1.24,.4,1)":"none"}}>
+          <style>{`@keyframes oshiSheetUp{0%{transform:translateY(100%)}100%{transform:translateY(0)}}`}</style>
           <div style={{width:38,height:5,borderRadius:999,background:"rgba(0,0,0,0.16)",margin:"0 auto 14px"}}/>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <span style={{fontSize:38}}>{selStock.emoji}</span>
@@ -8918,7 +8935,7 @@ function OshiKabu({child,data,update}){
               <div style={{fontWeight:900,fontSize:17,color:TEXT}}>{selStock.name}</div>
               <div style={{fontSize:12,color:MUTED,fontWeight:700}}>{selStock.sector} ・ 1株 {toPts(selStock,selStock.price).toLocaleString()}pt <span style={{color:(selStock.lastChange||0)>=0?G:R}}>{(selStock.lastChange||0)>=0?"▲":"▼"}{Math.abs(selStock.lastChange||0).toFixed(1)}%</span></div>
             </div>
-            <button onClick={()=>setSel(null)} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,fontSize:15,cursor:"pointer",color:MUTED,fontFamily:F,flexShrink:0}}>✕</button>
+            <button onClick={closeSheet} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,fontSize:15,cursor:"pointer",color:MUTED,fontFamily:F,flexShrink:0}}>✕</button>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
             <span style={{fontSize:13,fontWeight:800,color:TEXTS}}>何株？</span>
