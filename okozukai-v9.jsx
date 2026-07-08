@@ -4008,8 +4008,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       </div>
         );
       })()}
-      {/* タブナビゲーション */}
-      <div style={{display:"flex",background:isJunior?CARD:"#0f1a2e",borderBottom:isJunior?`1px solid ${BORDER}`:"1px solid rgba(74,158,255,0.12)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 2px 8px rgba(24,35,29,0.04)":"0 2px 12px rgba(0,0,0,0.4)"}}>
+      {/* タブナビゲーション（iOS 26 リキッドグラス：半透明＋backdrop-blur） */}
+      <div style={{display:"flex",background:isJunior?"rgba(255,255,255,0.72)":"rgba(15,26,46,0.66)",backdropFilter:"saturate(180%) blur(20px)",WebkitBackdropFilter:"saturate(180%) blur(20px)",borderBottom:isJunior?"1px solid rgba(24,35,29,0.06)":"1px solid rgba(255,255,255,0.08)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 1px 14px rgba(24,35,29,0.05)":"0 1px 18px rgba(0,0,0,0.35)"}}>
         {MAIN_TABS.map(([v,l])=>{
           // 控えめな金色ドット: 「今日まだのおてつだい」と「今日まだのガチャ」だけ(最大2個)。やり終えたら消える。
           const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone);
@@ -4270,8 +4270,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Reward confirm */}
       {rewardPop && (
-        <div style={{position:"fixed",inset:0,background:"#0008",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div style={{background:CARD,borderRadius:24,padding:28,width:"100%",maxWidth:320,textAlign:"center",fontFamily:F}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",backdropFilter:"blur(3px)",WebkitBackdropFilter:"blur(3px)",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:"rgba(255,255,255,0.92)",backdropFilter:"saturate(180%) blur(24px)",WebkitBackdropFilter:"saturate(180%) blur(24px)",border:"1px solid rgba(255,255,255,0.6)",borderRadius:28,padding:28,width:"100%",maxWidth:320,textAlign:"center",fontFamily:F,boxShadow:"0 20px 60px rgba(0,0,0,0.22)"}}>
             <div style={{fontSize:52}}>{rewardPop.emoji}</div>
             <h3 style={{fontWeight:900,fontSize:18,margin:"8px 0 4px"}}>{rewardPop.label}</h3>
             <p style={{color:MUTED,fontSize:13,margin:"0 0 14px"}}>{rewardPop.unit}</p>
@@ -8909,8 +8909,9 @@ function OshiKabu({child,data,update}){
     )}
     {/* 応援シート（選択時） */}
     {selStock&&(
-      <div style={{position:"fixed",inset:0,background:"#0007",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSel(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:CARD,borderRadius:"24px 24px 0 0",padding:"20px 20px calc(env(safe-area-inset-bottom,0px) + 20px)",width:"100%",maxWidth:480,fontFamily:F}}>
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSel(null)}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"rgba(255,255,255,0.9)",backdropFilter:"saturate(180%) blur(24px)",WebkitBackdropFilter:"saturate(180%) blur(24px)",borderTop:"1px solid rgba(255,255,255,0.6)",borderRadius:"28px 28px 0 0",padding:"10px 20px calc(env(safe-area-inset-bottom,0px) + 20px)",width:"100%",maxWidth:480,fontFamily:F,boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+          <div style={{width:38,height:5,borderRadius:999,background:"rgba(0,0,0,0.16)",margin:"0 auto 14px"}}/>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
             <span style={{fontSize:38}}>{selStock.emoji}</span>
             <div style={{flex:1,minWidth:0}}>
