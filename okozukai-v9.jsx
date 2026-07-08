@@ -2385,7 +2385,7 @@ function DailyTasks({ child, data, update }) {
   return (
     <div style={{padding:"12px 16px",paddingBottom:0}}>
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease",pointerEvents:"none"}}>
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
@@ -4261,7 +4261,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Flash */}
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pending?GOLD:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pending?GOLD:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease",pointerEvents:"none"}}>
           <div style={{fontSize:38}}>{flash.emoji}</div>
           {flash.pending
             ? <div style={{fontSize:12,fontWeight:700,marginTop:4}}>おうちの人に確認するね</div>
@@ -4736,12 +4736,23 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {(data.rewards||[]).map(r=>{
               const ok=myBal>=r.cost;
+              const pct=r.cost>0?Math.min(100,Math.round(myBal/r.cost*100)):100;   // 達成度メーター(競合レビュー要望)
+              const rem=Math.max(0,r.cost-myBal);
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
-                  style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:F,opacity:ok?1:.55}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
-                  <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
+                  style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:9,textAlign:"left",fontFamily:F,opacity:ok?1:.85}}>
+                  <div style={{display:"flex",alignItems:"center",gap:14,width:"100%"}}>
+                    {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
+                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
+                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
+                  </div>
+                  {/* 達成メーター：ごほうびが貯まるまでの割合を視覚化 */}
+                  <div style={{width:"100%",display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{flex:1,height:8,borderRadius:999,background:ok?GS:BORDER,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:ok?`linear-gradient(90deg,${G},#4ade80)`:`linear-gradient(90deg,${GOLD},#f59e0b)`,transition:"width .5s"}}/>
+                    </div>
+                    <span style={{fontSize:11,fontWeight:900,color:ok?G:GOLD,minWidth:34,textAlign:"right"}}>{pct}%</span>
+                  </div>
                 </button>
               );
             })}
@@ -5078,11 +5089,24 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div>
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
-          {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
-            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
-            const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
-            return <LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>;
-          })}
+          {(()=>{
+            const sorted=[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50);
+            const showDivider=logSort==="new"||logSort==="old";   // 日付順のときだけ区切り線(競合レビュー要望)
+            let prevKey=null; const out=[];
+            sorted.forEach(l=>{
+              const key=(l.date||"").slice(0,10);
+              if(showDivider && key!==prevKey){
+                prevKey=key;
+                const dt=new Date(l.date); const w=["日","月","火","水","木","金","土"][dt.getDay()];
+                const lbl=isTodayLocal(l.date)?"きょう":`${dt.getMonth()+1}月${dt.getDate()}日(${w})`;
+                out.push(<div key={"d_"+key} style={{display:"flex",alignItems:"center",gap:8,margin:"14px 2px 8px"}}><div style={{height:1,flex:1,background:BORDER}}/><span style={{fontSize:11,fontWeight:900,color:MUTED,whiteSpace:"nowrap"}}>{lbl}</span><div style={{height:1,flex:1,background:BORDER}}/></div>);
+              }
+              const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
+              const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
+              out.push(<LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>);
+            });
+            return out;
+          })()}
           </div>
           )}
         </div>
@@ -10343,6 +10367,10 @@ function SetupWizard({ data, update, onComplete }) {
                 {e}
               </button>
             ))}
+            {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
+            <input value={CHILD_EMOJIS.includes(childEmoji)?"":childEmoji} onChange={e=>setChildEmoji((e.target.value||"").slice(0,4)||"⚡")}
+              placeholder="✏️" aria-label="絵文字を入力"
+              style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!CHILD_EMOJIS.includes(childEmoji)?GP:BORDER}`,background:!CHILD_EMOJIS.includes(childEmoji)?`${GP}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
           </div>
           <input value={childName} onChange={e=>setChildName(e.target.value)}
             placeholder="名前（例：かなと）"
@@ -10402,6 +10430,10 @@ function SetupWizard({ data, update, onComplete }) {
                     {e}
                   </button>
                 ))}
+                {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
+                <input value={PARENT_EMOJIS.includes(parentEmoji)?"":parentEmoji} onChange={e=>setParentEmoji((e.target.value||"").slice(0,4)||"👨")}
+                  placeholder="✏️" aria-label="絵文字を入力"
+                  style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!PARENT_EMOJIS.includes(parentEmoji)?B:BORDER}`,background:!PARENT_EMOJIS.includes(parentEmoji)?`${B}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
               </div>
               <input value={parentName} onChange={e=>setParentName(e.target.value)}
                 placeholder="名前（例：お父さん、ゆうた）"
