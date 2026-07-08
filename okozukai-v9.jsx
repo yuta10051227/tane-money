@@ -4040,12 +4040,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* 💬 かぞく会議カード（週替わり・家族の会話づくり） */}
-      {effectiveTab==="daily" && (
-        <div style={{padding:"10px 16px 0"}}>
-          <FamilyTalkCard child={child} data={data} update={update}/>
-        </div>
-      )}
+      {/* かぞく会議カードは廃止（ユーザー要望・シンプル化） */}
 
       {/* 🎯 きょうのミッション(毎日リセット) ※ユーザー要望で非表示(falseで無効化・復活可) */}
       {false && effectiveTab==="daily" && showMissions && (()=>{
