@@ -2792,19 +2792,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                           −減算
                         </button>
                       </div>
-                      {/* 育成タマゴのプレゼントは、そだてる(育成)廃止に伴い撤去 */}
-                      {/* 🎟 ガチャチケットを1枚プレゼント(その日のガチャをもう1回引ける) */}
-                      <div style={{marginTop:10,borderTop:`1px dashed ${BORDER}`,paddingTop:10}}>
-                        <button
-                          onClick={()=>{ if(!txGuard("giftticket_"+member.id)) return;
-                            if(typeof window!=="undefined"&&!window.confirm(`${member.name}に「ガチャチケット」を1枚プレゼントする？\nその日のガチャを もう1回 引けるよ🎟`)) return;
-                            update(d=>({...d,battleTickets:{...(d.battleTickets||{}),[member.id]:((d.battleTickets?.[member.id])||0)+1}}));
-                            setGrantChild(null); }}
-                          style={{width:"100%",padding:"9px 0",borderRadius:10,border:`1.5px solid ${GOLD}`,cursor:"pointer",fontFamily:F,fontWeight:800,fontSize:12,background:GOLDS,color:"#9a7000"}}>
-                          🎟 ガチャチケットを1枚プレゼント{(data.battleTickets?.[member.id])>0?`（所持${data.battleTickets[member.id]}枚）`:""}
-                        </button>
-                        <div style={{fontSize:10.5,color:MUTED,marginTop:5,lineHeight:1.5}}>その日のガチャを もう1回 引けるチケット。がんばったご褒美に🎁</div>
-                      </div>
+                      {/* 育成タマゴ・ガチャチケットのプレゼントは、育成廃止＆ガチャ→まいにちのタネ化に伴い撤去 */}
                     </div>
                   )}
                 </div>
@@ -3739,40 +3727,33 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const hasTicket = (data.battleTickets?.[child.id]||0) > 0;
+  // 🌱 まいにちのタネ（ログインボーナス）：ランダム・レア・チケットを廃止し射幸性カット。
+  //   毎日ひらく理由(開ける演出)は維持。ポイントは固定＋連続日数で少し増える。図鑑は順番に解放。
   const doGacha = () => {
-    if (gachaBusyRef.current) return;   // 連打ガード: 結果表示を閉じるまで二重に回せない
-    const useTicket = todayDone && hasTicket;
-    if (todayDone && !hasTicket) return;
+    if (gachaBusyRef.current) return;   // 連打ガード
+    if (todayDone) return;              // 1日1回のみ
     gachaBusyRef.current = true;
-    let res = rollGacha(data.gacha);
-    // 連続日数で「がんばりが報われる」確定演出（7日でSR以上・30日で激レア確定）
-    const _gf = (id)=> (data.gacha||[]).find(g=>g.id===id);
-    if(curStreak>0){
-      if(curStreak%30===0 && res.rate>3){ const g=_gf("gc4"); if(g) res={...g, pts:Math.floor(Math.random()*(g.max-g.min+1))+g.min}; }
-      else if(curStreak%7===0 && res.rate>12){ const g=_gf("gc3"); if(g) res={...g, pts:Math.floor(Math.random()*(g.max-g.min+1))+g.min}; }
-    }
-    const theme = getMonthTheme();
-    const bonusPts = 0;   // ストリークボーナスは廃止
-    const basePts = res.id==="gc1" ? Math.max(res.pts,5) : res.pts; // ノーマルの最低保証(毎日「来てよかった」)
-    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
-    const tierItems = GACHA_ITEMS.filter(i=>i.tierId===res.id);
-    const collItem = tierItems.length>0 ? tierItems[Math.floor(Math.random()*tierItems.length)] : null;
-    const isNewItem = collItem ? !(data.gachaCollection?.[child.id]?.[collItem.id]) : false;
-    const finalRes = {...res, pts:basePts+bonusPts, bonusPts, theme, collItem, isNewItem, todayTasks, simpleAnim:!!(data.familySettings?.gachaSimple)};
-    setGachaRes(finalRes);
-    taneHaptic(res.rate<=3?"strong":"success");
     const today = todayKey();
     const prev  = data.streak?.[child.id] || { cur:0, max:0, last:"" };
     const yesterday = (()=>{ const d=new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; })();
     const newCur = prev.last===yesterday ? prev.cur+1 : 1;
+    const base = 5;
+    const bonus = newCur>=30?15 : newCur>=14?10 : newCur>=7?5 : newCur>=3?3 : 0;   // 連続でちょいプラス(煽りなし)
+    const dayPts = base + bonus;
+    const theme = getMonthTheme();
+    // 図鑑コレクション：ランダムをやめ「まだ持ってないものを順番に」解放（毎日コツコツ集まる）
+    const owned = data.gachaCollection?.[child.id] || {};
+    const collItem = GACHA_ITEMS.find(i=>!owned[i.id]) || null;
+    const isNewItem = !!collItem;
+    const todayTasks = myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
+    const finalRes = { id:"daily", label:"まいにちのタネ", rate:30, pts:dayPts, bonusPts:bonus, theme, collItem, isNewItem, todayTasks, streakDay:newCur, simpleAnim:!!(data.familySettings?.gachaSimple) };
+    setGachaRes(finalRes);
+    taneHaptic("success");
     update(d => ({
       ...d,
-      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🎰 ガチャ（${res.label}）${useTicket?" 🎟チケット":""}`, pts:finalRes.pts, date:new Date().toISOString(), rare:res.rate<=3, tierId:res.id, collItemId:collItem?.id, ticket:useTicket }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
-      // チケット使用時は当日記録(gachaDate/streak)を変えず、チケットを1枚消費
-      ...(useTicket
-        ? { battleTickets: {...(d.battleTickets||{}), [child.id]: Math.max(0,(d.battleTickets?.[child.id]||0)-1)} }
-        : { gachaDate: {...(d.gachaDate||{}), [child.id]: today},
-            streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }} }),
+      logs: (()=>{ const _e={ id:uid(), cid:child.id, type:"gacha", label:`🌱 まいにちのタネ（+${dayPts}pt${bonus>0?` ・連続${newCur}日`:""}）`, pts:dayPts, date:new Date().toISOString(), tierId:"daily", collItemId:collItem?.id }; addLogToFirestore(_e); return[_e,...d.logs]; })(),
+      gachaDate: {...(d.gachaDate||{}), [child.id]: today},
+      streak: {...(d.streak||{}), [child.id]: { cur:newCur, max:Math.max(prev.max||0,newCur), last:today }},
       gachaCollection: collItem ? {...(d.gachaCollection||{}), [child.id]: {...(d.gachaCollection?.[child.id]||{}), [collItem.id]:((d.gachaCollection?.[child.id]?.[collItem.id]||0)+1)}} : (d.gachaCollection||{}),
     }));
   };
@@ -4307,17 +4288,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* ── DAILY ── */}
       {effectiveTab==="daily" && showGacha && <>
-        {/* フローティング・ガチャボタン: タスクが多くても埋もれず常にワンタップで引ける */}
+        {/* フローティング・まいにちのタネ ボタン(1日1回・ログインボーナス) */}
         {(()=>{ const ft=getMonthTheme(); return (
-          <button onClick={()=>{ if(!todayDone||hasTicket) doGacha(); }} disabled={todayDone&&!hasTicket} aria-label="デイリーガチャ"
+          <button onClick={()=>{ if(!todayDone) doGacha(); }} disabled={todayDone} aria-label="まいにちのタネ"
             style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
               border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
               background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
               boxShadow:todayDone?"0 4px 12px rgba(0,0,0,0.25)":`0 6px 22px ${ft.color}95`,
               cursor:todayDone?"default":"pointer",fontSize:30,display:"flex",alignItems:"center",justifyContent:"center",
               animation:todayDone?"none":"gachaFab 1.6s ease-in-out infinite",fontFamily:F}}>
-            {todayDone?"✓":ft.emoji}
-            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:11,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>ひく！</span>}
+            {todayDone?"✓":"🌱"}
+            {!todayDone&&<span style={{position:"absolute",top:-7,right:-8,background:R,color:"#fff",fontSize:10,fontWeight:900,borderRadius:10,padding:"1px 6px",border:"1.5px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,0.3)"}}>どうぞ</span>}
           </button>
         );})()}
         <style>{`@keyframes gachaFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
@@ -4341,7 +4322,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           const claimed=(data.claimedMissions||{})[child.id]||[];
           const quests=[
             {id:"q1",emoji:"⭐",label:"タスクをやろう",hint:isJunior?"「やること」タブでお手伝いをやってみよう":"「活動」タブでお手伝いをやってみよう",done:myLogs.some(l=>l.type==="good"||l.type==="bad")||(data.pendingApprovals||[]).some(p=>p.cid===child.id),nav:()=>setTab(isJunior?"tasks":"activity")},
-            {id:"q2",emoji:"🎰",label:"ガチャを引こう",hint:"今日のガチャを1回引いてみよう",done:myLogs.some(l=>l.type==="gacha"),nav:null},
+            {id:"q2",emoji:"🌱",label:"まいにちのタネを開こう",hint:"今日のタネを1回ひらいてボーナスをうけとろう",done:myLogs.some(l=>l.type==="gacha"),nav:null},
             {id:"q3",emoji:"🎯",label:"目標を1つ決めよう",hint:"「ためる」タブで貯金の目標を作ってみよう",done:(data.goals||[]).some(g=>g.cid===child.id),nav:()=>{if(isJunior){setTab("goals");}else{setTab("money");setMonTab("goals");}}},
             ...(!isJunior?[{id:"q4",emoji:"🛍",label:"ポイントをつかってみよう",hint:"「ためる」タブのこうかんで使えるよ",done:myLogs.some(l=>l.type==="reward"),nav:()=>{setTab("money");setMonTab("rewards");}}]:[]),
           ];
@@ -4412,16 +4393,16 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </>}
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
         {showGacha && <div style={{padding:"12px 16px 4px"}}>
-          {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🎰 きょうの ガチャ</div>}
+          {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🌱 まいにちのタネ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
-            const bonusLabel=curStreak>=30?"+50pt":curStreak>=10?"+20pt":curStreak>=5?"+10pt":null;
+            const bonusLabel=curStreak>=30?"+15pt":curStreak>=14?"+10pt":curStreak>=7?"+5pt":curStreak>=3?"+3pt":null;
             const monthGacha=myLogs.filter(l=>l.type==="gacha"&&(l.date||"").startsWith(monthKey()));
             const todayChores=myLogs.filter(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)).length;
             const tierCounts=(data.gacha||[]).map(tier=>({...tier,count:monthGacha.filter(l=>l.tierId===tier.id||(l.label||"").includes(tier.label)).length}));
             return(<>
               <div style={{background:darkBG?(todayDone?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.07)"):(todayDone?CARD:`linear-gradient(135deg,${mTheme.bg},#fffbe6)`),border:darkBG?`1px solid ${todayDone?"rgba(255,255,255,0.1)":mTheme.color+"50"}`:`2px solid ${todayDone?BORDER:mTheme.color}`,borderRadius:20,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
-                <button onClick={doGacha} disabled={todayDone&&!hasTicket}
+                <button onClick={doGacha} disabled={todayDone}
                   style={{width:62,height:62,borderRadius:"50%",border:"none",flexShrink:0,
                     background:todayDone?"radial-gradient(circle at 35% 35%,#ccc,#aaa)":`radial-gradient(circle at 35% 35%,${mTheme.bg},${mTheme.color})`,
                     fontSize:28,cursor:todayDone?"default":"pointer",
@@ -4430,16 +4411,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   {mTheme.emoji}
                 </button>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:11,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}ガチャ</div>
+                  <div style={{fontSize:11,color:mTheme.color,fontWeight:700,marginBottom:2}}>{mTheme.emoji} {mTheme.name}のタネ</div>
                   <div style={{fontWeight:800,fontSize:14,color:darkBG?(todayDone?"rgba(255,255,255,0.35)":"#fff"):(todayDone?MUTED:TEXT)}}>
-                    {todayDone?(darkBG?"ひいたよ！":"✅ 今日は引き済み！"):"デイリーガチャ"}
+                    {todayDone?(darkBG?"うけとった！":"✅ 今日は受け取り済み！"):"まいにちのタネ"}
                   </div>
                   <div style={{fontSize:12,color:darkBG?"rgba(255,255,255,0.3)":MUTED,marginTop:2}}>
-                    {todayDone?(darkBG?"また あした":"また明日ね🌙"):`1日1回 · 最大${Math.max(...(data.gacha||[]).map(g=>g.max))}pt`}
+                    {todayDone?(darkBG?"また あした":"また明日ね🌙"):"1日1回 ひらくと ボーナスpt"}
                   </div>
-                  {!todayDone&&<div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.42)":MUTED,marginTop:3}}>かくりつ ⚪60 🔵25 🟡12 🔴3 ％</div>}
-                  {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}連続ボーナス {bonusLabel}！</div>}
-                  {!bonusLabel&&curStreak>=3&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！</div>}
+                  {bonusLabel&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続ボーナス {bonusLabel}！</div>}
+                  {!bonusLabel&&curStreak>=1&&!todayDone&&<div style={{marginTop:4,fontSize:11,color:R,fontWeight:700}}>🔥 {curStreak}日連続中！3日でボーナス</div>}
                   {todayDone&&darkBG&&(()=>{const coll=data.gachaCollection?.[child.id]||{};const rem=GACHA_ITEMS.length-GACHA_ITEMS.filter(i=>(coll[i.id]||0)>0).length;return rem>0?<div style={{marginTop:5,fontSize:11,color:"rgba(74,158,255,0.55)",fontWeight:700}}>図鑑のこり{rem}体 · ぜんぶ あつめよう</div>:<div style={{marginTop:5,display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:"#fbbf24",fontWeight:700}}>ぜんぶ あつめた ★</span><span onClick={(e)=>{e.stopPropagation();shareCard({emoji:"🏆",title:"ずかん コンプリート！",subtitle:`${GACHA_ITEMS.length}しゅるい ぜんぶ あつめた`,color:"#fbbf24"});}} style={{fontSize:11,color:"#4a9eff",fontWeight:800,cursor:"pointer"}}>シェア 📤</span></div>;})()}
                 </div>
                 {!todayDone&&<div style={{fontSize:11,background:mTheme.bg,color:mTheme.color,padding:"4px 10px",borderRadius:999,fontWeight:700,flexShrink:0,border:`1px solid ${mTheme.color}40`}}>TAP！</div>}
@@ -4447,17 +4427,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{marginTop:6,display:"flex",gap:10,flexWrap:"wrap",fontSize:11,fontWeight:800}}>
                 {!todayDone&&(todayChores>0
                   ? <span style={{color:darkBG?"#bff0c8":G}}>🌱 きょうのお手伝い {todayChores}こ・タネが げんき！</span>
-                  : <span style={{color:darkBG?"#ffd9a8":"#9a7000"}}>💪 さきに お手伝いすると タネが もっと げんきに！</span>)}
-                {hasTicket&&<span style={{color:darkBG?"#bff0c8":G}}>🎟 チケット{data.battleTickets[child.id]}まい・ガチャもう1回！</span>}
-                <span style={{color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>🧩 チケットのかけら {(data.battleFragments?.[child.id]||0)}/5</span>
+                  : <span style={{color:darkBG?"#ffd9a8":"#9a7000"}}>💪 まいにち ひらいて 連続を のばそう！</span>)}
               </div>
-              {/* モンスターバトルは「そだてる」タブへ移動 */}
               {monthGacha.length>0&&(
-                <div style={{marginTop:8,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-                  <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:600}}>今月:</span>
-                  {tierCounts.filter(t=>t.count>0).map(t=>(
-                    <span key={t.id} style={{fontSize:11,background:darkBG?"rgba(255,255,255,0.06)":CARD,border:`1px solid ${t.color}50`,borderRadius:999,padding:"2px 8px",color:t.color,fontWeight:700}}>{t.emoji}×{t.count}</span>
-                  ))}
+                <div style={{marginTop:8,fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:700}}>
+                  🌱 今月 {monthGacha.length}日 ひらいた
                 </div>
               )}
               {/* 図鑑 */}
@@ -6469,54 +6443,26 @@ function ParentScreen({ data, update, onBack }) {
         </div>
       )}
 
-      {/* GACHA settings */}
+      {/* まいにちのタネ settings（ガチャ→ログインボーナス化。確率設定は廃止） */}
       {tab==="gacha" && (
         <div style={{padding:16}}>
           <div style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:16}}>
-            <p style={{fontWeight:900,fontSize:14,margin:"0 0 4px"}}>🎰 デイリーガチャ設定</p>
-            <p style={{color:MUTED,fontSize:12,margin:"0 0 14px"}}>出現率の合計を100%にしてください。</p>
-            {!gachaEdit ? (
-              <>
-                {data.gacha.map(g=>(
-                  <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
-                    <span style={{fontSize:18}}>{g.emoji}</span>
-                    <div style={{flex:1}}><div style={{fontWeight:800,fontSize:13,color:g.color}}>{g.label}</div><div style={{color:MUTED,fontSize:11}}>{g.min}〜{g.max}pt</div></div>
-                    <span style={{background:`${g.color}20`,color:g.color,fontWeight:800,fontSize:11,padding:"2px 9px",borderRadius:20}}>{g.rate}%</span>
-                  </div>
-                ))}
-                <button onClick={()=>setGachaEdit(JSON.parse(JSON.stringify(data.gacha)))} style={{marginTop:14,background:Y,border:"none",borderRadius:10,padding:"10px 0",width:"100%",fontWeight:800,fontSize:14,color:TEXT,cursor:"pointer",fontFamily:F}}>✏ 設定を変更する</button>
-              </>
-            ) : (
-              <>
-                <p style={{color:gachaEdit.reduce((s,g)=>s+Number(g.rate),0)===100?G:R,fontSize:12,fontWeight:700,marginBottom:12}}>合計: {gachaEdit.reduce((s,g)=>s+Number(g.rate),0)}% / 100%</p>
-                {gachaEdit.map((g,i)=>(
-                  <div key={g.id} style={{background:`${g.color}10`,border:`1.5px solid ${g.color}40`,borderRadius:12,padding:12,marginBottom:10}}>
-                    <div style={{fontWeight:800,fontSize:13,color:g.color,marginBottom:8}}>{g.emoji} {g.label}</div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                      {[["出現率(%)","rate"],["最小(pt)","min"],["最大(pt)","max"]].map(([lbl,key])=>(
-                        <div key={key}>
-                          <p style={{color:MUTED,fontSize:11,margin:"0 0 3px"}}>{lbl}</p>
-                          <input value={g[key]} type="number" onChange={e=>{const c=[...gachaEdit];c[i]={...c[i],[key]:e.target.value};setGachaEdit(c);}} style={{...INP,padding:"6px 8px",fontSize:13}}/>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button onClick={saveGacha} style={{flex:1,background:G,border:"none",borderRadius:10,padding:11,color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>✅ 保存する</button>
-                  <button onClick={()=>setGachaEdit(null)} style={{flex:1,background:MUTED,border:"none",borderRadius:10,padding:11,color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>キャンセル</button>
-                </div>
-              </>
-            )}
+            <p style={{fontWeight:900,fontSize:14,margin:"0 0 6px"}}>🌱 まいにちのタネ</p>
+            <p style={{color:TEXTS,fontSize:12.5,margin:"0 0 10px",lineHeight:1.6}}>毎日ひらくと ボーナスポイントがもらえる ログインボーナスです。ランダム（ガチャ）や レア確率は使わず、<b>誠実さ重視</b>で だれでも同じ・射幸性なし。</p>
+            <div style={{background:GS,borderRadius:12,padding:"10px 13px",fontSize:12,color:GP,fontWeight:700,lineHeight:1.7}}>
+              ・毎日 +5pt<br/>
+              ・連続3日 +3 / 7日 +5 / 14日 +10 / 30日 +15pt<br/>
+              ・図鑑は ひらくたびに 順番に集まる（ぜんぶ集められる）
+            </div>
           </div>
-          <p style={{color:MUTED,fontSize:13,fontWeight:800,marginBottom:8}}>今日のガチャ状況</p>
+          <p style={{color:MUTED,fontSize:13,fontWeight:800,marginBottom:8}}>今日の受け取り状況</p>
           {data.children.map(child=>{
             const done=data.gachaDate?.[child.id]===todayKey();
             return (
               <div key={child.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"11px 13px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
                 <Emo e={child.emoji} size={26}/>
                 <span style={{flex:1,fontWeight:700,fontSize:14}}>{child.name}</span>
-                <span style={{fontWeight:800,fontSize:12,color:done?G:MUTED}}>{done?"✅ 引き済み":"⏳ まだ"}</span>
+                <span style={{fontWeight:800,fontSize:12,color:done?G:MUTED}}>{done?"✅ 受け取り済み":"⏳ まだ"}</span>
               </div>
             );
           })}
