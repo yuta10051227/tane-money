@@ -2385,7 +2385,7 @@ function DailyTasks({ child, data, update }) {
   return (
     <div style={{padding:"12px 16px",paddingBottom:0}}>
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease",pointerEvents:"none"}}>
           <div style={{fontSize:36}}>{flash.emoji}</div>
           <Yen v={flash.pts} sz={20}/>
           {flash.pts>0&&<>
@@ -3651,6 +3651,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
+  // 🌱 これまでにためた合計（累計・リセットしないのがうちの強み。競合の要望上位を先取り）
+  const lifetimeEarned = (data.logs||[]).filter(l=>l.cid===child.id&&l.pts>0).reduce((s,l)=>s+l.pts,0);
   const myBal    = bal(data.logs, child.id);
   const myLogs   = (data.logs||[]).filter(l=>l.cid===child.id);
   // ── レベルアップ検知→演出＆報酬(回復カプセル。ptは配らない) ──
@@ -3904,6 +3906,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>今月</span>
                 <span style={{fontSize:12,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>つうさん</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#86efac"}}>{lifetimeEarned.toLocaleString()}pt</span>
                 {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,200,0,0.2)",color:"#fde68a",padding:"2px 7px",borderRadius:999,fontWeight:700}}>🔥 {curStreak}日</span>}
               </div>
             </div>
@@ -3976,6 +3980,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
             </div>
+            <div style={{color:"rgba(255,255,255,0.5)",fontSize:10.5,fontWeight:700,marginBottom:5}}>🌱 これまでに ためた 合計 <span style={{color:"#4ade80",fontWeight:900}}>{lifetimeEarned.toLocaleString()}pt</span></div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{color:"rgba(255,255,255,0.58)",fontSize:11}}>今月</span>
               <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
@@ -4036,43 +4041,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })}
       </div>
 
-      {/* 🐣 そだてる フローティングボタン(ガチャと同様・rpg以外の画面で左下に常駐) */}
-      {effectiveTab!=="rpg" && (
-        <button onClick={()=>setTab("rpg")} aria-label="そだてる"
-          style={{position:"fixed",left:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
-            background:"radial-gradient(circle at 35% 35%,#b07bff,#7b61c9)",boxShadow:"0 6px 22px rgba(123,97,201,.6)",
-            cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
-            animation:"sodateFab 1.8s ease-in-out infinite"}}>
-          <span style={{fontSize:26,lineHeight:1}}>🐣</span>
-          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>そだてる</span>
-          <style>{`@keyframes sodateFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.09) translateY(-3px)}}`}</style>
-        </button>
-      )}
-
-      {/* 🏙 投資ワールド 全画面ページ（まちボタンで“別ページ”として開く） */}
-      {worldFull && !data.familySettings?.investOff && (
-        <div style={{position:"fixed",inset:0,zIndex:800,background:BG,overflowY:"auto",WebkitOverflowScrolling:"touch",animation:"worldIn .3s cubic-bezier(.22,.9,.3,1)"}}>
-          <div style={{position:"sticky",top:0,zIndex:5,display:"flex",alignItems:"center",gap:10,padding:"calc(env(safe-area-inset-top,0px) + 10px) 14px 10px",background:"rgba(247,245,239,.9)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}>
-            <button onClick={()=>{ taneHaptic("tap"); setWorldFull(false); }} style={{display:"flex",alignItems:"center",gap:5,background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:999,padding:"8px 15px",cursor:"pointer",fontFamily:F,color:GP,fontWeight:900,fontSize:14}}>‹ もどる</button>
-            <span style={{fontWeight:900,fontSize:15,color:GP}}>🏙 とうしワールド</span>
-          </div>
-          <InvestTab child={child} data={data} update={update}/>
-          <style>{`@keyframes worldIn{0%{transform:translateY(100%);opacity:.5}100%{transform:translateY(0);opacity:1}}`}</style>
-        </div>
-      )}
-
-      {/* 🏙 まち フローティングボタン(常駐・投資ワールドを別ページで開く) */}
-      {effectiveTab!=="rpg" && !data.familySettings?.investOff && (isJunior||!young) && !worldFull && (
-        <button onClick={()=>{ taneHaptic("tap"); setWorldFull(true); }} aria-label="推しカンパニーの街"
-          style={{position:"fixed",left:16,bottom:98,zIndex:120,width:66,height:66,borderRadius:"50%",border:"3px solid #fff",
-            background:"radial-gradient(circle at 35% 35%,#5fd699,#2e9e6a)",boxShadow:"0 6px 22px rgba(46,158,106,.55)",
-            cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:0,fontFamily:F,
-            animation:"hatakeFab 2.1s ease-in-out infinite"}}>
-          <span style={{fontSize:26,lineHeight:1}}>🏙</span>
-          <span style={{fontSize:9,fontWeight:900,color:"#fff",lineHeight:1,marginTop:1}}>まち</span>
-          <style>{`@keyframes hatakeFab{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.07) translateY(-3px)}}`}</style>
-        </button>
-      )}
+      {/* 育成RPG(そだてるFAB)・投資ワールド全画面(まちFAB)は廃止。投資はmoneyタブ内「推し株」に統合。 */}
 
       {/* 📢 おしらせ(新機能の告知) */}
       {effectiveTab==="daily" && (
@@ -4292,7 +4261,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* Flash */}
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pending?GOLD:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pending?GOLD:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"14px 26px",zIndex:900,textAlign:"center",boxShadow:"0 8px 30px #0003",animation:"popIn .3s ease",pointerEvents:"none"}}>
           <div style={{fontSize:38}}>{flash.emoji}</div>
           {flash.pending
             ? <div style={{fontSize:12,fontWeight:700,marginTop:4}}>おうちの人に確認するね</div>
@@ -4638,10 +4607,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0",display:"flex",gap:6}}>
           {(isJunior
-            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["hatake","🏢 推しカンパニー"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["hatake","🏢 推しカンパニー"]]:[])]
+            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
           ).map(([k,l])=>(
-            <button key={k} onClick={()=>{ if(k==="hatake"){ taneHaptic("tap"); setWorldFull(true); } else setMonTab(k); }}
+            <button key={k} onClick={()=>{ taneHaptic("tap"); setMonTab(k); }}
               style={{flex:1,padding:"8px 0",border:"none",borderRadius:10,
                 background:monTab===k?GP:"transparent",
                 color:monTab===k?"#fff":MUTED,
@@ -4651,7 +4620,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           ))}
         </div>
       )}
-      {/* 投資ワールドは全画面ページ(worldFull)で表示。タブ内インライン表示は廃止 */}
+      {/* 🌟 推し株：moneyタブ内にインライン表示（街づくり・全画面ワールドは廃止） */}
+      {effectiveTab==="money" && monTab==="oshi" && !data.familySettings?.investOff && <OshiKabu child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
         // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
         const _spend=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="reward"&&(l.pts||0)<0);
@@ -4766,12 +4736,23 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {(data.rewards||[]).map(r=>{
               const ok=myBal>=r.cost;
+              const pct=r.cost>0?Math.min(100,Math.round(myBal/r.cost*100)):100;   // 達成度メーター(競合レビュー要望)
+              const rem=Math.max(0,r.cost-myBal);
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
-                  style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:F,opacity:ok?1:.55}}>
-                  {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
-                  <div style={{flex:1}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":"残高不足"}</div></div>
+                  style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:9,textAlign:"left",fontFamily:F,opacity:ok?1:.85}}>
+                  <div style={{display:"flex",alignItems:"center",gap:14,width:"100%"}}>
+                    {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
+                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
+                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
+                  </div>
+                  {/* 達成メーター：ごほうびが貯まるまでの割合を視覚化 */}
+                  <div style={{width:"100%",display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{flex:1,height:8,borderRadius:999,background:ok?GS:BORDER,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:ok?`linear-gradient(90deg,${G},#4ade80)`:`linear-gradient(90deg,${GOLD},#f59e0b)`,transition:"width .5s"}}/>
+                    </div>
+                    <span style={{fontSize:11,fontWeight:900,color:ok?G:GOLD,minWidth:34,textAlign:"right"}}>{pct}%</span>
+                  </div>
                 </button>
               );
             })}
@@ -5108,11 +5089,24 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div>
           <div style={{marginBottom:12}}><SortBar options={[["new","新しい順"],["old","古い順"],["pts_high","pt高い順"],["pts_low","pt低い順"]]} value={logSort} onChange={setLogSort}/></div>
           {myLogs.length===0 && <p style={{color:MUTED,textAlign:"center",marginTop:20}}>まだきろくがないよ</p>}
-          {[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50).map(l=>{
-            const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
-            const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
-            return <LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>;
-          })}
+          {(()=>{
+            const sorted=[...myLogs].sort((a,b)=>logSort==="new"?(b.date||"").localeCompare(a.date||""):logSort==="old"?(a.date||"").localeCompare(b.date||""):logSort==="pts_high"?b.pts-a.pts:a.pts-b.pts).slice(0,50);
+            const showDivider=logSort==="new"||logSort==="old";   // 日付順のときだけ区切り線(競合レビュー要望)
+            let prevKey=null; const out=[];
+            sorted.forEach(l=>{
+              const key=(l.date||"").slice(0,10);
+              if(showDivider && key!==prevKey){
+                prevKey=key;
+                const dt=new Date(l.date); const w=["日","月","火","水","木","金","土"][dt.getDay()];
+                const lbl=isTodayLocal(l.date)?"きょう":`${dt.getMonth()+1}月${dt.getDate()}日(${w})`;
+                out.push(<div key={"d_"+key} style={{display:"flex",alignItems:"center",gap:8,margin:"14px 2px 8px"}}><div style={{height:1,flex:1,background:BORDER}}/><span style={{fontSize:11,fontWeight:900,color:MUTED,whiteSpace:"nowrap"}}>{lbl}</span><div style={{height:1,flex:1,background:BORDER}}/></div>);
+              }
+              const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
+              const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
+              out.push(<LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>);
+            });
+            return out;
+          })()}
           </div>
           )}
         </div>
@@ -8795,6 +8789,183 @@ function pickInvestNavi(gp, holdDays, concentrated, has, rot){
     {...INVEST_NAVI.kotsu, line:"ゆっくりで いいよ。街は 1日にして ならず、だよ。"},
   ]);
 }
+// 🌟 推し株：好きな会社を「推し（応援）」する、やさしい投資。街づくり・為替・損益演出は無し。損益は控えめに残す。
+function OshiKabu({child,data,update}){
+  const [sel,setSel]=useState(null);       // 選択中の銘柄id
+  const [qty,setQty]=useState("1");
+  const [reason,setReason]=useState("");
+  const [toast,setToast]=useState(null);
+  const [showAll,setShowAll]=useState(false);
+  const myBal=bal(data.logs,child.id);
+  const stocks=(data.stocks||[]);
+  const myHoldings=(data.holdings||{})[child.id]||[];
+  const heldIds=new Set(myHoldings.map(h=>h.stockId));
+  const toPts=(s,p)=>s.currency==="USD"?Math.max(1,Math.round(p*1.5)):Math.max(1,Math.round(p/100));
+  const FEE=0.02;
+  const flash=(msg,color)=>{ setToast({msg,color}); setTimeout(()=>setToast(null),1600); };
+  // 推し候補（応援おすすめ）: 子ども定番＋架空。ぜんぶ見るで全銘柄。
+  const FAV=new Set(["f1","f2","f3","f4","f5","s1","s7","s4","s6","s21","s11","s10","s5","s26"]);
+  const listStocks = showAll? stocks : stocks.filter(s=>FAV.has(s.id)||heldIds.has(s.id));
+  const selStock=stocks.find(s=>s.id===sel);
+  const selHold=myHoldings.find(h=>h.stockId===sel);
+  const qtyN=Math.max(1,Math.round(parseFloat(qty)||1));   // 推し株は「株」単位で整数（やさしく）
+  const unitPts=selStock?toPts(selStock,selStock.price):0;
+  const buyCost=Math.ceil(unitPts*qtyN*(1+FEE));
+  const sellGet=selStock&&selHold?Math.floor(unitPts*Math.min(qtyN,selHold.qty)*(1-FEE)):0;
+  const portVal=myHoldings.reduce((s,h)=>{const st=stocks.find(x=>x.id===h.stockId);return s+(st?toPts(st,st.price)*h.qty:0);},0);
+  const portCost=myHoldings.reduce((s,h)=>s+h.avgPrice*h.qty,0);
+  const portGain=Math.round(portVal*0.98)-portCost;
+
+  function cheer(){   // 応援する = 買う
+    if(!selStock||qtyN<1||myBal<buyCost) return;
+    if(!txGuard("oshi_buy_"+child.id)) return;
+    update(d=>{
+      const ex=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
+      let nh; const tq=(ex?.qty||0)+qtyN;
+      if(ex) nh=(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:tq,avgPrice:Math.round((ex.avgPrice*ex.qty+buyCost)/tq),...(reason?{reason}:{})}:h);
+      else nh=[...(d.holdings?.[child.id]||[]),{stockId:selStock.id,qty:qtyN,avgPrice:Math.round(buyCost/qtyN),firstBuyDate:new Date().toISOString(),...(reason?{reason}:{})}];
+      const _e={id:uid(),cid:child.id,type:"invest_buy",label:`🌟 ${selStock.emoji}${selStock.name} を ${qtyN}株 おうえん${reason?` ・ ${reason}`:""}`,pts:-buyCost,date:new Date().toISOString()};
+      addLogToFirestore(_e);
+      return {...d,holdings:{...(d.holdings||{}),[child.id]:nh},logs:[_e,...d.logs]};
+    });
+    flash(`💚 ${selStock.emoji}${selStock.name} を おうえんした！`,"#22c55e");
+    setSel(null);setQty("1");setReason("");
+  }
+  function stopCheer(){   // 応援をやめる = 売る
+    if(!selStock||!selHold) return;
+    if(!txGuard("oshi_sell_"+child.id)) return;
+    const q=Math.min(qtyN,selHold.qty);
+    const get=Math.floor(unitPts*q*(1-FEE));
+    const profit=Math.round(get-selHold.avgPrice*q);
+    update(d=>{
+      const _e={id:uid(),cid:child.id,type:"invest_sell",label:`👋 ${selStock.emoji}${selStock.name} ${q}株 おうえん おわり`,pts:get,date:new Date().toISOString()};
+      addLogToFirestore(_e);
+      return {...d,holdings:{...(d.holdings||{}),[child.id]:(d.holdings[child.id]).map(h=>h.stockId===selStock.id?{...h,qty:h.qty-q}:h).filter(h=>h.qty>0)},logs:[_e,...d.logs]};
+    });
+    flash(profit>=0?`👋 ${get.toLocaleString()}pt もどってきた！`:`👋 ${get.toLocaleString()}pt。つぎの推しを さがそう`, profit>=0?"#34C77B":"#D95C55");
+    setSel(null);setQty("1");
+  }
+
+  return(<div style={{padding:"14px 16px 32px",fontFamily:F}}>
+    {toast&&(
+      <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1400,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
+        <div style={{marginTop:14,background:toast.color,color:"#fff",fontWeight:900,fontSize:14,padding:"11px 20px",borderRadius:14,boxShadow:"0 8px 24px rgba(0,0,0,.3)"}}>{toast.msg}</div>
+      </div>
+    )}
+    {/* ヘッダー：残高＋応援中サマリ */}
+    <div style={{background:`linear-gradient(160deg,${GS},#eafaf0)`,border:`2px solid ${G}`,borderRadius:20,padding:"14px 16px",marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <span style={{fontSize:22}}>🌟</span>
+        <span style={{fontWeight:900,fontSize:16,color:GP}}>推し株</span>
+      </div>
+      <div style={{fontSize:12,color:TEXTS,fontWeight:700,lineHeight:1.6,marginBottom:10}}>すきな会社を「推し」に えらんで おうえんしよう。ポイントで株を もつと、上がったり下がったり…なんで推してるか おうちの人に 話してみてね。</div>
+      <div style={{display:"flex",gap:8}}>
+        <div style={{flex:1,textAlign:"center",background:"#fff",borderRadius:12,padding:"8px 4px"}}>
+          <div style={{fontSize:10,color:MUTED,fontWeight:700}}>のこりポイント</div>
+          <div style={{fontSize:16,fontWeight:900,color:G}}>{myBal.toLocaleString()}</div>
+        </div>
+        <div style={{flex:1,textAlign:"center",background:"#fff",borderRadius:12,padding:"8px 4px"}}>
+          <div style={{fontSize:10,color:MUTED,fontWeight:700}}>おうえん中</div>
+          <div style={{fontSize:16,fontWeight:900,color:GP}}>{myHoldings.length}社</div>
+        </div>
+        {portCost>0&&(
+          <div style={{flex:1,textAlign:"center",background:"#fff",borderRadius:12,padding:"8px 4px"}}>
+            <div style={{fontSize:10,color:MUTED,fontWeight:700}}>いま うると</div>
+            <div style={{fontSize:14,fontWeight:900,color:portGain>=0?G:R}}>{portGain>=0?"+":""}{portGain.toLocaleString()}</div>
+          </div>
+        )}
+      </div>
+    </div>
+    {/* 応援中の推し */}
+    {myHoldings.length>0&&(
+      <div style={{marginBottom:16}}>
+        <div style={{fontSize:12,fontWeight:900,color:GP,marginBottom:8}}>💚 おうえん中の推し</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {myHoldings.map(h=>{
+            const st=stocks.find(x=>x.id===h.stockId); if(!st) return null;
+            const val=toPts(st,st.price)*h.qty; const gain=Math.round(val*0.98)-h.avgPrice*h.qty;
+            const up=(st.lastChange||0)>=0;
+            return (
+              <button key={h.stockId} onClick={()=>{setSel(st.id);setQty("1");}}
+                style={{background:CARD,border:`2px solid ${G}`,borderRadius:16,padding:"11px 14px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:30}}>{st.emoji}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{st.name}</div>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700}}>{h.qty}株 もってる{h.reason?` ・「${h.reason}」`:""}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:11,fontWeight:700,color:up?G:R}}>{up?"▲":"▼"}{Math.abs(st.lastChange||0).toFixed(1)}%</div>
+                  <div style={{fontSize:11,fontWeight:800,color:gain>=0?G:R}}>{gain>=0?"+":""}{gain.toLocaleString()}pt</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    {/* 推し候補 */}
+    <div style={{fontSize:12,fontWeight:900,color:TEXT,marginBottom:8}}>🔎 推しを さがす</div>
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {listStocks.filter(s=>!heldIds.has(s.id)).map(s=>{
+        const up=(s.lastChange||0)>=0;
+        return (
+          <button key={s.id} onClick={()=>{setSel(s.id);setQty("1");}}
+            style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"11px 14px",cursor:"pointer",fontFamily:F,textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:28}}>{s.emoji}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:800,fontSize:14,color:TEXT}}>{s.name}</div>
+              <div style={{fontSize:11,color:MUTED,fontWeight:700}}>{s.sector}</div>
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontWeight:900,fontSize:14,color:GP}}>{toPts(s,s.price).toLocaleString()}pt</div>
+              <div style={{fontSize:11,fontWeight:700,color:up?G:R}}>{up?"▲":"▼"}{Math.abs(s.lastChange||0).toFixed(1)}%</div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+    {!showAll&&(
+      <button onClick={()=>setShowAll(true)} style={{width:"100%",marginTop:10,padding:"11px",background:`${GP}12`,border:`2px dashed ${GP}`,borderRadius:12,color:GP,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>ぜんぶの会社を見る（{stocks.length}社）</button>
+    )}
+    {/* 応援シート（選択時） */}
+    {selStock&&(
+      <div style={{position:"fixed",inset:0,background:"#0007",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSel(null)}>
+        <div onClick={e=>e.stopPropagation()} style={{background:CARD,borderRadius:"24px 24px 0 0",padding:"20px 20px calc(env(safe-area-inset-bottom,0px) + 20px)",width:"100%",maxWidth:480,fontFamily:F}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+            <span style={{fontSize:38}}>{selStock.emoji}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:17,color:TEXT}}>{selStock.name}</div>
+              <div style={{fontSize:12,color:MUTED,fontWeight:700}}>{selStock.sector} ・ 1株 {toPts(selStock,selStock.price).toLocaleString()}pt <span style={{color:(selStock.lastChange||0)>=0?G:R}}>{(selStock.lastChange||0)>=0?"▲":"▼"}{Math.abs(selStock.lastChange||0).toFixed(1)}%</span></div>
+            </div>
+            <button onClick={()=>setSel(null)} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,fontSize:15,cursor:"pointer",color:MUTED,fontFamily:F,flexShrink:0}}>✕</button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <span style={{fontSize:13,fontWeight:800,color:TEXTS}}>何株？</span>
+            <button onClick={()=>setQty(q=>String(Math.max(1,(parseInt(q)||1)-1)))} style={{width:38,height:38,borderRadius:10,border:`1.5px solid ${BORDER}`,background:BG,fontSize:20,fontWeight:900,cursor:"pointer",color:GP,fontFamily:F}}>−</button>
+            <div style={{minWidth:44,textAlign:"center",fontSize:20,fontWeight:900,color:TEXT}}>{Math.max(1,parseInt(qty)||1)}</div>
+            <button onClick={()=>setQty(q=>String((parseInt(q)||1)+1))} style={{width:38,height:38,borderRadius:10,border:`1.5px solid ${BORDER}`,background:BG,fontSize:20,fontWeight:900,cursor:"pointer",color:GP,fontFamily:F}}>＋</button>
+            <div style={{flex:1,textAlign:"right",fontSize:13,fontWeight:800,color:GP}}>{buyCost.toLocaleString()}pt</div>
+          </div>
+          {!selHold&&(
+            <input value={reason} onChange={e=>setReason(e.target.value)} placeholder="なんで推す？（れい：ゲームが好き）" style={{width:"100%",boxSizing:"border-box",border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"11px 14px",fontSize:14,fontFamily:F,marginBottom:12,background:BG,color:TEXT}}/>
+          )}
+          {selHold&&(
+            <div style={{background:GS,borderRadius:12,padding:"9px 13px",marginBottom:12,fontSize:12,color:GP,fontWeight:700}}>いま {selHold.qty}株 おうえん中{selHold.reason?`「${selHold.reason}」`:""}</div>
+          )}
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={cheer} disabled={myBal<buyCost}
+              style={{flex:1,background:myBal<buyCost?BORDER:G,border:"none",borderRadius:14,padding:14,fontWeight:900,fontSize:15,color:"#fff",cursor:myBal<buyCost?"default":"pointer",fontFamily:F}}>💚 おうえんする</button>
+            {selHold&&(
+              <button onClick={stopCheer} style={{flex:1,background:RS,border:`1.5px solid ${R}`,borderRadius:14,padding:14,fontWeight:900,fontSize:15,color:R,cursor:"pointer",fontFamily:F}}>👋 やめる（{sellGet.toLocaleString()}pt）</button>
+            )}
+          </div>
+          {myBal<buyCost&&<div style={{textAlign:"center",fontSize:12,color:R,fontWeight:700,marginTop:8}}>ポイントが たりないよ</div>}
+        </div>
+      </div>
+    )}
+  </div>);
+}
+
 function InvestTab({child,data,update}){
   const [investTab,setInvestTab]=useState("stocks"); // stocks | forex
   const [selected,setSelected]=useState(null);
@@ -10196,6 +10367,10 @@ function SetupWizard({ data, update, onComplete }) {
                 {e}
               </button>
             ))}
+            {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
+            <input value={CHILD_EMOJIS.includes(childEmoji)?"":childEmoji} onChange={e=>setChildEmoji((e.target.value||"").slice(0,4)||"⚡")}
+              placeholder="✏️" aria-label="絵文字を入力"
+              style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!CHILD_EMOJIS.includes(childEmoji)?GP:BORDER}`,background:!CHILD_EMOJIS.includes(childEmoji)?`${GP}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
           </div>
           <input value={childName} onChange={e=>setChildName(e.target.value)}
             placeholder="名前（例：かなと）"
@@ -10255,6 +10430,10 @@ function SetupWizard({ data, update, onComplete }) {
                     {e}
                   </button>
                 ))}
+                {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
+                <input value={PARENT_EMOJIS.includes(parentEmoji)?"":parentEmoji} onChange={e=>setParentEmoji((e.target.value||"").slice(0,4)||"👨")}
+                  placeholder="✏️" aria-label="絵文字を入力"
+                  style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!PARENT_EMOJIS.includes(parentEmoji)?B:BORDER}`,background:!PARENT_EMOJIS.includes(parentEmoji)?`${B}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
               </div>
               <input value={parentName} onChange={e=>setParentName(e.target.value)}
                 placeholder="名前（例：お父さん、ゆうた）"
