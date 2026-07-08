@@ -3651,6 +3651,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const showMissions= gameMode !== "money";   // きょうのミッション
   const thisMonth = new Date().toISOString().slice(0,7);
   const monthDelta = (data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
+  // 🌱 これまでにためた合計（累計・リセットしないのがうちの強み。競合の要望上位を先取り）
+  const lifetimeEarned = (data.logs||[]).filter(l=>l.cid===child.id&&l.pts>0).reduce((s,l)=>s+l.pts,0);
   const myBal    = bal(data.logs, child.id);
   const myLogs   = (data.logs||[]).filter(l=>l.cid===child.id);
   // ── レベルアップ検知→演出＆報酬(回復カプセル。ptは配らない) ──
@@ -3904,6 +3906,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>今月</span>
                 <span style={{fontSize:12,fontWeight:700,color:monthDelta>=0?"#86efac":"#fca5a5"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>つうさん</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#86efac"}}>{lifetimeEarned.toLocaleString()}pt</span>
                 {curStreak>=3&&<span style={{fontSize:11,background:"rgba(255,200,0,0.2)",color:"#fde68a",padding:"2px 7px",borderRadius:999,fontWeight:700}}>🔥 {curStreak}日</span>}
               </div>
             </div>
@@ -3976,6 +3980,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
             </div>
+            <div style={{color:"rgba(255,255,255,0.5)",fontSize:10.5,fontWeight:700,marginBottom:5}}>🌱 これまでに ためた 合計 <span style={{color:"#4ade80",fontWeight:900}}>{lifetimeEarned.toLocaleString()}pt</span></div>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <span style={{color:"rgba(255,255,255,0.58)",fontSize:11}}>今月</span>
               <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
