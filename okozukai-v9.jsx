@@ -3670,14 +3670,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4a9eff",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
             </div>
-            <div style={{color:"rgba(255,255,255,0.5)",fontSize:10.5,fontWeight:700,marginBottom:5}}>🌱 これまでに ためた 合計 <span style={{color:"#4ade80",fontWeight:900}}>{lifetimeEarned.toLocaleString()}pt</span></div>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <span style={{color:"rgba(255,255,255,0.58)",fontSize:11}}>今月</span>
-              <span style={{fontWeight:700,fontSize:12,color:monthDelta>=0?"#4ade80":"#f87171"}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+              <span style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:700}}>今月 <span style={{color:monthDelta>=0?"#4ade80":"#f87171",fontWeight:800}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}</span><span style={{color:"rgba(255,255,255,0.28)"}}> · </span>つうさん <span style={{color:"#4ade80",fontWeight:800}}>{lifetimeEarned.toLocaleString()}</span></span>
               <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(74,158,255,0.12)",border:"1px solid rgba(74,158,255,0.25)",borderRadius:10,padding:"5px 13px",color:"#4a9eff",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
           </div>
-          <Buddy child={child} data={data} size={100} update={update}/>
+          <Buddy child={child} data={data} size={118} update={update}/>
         </div>
         {/* 目標までの進捗バー(参考ゲームの進行感を健全に: 直近の未達成目標を1本だけ) */}
         {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
@@ -3690,26 +3688,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             </div>
           </div>
         );})()}
-        {/* 4ステータスグリッド */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:"0 20px 24px",position:"relative",zIndex:2}}>
-          {[
-            ["🔥","連続",curStreak>0?`${curStreak}日`:null,"#fde68a","daily","毎日開こう","flame"],
-            ["⚡","タスク",ttd>0?`${ttd}回`:null,"#a78bfa","activity","タスクをやろう","clipboard"],
-            ["🌟","推し株",portV2>0?`${portV2.toLocaleString()}pt`:null,"#4ade80","money","推しを応援","chartup"],
-            ["🏅","バッジ",myBadges>0?`${myBadges}個`:null,"#fbbf24","more","実績を稼ごう","medal"],
-          ].map(([e,l,v,c,tabTarget,hint,ic])=>(
-            <div key={l} onClick={()=>{if(!v)setTab(tabTarget);}}
-              style={{background:"rgba(255,255,255,0.04)",border:`1px solid ${!v?"rgba(74,158,255,0.15)":"rgba(255,255,255,0.07)"}`,borderRadius:14,padding:"12px 14px",cursor:!v?"pointer":"default",transition:"background .15s"}}>
-              <div style={{marginBottom:3}}><Ico name={ic} fb={e} size={24}/></div>
-              <div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:0.5,marginBottom:3}}>{l}</div>
-              {v ? (
-                <div style={{color:c,fontSize:17,fontWeight:900}}>{v}</div>
-              ) : (
-                <div style={{color:"rgba(74,158,255,0.6)",fontSize:11,lineHeight:1.4}}>{hint} →</div>
-              )}
-            </div>
-          ))}
-        </div>
+        <div style={{height:6}}/>
       </div>
         );
       })()}
