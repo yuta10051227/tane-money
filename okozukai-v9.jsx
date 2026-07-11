@@ -3289,6 +3289,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
   const [scrollY, setScrollY] = useState(0);   // iOS風 大きいタイトルのスクロール縮小用
+  const [showTips, setShowTips] = useState(false);   // まめちしき(旧・学ぶタブ)を毎日タブ内で開閉
   useEffect(()=>{ const on=()=>setScrollY(window.scrollY||0); window.addEventListener("scroll",on,{passive:true}); return ()=>window.removeEventListener("scroll",on); },[]);
   const [gachaRes, setGachaRes] = useState(null);
   const gachaBusyRef = useRef(false);   // ガチャ連打ガード(0.1秒更新中の二重発火/多重回しを防止)
@@ -3490,15 +3491,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     taskSort==="pts_low"?Math.abs(taskPts(a,child.id))-Math.abs(taskPts(b,child.id)):
     taskSort==="name"?a.label.localeCompare(b.label,"ja"):0;
 
-  // 5-tab grouped nav
+  // 4-tab grouped nav（学ぶは独立タブをやめ「毎日」内に差し込み＝North StarのシンプルIA）
   const MAIN_TABS = isJunior
     ? [["daily","📋 まいにち"],["tasks","✅ やること"],["goals","🌱 ためる"]]
-    : [["daily","毎日"],["activity","活動"],["money","ためる"],["learn","学ぶ"],["more","記録"]];
+    : [["daily","毎日"],["activity","活動"],["money","ためる"],["more","記録"]];
   // 新タブ体系マッピング（旧→新）
   const tabAlias = {
     tasks:"activity", invest:"money", kakeibo:"money",
     goals:"money", rewards:"money", log:"more",
-    badges:"more", tips:"more", ranking:"more", gacha:"daily"
+    badges:"more", tips:"more", ranking:"more", gacha:"daily", learn:"daily"
   };
   const effectiveTab = tabAlias[tab] || tab;
   // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
@@ -3776,9 +3777,16 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* ── 学ぶ（Teenモード） ── */}
-      {effectiveTab==="learn" && !isJunior && (
-        <TipsSection ageMode={child.ageMode||"middle"} child={child} data={data} update={update}/>
+      {/* ── まめちしき（旧・学ぶタブ→毎日タブ内の1枚に。独立タブ廃止） ── */}
+      {effectiveTab==="daily" && !isJunior && (
+        <div style={{padding:"10px 16px 0"}}>
+          <button onClick={()=>{taneHaptic("tap");setShowTips(v=>!v);}} style={{width:"100%",display:"flex",alignItems:"center",gap:8,background:darkBG?"rgba(255,255,255,0.05)":CARD,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:14,padding:"9px 14px",cursor:"pointer",fontFamily:F}}>
+            <span style={{fontSize:16}}>📖</span>
+            <span style={{flex:1,textAlign:"left",fontWeight:800,fontSize:13,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>まめちしき（お金のまなび）</span>
+            <span style={{fontSize:13,color:MUTED}}>{showTips?"▲":"›"}</span>
+          </button>
+          {showTips && <TipsSection ageMode={child.ageMode||"middle"} child={child} data={data} update={update}/>}
+        </div>
       )}
 
       {/* ── 家族ミッション導線（ホームタブ内の小カード） ── */}
@@ -4290,13 +4298,14 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               const ok=myBal>=r.cost;
               const pct=r.cost>0?Math.min(100,Math.round(myBal/r.cost*100)):100;   // 達成度メーター(競合レビュー要望)
               const rem=Math.max(0,r.cost-myBal);
+              const pending=(data.pendingRedemptions||[]).some(p=>p.cid===child.id&&p.rewardId===r.id);   // 承認待ちの見える化
               return (
                 <button key={r.id} onClick={()=>setRewardPop(r)}
                   style={{background:ok?CARD:BG,border:`2.5px solid ${ok?P:BORDER}`,borderRadius:18,padding:"13px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:9,textAlign:"left",fontFamily:F,opacity:ok?1:.85}}>
                   <div style={{display:"flex",alignItems:"center",gap:14,width:"100%"}}>
                     {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
                     <div style={{flex:1,minWidth:0}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
-                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:ok?G:R,fontWeight:700}}>{ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
+                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:pending?GOLD:ok?G:R,fontWeight:700}}>{pending?"✋ しんせい中":ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
                   </div>
                   {/* 達成メーター：ごほうびが貯まるまでの割合を視覚化 */}
                   <div style={{width:"100%",display:"flex",alignItems:"center",gap:8}}>
@@ -4355,17 +4364,22 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── LOG ── */}
       {effectiveTab==="more" && (
         <div style={{padding:16}}>
-          {/* サブタブ: 履歴 / バッジ / ランキング */}
-          <div style={{display:"flex",gap:6,marginBottom:14}}>
-            {[["log","📋 履歴"],["badges","🎖 バッジ"],["ranking","🏅 ランキング"]].map(([k,l])=>(
-              <button key={k} onClick={()=>setMoreOpen(k==="log"?"log":k==="badges"?"badges":"ranking")}
-                style={{flex:1,padding:"7px 0",border:"none",borderRadius:10,
-                  background:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?GP:"transparent",
-                  color:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?"#fff":MUTED,
-                  fontWeight:(["badges","ranking"].includes(moreOpen)?moreOpen:"log")===k?700:400,fontSize:11,cursor:"pointer",fontFamily:F}}>
+          {/* サブタブ: 履歴 / バッジ / ランキング（iOSセグメント統一） */}
+          <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:darkBG?"rgba(255,255,255,0.08)":"rgba(120,120,128,0.14)",marginBottom:14}}>
+            {[["log","📋 履歴"],["badges","🎖 バッジ"],["ranking","🏅 ランキング"]].map(([k,l])=>{
+              const cur=(["badges","ranking"].includes(moreOpen)?moreOpen:"log");
+              const on=cur===k;
+              return (
+              <button key={k} onClick={()=>{taneHaptic("tap");setMoreOpen(k==="log"?"log":k==="badges"?"badges":"ranking");}}
+                style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,
+                  background:on?(darkBG?"rgba(255,255,255,0.18)":"#fff"):"transparent",
+                  color:on?(darkBG?"#fff":GP):(darkBG?"rgba(255,255,255,0.55)":MUTED),
+                  fontWeight:on?800:600,fontSize:11,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",
+                  boxShadow:on&&!darkBG?"0 1px 3px rgba(0,0,0,0.16),0 1px 1px rgba(0,0,0,0.06)":"none",transition:"background .18s,color .18s"}}>
                 {l}
               </button>
-            ))}
+              );
+            })}
           </div>
           {(["badges","ranking"].includes(moreOpen)?moreOpen:"log")==="log" && (
           <div>
@@ -5352,6 +5366,22 @@ function ParentScreen({ data, update, onBack }) {
       {/* OVERVIEW */}
       {tab==="overview" && (
         <div style={{padding:16}}>
+          {/* 🌱 はじめてガイド（最初の5分）: ログが少ない家庭にだけ表示・✕で消せる */}
+          {!data.parentGuideDone && (data.logs||[]).length<15 && (
+            <div style={{background:`linear-gradient(135deg,${GS},#fff)`,border:`2px solid ${G}`,borderRadius:18,padding:"14px 16px",marginBottom:14,position:"relative"}}>
+              <button onClick={()=>update(d=>({...d,parentGuideDone:true}))} style={{position:"absolute",top:8,right:10,background:"none",border:"none",fontSize:15,cursor:"pointer",color:MUTED,fontFamily:F}}>✕</button>
+              <div style={{fontWeight:900,fontSize:14,color:GP,marginBottom:8}}>🌱 はじめかた（3ステップ・5分）</div>
+              {[["1","お手伝いを決める","「タスク」タブで、わが家のお手伝いとポイントを設定（初期リストのままでもOK）"],
+                ["2","ごほうびを決める","「特典」タブで、貯めたポイントの使い道を設定（例: ゲーム30分 = 100pt）"],
+                ["3","子どもと一緒に1回やる","子どもの画面でお手伝いを1つタップ→ポイントが貯まるのを一緒に見る。ここまでできれば準備完了！"]].map(([n,t,b])=>(
+                <div key={n} style={{display:"flex",gap:10,marginBottom:8}}>
+                  <div style={{width:22,height:22,borderRadius:"50%",background:GP,color:"#fff",fontSize:12,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+                  <div style={{flex:1}}><div style={{fontWeight:800,fontSize:13,color:TEXT}}>{t}</div><div style={{fontSize:11.5,color:TEXTS,lineHeight:1.5}}>{b}</div></div>
+                </div>
+              ))}
+              <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:4}}>💡 ポイントの相場は「1回のお手伝い = 10〜50pt」くらいが続きやすいです</div>
+            </div>
+          )}
           {data.children.map(child=>(
             <div key={child.id} style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:20,padding:16,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
@@ -5373,6 +5403,30 @@ function ParentScreen({ data, update, onBack }) {
               )}
             </div>
           ))}
+          {/* 🌟 子どもの推し株×会話のタネ: 推し理由を親に見せて会話のきっかけに */}
+          {(()=>{
+            const rows=data.children.flatMap(c=>((data.holdings||{})[c.id]||[]).map(h=>{
+              const st=(data.stocks||[]).find(x=>x.id===h.stockId);
+              return st?{c,st,h}:null;
+            }).filter(Boolean));
+            if(rows.length===0) return null;
+            return (
+              <div style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:18,padding:16,marginBottom:14}}>
+                <p style={{fontWeight:800,fontSize:13,color:MUTED,margin:"0 0 4px"}}>🌟 子どもの推し株</p>
+                <p style={{fontSize:11.5,color:TEXTS,margin:"0 0 10px",lineHeight:1.5}}>「なんでこの会社を推したの？」と聞いてみてください。お金の会話が いちばんの学びです。</p>
+                {rows.map(({c,st,h},i)=>(
+                  <div key={c.id+st.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i>0?`1px solid ${BORDER}`:"none"}}>
+                    <Emo e={c.emoji} size={18}/>
+                    <span style={{fontSize:20,flexShrink:0}}>{st.emoji}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:800,fontSize:13,color:TEXT}}>{c.name} × {st.name} <span style={{fontSize:11,color:MUTED,fontWeight:700}}>{h.qty}株</span></div>
+                      <div style={{fontSize:11.5,color:h.reason?GP:MUTED,fontWeight:700}}>{h.reason?`「${h.reason}」`:"（推し理由は まだ聞けてない）"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {/* monthly summary */}
           <div style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:18,padding:16,marginTop:4}}>
             <p style={{fontWeight:800,fontSize:13,color:MUTED,margin:"0 0 12px"}}>📋 今月のまとめ</p>
