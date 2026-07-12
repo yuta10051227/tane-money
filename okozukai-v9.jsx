@@ -7947,10 +7947,19 @@ function SetupWizard({ data, update, onComplete }) {
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center"}}>
           <div style={{fontSize:88,marginBottom:16,lineHeight:1}}>🌱</div>
           <h1 style={{fontWeight:900,fontSize:30,color:GP,margin:"0 0 14px",lineHeight:1.2,fontFamily:FB}}>Tane Money</h1>
-          <p style={{color:TEXTS,fontSize:15,lineHeight:1.9,margin:"0 0 12px",maxWidth:280}}>
+          <p style={{color:TEXTS,fontSize:15,lineHeight:1.9,margin:"0 0 16px",maxWidth:280}}>
             家族みんなで楽しく<br/>お金のことを学ぼう！
           </p>
-          <p style={{color:MUTED,fontSize:12,margin:"0 0 28px"}}>⏱ セットアップは約3分で完了</p>
+          {/* 競合との差別化3点（家族共有・ずっと貯まる・編集自由）を入口で明示 */}
+          <div style={{textAlign:"left",margin:"0 0 16px",display:"flex",flexDirection:"column",gap:7}}>
+            {[["🌱","ポイントは ずっと貯まる（月でリセットされない）"],["👨‍👩‍👧","家族みんなで共有（何人でも）"],["✏️","お手伝いも 金額も 自由に編集できる"]].map(([e,t])=>(
+              <div key={t} style={{display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,0.7)",borderRadius:12,padding:"8px 13px"}}>
+                <span style={{fontSize:16,flexShrink:0}}>{e}</span>
+                <span style={{fontSize:12.5,fontWeight:700,color:TEXT}}>{t}</span>
+              </div>
+            ))}
+          </div>
+          <p style={{color:MUTED,fontSize:12,margin:"0 0 24px"}}>⏱ セットアップは約3分で完了</p>
           <button onClick={()=>setStep(1)} style={{...btnStyle(true),fontSize:18,padding:"17px",boxShadow:`0 8px 24px ${GP}40`,marginBottom:16}}>
             はじめる 🌟
           </button>

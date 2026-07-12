@@ -1,7 +1,7 @@
 {
   "name": "Tane Money",
   "short_name": "タネマネ",
-  "description": "家族でお金を楽しく学ぶアプリ",
+  "description": "家族で共有できる、お小遣い×お金の学びアプリ。ポイントはずっと貯まる・編集自由・推し株でお金の会話が生まれる",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F7F5EF",
@@ -15,6 +15,6 @@
     {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
   ],
   "shortcuts": [
-    {"name": "今日のガチャ", "short_name": "ガチャ", "url": "/", "description": "毎日ガチャを引こう！"}
+    {"name": "まいにちのタネ", "short_name": "タネ", "url": "/", "description": "今日のタネをひらいてボーナスをうけとろう"}
   ]
 }
