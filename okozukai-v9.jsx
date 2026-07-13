@@ -1032,9 +1032,16 @@ const INIT = {
     gachaSimple: true,  // 初期値=ガチャ演出シンプル(まぶしさ/タメ演出を省く＝射幸性を抑える安全寄りの初期値)
     gameMode: "full",   // full=全部 / light=バトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
     dailyBattleLimit: 0,   // 1日のバトル回数上限(0=無制限・周回しすぎ防止)
+    vacationMode: false,   // 🏖 長期休みモード(ONで vacation:true のセットを優先表示)
+    privileges: [          // 🎁 やくそくのごほうび(⭐やくそく全達成で翌日つかえる。ポイントとは別)
+      {id:"pv1",emoji:"📱",label:"スマホ"},
+      {id:"pv2",emoji:"🎮",label:"スイッチ"},
+      {id:"pv3",emoji:"📺",label:"どうが"},
+    ],
   },
   pendingApprovals: [],
   pendingRedemptions: [],
+  yakusokuDone: {},   // {childId:'YYYY-M-D'} ⭐やくそく全達成した日(翌日にごほうび解放)
 };
 
 function migrate(d) {
@@ -1057,6 +1064,9 @@ function migrate(d) {
   if(d.familySettings.requireApproval===undefined) d.familySettings.requireApproval=false;
   if(d.familySettings.approvalNotification===undefined) d.familySettings.approvalNotification=false;
   if(d.familySettings.rewardApproval===undefined) d.familySettings.rewardApproval=false;
+  if(d.familySettings.vacationMode===undefined) d.familySettings.vacationMode=false;
+  if(!Array.isArray(d.familySettings.privileges)) d.familySettings.privileges=INIT.familySettings.privileges.map(p=>({...p}));
+  if(!d.yakusokuDone) d.yakusokuDone={};
   if(!d.familySettings.familyMission) d.familySettings.familyMission={...INIT.familySettings.familyMission};
   if(!d.monsterEvolved) d.monsterEvolved={};
   if(!d.monsterIV) d.monsterIV={};
@@ -1942,6 +1952,52 @@ function NewsModal({onClose}){
 // ═══════════════════════════════════════════════════════
 // DAILY TASKS
 // ═══════════════════════════════════════════════════════
+// ⭐やくそく: その日に表示される必須タスク(req:true)の達成状況を返す
+// (DailyTasksと同じセット自動選択＋曜日フィルタ。dateObj省略時は今日)
+function getYakusokuInfo(data, childId, dateObj) {
+  try {
+    const now = dateObj || new Date();
+    const day = now.getDay();
+    const iso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    const key = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+    const sets = data.dailyTaskSets || [];
+    const inW = s => !!s && s.active!==false &&
+      (!s.startDate || iso >= s.startDate) && (!s.endDate || iso <= s.endDate);
+    const vac = !!(data.familySettings && data.familySettings.vacationMode);
+    let chosen;
+    if (vac && sets.some(s => !!s && s.vacation===true && inW(s))) {
+      chosen = sets.filter(s => !!s && s.vacation===true && inW(s)).slice(0,4);
+    } else {
+      const ids = (Array.isArray(data.activeSetIds) && data.activeSetIds.length)
+        ? data.activeSetIds : (data.activeSetId ? [data.activeSetId] : []);
+      chosen = ids.map(id => sets.find(s => s.id === id)).filter(inW);
+      if (chosen.length === 0) {
+        const fb = sets.find(inW) || sets.find(s => !!s && s.active!==false) || sets[0];
+        chosen = fb ? [fb] : [];
+      }
+      if (!vac) {
+        const nv = chosen.filter(s => !s.vacation);
+        if (nv.length) chosen = nv;
+        else { const fb2 = sets.find(s => !!s && !s.vacation && inW(s)); if (fb2) chosen = [fb2]; }
+      }
+      chosen = chosen.slice(0,4);
+    }
+    // その日のセット自動選択(DailyTasksの_pickTodayと同じ)
+    const wkend = [0,6].includes(day);
+    const pick = (vac && chosen[0] && chosen[0].vacation) ? chosen[0] : (() => {
+      const wk  = chosen.find(s=>(s.name||"").includes("平日"));
+      const hol = chosen.find(s=>/休|週末|土日/.test(s.name||""));
+      return (wkend ? (hol||wk) : (wk||hol)) || chosen[0] || null;
+    })();
+    if (!pick) return { reqTasks:[], done:0, allDone:false };
+    const dowOk = t => !Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(day);
+    const reqTasks = (Array.isArray(pick.tasks)?pick.tasks:[]).filter(t => t.req===true && dowOk(t));
+    const p = (data.dailyProgress?.[childId]?.[key]) || {};
+    const done = reqTasks.filter(t => t.type==="check" ? !!p[`${pick.id}::${t.id}`] : (p[`${pick.id}::${t.id}`]||0) >= (t.target||1)).length;
+    return { reqTasks, done, allDone: reqTasks.length>0 && done===reqTasks.length };
+  } catch(e) { return { reqTasks:[], done:0, allDone:false }; }
+}
+
 function DailyTasks({ child, data, update }) {
   const today  = todayKey();
   // アクティブセットを取得（最大2セットを同時に。期間チェック・null安全）
@@ -1949,15 +2005,30 @@ function DailyTasks({ child, data, update }) {
   const _todayISO = todayISO();
   const inWindow = s => !!s && s.active!==false &&
     (!s.startDate || _todayISO >= s.startDate) && (!s.endDate || _todayISO <= s.endDate);
+  const vacMode = !!(data.familySettings && data.familySettings.vacationMode);
   const activeSets = (() => {
     try {
       if (sets.length === 0) return [];
+      // 🏖 長期休みモードON: vacation:true のセットがあればそれだけを表示
+      if (vacMode) {
+        const vs = sets.filter(s => !!s && s.vacation === true && inWindow(s));
+        if (vs.length) return vs.slice(0, 4);
+      }
       const ids = (Array.isArray(data.activeSetIds) && data.activeSetIds.length)
         ? data.activeSetIds : (data.activeSetId ? [data.activeSetId] : []);
       let chosen = ids.map(id => sets.find(s => s.id === id)).filter(inWindow);
       if (chosen.length === 0) {
         const fb = sets.find(inWindow) || sets.find(s => s.active!==false) || sets[0];
         chosen = fb ? [fb] : [];
+      }
+      // 長期休みモードOFF: 長期休み用セットはタブから除外(通常の平日/休日運用に戻す)
+      if (!vacMode) {
+        const nv = chosen.filter(s => !s.vacation);
+        if (nv.length) chosen = nv;
+        else {
+          const fb2 = sets.find(s => !s.vacation && inWindow(s));
+          if (fb2) chosen = [fb2];
+        }
       }
       return chosen.slice(0, 4);
     } catch(e) { return []; }
@@ -1966,6 +2037,7 @@ function DailyTasks({ child, data, update }) {
   // 平日/休日タブ: 1セットずつ表示。今日に合うセットを自動選択(手動でも切替可)
   const _isWeekend = [0,6].includes(new Date().getDay());
   const _pickToday = () => {
+    if (vacMode && activeSets[0] && activeSets[0].vacation) return activeSets[0].id;   // 長期休み中は先頭の長期休み用セット
     const wk  = activeSets.find(s=>(s.name||"").includes("平日"));
     const hol = activeSets.find(s=>/休|週末|土日/.test(s.name||""));
     return ((_isWeekend ? (hol||wk) : (wk||hol)) || activeSets[0] || {}).id || null;
@@ -1973,11 +2045,14 @@ function DailyTasks({ child, data, update }) {
   const [selSetId, setSelSetId] = useState(null);
   const selId   = (selSetId && activeSets.some(s=>s.id===selSetId)) ? selSetId : _pickToday();
   const viewSet = activeSets.find(s=>s.id===selId) || activeSets[0] || null;
+  // 曜日指定(dow)タスクは今日の曜日だけ表示。dowなし/空=毎日(後方互換)
+  const dowOk = t => !Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(new Date().getDay());
   // 完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
-  const tasks = viewSet
+  const tasks = (viewSet
     ? (Array.isArray(viewSet.tasks)?viewSet.tasks:[]).map(t =>
         ({...t, _k:`${viewSet.id}::${t.id}`, _setId:viewSet.id, _setName:viewSet.name, _setEmoji:viewSet.emoji}))
-    : (data.dailyTasks || []).map(t => ({...t, _k:t.id, _setId:"", _setName:"", _setEmoji:""}));
+    : (data.dailyTasks || []).map(t => ({...t, _k:t.id, _setId:"", _setName:"", _setEmoji:""}))
+  ).filter(dowOk);
   const bonusTotal = viewSet ? (viewSet.bonus??0) : (data.dailyBonus??50);
   const prog   = (data.dailyProgress?.[child.id]?.[today]) || {};
   const [flash, setFlash] = useState(null);
@@ -2011,7 +2086,7 @@ function DailyTasks({ child, data, update }) {
   const allDone   = doneCount === tasks.length && tasks.length > 0;
   // セット単位の完了/ボーナス判定(2セットそれぞれに全達成ボーナス)
   const bonusKey  = s => `__bonus__::${s.id}`;
-  const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).every(tt =>
+  const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).filter(dowOk).every(tt =>
     tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
   const allBonusGiven = viewSet ? (!viewSet.bonus || !!prog[bonusKey(viewSet)]) : true;
   // 開閉: 既定は「未完なら開く・全部できたら畳む」。タップで手動上書き。
@@ -2042,12 +2117,19 @@ function DailyTasks({ child, data, update }) {
     }, 600);
   };
 
+  // ⭐やくそく: 完了直後、今日表示の必須タスクが全部できていたら達成日を記録(翌日のごほうび解放)
+  const markYakusoku = d => {
+    const info = getYakusokuInfo(d, child.id);
+    if (!info.reqTasks.length || !info.allDone) return d;
+    return { ...d, yakusokuDone: { ...(d.yakusokuDone||{}), [child.id]: today } };
+  };
+
   const handleCheck = t => {
     if (isDone(t)) return;
     showFlash(t.pts, t.emoji);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts)));
+    update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts))));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
   };
@@ -2059,7 +2141,7 @@ function DailyTasks({ child, data, update }) {
     showFlash(t.pts, t.emoji);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
-    update(d => careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts)));
+    update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts))));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
   };
@@ -3715,6 +3797,39 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
+      {/* ⭐ やくそくカード（ぜんぶクリアで あしたのおたのしみ解放。ポイントとは別） */}
+      {effectiveTab==="daily" && (()=>{
+        const _yd = new Date(); _yd.setDate(_yd.getDate()-1);
+        const yesterdayKey = `${_yd.getFullYear()}-${_yd.getMonth()+1}-${_yd.getDate()}`;
+        const info = getYakusokuInfo(data, child.id);
+        const okToday = (data.yakusokuDone||{})[child.id] === yesterdayKey;
+        if (info.reqTasks.length===0 && !okToday) return null;
+        const privs = (data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
+        const privStr = privs.length ? privs.map(p=>`${p.emoji}${p.label}`).join("・") : "おたのしみ";
+        const hadReqYesterday = getYakusokuInfo(data, child.id, _yd).reqTasks.length>0;
+        return (
+          <div style={{padding:"10px 16px 0"}}>
+            <div style={{background:okToday?GS:(darkBG?"rgba(255,255,255,0.05)":CARD),border:`1.5px solid ${okToday?G:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,borderRadius:14,padding:"10px 14px"}}>
+              {okToday
+                ? <p style={{margin:0,fontWeight:900,fontSize:13,color:GP}}>🎉 きょうは {privStr} OK！</p>
+                : hadReqYesterday
+                  ? <p style={{margin:0,fontWeight:700,fontSize:11.5,lineHeight:1.5,color:darkBG?"rgba(255,255,255,0.55)":MUTED}}>きょうの おたのしみは おやすみ…きょうの やくそくで あしたゲット！</p>
+                  : null}
+              {info.reqTasks.length>0 && <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:(okToday||hadReqYesterday)?"8px 0 4px":"0 0 4px"}}>
+                  <span style={{fontWeight:800,fontSize:12,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>⭐きょうの やくそく</span>
+                  <span style={{fontWeight:800,fontSize:12,color:info.allDone?G:MUTED}}>{info.done}/{info.reqTasks.length}</span>
+                </div>
+                <div style={{height:8,background:darkBG?"rgba(255,255,255,0.12)":BORDER,borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${info.done/info.reqTasks.length*100}%`,background:info.allDone?G:GOLD,borderRadius:4,transition:"width .5s ease"}}/>
+                </div>
+                {info.allDone && <p style={{margin:"6px 0 0",fontWeight:900,fontSize:12,color:G}}>🎉 あしたは {privStr} つかえるよ！</p>}
+              </>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* かぞく会議カードは廃止（ユーザー要望・シンプル化） */}
 
       {/* 🎯 きょうのミッション(毎日リセット) ※ユーザー要望で非表示(falseで無効化・復活可) */}
@@ -4471,6 +4586,7 @@ function ParentDailyTab({data,update,sb}){
   const [nd,setNd] = useState({emoji:"⭐",label:"",type:"check",pts:"",target:"1"});
   const [editDt,setEditDt] = useState(null);
   const [newSetForm,setNewSetForm] = useState({name:"",emoji:"📋",bonus:"50",startDate:"",endDate:""});
+  const [npv,setNpv] = useState({emoji:"🎁",label:""});
 
   const sets = (data.dailyTaskSets||[]).map(s=>({
     ...s,
@@ -4548,8 +4664,66 @@ function ParentDailyTab({data,update,sb}){
     }));
     setEditDt(null);
   };
+  // 曜日チップ(dow)・やくそく(req)のトグル。dowなし/空=毎日(後方互換)
+  const DOWS=["日","月","火","水","木","金","土"];
+  const updateTaskInSet=(setId,taskId,fn)=>update(d=>({...d,
+    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:(Array.isArray(s.tasks)?s.tasks:[]).map(t=>t.id===taskId?fn(t):t)}:s)
+  }));
+  const toggleDow=(setId,taskId,day)=>updateTaskInSet(setId,taskId,tt=>{
+    const cur=Array.isArray(tt.dow)?tt.dow:[];
+    return {...tt, dow: cur.includes(day)?cur.filter(x=>x!==day):[...cur,day].sort((a,b)=>a-b)};
+  });
+
+  const vacMode = !!(data.familySettings && data.familySettings.vacationMode);
+  const toggleVacMode = () => update(d=>({...d,
+    familySettings:{...(d.familySettings||{}), vacationMode: !(d.familySettings&&d.familySettings.vacationMode)}
+  }));
 
   return(<div style={{padding:16}}>
+
+    {/* ── 🏖 長期休みモード ── */}
+    <div style={{background:vacMode?`${B}12`:CARD,border:`2px solid ${vacMode?B:BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:26,flexShrink:0}}>🏖</span>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:900,fontSize:14,color:vacMode?B:TEXT}}>長期休みモード{vacMode?"（ON）":""}</div>
+        <div style={{color:MUTED,fontSize:11,marginTop:2,lineHeight:1.5}}>夏休み・冬休みは 長期休み用セットに切り替え</div>
+      </div>
+      <button onClick={toggleVacMode}
+        style={{background:vacMode?B:BORDER,border:"none",borderRadius:16,width:46,height:26,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+        <div style={{position:"absolute",top:3,left:vacMode?23:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+      </button>
+    </div>
+
+    {/* ── 🎁 やくそくのごほうび ── */}
+    {(()=>{
+      const privs=(data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
+      const setPrivs=fn=>update(d=>{
+        const cur=(d.familySettings&&Array.isArray(d.familySettings.privileges))?d.familySettings.privileges:[];
+        return {...d, familySettings:{...(d.familySettings||{}), privileges:fn(cur)}};
+      });
+      return(<div style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:16,padding:"12px 14px",marginBottom:12}}>
+        <p style={{fontWeight:900,fontSize:14,color:TEXT,margin:"0 0 4px"}}>🎁 やくそくのごほうび（あしたの おたのしみ）</p>
+        <p style={{color:MUTED,fontSize:11,lineHeight:1.6,margin:"0 0 10px"}}>⭐やくそくを ぜんぶクリアすると、翌日に使えるごほうびです（ポイントとは別）</p>
+        {privs.map(pv=>(
+          <div key={pv.id} style={{display:"flex",alignItems:"center",gap:8,background:BG,borderRadius:10,padding:"7px 10px",marginBottom:6}}>
+            <span style={{fontSize:18,flexShrink:0}}>{pv.emoji}</span>
+            <span style={{flex:1,fontWeight:700,fontSize:13}}>{pv.label}</span>
+            <button onClick={()=>setPrivs(cur=>cur.filter(x=>x.id!==pv.id))}
+              style={{width:26,height:26,borderRadius:8,border:`1px solid ${BORDER}`,background:"transparent",color:MUTED,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F,padding:0,lineHeight:1}}>✕</button>
+          </div>
+        ))}
+        {privs.length===0&&<p style={{color:MUTED,fontSize:12,textAlign:"center",margin:"4px 0 8px"}}>まだごほうびがありません</p>}
+        <div style={{display:"flex",gap:6}}>
+          <input value={npv.emoji} onChange={e=>setNpv(v=>({...v,emoji:e.target.value}))} style={{...INP,width:50}} placeholder="絵文字"/>
+          <input value={npv.label} onChange={e=>setNpv(v=>({...v,label:e.target.value}))} style={{...INP,flex:1}} placeholder="ごほうび名（例：ゲーム）"/>
+          <Btn c={G} label="＋追加" onClick={()=>{
+            if(!npv.label) return;
+            setPrivs(cur=>[...cur,{id:"pv_"+uid(),emoji:npv.emoji||"🎁",label:npv.label}]);
+            setNpv({emoji:"🎁",label:""});
+          }} disabled={!npv.label} sm/>
+        </div>
+      </div>);
+    })()}
 
     {/* ── セット一覧 ── */}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -4597,6 +4771,7 @@ function ParentDailyTab({data,update,sb}){
             <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
               <span style={{fontSize:11,fontWeight:700,color:statusColor[status]}}>{statusLabel[status]}</span>
               <span style={{fontSize:11,color:MUTED}}>{s.tasks.length}タスク · ボーナス{s.bonus}pt</span>
+              {s.vacation&&<span style={{fontSize:11,fontWeight:700,color:B}}>🏖 長期休み用</span>}
               {s.startDate&&<span style={{fontSize:11,color:MUTED}}>{s.startDate}〜{s.endDate||"無期限"}</span>}
             </div>
           </div>
@@ -4646,6 +4821,12 @@ function ParentDailyTab({data,update,sb}){
                 <div style={{position:"absolute",top:3,left:s.active?20:3,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
               </button>
               <span style={{color:s.active?G:MUTED,fontSize:11,fontWeight:700}}>{s.active?"ON":"OFF"}</span>
+              <span style={{width:8}}/>
+              <span style={{color:MUTED,fontSize:11}}>🏖 長期休み用</span>
+              <button onClick={()=>updateSet(s.id,{vacation:!s.vacation})}
+                style={{background:s.vacation?B:BORDER,border:"none",borderRadius:16,width:40,height:22,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+                <div style={{position:"absolute",top:3,left:s.vacation?20:3,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+              </button>
             </div>
           </div>
 
@@ -4668,16 +4849,34 @@ function ParentDailyTab({data,update,sb}){
                   </div>
                   <div style={{display:"flex",gap:6}}><Btn c={G} label="保存" onClick={()=>saveTaskEdit(s.id)} sm/><Btn c={MUTED} label="キャンセル" onClick={()=>setEditDt(null)} sm/></div>
                 </div>
-                :<div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:13}}>{t.label}</div>
-                    <div style={{color:MUTED,fontSize:11}}>{t.type==="check"?"✅":"🔢"} +{t.pts}pt{t.type==="count"&&` · 目標${t.target||1}回`}</div>
+                :<div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{t.label}</div>
+                      <div style={{color:MUTED,fontSize:11}}>{t.type==="check"?"✅":"🔢"} +{t.pts}pt{t.type==="count"&&` · 目標${t.target||1}回`}</div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>
+                      <Btn c={B} label="✏" onClick={()=>setEditDt({...t,pts:String(t.pts),target:String(t.target||1)})} sm/>
+                      <Btn c={R} label="🗑" onClick={()=>delTaskFromSet(s.id,t.id)} sm/>
+                    </div>
                   </div>
-                  <div style={{display:"flex",gap:4}}>
-                    <Btn c={B} label="✏" onClick={()=>setEditDt({...t,pts:String(t.pts),target:String(t.target||1)})} sm/>
-                    <Btn c={R} label="🗑" onClick={()=>delTaskFromSet(s.id,t.id)} sm/>
+                  {/* 曜日チップ（選んだ曜日だけ表示。なにも選ばないと毎日） */}
+                  <div style={{display:"flex",gap:4,marginTop:7,alignItems:"center",flexWrap:"wrap"}}>
+                    {DOWS.map((lb,day)=>{
+                      const on=Array.isArray(t.dow)&&t.dow.includes(day);
+                      const c=day===0?R:day===6?B:GP;
+                      return(<button key={day} onClick={()=>toggleDow(s.id,t.id,day)}
+                        style={{width:26,height:26,borderRadius:"50%",border:`1.5px solid ${on?c:BORDER}`,background:on?c:CARD,color:on?"#fff":(day===0?R:day===6?B:MUTED),fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F,padding:0,lineHeight:1}}>
+                        {lb}
+                      </button>);
+                    })}
+                    <button onClick={()=>updateTaskInSet(s.id,t.id,tt=>({...tt,req:!tt.req}))}
+                      style={{marginLeft:2,padding:"4px 9px",borderRadius:999,border:`1.5px solid ${t.req?Y:BORDER}`,background:t.req?`${Y}25`:CARD,color:t.req?"#9a7000":MUTED,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
+                      ⭐やくそく{t.req?"✓":""}
+                    </button>
                   </div>
+                  <p style={{color:MUTED,fontSize:10,margin:"5px 0 0"}}>曜日：なにも選ばないと毎日 ／ ⭐やくそく＝あしたのごほうびの条件</p>
                 </div>}
             </div>
           ))}
@@ -4727,12 +4926,13 @@ function ParentDailyTab({data,update,sb}){
             <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>今日の達成状況</p>
             {data.children.map(child=>{
               const prog=(data.dailyProgress||{})[child.id]?.[today]||{};
-              const done=s.tasks.filter(t=>t.type==="check"?!!prog[t.id]:(prog[t.id]||0)>=(t.target||1)).length;
-              const allD=done===s.tasks.length&&s.tasks.length>0;
+              const vis=s.tasks.filter(t=>!Array.isArray(t.dow)||t.dow.length===0||t.dow.includes(new Date().getDay()));
+              const done=vis.filter(t=>t.type==="check"?!!prog[t.id]:(prog[t.id]||0)>=(t.target||1)).length;
+              const allD=done===vis.length&&vis.length>0;
               return(<div key={child.id} style={{display:"flex",alignItems:"center",gap:8,background:allD?"#e8faf0":BG,border:`1px solid ${allD?G:BORDER}`,borderRadius:10,padding:"7px 10px",marginBottom:6}}>
                 <ChildAvatar child={child} size={24}/>
                 <span style={{fontWeight:700,fontSize:12,flex:1}}>{child.name}</span>
-                <span style={{color:allD?G:MUTED,fontWeight:800,fontSize:11}}>{done}/{s.tasks.length} {allD?"🌟":""}</span>
+                <span style={{color:allD?G:MUTED,fontWeight:800,fontSize:11}}>{done}/{vis.length} {allD?"🌟":""}</span>
                 <PromptModalButton btnLabel="🎁 付与" title={`${child.name}に ボーナスpt`} desc={`${s.name} のごほうび。何ポイント あげる？`} type="number" maxLen={4} initial={String((data.childDailyBonus||{})[child.id]??s.bonus)} placeholder="pt"
                   btnStyle={{padding:"3px 8px",background:`${Y}20`,border:`1px solid ${Y}`,borderRadius:7,color:"#9a7000",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
                   onSubmit={(val)=>{ const amt=parseInt(val); if(!isNaN(amt)&&amt>0){const _e={id:uid(),cid:child.id,type:"grant",label:`🌟 ボーナスpt（${s.name}）`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);} }}/>
