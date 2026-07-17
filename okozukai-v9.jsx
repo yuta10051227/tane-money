@@ -1922,6 +1922,7 @@ const MISSIONS = [
   {id:"m_battle", e:"⚔", label:"バトルに 1かい かつ", goal:1, metric:"battle", exp:12},
 ];
 function NewsModal({onClose}){
+  useEffect(()=>{ const prev=document.body.style.overflow; document.body.style.overflow="hidden"; return ()=>{ document.body.style.overflow=prev; }; },[]);
   return (
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(8,6,18,.6)",backdropFilter:"blur(2px)",display:"flex",alignItems:"flex-end",justifyContent:"center",fontFamily:F}}>
       <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,maxHeight:"82vh",background:BG,borderRadius:"22px 22px 0 0",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 30px rgba(0,0,0,.3)"}}>
@@ -1929,7 +1930,7 @@ function NewsModal({onClose}){
           <span style={{fontWeight:900,fontSize:17,color:TEXT}}>📢 おしらせ</span>
           <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
         </div>
-        <div style={{overflowY:"auto",padding:"12px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+        <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"12px 16px calc(20px + env(safe-area-inset-bottom))"}}>
           {NEWS.map((n,i)=>(
             <div key={n.id} style={{background:CARD,border:`1.5px solid ${i===0?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:10,display:"flex",gap:11}}>
               <div style={{fontSize:26,flexShrink:0}}>{n.e}</div>
@@ -2418,6 +2419,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [smRUnit, setSmRUnit] = useState("");
   const [planMsg, setPlanMsg] = useState("");
   const [planBusy, setPlanBusy] = useState(false);
+  // 背面(個別ページ)のスクロール抜けを防ぐ：モーダル表示中は body のスクロールをロック
+  useEffect(()=>{ const prev=document.body.style.overflow; document.body.style.overflow="hidden"; return ()=>{ document.body.style.overflow=prev; }; },[]);
 
   const F = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
   const G="#34c77b",Y="#f5c842",R="#f0605a",B="#4a9eff",P="#a855f7";
@@ -2506,7 +2509,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           ))}
         </div>
         {/* コンテンツ */}
-        <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
+        <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"16px"}}>
 
           {/* ── pt付与タブ ── */}
           {settingsTab==="grant"&&(
@@ -3357,7 +3360,7 @@ function LogRow({ l, emoji, canDelete, child, update, showFlash }){
   );
 }
 
-function ChildScreen({ child, data, update, onBack, onFamily, openSettings, onSettingsShown }) {
+function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [tab, setTab]   = useState("daily");
   // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
@@ -3386,8 +3389,7 @@ function ChildScreen({ child, data, update, onBack, onFamily, openSettings, onSe
   const [taskSort, setTaskSort] = useState("default");
   const [rewardSort, setRewardSort] = useState("default");
   const [logSort, setLogSort] = useState("new");
-  const [showSettings, setShowSettings] = useState(!!openSettings);   // トップの⚙からPIN経由で直接設定を開く導線
-  useEffect(()=>{ if(openSettings){ setShowSettings(true); onSettingsShown&&onSettingsShown(); } },[]);
+  const [showSettings, setShowSettings] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showZukan, setShowZukan] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
@@ -7884,6 +7886,7 @@ function TipsSection({ageMode,child,data,update}){
 
 // ── TaskCustomizer ────────────────────────────────────
 function TaskCustomizer({child,data,update,onClose}){
+  useEffect(()=>{ const prev=document.body.style.overflow; document.body.style.overflow="hidden"; return ()=>{ document.body.style.overflow=prev; }; },[]);
   const allGood=data.goodTasks||[];
   const allBad=data.badTasks||[];
   const myIds=(data.myTaskIds||{})[child.id]||[];
@@ -7916,7 +7919,7 @@ function TaskCustomizer({child,data,update,onClose}){
           <button onClick={()=>clearSection(section)} style={{flex:1,padding:"6px 0",border:`1.5px solid ${BORDER}`,borderRadius:10,background:"transparent",color:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>全解除</button>
         </div>
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"12px 20px"}}>
+      <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"12px 20px"}}>
         {currentList.map(t=>{const on=selected.includes(t.id);return(
           <button key={t.id} onClick={()=>toggle(t.id)} style={{width:"100%",background:on?`${col}10`:BG,border:`2px solid ${on?col:BORDER}`,borderRadius:14,padding:"11px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12,cursor:"pointer",textAlign:"left",fontFamily:F,transition:"all .15s"}}>
             <span style={{fontSize:22,flexShrink:0}}>{t.emoji}</span>
@@ -8660,7 +8663,7 @@ export default function App() {
   const [syncSt,  setSyncSt]  = useState("saved"); // saving | saved | error
   const [screen,  setScreen]  = useState("home");
   const [activeChild, setActiveChild] = useState(null);
-  const [pendingParentSettings, setPendingParentSettings] = useState(false);   // トップの⚙→PIN→設定を直接開く
+  const [showAppSettings, setShowAppSettings] = useState(false);   // トップの⚙→設定(SettingsModalが自前でPIN認証。二重PIN防止)
 
   // Load from cloud on mount
   // リアルタイム同期＋5秒ポーリングの開始（マウント時と、セットアップ完了直後の両方から呼ぶ）
@@ -8847,7 +8850,7 @@ export default function App() {
             }
           }}
           onParent={()=>setScreen("pin-parent")}
-          onSettings={()=>{ setActiveChild(null); setPendingParentSettings(true); setScreen("pin-parent"); }}
+          onSettings={()=>setShowAppSettings(true)}
           onParentCard={parent=>{
             setActiveChild(parent);
             if((data.noPinIds||{})[parent.id]){
@@ -8919,11 +8922,13 @@ export default function App() {
         <ChildScreen child={data.children.find(c=>c.id===activeChild.id)||activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_public")}/>
       )}
       {screen==="parent" && activeChild && (
-        <ChildScreen child={activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")} openSettings={pendingParentSettings} onSettingsShown={()=>setPendingParentSettings(false)}/>
+        <ChildScreen child={activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")}/>
       )}
       {screen==="parent" && !activeChild && (
-        <ChildScreen child={(data.parents||[])[0]||{id:"p1",name:"パパ",emoji:"👨",pin:"3333",ageMode:"senior"}} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")} openSettings={pendingParentSettings} onSettingsShown={()=>setPendingParentSettings(false)}/>
+        <ChildScreen child={(data.parents||[])[0]||{id:"p1",name:"パパ",emoji:"👨",pin:"3333",ageMode:"senior"}} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")}/>
       )}
+      {/* トップの⚙から開く全体管理：App直下に描画（個別ページに入れ子にしない＝二重PIN/スクロール抜けを防ぐ） */}
+      {showAppSettings && <SettingsModal data={data} update={update} onClose={()=>setShowAppSettings(false)} currentMemberId={(data.parents||[])[0]?.id||(data.children||[])[0]?.id||"parent"}/>}
       {screen==="family_public" && (
         <FamilyPublicScreen data={data} viewerRole={activeChild?.role||"child"} onBack={()=>setScreen(activeChild?.role==="parent"?"parent":"child")}/>
       )}
