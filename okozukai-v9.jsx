@@ -4896,8 +4896,7 @@ function ParentDailyTab({data,update,sb}){
 
           {/* タスク追加パネル */}
           {(()=>{
-            const alreadyIds=new Set(s.tasks.map(t=>t.srcId||t.id));
-            const available=(data.goodTasks||[]).filter(t=>!alreadyIds.has(t.id));
+            const allTasks=(data.goodTasks||[]);   // 追加済みでも除外しない＝同じタスクを何個でも入れられる
             return(<div style={{background:`${G}10`,border:`1.5px dashed ${G}`,borderRadius:12,padding:12,marginTop:4}}>
               <div style={{display:"flex",gap:0,background:BORDER,borderRadius:8,overflow:"hidden",marginBottom:10}}>
                 {[["pick","📋 お手伝いから選ぶ"],["manual","✏ 手動入力"]].map(([v,l])=>(
@@ -4906,15 +4905,18 @@ function ParentDailyTab({data,update,sb}){
               </div>
               {addMode==="pick"?(
                 <div style={{maxHeight:220,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
-                  {available.length===0&&<p style={{color:MUTED,fontSize:12,textAlign:"center",padding:"8px 0"}}>全て追加済み</p>}
-                  {available.map(t=>(
+                  {allTasks.length===0&&<p style={{color:MUTED,fontSize:12,textAlign:"center",padding:"8px 0"}}>お手伝いが まだ登録されていません</p>}
+                  {allTasks.map(t=>{
+                    const cnt=s.tasks.filter(x=>(x.srcId||"")===t.id).length;   // このセットに何個入っているか
+                    return (
                     <button key={t.id} onClick={()=>addTaskToSet(s.id,{id:uid(),srcId:t.id,emoji:t.emoji,label:t.label,type:"check",pts:t.pts,target:1})}
-                      style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left",fontFamily:F}}>
+                      style={{background:CARD,border:`1.5px solid ${cnt>0?G:BORDER}`,borderRadius:10,padding:"8px 12px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",textAlign:"left",fontFamily:F}}>
                       <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
-                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{t.label}</div><div style={{color:MUTED,fontSize:11}}>+{t.pts}pt</div></div>
-                      <span style={{color:G,fontSize:16,fontWeight:900}}>+</span>
+                      <div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{t.label}</div><div style={{color:MUTED,fontSize:11}}>+{t.pts}pt{cnt>0&&<span style={{color:G,fontWeight:800}}> ・ {cnt}こ追加ずみ</span>}</div></div>
+                      <span style={{color:G,fontSize:16,fontWeight:900}}>＋</span>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               ):(
                 <div>
