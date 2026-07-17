@@ -2071,7 +2071,7 @@ function DailyTasks({ child, data, update }) {
   const heroImg  = (_bgUnlocked && _bgTheme.img) ? _bgTheme.img : null;
   const heroStars = _bgUnlocked && _bgTheme.stars;
 
-  const showFlash = (pts, emoji) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1100); };
+  const showFlash = (pts, emoji, yaku) => { taneHaptic(pts>=0?"success":"warn"); setFlash({pts,emoji,yaku:!!yaku,cheer:pts>0?taneCheer():null}); setTimeout(()=>setFlash(null),1100); };
   const markJustDone = id => {
     setJustDone(p=>({...p,[id]:true}));
     setTimeout(()=>setJustDone(p=>{const n={...p};delete n[id];return n;}),550);
@@ -2126,7 +2126,7 @@ function DailyTasks({ child, data, update }) {
 
   const handleCheck = t => {
     if (isDone(t)) return;
-    showFlash(t.pts, t.emoji);
+    showFlash(t.pts, t.emoji, (t.pts||0)===0&&t.req);
     markJustDone(t._k);
     const entry = mkEntry(`✅ ${t.label}`, t.pts);
     update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts))));
@@ -2138,7 +2138,7 @@ function DailyTasks({ child, data, update }) {
     const cur = prog[t._k] || 0;
     if (cur >= (t.target||1) && isDone(t)) return;
     const nxt = cur + 1;
-    showFlash(t.pts, t.emoji);
+    showFlash(t.pts, t.emoji, (t.pts||0)===0&&t.req);
     if(nxt>=(t.target||1)) markJustDone(t._k);
     const entry = mkEntry(`🔢 ${t.label}（${nxt}回目）`, t.pts);
     update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts))));
@@ -2149,9 +2149,9 @@ function DailyTasks({ child, data, update }) {
   return (
     <div style={{padding:"12px 16px",paddingBottom:0}}>
       {flash && (
-        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.pts>=0?G:R,color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease",pointerEvents:"none"}}>
+        <div style={{position:"fixed",top:"28%",left:"50%",transform:"translate(-50%,-50%)",background:flash.yaku?GOLD:(flash.pts>=0?G:R),color:"#fff",borderRadius:20,padding:"13px 24px",zIndex:900,textAlign:"center",animation:"popIn .3s ease",pointerEvents:"none"}}>
           <div style={{fontSize:36}}>{flash.emoji}</div>
-          <Yen v={flash.pts} sz={20}/>
+          {flash.yaku?<div style={{fontSize:16,fontWeight:900}}>⭐やくそく クリア！</div>:<Yen v={flash.pts} sz={20}/>}
           {flash.pts>0&&<>
             <img src={`/assets/monster_${monStageId}_f0.png`} style={{width:48,height:48,objectFit:"contain",display:"block",margin:"5px auto 2px",imageRendering:"pixelated",animation:"heartbeat .6s ease-in-out"}} onError={e=>{e.target.style.display="none"}}/>
             <div style={{fontSize:11.5,fontWeight:800,color:"rgba(255,255,255,0.95)",maxWidth:210,lineHeight:1.45,margin:"0 auto"}}>{flash.cheer||"✨ なかまがよろこんだ！"}</div>
@@ -2223,9 +2223,11 @@ function DailyTasks({ child, data, update }) {
             style={{background:done?"#e8faf0":CARD, border:`2px solid ${done?G:BORDER}`, borderRadius:16, padding:"14px 16px", marginBottom:10, display:"flex", alignItems:"center", gap:12, transition:"all .25s", transform:justDone[t._k]?"scale(1.08)":"scale(1)", boxShadow:justDone[t._k]?`0 0 0 4px ${G}90`:"none"}}>
             <span style={{fontSize:32}}>{t.emoji}</span>
             <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}</div>
+              <div style={{fontWeight:800,fontSize:15,color:done?G:TEXT,textDecoration:done&&isCheck(t)?"line-through":"none"}}>{t.label}{t.req&&<span style={{color:GOLD,fontSize:12,marginLeft:4}}>⭐</span>}</div>
               <div style={{color:MUTED,fontSize:12,marginTop:2}}>
-                {isCheck(t) ? `+${t.pts}pt` : `1回 +${t.pts}pt　目標: ${t.target||1}回`}
+                {(t.pts||0)===0
+                  ? <><span style={{color:GOLD,fontWeight:800}}>⭐やくそく</span>{!isCheck(t)&&`　目標: ${t.target||1}回`}</>
+                  : (isCheck(t) ? `+${t.pts}pt` : `1回 +${t.pts}pt　目標: ${t.target||1}回`)}
               </div>
             </div>
             {isCheck(t) ? (
@@ -4583,7 +4585,10 @@ function ParentDailyTab({data,update,sb}){
   const [selSetId,setSelSetId] = useState(null);
   const [showNewSet,setShowNewSet] = useState(false);
   const [addMode,setAddMode] = useState("pick");
-  const [nd,setNd] = useState({emoji:"⭐",label:"",type:"check",pts:"",target:"1"});
+  const [nd,setNd] = useState({emoji:"⭐",label:"",type:"check",pts:"",target:"1",reward:"pts"});
+  // ごほうび種別: pts=ポイントのみ / yaku=⭐やくそくのみ(0pt) / both=ポイント＋⭐
+  const REWARD_OPTS=[["pts","💰ポイント"],["yaku","⭐やくそく"],["both","💰＋⭐"]];
+  const rewardOf = t => t.req ? (((t.pts||0)===0)?"yaku":"both") : "pts";
   const [editDt,setEditDt] = useState(null);
   const [newSetForm,setNewSetForm] = useState({name:"",emoji:"📋",bonus:"50",startDate:"",endDate:""});
   const [npv,setNpv] = useState({emoji:"🎁",label:""});
@@ -4658,9 +4663,11 @@ function ParentDailyTab({data,update,sb}){
   }));
   const saveTaskEdit = (setId) => {
     if(!editDt) return;
-    const pts=parseInt(editDt.pts); if(isNaN(pts)) return;
+    const rw=editDt.reward||rewardOf({...editDt,pts:parseInt(editDt.pts)||0});
+    const pts=rw==="yaku"?0:parseInt(editDt.pts); if(isNaN(pts)) return;
+    const {reward:_rw,...rest}=editDt;
     update(d=>({...d,
-      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.map(t=>t.id===editDt.id?{...editDt,pts,target:parseInt(editDt.target)||1}:t)}:s)
+      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.map(t=>t.id===editDt.id?{...rest,pts,target:parseInt(editDt.target)||1,req:rw!=="pts"}:t)}:s)
     }));
     setEditDt(null);
   };
@@ -4843,8 +4850,13 @@ function ParentDailyTab({data,update,sb}){
                   <div style={{display:"flex",gap:6,marginBottom:6}}>
                     {[["check","✅ チェック"],["count","🔢 回数"]].map(([x,l])=><button key={x} onClick={()=>setEditDt(v=>({...v,type:x}))} style={{flex:1,padding:"6px 0",border:`2px solid ${editDt.type===x?G:BORDER}`,borderRadius:8,background:editDt.type===x?`${G}15`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:editDt.type===x?G:MUTED}}>{l}</button>)}
                   </div>
+                  <p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>ごほうび</p>
                   <div style={{display:"flex",gap:6,marginBottom:6}}>
-                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={editDt.pts} onChange={e=>setEditDt(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
+                    {REWARD_OPTS.map(([x,l])=><button key={x} onClick={()=>setEditDt(v=>({...v,reward:x}))} style={{flex:1,padding:"6px 0",border:`2px solid ${(editDt.reward||"pts")===x?GOLD:BORDER}`,borderRadius:8,background:(editDt.reward||"pts")===x?`${GOLD}20`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:(editDt.reward||"pts")===x?"#9a7000":MUTED}}>{l}</button>)}
+                  </div>
+                  {(editDt.reward||"pts")==="yaku"&&<p style={{color:MUTED,fontSize:10,lineHeight:1.5,margin:"0 0 6px"}}>ポイントは付きません。クリアすると翌日の🎁ごほうび(スマホ等)の条件になります</p>}
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    {(editDt.reward||"pts")!=="yaku"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={editDt.pts} onChange={e=>setEditDt(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>}
                     {editDt.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>目標回数</p><input value={editDt.target} onChange={e=>setEditDt(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
                   </div>
                   <div style={{display:"flex",gap:6}}><Btn c={G} label="保存" onClick={()=>saveTaskEdit(s.id)} sm/><Btn c={MUTED} label="キャンセル" onClick={()=>setEditDt(null)} sm/></div>
@@ -4854,10 +4866,10 @@ function ParentDailyTab({data,update,sb}){
                     <span style={{fontSize:18,flexShrink:0}}>{t.emoji}</span>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:13}}>{t.label}</div>
-                      <div style={{color:MUTED,fontSize:11}}>{t.type==="check"?"✅":"🔢"} +{t.pts}pt{t.type==="count"&&` · 目標${t.target||1}回`}</div>
+                      <div style={{color:MUTED,fontSize:11}}>{t.type==="check"?"✅":"🔢"} {(t.pts||0)===0?<span style={{color:"#9a7000",fontWeight:700}}>⭐やくそく（ポイントなし）</span>:`+${t.pts}pt`}{t.type==="count"&&` · 目標${t.target||1}回`}</div>
                     </div>
                     <div style={{display:"flex",gap:4}}>
-                      <Btn c={B} label="✏" onClick={()=>setEditDt({...t,pts:String(t.pts),target:String(t.target||1)})} sm/>
+                      <Btn c={B} label="✏" onClick={()=>setEditDt({...t,pts:String(t.pts),target:String(t.target||1),reward:rewardOf(t)})} sm/>
                       <Btn c={R} label="🗑" onClick={()=>delTaskFromSet(s.id,t.id)} sm/>
                     </div>
                   </div>
@@ -4907,15 +4919,21 @@ function ParentDailyTab({data,update,sb}){
                 <div>
                   <div style={{display:"flex",gap:6,marginBottom:6}}><input value={nd.emoji} onChange={e=>setNd(v=>({...v,emoji:e.target.value}))} style={{...INP,width:50}}/><input value={nd.label} onChange={e=>setNd(v=>({...v,label:e.target.value}))} placeholder="タスク名" style={INP}/></div>
                   <div style={{display:"flex",gap:6,marginBottom:6}}>{[["check","✅"],["count","🔢"]].map(([x,l])=><button key={x} onClick={()=>setNd(v=>({...v,type:x}))} style={{flex:1,padding:"5px 0",border:`2px solid ${nd.type===x?G:BORDER}`,borderRadius:8,background:nd.type===x?`${G}15`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:nd.type===x?G:MUTED}}>{l}</button>)}</div>
+                  <p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>ごほうび</p>
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    {REWARD_OPTS.map(([x,l])=><button key={x} onClick={()=>setNd(v=>({...v,reward:x}))} style={{flex:1,padding:"5px 0",border:`2px solid ${(nd.reward||"pts")===x?GOLD:BORDER}`,borderRadius:8,background:(nd.reward||"pts")===x?`${GOLD}20`:"transparent",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,color:(nd.reward||"pts")===x?"#9a7000":MUTED}}>{l}</button>)}
+                  </div>
+                  {(nd.reward||"pts")==="yaku"&&<p style={{color:MUTED,fontSize:10,lineHeight:1.5,margin:"0 0 6px"}}>ポイントは付きません。クリアすると翌日の🎁ごほうび(スマホ等)の条件になります</p>}
                   <div style={{display:"flex",gap:6,marginBottom:8}}>
-                    <div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={nd.pts} onChange={e=>setNd(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>
+                    {(nd.reward||"pts")!=="yaku"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>pt</p><input value={nd.pts} onChange={e=>setNd(v=>({...v,pts:e.target.value}))} type="number" style={INP}/></div>}
                     {nd.type==="count"&&<div style={{flex:1}}><p style={{color:MUTED,fontSize:11,margin:"0 0 2px"}}>目標回数</p><input value={nd.target} onChange={e=>setNd(v=>({...v,target:e.target.value}))} type="number" style={INP}/></div>}
                   </div>
                   <Btn c={G} label="追加する" onClick={()=>{
-                    const pts=parseInt(nd.pts);if(!nd.label||isNaN(pts))return;
-                    addTaskToSet(s.id,{id:uid(),emoji:nd.emoji,label:nd.label,type:nd.type,pts,target:parseInt(nd.target)||1});
-                    setNd({emoji:"⭐",label:"",type:"check",pts:"",target:"1"});
-                  }} disabled={!nd.label||!nd.pts} sm/>
+                    const rw=nd.reward||"pts";
+                    const pts=rw==="yaku"?0:parseInt(nd.pts);if(!nd.label||isNaN(pts))return;
+                    addTaskToSet(s.id,{id:uid(),emoji:nd.emoji,label:nd.label,type:nd.type,pts,target:parseInt(nd.target)||1,req:rw!=="pts"});
+                    setNd({emoji:"⭐",label:"",type:"check",pts:"",target:"1",reward:"pts"});
+                  }} disabled={!nd.label||((nd.reward||"pts")!=="yaku"&&!nd.pts)} sm/>
                 </div>
               )}
             </div>);
