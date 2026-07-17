@@ -3357,7 +3357,7 @@ function LogRow({ l, emoji, canDelete, child, update, showFlash }){
   );
 }
 
-function ChildScreen({ child, data, update, onBack, onFamily }) {
+function ChildScreen({ child, data, update, onBack, onFamily, openSettings, onSettingsShown }) {
   const [tab, setTab]   = useState("daily");
   // 背景テーマ解決（累計タスクで解放。未解放/autoならデフォルト時間帯背景）
   const _cTotalDone = (data.logs||[]).filter(l=>l.cid===child.id&&(l.type==="good"||l.type==="daily")).length;
@@ -3386,7 +3386,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [taskSort, setTaskSort] = useState("default");
   const [rewardSort, setRewardSort] = useState("default");
   const [logSort, setLogSort] = useState("new");
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(!!openSettings);   // トップの⚙からPIN経由で直接設定を開く導線
+  useEffect(()=>{ if(openSettings){ setShowSettings(true); onSettingsShown&&onSettingsShown(); } },[]);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showZukan, setShowZukan] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
@@ -6093,8 +6094,7 @@ function ParentScreen({ data, update, onBack }) {
 // ═══════════════════════════════════════════════════════
 // HOME
 // ═══════════════════════════════════════════════════════
-function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
-  const [showSettings, setShowSettings] = useState(false);
+function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings }) {
   const [showOnboardGuide, setShowOnboardGuide] = useState(false);
   const [showDash, setShowDash] = useState(false);   // 親ダッシュボード(今日/今週)の折りたたみ
   const allMembers = [
@@ -6143,7 +6143,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
               <div style={{fontSize:11,color:MUTED,letterSpacing:.3}}>お金は、未来を育てるタネ。</div>
             </div>
           </div>
-          <button onClick={()=>setShowSettings(true)}
+          <button onClick={()=>onSettings&&onSettings()}
             style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)",position:"relative"}}>
             ⚙
             {parentPinIsDefault(data)&&<div style={{position:"absolute",top:-4,right:-4,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
@@ -6153,7 +6153,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
 
       {/* 未承認だけは緊急性が高いので 上部に細いアラートで残す */}
       {pendCount>0 && (
-        <div onClick={()=>setShowSettings(true)} style={{margin:"0 20px 12px",background:RS,border:`1.5px solid ${R}`,borderRadius:12,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+        <div onClick={()=>onParent&&onParent()} style={{margin:"0 20px 12px",background:RS,border:`1.5px solid ${R}`,borderRadius:12,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
           <span style={{fontSize:16}}>🔔</span>
           <span style={{flex:1,fontSize:13,fontWeight:800,color:R}}>みしょうにんが {pendCount}けん あります</span>
           <span style={{fontSize:12,color:R,fontWeight:700}}>かくにん ›</span>
@@ -6242,7 +6242,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
                 <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"14px 16px",boxShadow:SHADOW,marginTop:10}}>
                   <div style={{fontSize:12,fontWeight:800,color:MUTED,marginBottom:10,letterSpacing:.5}}>📋 きょうの ようす</div>
                   <div style={{display:"flex",alignItems:"stretch",gap:8}}>
-                    <div onClick={()=>pendCount>0&&setShowSettings(true)} style={{flex:1,textAlign:"center",cursor:pendCount>0?"pointer":"default"}}>
+                    <div onClick={()=>pendCount>0&&onParent&&onParent()} style={{flex:1,textAlign:"center",cursor:pendCount>0?"pointer":"default"}}>
                       <div style={{fontSize:24,fontWeight:900,color:pendCount>0?R:TEXT,lineHeight:1.1}}>{pendCount}</div>
                       <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>みしょうにん{pendCount>0?" 👆":""}</div>
                     </div>
@@ -6346,24 +6346,6 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard }) {
       )}
 
       {/* 設定モーダル */}
-      {showSettings&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:999,display:"flex",alignItems:"flex-end",fontFamily:F}} onClick={()=>setShowSettings(false)}>
-          <div style={{background:CARD,borderRadius:"24px 24px 0 0",width:"100%",padding:"24px 20px 48px",boxShadow:"0 -8px 32px rgba(24,35,29,0.10)"}} onClick={e=>e.stopPropagation()}>
-            <div style={{width:36,height:4,borderRadius:999,background:BORDER,margin:"0 auto 20px"}}/>
-            <h3 style={{fontWeight:800,fontSize:17,margin:"0 0 16px",color:TEXT}}>設定</h3>
-            <button onClick={()=>{setShowSettings(false);onParent();}}
-              style={{width:"100%",background:GP,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,marginBottom:10}}>
-              🔐 おや管理（PIN認証）
-            </button>
-            <div style={{background:BG,borderRadius:14,padding:"12px 16px",marginBottom:10}}>
-              <p style={{color:MUTED,fontSize:11,fontWeight:600,margin:"0 0 3px",letterSpacing:.5}}>かぞくコード</p>
-              <p style={{fontWeight:800,fontSize:15,color:TEXT,margin:0,letterSpacing:2.5}}>
-                {(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -8676,6 +8658,7 @@ export default function App() {
   const [syncSt,  setSyncSt]  = useState("saved"); // saving | saved | error
   const [screen,  setScreen]  = useState("home");
   const [activeChild, setActiveChild] = useState(null);
+  const [pendingParentSettings, setPendingParentSettings] = useState(false);   // トップの⚙→PIN→設定を直接開く
 
   // Load from cloud on mount
   // リアルタイム同期＋5秒ポーリングの開始（マウント時と、セットアップ完了直後の両方から呼ぶ）
@@ -8862,6 +8845,7 @@ export default function App() {
             }
           }}
           onParent={()=>setScreen("pin-parent")}
+          onSettings={()=>{ setActiveChild(null); setPendingParentSettings(true); setScreen("pin-parent"); }}
           onParentCard={parent=>{
             setActiveChild(parent);
             if((data.noPinIds||{})[parent.id]){
@@ -8933,10 +8917,10 @@ export default function App() {
         <ChildScreen child={data.children.find(c=>c.id===activeChild.id)||activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_public")}/>
       )}
       {screen==="parent" && activeChild && (
-        <ChildScreen child={activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")}/>
+        <ChildScreen child={activeChild} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")} openSettings={pendingParentSettings} onSettingsShown={()=>setPendingParentSettings(false)}/>
       )}
       {screen==="parent" && !activeChild && (
-        <ChildScreen child={(data.parents||[])[0]||{id:"p1",name:"パパ",emoji:"👨",pin:"3333",ageMode:"senior"}} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")}/>
+        <ChildScreen child={(data.parents||[])[0]||{id:"p1",name:"パパ",emoji:"👨",pin:"3333",ageMode:"senior"}} data={data} update={update} onBack={()=>setScreen("home")} onFamily={()=>setScreen("family_guardian")} openSettings={pendingParentSettings} onSettingsShown={()=>setPendingParentSettings(false)}/>
       )}
       {screen==="family_public" && (
         <FamilyPublicScreen data={data} viewerRole={activeChild?.role||"child"} onBack={()=>setScreen(activeChild?.role==="parent"?"parent":"child")}/>
