@@ -2089,7 +2089,8 @@ function DailyTasks({ child, data, update }) {
   const bonusKey  = s => `__bonus__::${s.id}`;
   const setDoneIn = (s, p) => (Array.isArray(s.tasks)?s.tasks:[]).filter(dowOk).every(tt =>
     tt.type==="check" ? !!p[`${s.id}::${tt.id}`] : (p[`${s.id}::${tt.id}`]||0) >= (tt.target||1));
-  const allBonusGiven = viewSet ? (!viewSet.bonus || !!prog[bonusKey(viewSet)]) : true;
+  const setGivesBonus = s => { const rw=s?.bonusReward||"pts"; return (((rw==="pts"||rw==="both")&&(s?.bonus>0)) || (rw==="yaku"||rw==="both")); };
+  const allBonusGiven = viewSet ? (!setGivesBonus(viewSet) || !!prog[bonusKey(viewSet)]) : true;
   // 開閉: 既定は「未完なら開く・全部できたら畳む」。タップで手動上書き。
   const open = openOverride !== null ? openOverride : !allDone;
   const toggleOpen = () => setOpenOverride(!open);
@@ -2106,14 +2107,27 @@ function DailyTasks({ child, data, update }) {
   // 該当セットが全部終わったら、そのセットのボーナスを付与(1回だけ)
   const awardSetBonus = (setId, newProg) => {
     const s = activeSets.find(x => x.id === setId);
-    if (!s || !s.bonus || s.bonus <= 0) return;
+    if (!s) return;
+    const rw = s.bonusReward || "pts";                       // pts / yaku / both（全クリア時のごほうび種別）
+    const givesPts  = (rw==="pts"||rw==="both") && (s.bonus>0);
+    const givesYaku = (rw==="yaku"||rw==="both");
+    if (!givesPts && !givesYaku) return;
     if (prog[bonusKey(s)]) return;
     if (!setDoneIn(s, newProg)) return;
     setTimeout(() => {
-      const bonusEntry = mkEntry(`🌟 ${s.name} ぜんぶ達成ボーナス！`, s.bonus);
-      update(d => ({ ...setDailyProg(d, {[bonusKey(s)]:true}), logs:[bonusEntry,...d.logs] }));
-      addLogToFirestore(bonusEntry);
-      setFlash({ pts:s.bonus, emoji:"🌟" });
+      update(d => {
+        let nd = setDailyProg(d, {[bonusKey(s)]:true});
+        if (givesPts) {
+          const bonusEntry = mkEntry(`🌟 ${s.name} ぜんぶ達成ボーナス！`, s.bonus);
+          addLogToFirestore(bonusEntry);
+          nd = { ...nd, logs:[bonusEntry, ...nd.logs] };
+        }
+        if (givesYaku) {                                     // 全クリアで翌日のごほうび(スマホ等)を解放
+          nd = { ...nd, yakusokuDone: { ...(nd.yakusokuDone||{}), [child.id]: today } };
+        }
+        return nd;
+      });
+      setFlash({ pts: givesPts ? s.bonus : 0, emoji:"🌟", yaku: givesYaku && !givesPts });
       setTimeout(()=>setFlash(null),1400);
     }, 600);
   };
@@ -2194,11 +2208,17 @@ function DailyTasks({ child, data, update }) {
         <div style={{height:10,background:BORDER,borderRadius:5,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${tasks.length?doneCount/tasks.length*100:0}%`,background:allDone?G:Y,borderRadius:5,transition:"width .5s ease"}}/>
         </div>
-        {bonusTotal>0 && (
+        {viewSet && setGivesBonus(viewSet) && (()=>{
+          const rw=viewSet.bonusReward||"pts";
+          const showPts=(rw==="pts"||rw==="both")&&bonusTotal>0;
+          const showYaku=(rw==="yaku"||rw==="both");
+          const rwTxt=`${showPts?`+${bonusTotal}pt`:""}${showPts&&showYaku?"＋":""}${showYaku?"あしたのごほうび🎁":""}`;
+          return (
           <p style={{color:allBonusGiven?G:MUTED,fontSize:12,fontWeight:700,margin:0}}>
-            {allBonusGiven ? `✅ ボーナス +${bonusTotal}pt もらえた！` : `🎁 ぜんぶやると +${bonusTotal}pt ボーナス！`}
+            {allBonusGiven ? `✅ ${rwTxt} ゲット！` : `🎁 ぜんぶやると ${rwTxt}！`}
           </p>
-        )}
+          );
+        })()}
         {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
@@ -4813,10 +4833,23 @@ function ParentDailyTab({data,update,sb}){
               <input value={s.emoji} onChange={e=>updateSet(s.id,{emoji:e.target.value})} style={{...INP,width:54}}/>
               <input value={s.name} onChange={e=>updateSet(s.id,{name:e.target.value})} style={INP}/>
             </div>
-            <div style={{display:"flex",gap:8,marginBottom:6,alignItems:"center"}}>
-              <span style={{color:MUTED,fontSize:11,flexShrink:0}}>ボーナス</span>
-              <input value={s.bonus} onChange={e=>updateSet(s.id,{bonus:parseInt(e.target.value)||0})} type="number" style={{...INP,flex:1}}/>
-              <span style={{color:MUTED,fontSize:11,flexShrink:0}}>pt</span>
+            <div style={{marginBottom:6}}>
+              {/* 全クリアのごほうび: ポイント / やくそく(翌日のごほうび) / 両方 */}
+              <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:5}}>
+                <span style={{color:MUTED,fontSize:11,flexShrink:0}}>全クリアで</span>
+                {REWARD_OPTS.map(([x,l])=>{const cur=s.bonusReward||"pts";return(
+                  <button key={x} onClick={()=>updateSet(s.id,{bonusReward:x})} style={{flex:1,padding:"5px 0",border:`2px solid ${cur===x?GOLD:BORDER}`,borderRadius:8,background:cur===x?`${GOLD}20`:"transparent",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:F,color:cur===x?"#9a7000":MUTED}}>{l}</button>
+                );})}
+              </div>
+              {(s.bonusReward||"pts")!=="yaku"?(
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{color:MUTED,fontSize:11,flexShrink:0}}>ボーナス</span>
+                  <input value={s.bonus} onChange={e=>updateSet(s.id,{bonus:parseInt(e.target.value)||0})} type="number" style={{...INP,flex:1}}/>
+                  <span style={{color:MUTED,fontSize:11,flexShrink:0}}>pt</span>
+                </div>
+              ):(
+                <p style={{color:MUTED,fontSize:10,lineHeight:1.5,margin:0}}>ぜんぶクリアで、翌日の🎁ごほうび(スマホ等)が解放されます（ポイントは付きません）</p>
+              )}
             </div>
             <div style={{display:"flex",gap:6,marginBottom:6,alignItems:"center"}}>
               <span style={{color:MUTED,fontSize:11,flexShrink:0}}>期間</span>
