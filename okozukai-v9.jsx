@@ -390,7 +390,19 @@ function startRealtimeSync(updateFn){
               if(prev.badTasks)  merged.badTasks =_uni(merged.badTasks,  prev.badTasks);
             }
             if(prev.myTaskIds) merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};
-            if(prev.dailyTaskSets&&prev.dailyTaskSets.length>0) merged.dailyTaskSets=prev.dailyTaskSets;
+            // 毎日タスクのセット定義: 端末間で「新しく編集した方(updatedAt)」を採用＋セットのユニオン。
+            // ※旧実装は prev(ローカル)を丸ごと優先し、他端末で追加したタスク/セットが永久に反映されないバグがあった。
+            if((prev.dailyTaskSets&&prev.dailyTaskSets.length>0)||(merged.dailyTaskSets&&merged.dailyTaskSets.length>0)){
+              const _byId={};
+              (merged.dailyTaskSets||[]).forEach(s=>{ if(s&&s.id!=null) _byId[s.id]=s; });   // まずリモート
+              (prev.dailyTaskSets||[]).forEach(s=>{                                            // ローカルを重ねる
+                if(!s||s.id==null) return;
+                const r=_byId[s.id];
+                if(!r){ _byId[s.id]=s; return; }                                              // 片方だけ→そのまま残す
+                _byId[s.id]=((s.updatedAt||0) >= (r.updatedAt||0)) ? s : r;                    // 両方→新しく編集した方を丸ごと採用
+              });
+              merged.dailyTaskSets=Object.values(_byId);
+            }
             if(prev.dailyTasks&&prev.dailyTasks.length>0) merged.dailyTasks=prev.dailyTasks;
             if(prev.activeSetId!==undefined) merged.activeSetId=prev.activeSetId;
             merged.logs=prev.logs; // logsはlogsリアルタイム同期で別管理
@@ -4646,7 +4658,7 @@ function ParentDailyTab({data,update,sb}){
       id:newId, name:newSetForm.name, emoji:newSetForm.emoji,
       tasks:[], bonus:parseInt(newSetForm.bonus)||50,
       startDate:newSetForm.startDate, endDate:newSetForm.endDate,
-      active:true,
+      active:true, updatedAt:Date.now(),
     };
     update(d=>({...d, dailyTaskSets:[...(d.dailyTaskSets||[]),newSet]}));
     setSelSetId(newId);
@@ -4664,7 +4676,7 @@ function ParentDailyTab({data,update,sb}){
   };
 
   const updateSet = (id,changes) => update(d=>({...d,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes}:s)
+    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes,updatedAt:Date.now()}:s)
   }));
 
   // 最大4セットを同時アクティブにトグル(5つ目を選ぶと一番古い選択が外れる)
@@ -4675,14 +4687,14 @@ function ParentDailyTab({data,update,sb}){
     else next = [...cur, id].slice(-4);                      // 追加(最大4・古いものから押し出し)
     if (next.length===0) next = [id];                        // 最低1つは残す
     return {...d, activeSetIds: next, activeSetId: next[0],
-      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true}:s)};
+      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true,updatedAt:Date.now()}:s)};
   });
 
   const addTaskToSet = (setId, task) => update(d=>({...d,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:[...s.tasks,task]}:s)
+    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:[...s.tasks,task],updatedAt:Date.now()}:s)
   }));
   const delTaskFromSet = (setId, taskId) => update(d=>({...d,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.filter(t=>t.id!==taskId)}:s)
+    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.filter(t=>t.id!==taskId),updatedAt:Date.now()}:s)
   }));
   const saveTaskEdit = (setId) => {
     if(!editDt) return;
@@ -4690,14 +4702,14 @@ function ParentDailyTab({data,update,sb}){
     const pts=rw==="yaku"?0:parseInt(editDt.pts); if(isNaN(pts)) return;
     const {reward:_rw,...rest}=editDt;
     update(d=>({...d,
-      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.map(t=>t.id===editDt.id?{...rest,pts,target:parseInt(editDt.target)||1,req:rw!=="pts"}:t)}:s)
+      dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.map(t=>t.id===editDt.id?{...rest,pts,target:parseInt(editDt.target)||1,req:rw!=="pts"}:t),updatedAt:Date.now()}:s)
     }));
     setEditDt(null);
   };
   // 曜日チップ(dow)・やくそく(req)のトグル。dowなし/空=毎日(後方互換)
   const DOWS=["日","月","火","水","木","金","土"];
   const updateTaskInSet=(setId,taskId,fn)=>update(d=>({...d,
-    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:(Array.isArray(s.tasks)?s.tasks:[]).map(t=>t.id===taskId?fn(t):t)}:s)
+    dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:(Array.isArray(s.tasks)?s.tasks:[]).map(t=>t.id===taskId?fn(t):t),updatedAt:Date.now()}:s)
   }));
   const toggleDow=(setId,taskId,day)=>updateTaskInSet(setId,taskId,tt=>{
     const cur=Array.isArray(tt.dow)?tt.dow:[];
