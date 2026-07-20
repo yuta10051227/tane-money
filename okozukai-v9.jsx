@@ -390,18 +390,17 @@ function startRealtimeSync(updateFn){
               if(prev.badTasks)  merged.badTasks =_uni(merged.badTasks,  prev.badTasks);
             }
             if(prev.myTaskIds) merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};
-            // 毎日タスクのセット定義: 端末間で「新しく編集した方(updatedAt)」を採用＋セットのユニオン。
-            // ※旧実装は prev(ローカル)を丸ごと優先し、他端末で追加したタスク/セットが永久に反映されないバグがあった。
-            if((prev.dailyTaskSets&&prev.dailyTaskSets.length>0)||(merged.dailyTaskSets&&merged.dailyTaskSets.length>0)){
-              const _byId={};
-              (merged.dailyTaskSets||[]).forEach(s=>{ if(s&&s.id!=null) _byId[s.id]=s; });   // まずリモート
-              (prev.dailyTaskSets||[]).forEach(s=>{                                            // ローカルを重ねる
-                if(!s||s.id==null) return;
-                const r=_byId[s.id];
-                if(!r){ _byId[s.id]=s; return; }                                              // 片方だけ→そのまま残す
-                _byId[s.id]=((s.updatedAt||0) >= (r.updatedAt||0)) ? s : r;                    // 両方→新しく編集した方を丸ごと採用
-              });
-              merged.dailyTaskSets=Object.values(_byId);
+            // 毎日タスクのセット定義: 原則サーバ優先(＝他端末の追加/編集が必ず反映される)。
+            // ただし「この端末が直近に編集した」場合だけ、保存が伝播するまでの数秒間ローカルを保護する。
+            // ※時計ズレの影響を避けるため、比較は自端末のDate.now()と自端末が刻んだupdatedAtのみ(端末間の時刻比較はしない)。
+            // ※旧実装は prev(ローカル)を無条件優先し、他端末での追加が永久に反映されないバグがあった。
+            {
+              const _localMaxTs=(prev.dailyTaskSets||[]).reduce((m,s)=>Math.max(m,(s&&s.updatedAt)||0),0);
+              const _recentlyEditedHere = _localMaxTs>0 && (Date.now()-_localMaxTs < 12000);   // 直近12秒に自分で編集
+              if(_recentlyEditedHere && prev.dailyTaskSets && prev.dailyTaskSets.length>0){
+                merged.dailyTaskSets=prev.dailyTaskSets;   // 保存が届くまで自分の編集を守る
+              }
+              // それ以外は merged(=サーバ値) をそのまま採用＝他端末の変更が確実に反映される
             }
             if(prev.dailyTasks&&prev.dailyTasks.length>0) merged.dailyTasks=prev.dailyTasks;
             if(prev.activeSetId!==undefined) merged.activeSetId=prev.activeSetId;

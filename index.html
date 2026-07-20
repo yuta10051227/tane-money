@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="9a13563">
+<meta name="tane-version" content="8e24c39">
 </head>
 <body>
   <div id="root"></div>
@@ -96,13 +96,14 @@ _lastSyncTime=t;try{const parsed=JSON.parse(doc.data().data);if(parsed&&parsed.c
 const merged=migrate(parsed);if(!prev)return merged;// ローカル優先（ユーザーが直接編集するデータ）
 if(prev.goals&&prev.goals.length>0)merged.goals=prev.goals;if(prev.holdings&&Object.keys(prev.holdings).length>0)merged.holdings=prev.holdings;if(prev.forexHoldings&&Object.keys(prev.forexHoldings).length>0)merged.forexHoldings=prev.forexHoldings;if(prev.expenses&&prev.expenses.length>0)merged.expenses=prev.expenses;if(prev.claimedBadges)merged.claimedBadges=prev.claimedBadges;if(prev.noPinIds)merged.noPinIds=prev.noPinIds;// お手伝い項目(タスク定義)は端末間ユニオン＝追加した項目が消えない(id衝突はローカル編集優先)。
 // ※以前はマージ対象外でサーバ値に上書きされ、別端末/遅延スナップショットで新規項目が消えるバグがあった
-{const _uni=(a,b)=>{const m={};[...(a||[]),...(b||[])].forEach(t=>{if(t&&t.id!=null)m[t.id]=t;});return Object.values(m);};if(prev.goodTasks)merged.goodTasks=_uni(merged.goodTasks,prev.goodTasks);if(prev.badTasks)merged.badTasks=_uni(merged.badTasks,prev.badTasks);}if(prev.myTaskIds)merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};// 毎日タスクのセット定義: 端末間で「新しく編集した方(updatedAt)」を採用＋セットのユニオン。
-// ※旧実装は prev(ローカル)を丸ごと優先し、他端末で追加したタスク/セットが永久に反映されないバグがあった。
-if(prev.dailyTaskSets&&prev.dailyTaskSets.length>0||merged.dailyTaskSets&&merged.dailyTaskSets.length>0){const _byId={};(merged.dailyTaskSets||[]).forEach(s=>{if(s&&s.id!=null)_byId[s.id]=s;});// まずリモート
-(prev.dailyTaskSets||[]).forEach(s=>{// ローカルを重ねる
-if(!s||s.id==null)return;const r=_byId[s.id];if(!r){_byId[s.id]=s;return;}// 片方だけ→そのまま残す
-_byId[s.id]=(s.updatedAt||0)>=(r.updatedAt||0)?s:r;// 両方→新しく編集した方を丸ごと採用
-});merged.dailyTaskSets=Object.values(_byId);}if(prev.dailyTasks&&prev.dailyTasks.length>0)merged.dailyTasks=prev.dailyTasks;if(prev.activeSetId!==undefined)merged.activeSetId=prev.activeSetId;merged.logs=prev.logs;// logsはlogsリアルタイム同期で別管理
+{const _uni=(a,b)=>{const m={};[...(a||[]),...(b||[])].forEach(t=>{if(t&&t.id!=null)m[t.id]=t;});return Object.values(m);};if(prev.goodTasks)merged.goodTasks=_uni(merged.goodTasks,prev.goodTasks);if(prev.badTasks)merged.badTasks=_uni(merged.badTasks,prev.badTasks);}if(prev.myTaskIds)merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};// 毎日タスクのセット定義: 原則サーバ優先(＝他端末の追加/編集が必ず反映される)。
+// ただし「この端末が直近に編集した」場合だけ、保存が伝播するまでの数秒間ローカルを保護する。
+// ※時計ズレの影響を避けるため、比較は自端末のDate.now()と自端末が刻んだupdatedAtのみ(端末間の時刻比較はしない)。
+// ※旧実装は prev(ローカル)を無条件優先し、他端末での追加が永久に反映されないバグがあった。
+{const _localMaxTs=(prev.dailyTaskSets||[]).reduce((m,s)=>Math.max(m,s&&s.updatedAt||0),0);const _recentlyEditedHere=_localMaxTs>0&&Date.now()-_localMaxTs<12000;// 直近12秒に自分で編集
+if(_recentlyEditedHere&&prev.dailyTaskSets&&prev.dailyTaskSets.length>0){merged.dailyTaskSets=prev.dailyTaskSets;// 保存が届くまで自分の編集を守る
+}// それ以外は merged(=サーバ値) をそのまま採用＝他端末の変更が確実に反映される
+}if(prev.dailyTasks&&prev.dailyTasks.length>0)merged.dailyTasks=prev.dailyTasks;if(prev.activeSetId!==undefined)merged.activeSetId=prev.activeSetId;merged.logs=prev.logs;// logsはlogsリアルタイム同期で別管理
 // リアルタイム取得系（ローカル優先）
 if(prev.stocks&&prev.stocks.length>0)merged.stocks=prev.stocks;if(prev.forex&&Object.keys(prev.forex).length>0)merged.forex=prev.forex;// ゲーム進行系（ローカル優先）
 // ※ gachaDateをここで守らないとFirestoreの遅延snaphotで1日1回制限が崩れる
