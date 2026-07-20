@@ -123,6 +123,10 @@ try{
 }catch(e){}
 
 let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_lastSyncTime=null;
+// この端末が毎日タスクのセット定義を最後に編集した時刻(この端末のDate.nowのみ／同期されない)。
+// リモート由来のupdatedAtを見ると時計ズレで誤作動するため、ローカル専用のこの値で「直近に自分が編集したか」を判定する。
+let _lastLocalDefEditTs=0;
+function markLocalDefEdit(){ _lastLocalDefEditTs=Date.now(); }
 // ── データ消失の防止ガード ──
 // クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。
 // 実際の書き込み成否とドキュメントサイズを1か所に集約し、UIに通知する。
@@ -238,22 +242,40 @@ async function cloudSave(d) {
   if(_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
   _cloudSaveTimer = setTimeout(()=>{ const dd=_cloudSavePending; _cloudSavePending=null; if(dd) _cloudPersist(dd); }, 300);
 }
-function _cloudPersist(d) {
-  const code = getFamilyCode()||"default";
-  // ログ肥大の抑制: 2000件を超えたら古い分を「くりこし」1行(cidごと)に集約して保存する。
-  // 残高は保持(合計を引き継ぐ)。直近1800件は表示用に残し、全ログはlogsサブコレクションに恒久保存。
-  // これで localStorage / Firestoreドキュメント / メモリ(再読込後) のサイズを小さく保てる。
+// 保存データのスリム化：メインblob(families/{code}.data)は900KB上限があり、超えると保存が“無言で失敗”して
+// タスク定義/セット/特典/設定が家族に永久に届かなくなる（logsは別コレクションで同期され続けるので気づきにくい）。
+// logsは logsサブコレクションが唯一の正なので、blobは残高保全のcarry＋直近少数だけ持つ。expenses/dailyProgressも上限を設ける。
+function _slimForCloud(d){
   let saveD = d;
-  if((d.logs||[]).length > 2000){
-    const keep = d.logs.slice(0,1800);
+  const KEEP_LOGS = 300;
+  if((d.logs||[]).length > KEEP_LOGS){
+    const keep = d.logs.slice(0, KEEP_LOGS);
     const sums = {};
-    d.logs.slice(1800).forEach(l=>{ if(l&&l.cid!=null) sums[l.cid]=(sums[l.cid]||0)+(l.pts||0); });
+    d.logs.slice(KEEP_LOGS).forEach(l=>{ if(l&&l.cid!=null) sums[l.cid]=(sums[l.cid]||0)+(l.pts||0); });  // carryも含めて合算＝残高保全
     const oldestDate = d.logs[d.logs.length-1]?.date || new Date().toISOString();
     const carry = Object.entries(sums).map(([cid,pts])=>({
       id:"carry_"+cid, cid, type:"grant", label:"くりこし（これより前の合計）", pts, date:oldestDate
     }));
-    saveD = {...d, logs:[...keep, ...carry]};
+    saveD = {...saveD, logs:[...keep, ...carry]};
   }
+  // dailyProgress: 毎日1エントリ増えるので、子ごと直近21日分だけ残す
+  if(saveD.dailyProgress && typeof saveD.dailyProgress==="object"){
+    const dp={};
+    for(const cid of Object.keys(saveD.dailyProgress)){
+      const days=saveD.dailyProgress[cid]||{};
+      const ks=Object.keys(days).sort().slice(-21);
+      const o={}; for(const k of ks) o[k]=days[k];
+      dp[cid]=o;
+    }
+    saveD={...saveD, dailyProgress:dp};
+  }
+  // expenses(家計簿): 直近400件まで
+  if((saveD.expenses||[]).length > 400){ saveD={...saveD, expenses:saveD.expenses.slice(0,400)}; }
+  return saveD;
+}
+function _cloudPersist(d) {
+  const code = getFamilyCode()||"default";
+  const saveD = _slimForCloud(d);
   const json = JSON.stringify(saveD);
   // 1. コード固有のローカルストレージ（他コードと分離）
   try { localStorage.setItem(LOCAL_KEY+"_"+code, json); } catch(e) {}
@@ -413,8 +435,8 @@ function startRealtimeSync(updateFn){
             // ※時計ズレの影響を避けるため、比較は自端末のDate.now()と自端末が刻んだupdatedAtのみ(端末間の時刻比較はしない)。
             // ※旧実装は prev(ローカル)を無条件優先し、他端末での追加が永久に反映されないバグがあった。
             {
-              const _localMaxTs=(prev.dailyTaskSets||[]).reduce((m,s)=>Math.max(m,(s&&s.updatedAt)||0),0);
-              const _recentlyEditedHere = _localMaxTs>0 && (Date.now()-_localMaxTs < 12000);   // 直近12秒に自分で編集
+              // 判定は「この端末が自分で編集した時刻(_lastLocalDefEditTs／同期されない)」だけ。端末間の時刻比較はしない。
+              const _recentlyEditedHere = _lastLocalDefEditTs>0 && (Date.now()-_lastLocalDefEditTs < 12000);
               if(_recentlyEditedHere && prev.dailyTaskSets && prev.dailyTaskSets.length>0){
                 merged.dailyTaskSets=prev.dailyTaskSets;   // 保存が届くまで自分の編集を守る
               }
@@ -4695,6 +4717,7 @@ function ParentDailyTab({data,update,sb}){
       startDate:newSetForm.startDate, endDate:newSetForm.endDate,
       active:true, updatedAt:Date.now(),
     };
+    markLocalDefEdit();
     update(d=>({...d, dailyTaskSets:[...(d.dailyTaskSets||[]),newSet]}));
     setSelSetId(newId);
     setShowNewSet(false);
@@ -4703,6 +4726,7 @@ function ParentDailyTab({data,update,sb}){
 
   const delSet = id => {
     if(sets.length<=1){alert("最低1つはセットが必要です");return;}
+    markLocalDefEdit();
     update(d=>({...d,
       dailyTaskSets:(d.dailyTaskSets||[]).filter(s=>s.id!==id),
       activeSetId: d.activeSetId===id ? (d.dailyTaskSets.find(s=>s.id!==id)?.id||"") : d.activeSetId,
@@ -4710,12 +4734,12 @@ function ParentDailyTab({data,update,sb}){
     setSelSetId(null);
   };
 
-  const updateSet = (id,changes) => update(d=>({...d,
+  const updateSet = (id,changes) => { markLocalDefEdit(); return update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===id?{...s,...changes,updatedAt:Date.now()}:s)
-  }));
+  })); };
 
   // 最大4セットを同時アクティブにトグル(5つ目を選ぶと一番古い選択が外れる)
-  const toggleActive = id => update(d=>{
+  const toggleActive = id => { markLocalDefEdit(); return update(d=>{
     const cur = Array.isArray(d.activeSetIds) ? d.activeSetIds.filter(x=>(d.dailyTaskSets||[]).some(s=>s.id===x)) : (d.activeSetId?[d.activeSetId]:[]);
     let next;
     if (cur.includes(id)) next = cur.filter(x=>x!==id);     // 解除
@@ -4723,15 +4747,16 @@ function ParentDailyTab({data,update,sb}){
     if (next.length===0) next = [id];                        // 最低1つは残す
     return {...d, activeSetIds: next, activeSetId: next[0],
       dailyTaskSets:(d.dailyTaskSets||[]).map(s=>next.includes(s.id)?{...s,active:true,updatedAt:Date.now()}:s)};
-  });
+  }); };
 
-  const addTaskToSet = (setId, task) => update(d=>({...d,
+  const addTaskToSet = (setId, task) => { markLocalDefEdit(); return update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:[...s.tasks,task],updatedAt:Date.now()}:s)
-  }));
-  const delTaskFromSet = (setId, taskId) => update(d=>({...d,
+  })); };
+  const delTaskFromSet = (setId, taskId) => { markLocalDefEdit(); return update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:s.tasks.filter(t=>t.id!==taskId),updatedAt:Date.now()}:s)
-  }));
+  })); };
   const saveTaskEdit = (setId) => {
+    markLocalDefEdit();
     if(!editDt) return;
     const rw=editDt.reward||rewardOf({...editDt,pts:parseInt(editDt.pts)||0});
     const pts=rw==="yaku"?0:parseInt(editDt.pts); if(isNaN(pts)) return;
@@ -4743,9 +4768,9 @@ function ParentDailyTab({data,update,sb}){
   };
   // 曜日チップ(dow)・やくそく(req)のトグル。dowなし/空=毎日(後方互換)
   const DOWS=["日","月","火","水","木","金","土"];
-  const updateTaskInSet=(setId,taskId,fn)=>update(d=>({...d,
+  const updateTaskInSet=(setId,taskId,fn)=>{ markLocalDefEdit(); return update(d=>({...d,
     dailyTaskSets:(d.dailyTaskSets||[]).map(s=>s.id===setId?{...s,tasks:(Array.isArray(s.tasks)?s.tasks:[]).map(t=>t.id===taskId?fn(t):t),updatedAt:Date.now()}:s)
-  }));
+  })); };
   const toggleDow=(setId,taskId,day)=>updateTaskInSet(setId,taskId,tt=>{
     const cur=Array.isArray(tt.dow)?tt.dow:[];
     return {...tt, dow: cur.includes(day)?cur.filter(x=>x!==day):[...cur,day].sort((a,b)=>a-b)};
@@ -8843,7 +8868,7 @@ export default function App() {
     const next = fn(prev);
     if(!next.logs||next.logs.length<(prev.logs||[]).length-2) next.logs=prev.logs;
     if(!next.expenses||next.expenses.length<(prev.expenses||[]).length-2) next.expenses=prev.expenses;
-    if(!next.rewards||next.rewards.length===0) next.rewards=prev.rewards||next.rewards;
+    if(next.rewards===undefined||next.rewards===null) next.rewards=prev.rewards;   // 空配列(全削除)は許可・undefinedのみ復元
     // お手伝い項目は1回の操作で大きく減らない=急減はバグとみなしてロールバック(意図的な1件削除は許容)
     if(!next.goodTasks || next.goodTasks.length < (prev.goodTasks||[]).length-1) next.goodTasks=prev.goodTasks;
     if(!next.badTasks  || next.badTasks.length  < (prev.badTasks||[]).length-1)  next.badTasks=prev.badTasks;
