@@ -291,6 +291,24 @@ if(typeof window!=="undefined"){
   window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushCloudSave(); });
 }
 
+// 手動「今すぐ同期」用：サーバの最新ドキュメントを直接読む（診断＆強制取得）。
+// 戻り値 {ok, data, bytes, code, err}。UIから呼ぶ。
+async function forcePullFromCloud(){
+  const code=getFamilyCode();
+  if(!code||code==="default") return {ok:false, err:"no_code", code};
+  const db=getDB();
+  if(!db) return {ok:false, err:"no_db", code};
+  try{
+    const doc=await db.collection("families").doc(code).get();
+    if(!doc.exists||!doc.data()||!doc.data().data) return {ok:false, err:"empty", code};
+    const raw=doc.data().data;
+    const parsed=JSON.parse(raw);
+    try{localStorage.setItem(LOCAL_KEY+"_"+code,raw);}catch(e){}
+    _lastSyncTime=doc.data().updatedAt||_lastSyncTime;   // 直後の自己スナップショットで二重処理しない
+    return {ok:true, data:parsed, bytes:byteLen(raw), code, updatedAt:doc.data().updatedAt};
+  }catch(e){ return {ok:false, err:String(e&&e.message||e), code}; }
+}
+
 async function cloudLoad() {
   const code = getFamilyCode();
   // 1. Firestoreから読む（最優先・他デバイスと同期）
@@ -2824,7 +2842,25 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <div style={{background:BG,borderRadius:12,padding:"12px 14px",marginTop:8,border:`1.5px solid ${BORDER}`}}>
                 <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 4px"}}>ファミリーコード</p>
                 <p style={{fontWeight:900,fontSize:16,letterSpacing:3,margin:"0 0 8px"}}>{(()=>{try{return localStorage.getItem("tane_money_family_code")||"---";}catch(e){return "---";}})()}</p>
-                <p style={{color:MUTED,fontSize:11,margin:"0 0 10px"}}>このコードを家族に共有してください</p>
+                <p style={{color:MUTED,fontSize:11,margin:"0 0 10px"}}>このコードを家族に共有してください（全端末で同じであること）</p>
+                {/* 今すぐ同期：サーバの最新を強制取得。反映されない時の手動リカバリ＋診断 */}
+                <button onClick={async()=>{
+                  const r=await forcePullFromCloud();
+                  if(!r.ok){ alert(r.err==="no_code"?"ファミリーコードが未設定です。":r.err==="empty"?"サーバにまだデータがありません。":"同期できませんでした（通信を確認）。\n"+(r.err||"")); return; }
+                  const kb=Math.round((r.bytes||0)/1024);
+                  // サーバの設定系(定義)を取り込む。ログ/進行はローカル(別途同期)を維持。
+                  update(d=>({...d,
+                    goodTasks:r.data.goodTasks||d.goodTasks, badTasks:r.data.badTasks||d.badTasks,
+                    dailyTaskSets:r.data.dailyTaskSets||d.dailyTaskSets, dailyTasks:r.data.dailyTasks||d.dailyTasks,
+                    rewards:r.data.rewards||d.rewards, familySettings:{...(d.familySettings||{}),...(r.data.familySettings||{})},
+                    children:r.data.children||d.children, parents:r.data.parents||d.parents,
+                    activeSetIds:r.data.activeSetIds||d.activeSetIds, activeSetId:r.data.activeSetId||d.activeSetId,
+                  }));
+                  alert(`✅ 家族の最新を取り込みました（データ量 約${kb}KB）。\nタスクや特典が反映されているか確認してください。`);
+                }}
+                  style={{width:"100%",padding:"9px",background:`${G}15`,border:`1.5px solid ${G}`,borderRadius:10,color:GP,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}>
+                  🔄 今すぐ同期（家族の最新を取得）
+                </button>
                 <PromptModalButton btnLabel="🔗 ファミリーコードを変更" title="ファミリーコードを変更" desc="参加したいコードを入力（家族の端末の設定で確認できます）" type="text" maxLen={20} placeholder="TANE-XXXX-XXXX"
                   btnStyle={{width:"100%",padding:"9px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:10,color:B,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,marginBottom:8}}
                   onSubmit={(newCode)=>{
