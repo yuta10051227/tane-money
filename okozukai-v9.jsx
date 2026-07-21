@@ -3655,11 +3655,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
   const delGoal  = id => update(d=>({...d,goals:(d.goals||[]).filter(g=>g.id!==id)}));
 
-  // MyTasks filter
+  // MyTasks filter（マイタスクリスト＝メンバー専用リスト）
+  // ・自分の専用リストがある→そのタスクだけ表示
+  // ・空→「誰の専用リストにも入っていない共有タスク」だけ表示（他メンバー専用のタスクは出さない＝家族に漏れない）
   const myIds = (data.myTaskIds||{})[child.id]||[];
   const hasFilter = myIds.length>0;
-  const filtGood = hasFilter?(data.goodTasks||[]).filter(t=>myIds.includes(t.id)):(data.goodTasks||[]);
-  const filtBad  = hasFilter?(data.badTasks||[]).filter(t=>myIds.includes(t.id)):(data.badTasks||[]);
+  const _assignedElsewhere = (()=>{ const s=new Set(); Object.entries(data.myTaskIds||{}).forEach(([mid,ids])=>{ if(mid!==child.id)(ids||[]).forEach(id=>s.add(id)); }); return s; })();
+  const _taskVisible = t => hasFilter ? myIds.includes(t.id) : !_assignedElsewhere.has(t.id);
+  const filtGood = (data.goodTasks||[]).filter(_taskVisible);
+  const filtBad  = (data.badTasks||[]).filter(_taskVisible);
   const sortTaskFn = (a,b) =>
     taskSort==="pts_high"?Math.abs(taskPts(b,child.id))-Math.abs(taskPts(a,child.id)):
     taskSort==="pts_low"?Math.abs(taskPts(a,child.id))-Math.abs(taskPts(b,child.id)):
