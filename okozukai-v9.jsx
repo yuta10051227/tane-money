@@ -235,6 +235,9 @@ function parentPinIsDefault(data){
 }
 
 let _cloudSaveTimer=null, _cloudSavePending=null;
+// 直前にサーバへ実際に書いた内容(JSON)。次回が同一なら書き込みをスキップして
+// 「保存→自分のスナップショット→マージ→setData→保存…」の無限ループ／端末間ピンポンを断つ。
+let _lastWrittenJson=null;
 // data変更のたびに呼ばれるが、重い同期処理(JSON.stringify＋localStorage＋Firestore準備)を
 // 約300msデバウンスして、タップ直後の再描画をブロックしない(肥大データでのフリーズ防止)。
 async function cloudSave(d) {
@@ -290,9 +293,14 @@ function _cloudPersist(d) {
     if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); return; }
     const db = getDB();
     if(!db){ reportSaveHealth({ok:true, failStreak:0}); return; }
+    // 前回サーバへ書いた内容と完全一致なら書かない＝自己エコー／端末間ピンポンの保存ループを断つ。
+    // (ユーザーの実編集は必ず内容が変わるので誤スキップしない。純粋な受信→再保存だけが止まる)
+    if(_pendingSave === _lastWrittenJson){ reportSaveHealth({ok:true, failStreak:0}); return; }
     try{
       const ts = new Date().toISOString();
-      await db.collection("families").doc(code).set({data:_pendingSave,updatedAt:ts});
+      const payload = _pendingSave;   // await中に別の保存で_pendingSaveが変わっても“実際に書いた内容”を正確に記録する
+      await db.collection("families").doc(code).set({data:payload,updatedAt:ts});
+      _lastWrittenJson = payload;   // 実際に書いた内容を記録（次回同一ならスキップ）
       _lastSyncTime = ts;  // 書き込み成功後にセット＝失敗時に自己スナップショット除外が誤動作しない
       reportSaveHealth({ok:true, failStreak:0});
     }catch(e){
@@ -404,6 +412,10 @@ function startRealtimeSync(updateFn){
   try{
     _unsubscribe=db.collection("families").doc(code).onSnapshot(doc=>{
       if(!doc.exists||!doc.data()||!doc.data().data)return;
+      // 自端末の未確定書き込み(Firestoreのlatency compensation)はスキップ。
+      // これを処理すると「保存→自分のローカルスナップショット→巨大マージ→setData→保存…」の
+      // 無限ループになり、肥大データ＋連打で端末がフリーズする（数が反映しない主因）。
+      if(doc.metadata && doc.metadata.hasPendingWrites) return;
       const t=doc.data().updatedAt||"";
       if(_lastSyncTime===t)return; // 自分の保存は無視
       _lastSyncTime=t;
@@ -422,12 +434,17 @@ function startRealtimeSync(updateFn){
             if(prev.expenses&&prev.expenses.length>0) merged.expenses=prev.expenses;
             if(prev.claimedBadges) merged.claimedBadges=prev.claimedBadges;
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
-            // お手伝い項目(タスク定義)は端末間ユニオン＝追加した項目が消えない(id衝突はローカル編集優先)。
-            // ※以前はマージ対象外でサーバ値に上書きされ、別端末/遅延スナップショットで新規項目が消えるバグがあった
+            // お手伝い項目(タスク定義)は原則サーバ優先＝追加/編集/削除/並び替えが全端末へ必ず反映される。
+            // ただし自端末が直近12秒に編集した場合だけ、保存がサーバへ伝播するまでローカルを保護(消えない)。
+            // 判定は自端末のDate.now()と自端末が刻んだ編集時刻(_lastLocalDefEditTs／同期されない)だけ＝端末間の時計比較はしない。
+            // ※旧実装はunion(ローカル優先)で、編集・削除・並び替えが他端末に永久に伝わらないバグがあった
+            //   （＝「設定でお手伝い項目を編集しても家族の端末に反映されない」の主因）。全writerがmarkLocalDefEdit()を呼ぶ前提。
             {
-              const _uni=(a,b)=>{const m={};[...(a||[]),...(b||[])].forEach(t=>{if(t&&t.id!=null)m[t.id]=t;});return Object.values(m);};
-              if(prev.goodTasks) merged.goodTasks=_uni(merged.goodTasks, prev.goodTasks);
-              if(prev.badTasks)  merged.badTasks =_uni(merged.badTasks,  prev.badTasks);
+              const _recentDefEdit = _lastLocalDefEditTs>0 && (Date.now()-_lastLocalDefEditTs < 12000);
+              // 直近編集 or サーバ値が空/欠損のときはローカルを守る（サーバの一過性の空読みでタスク全消えを防ぐ安全弁）
+              if(prev.goodTasks && prev.goodTasks.length && (_recentDefEdit || !(merged.goodTasks&&merged.goodTasks.length))) merged.goodTasks=prev.goodTasks;
+              if(prev.badTasks  && prev.badTasks.length  && (_recentDefEdit || !(merged.badTasks &&merged.badTasks.length )))  merged.badTasks =prev.badTasks;
+              // それ以外は merged(=サーバ値) をそのまま採用＝他端末の変更が確実に反映
             }
             if(prev.myTaskIds) merged.myTaskIds={...(merged.myTaskIds||{}),...prev.myTaskIds};
             // 毎日タスクのセット定義: 原則サーバ優先(＝他端末の追加/編集が必ず反映される)。
@@ -3252,7 +3269,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             const PLANS=[
               {id:"single",e:"🌱",name:"月額プラン",price:"¥1,100",unit:"/月",sub:"お子さま1人・いつでも解約OK",rec:nKids===1},
               {id:"annual",e:"📅",name:"年額プラン",price:"¥10,560",unit:"/年",sub:"実質 月¥880・2ヶ月分以上おトク",rec:nKids===1},
-              {id:"family",e:"👨‍👩‍👧‍👦",name:"ファミリー年額",price:"¥21,120",unit:"/年",sub:"最大4人・4人なら1人1日 約14円",rec:nKids>=2},
+              {id:"family",e:"👨👩👧👦",name:"ファミリー年額",price:"¥21,120",unit:"/年",sub:"最大4人・4人なら1人1日 約14円",rec:nKids>=2},
             ];
             const setPlan=(id)=>update(d=>({...d,subscription:{...(d.subscription||{}),plan:id}}));
             const startTrial=()=>update(d=>(d.subscription?.trialStart?d:{...d,subscription:{...(d.subscription||{}),trialStart:new Date().toISOString()}}));
@@ -3681,7 +3698,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
   const effectiveTab = tabAlias[tab] || tab;
   // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
-  const TAB_FB = {daily:"☀️",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
+  const TAB_FB = {daily:"☀",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
   const darkBG = !isJunior; // teen/adultはダークモード
 
   return (
@@ -5532,7 +5549,7 @@ function ParentScreen({ data, update, onBack }) {
   const [dragTask,setDragTask]=useState(null);   // {k,id,dy}
   const dragRef=useRef({startY:0});
   const rowRefs=useRef({});
-  const moveTask=(k,id,steps)=>{ if(!steps) return; update(d=>{ const arr=[...(d[k]||[])]; const i=arr.findIndex(t=>t.id===id); if(i<0) return d; const j=Math.max(0,Math.min(arr.length-1,i+steps)); if(i===j) return d; const [it]=arr.splice(i,1); arr.splice(j,0,it); return {...d,[k]:arr}; }); };
+  const moveTask=(k,id,steps)=>{ if(!steps) return; markLocalDefEdit(); update(d=>{ const arr=[...(d[k]||[])]; const i=arr.findIndex(t=>t.id===id); if(i<0) return d; const j=Math.max(0,Math.min(arr.length-1,i+steps)); if(i===j) return d; const [it]=arr.splice(i,1); arr.splice(j,0,it); return {...d,[k]:arr}; }); };
 
   // rewards
   const [editReward,    setEditReward]    = useState(null);
@@ -5573,20 +5590,23 @@ function ParentScreen({ data, update, onBack }) {
   const saveTask = () => {
     if(!editTask)return; const pts=parseInt(editTask.pts); if(isNaN(pts))return;
     const k=editTask.kind==="good"?"goodTasks":"badTasks";
+    markLocalDefEdit();
     update(d=>({...d,[k]:d[k].map(t=>t.id===editTask.id?{...t,label:editTask.label,emoji:editTask.emoji,pts}:t)}));
     setEditTask(null);
   };
-  const delTask = (kind,id) => { const k=kind==="good"?"goodTasks":"badTasks"; update(d=>({...d,[k]:d[k].filter(t=>t.id!==id)})); };
+  const delTask = (kind,id) => { const k=kind==="good"?"goodTasks":"badTasks"; markLocalDefEdit(); update(d=>({...d,[k]:d[k].filter(t=>t.id!==id)})); };
   const addTask = () => {
     if(!ntLabel||!ntPts)return; const pts=parseInt(ntPts); if(isNaN(pts))return;
     const kind=newTask.kind; const k=kind==="good"?"goodTasks":"badTasks";
     const fp=kind==="bad"&&pts>0?-pts:pts;
+    markLocalDefEdit();
     update(d=>({...d,[k]:[...d[k],{id:uid(),emoji:ntEmoji,label:ntLabel,pts:fp,over:{}}]}));
     setNewTask(null); setNtLabel(""); setNtEmoji("⭐"); setNtPts("");
   };
   const setOver = (taskId, kind, cid, val) => {
     const k=kind==="good"?"goodTasks":"badTasks";
     const v=val===""?undefined:parseInt(val);
+    markLocalDefEdit();
     update(d=>({...d,[k]:d[k].map(t=>t.id===taskId?{...t,over:{...t.over,[cid]:v}}:t)}));
     setOverModal(m=>m?{...m,task:{...m.task,over:{...m.task.over,[cid]:v}}}:m);
   };
@@ -7779,7 +7799,7 @@ function TipsSection({ageMode,child,data,update}){
         {missDone&&<span style={{fontSize:10,fontWeight:900,color:"#fff",background:G,borderRadius:8,padding:"3px 8px"}}>コンプリート！</span>}
       </div>
       <div style={{display:"flex",gap:6}}>
-        {[["📖 まめちしきを 1つよむ",missRead],["✏️ クイズに 1問せいかい",missQuiz]].map(([k,ok])=>(
+        {[["📖 まめちしきを 1つよむ",missRead],["✏ クイズに 1問せいかい",missQuiz]].map(([k,ok])=>(
           <div key={k} style={{flex:1,display:"flex",alignItems:"center",gap:6,background:ok?GS:BG,border:`1px solid ${ok?G:BORDER}`,borderRadius:10,padding:"7px 9px"}}>
             <span style={{fontSize:14}}>{ok?"✅":"⬜"}</span>
             <span style={{fontSize:10.5,fontWeight:800,color:ok?GP:TEXTS,lineHeight:1.25}}>{k}</span>
@@ -8266,7 +8286,7 @@ function SetupWizard({ data, update, onComplete }) {
           </p>
           {/* 競合との差別化3点（家族共有・ずっと貯まる・編集自由）を入口で明示 */}
           <div style={{textAlign:"left",margin:"0 0 16px",display:"flex",flexDirection:"column",gap:7}}>
-            {[["🌱","ポイントは ずっと貯まる（月でリセットされない）"],["👨‍👩‍👧","家族みんなで共有（何人でも）"],["✏️","お手伝いも 金額も 自由に編集できる"]].map(([e,t])=>(
+            {[["🌱","ポイントは ずっと貯まる（月でリセットされない）"],["👨👩👧","家族みんなで共有（何人でも）"],["✏","お手伝いも 金額も 自由に編集できる"]].map(([e,t])=>(
               <div key={t} style={{display:"flex",alignItems:"center",gap:9,background:"rgba(255,255,255,0.7)",borderRadius:12,padding:"8px 13px"}}>
                 <span style={{fontSize:16,flexShrink:0}}>{e}</span>
                 <span style={{fontSize:12.5,fontWeight:700,color:TEXT}}>{t}</span>
@@ -8343,7 +8363,7 @@ function SetupWizard({ data, update, onComplete }) {
             ))}
             {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
             <input value={CHILD_EMOJIS.includes(childEmoji)?"":childEmoji} onChange={e=>setChildEmoji((e.target.value||"").slice(0,4)||"⚡")}
-              placeholder="✏️" aria-label="絵文字を入力"
+              placeholder="✏" aria-label="絵文字を入力"
               style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!CHILD_EMOJIS.includes(childEmoji)?GP:BORDER}`,background:!CHILD_EMOJIS.includes(childEmoji)?`${GP}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
           </div>
           <input value={childName} onChange={e=>setChildName(e.target.value)}
@@ -8406,7 +8426,7 @@ function SetupWizard({ data, update, onComplete }) {
                 ))}
                 {/* 自由入力（絵文字を文字入力でも選べる・競合レビュー要望） */}
                 <input value={PARENT_EMOJIS.includes(parentEmoji)?"":parentEmoji} onChange={e=>setParentEmoji((e.target.value||"").slice(0,4)||"👨")}
-                  placeholder="✏️" aria-label="絵文字を入力"
+                  placeholder="✏" aria-label="絵文字を入力"
                   style={{width:42,height:42,borderRadius:11,border:`2.5px dashed ${!PARENT_EMOJIS.includes(parentEmoji)?B:BORDER}`,background:!PARENT_EMOJIS.includes(parentEmoji)?`${B}18`:"#fff",fontSize:20,textAlign:"center",fontFamily:F,flexShrink:0,boxSizing:"border-box",color:TEXT}}/>
               </div>
               <input value={parentName} onChange={e=>setParentName(e.target.value)}
