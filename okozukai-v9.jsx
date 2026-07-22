@@ -127,6 +127,16 @@ let _db=null,_fbInit=false,_saveTimer=null,_pendingSave=null,_unsubscribe=null,_
 // リモート由来のupdatedAtを見ると時計ズレで誤作動するため、ローカル専用のこの値で「直近に自分が編集したか」を判定する。
 let _lastLocalDefEditTs=0;
 function markLocalDefEdit(){ _lastLocalDefEditTs=Date.now(); }
+// 目標/家計簿/保有株など「ユーザーが直接編集する共有データ」の直近ローカル編集時刻（フィールド別・同期されない）。
+// これで同期マージを「原則サーバ優先＋直近12秒だけローカル保護」にでき、他端末の編集/削除が確実に反映される。
+// ※フィールド別にするのは、1つの編集(例:目標)が無関係フィールド(例:保有株)の受信まで12秒ブロックして
+//   他端末の変更を巻き戻すのを防ぐため（フィールドを跨いだ結合を断つ）。
+const _lastUserEditTs = { goals:0, expenses:0, holdings:0, forexHoldings:0 };
+function markLocalUserDataEdit(field){
+  const t=Date.now();
+  if(field && field in _lastUserEditTs) _lastUserEditTs[field]=t;
+  else { _lastUserEditTs.goals=t; _lastUserEditTs.expenses=t; _lastUserEditTs.holdings=t; _lastUserEditTs.forexHoldings=t; }
+}
 // ── データ消失の防止ガード ──
 // クラウド保存(Firestore)はデバウンス＋fire-and-forgetなので、失敗が画面に出ない。
 // 実際の書き込み成否とドキュメントサイズを1か所に集約し、UIに通知する。
@@ -138,6 +148,7 @@ function setSaveHealthCb(cb){ _saveHealthCb=cb; if(cb) cb(_saveHealth); }
 function reportSaveHealth(patch){ _saveHealth={..._saveHealth,...patch}; if(_saveHealthCb) _saveHealthCb(_saveHealth); }
 function byteLen(str){ try{ return (typeof Blob!=="undefined")?new Blob([str]).size:Math.round((str||"").length*1.4); }catch(e){ return (str||"").length; } }
 const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
+const _processedRedemptionIds=new Set(); // 交換(ごほうび)承認/却下済みIDを保持（遅延スナップショットでの復活＝二重減算を防ぐ）
 let _familyCode=null; // ファミリーコードのキャッシュ
 
 // 匿名認証（Firestoreルールの前提）。Auth未有効・オフラインでも従来動作を維持（fail-safe）
@@ -238,6 +249,13 @@ let _cloudSaveTimer=null, _cloudSavePending=null;
 // 直前にサーバへ実際に書いた内容(JSON)。次回が同一なら書き込みをスキップして
 // 「保存→自分のスナップショット→マージ→setData→保存…」の無限ループ／端末間ピンポンを断つ。
 let _lastWrittenJson=null;
+// 保存要求の世代カウンタ。await中に新しい編集が入ったら、古い保存の完了で「saved(緑)」を点けない（取りこぼし防止）。
+let _saveGen=0, _retryTimer=null;
+// 実際のFirestore保存結果を同期バッジ(SyncBadge)へ通知するコールバック。
+// ※旧実装は cloudSave 直後に楽観的に "saved" 表示していたため、無言拒否(900KB超)やオフラインでも「同期済み」の緑だった。
+let _syncStCb=null;
+function setSyncStCb(cb){ _syncStCb=cb; }
+function _notifySyncSt(s){ try{ _syncStCb && _syncStCb(s); }catch(e){} }
 // data変更のたびに呼ばれるが、重い同期処理(JSON.stringify＋localStorage＋Firestore準備)を
 // 約300msデバウンスして、タップ直後の再描画をブロックしない(肥大データでのフリーズ防止)。
 async function cloudSave(d) {
@@ -280,22 +298,27 @@ function _cloudPersist(d) {
   const code = getFamilyCode()||"default";
   const saveD = _slimForCloud(d);
   const json = JSON.stringify(saveD);
-  // 1. コード固有のローカルストレージ（他コードと分離）
-  try { localStorage.setItem(LOCAL_KEY+"_"+code, json); } catch(e) {}
-  try { localStorage.setItem(LOCAL_KEY2+"_"+code, json); } catch(e) {}
+  // 1. コード固有のローカルストレージ（他コードと分離）。両方失敗＝この端末に保存できない＝健全性へ通知。
+  let localOk=false;
+  try { localStorage.setItem(LOCAL_KEY+"_"+code, json); localOk=true; } catch(e) {}
+  try { localStorage.setItem(LOCAL_KEY2+"_"+code, json); localOk=true; } catch(e) {}
+  if(!localOk){ reportSaveHealth({ok:false, localFail:true}); _notifySyncSt("error"); }
   // 2. Firestore（デバウンス・家族間リアルタイム同期）。同じ圧縮済みを保存
   _pendingSave = json;
+  const myGen = ++_saveGen;   // この保存要求の世代（後続編集が来たら古い完了通知は無視する）
+  // 「saved」を点けてよいのは、その後に新しい編集が入っていない＝自分が最新世代のときだけ。
+  const okToGreen = ()=> myGen===_saveGen;
   // ドキュメントサイズを監視（1MB上限の手前で親に警告を出す）
   const near = byteLen(json) > SAVE_BYTE_WARN;
   reportSaveHealth({near, bytes:byteLen(json)});
   if(_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async()=>{
-    if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); return; }
+  _saveTimer = setTimeout(async function attempt(){
+    if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); if(okToGreen())_notifySyncSt("saved"); return; }
     const db = getDB();
-    if(!db){ reportSaveHealth({ok:true, failStreak:0}); return; }
+    if(!db){ reportSaveHealth({ok:true, failStreak:0}); if(okToGreen())_notifySyncSt("saved"); return; }
     // 前回サーバへ書いた内容と完全一致なら書かない＝自己エコー／端末間ピンポンの保存ループを断つ。
     // (ユーザーの実編集は必ず内容が変わるので誤スキップしない。純粋な受信→再保存だけが止まる)
-    if(_pendingSave === _lastWrittenJson){ reportSaveHealth({ok:true, failStreak:0}); return; }
+    if(_pendingSave === _lastWrittenJson){ reportSaveHealth({ok:true, failStreak:0}); if(okToGreen())_notifySyncSt("saved"); return; }
     try{
       const ts = new Date().toISOString();
       const payload = _pendingSave;   // await中に別の保存で_pendingSaveが変わっても“実際に書いた内容”を正確に記録する
@@ -303,10 +326,20 @@ function _cloudPersist(d) {
       _lastWrittenJson = payload;   // 実際に書いた内容を記録（次回同一ならスキップ）
       _lastSyncTime = ts;  // 書き込み成功後にセット＝失敗時に自己スナップショット除外が誤動作しない
       reportSaveHealth({ok:true, failStreak:0});
+      if(okToGreen())_notifySyncSt("saved");   // 実際に保存成功し、かつ後続の未保存編集が無いときだけ緑にする
     }catch(e){
       console.warn("Firestore save failed:",e);
       // 2回連続で失敗したら警告（一時的なネット瞬断で過剰に出さない）
-      reportSaveHealth({failStreak:_saveHealth.failStreak+1, ok:_saveHealth.failStreak+1<2});
+      const streak=_saveHealth.failStreak+1;
+      reportSaveHealth({failStreak:streak, ok:streak<2});
+      if(okToGreen()){
+        _notifySyncSt(streak<2?"saving":"error");   // 1回目は保留、2回連続失敗でエラー表示
+        // 後続の編集が無くてもバッジが「保存中…」で固着しないよう、最新世代なら数秒後に一度だけ再試行して収束させる。
+        if(_pendingSave!==_lastWrittenJson && streak<5){
+          if(_retryTimer) clearTimeout(_retryTimer);
+          _retryTimer=setTimeout(()=>{ _retryTimer=null; if(okToGreen()) attempt(); }, 5000);
+        }
+      }
     }
   },1000); // 1秒デバウンス（目標・設定変更が素早く保存される）
   // 3. Claude.ai内ならwindow.storageにも保存
@@ -427,11 +460,17 @@ function startRealtimeSync(updateFn){
             // マージルール：設定系はFirestore反映、ユーザーデータはローカル優先
             const merged=migrate(parsed);
             if(!prev) return merged;
-            // ローカル優先（ユーザーが直接編集するデータ）
-            if(prev.goals&&prev.goals.length>0) merged.goals=prev.goals;
-            if(prev.holdings&&Object.keys(prev.holdings).length>0) merged.holdings=prev.holdings;
-            if(prev.forexHoldings&&Object.keys(prev.forexHoldings).length>0) merged.forexHoldings=prev.forexHoldings;
-            if(prev.expenses&&prev.expenses.length>0) merged.expenses=prev.expenses;
+            // 目標/家計簿/保有株：原則サーバ優先＝他端末の編集/削除/並び替えが必ず反映される。
+            // ただし自端末が直近12秒に編集した時、またはサーバ値が空/欠損の時だけローカル保護（巻き戻り・全消し防止の安全弁）。
+            // ※旧実装は「ローカルが非空なら無条件ローカル優先」で、他端末の変更が永久に反映されず往復で消えるLWWロスト更新だった（goodTasksと同根）。
+            {
+              const _now=Date.now();
+              const _rud = (f)=> _lastUserEditTs[f]>0 && (_now-_lastUserEditTs[f] < 12000);   // フィールド別に判定＝跨いだブロックをしない
+              if(prev.goals&&prev.goals.length&&(_rud('goals')||!(merged.goals&&merged.goals.length))) merged.goals=prev.goals;
+              if(prev.expenses&&prev.expenses.length&&(_rud('expenses')||!(merged.expenses&&merged.expenses.length))) merged.expenses=prev.expenses;
+              if(prev.holdings&&Object.keys(prev.holdings).length&&(_rud('holdings')||!(merged.holdings&&Object.keys(merged.holdings).length))) merged.holdings=prev.holdings;
+              if(prev.forexHoldings&&Object.keys(prev.forexHoldings).length&&(_rud('forexHoldings')||!(merged.forexHoldings&&Object.keys(merged.forexHoldings).length))) merged.forexHoldings=prev.forexHoldings;
+            }
             if(prev.claimedBadges) merged.claimedBadges=prev.claimedBadges;
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
             // お手伝い項目(タスク定義)は原則サーバ優先＝追加/編集/削除/並び替えが全端末へ必ず反映される。
@@ -545,6 +584,10 @@ function startRealtimeSync(updateFn){
             if(_processedApprovalIds.size>0){
               merged.pendingApprovals=(merged.pendingApprovals||[]).filter(p=>!_processedApprovalIds.has(p.id));
             }
+            // pendingRedemptions(ごほうび交換): 承認/却下済みを遅延スナップショットで復活させない＝再承認による二重減算を防ぐ
+            if(_processedRedemptionIds.size>0){
+              merged.pendingRedemptions=(merged.pendingRedemptions||[]).filter(p=>!_processedRedemptionIds.has(p.id));
+            }
             // 新しいpendingApprovalsがあれば親デバイスで通知
             const _prevIds=new Set((prev.pendingApprovals||[]).map(p=>p.id));
             const _newPending=(merged.pendingApprovals||[]).filter(p=>!_prevIds.has(p.id)&&!_processedApprovalIds.has(p.id));
@@ -566,7 +609,9 @@ async function addLogToFirestore(logEntry) {
   const db = getDB();
   if(!db) return;
   try {
-    const docId = `log_${logEntry.cid}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+    // docIdはログのidをそのまま使う＝同一idの再書き込みは同じdocへ上書き(冪等)。
+    // これで利子/配当のような決定的id(interest_cid_日付 等)は端末が同時付与しても重複docを作らない。
+    const docId = String(logEntry.id || `log_${logEntry.cid}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`);
     await db.collection("families").doc(code)
             .collection("logs").doc(docId).set({
       ...logEntry,
@@ -576,17 +621,28 @@ async function addLogToFirestore(logEntry) {
   } catch(e) { console.warn("Firestore log write failed:", e); }
 }
 
-// ── Firestoreのlogsコレクションを全件読み込む ──
+// ── Firestoreのlogsコレクションを全件読み込む（ページングで漏れなく取得）──
+// ※旧実装は limit(5000) 固定で、生涯ログが5000件を超えると最古(多くは獲得＝プラス)が窓から漏れ、
+//   reconcileFullLogs が carry を捨てるため残高が全端末で目減りしていた（"fsLogs=全件"の前提が壊れる）。
 async function loadLogsFromFirestore() {
   const code = getFamilyCode();
   if(!code || code==="default") return null;
   const db = getDB();
   if(!db) return null;
   try {
-    const snap = await db.collection("families").doc(code)
-                         .collection("logs").orderBy("date","desc").limit(5000).get();
-    if(snap.empty) return null;
-    return snap.docs.map(d => d.data());
+    const PAGE = 2000;
+    let all = [], last = null;
+    for(;;){
+      let q = db.collection("families").doc(code).collection("logs").orderBy("date","desc").limit(PAGE);
+      if(last) q = q.startAfter(last);
+      const snap = await q.get();
+      if(snap.empty) break;
+      all = all.concat(snap.docs.map(d => d.data()));
+      if(snap.docs.length < PAGE) break;       // 最終ページ
+      last = snap.docs[snap.docs.length-1];
+      if(all.length > 100000) break;           // 暴走安全弁（現実には到達しない）
+    }
+    return all.length ? all : null;
   } catch(e) {
     console.warn("Firestore logs load failed:", e);
     return null;
@@ -609,7 +665,7 @@ function reconcileFullLogs(prevLogs, fsLogs){
     if(l && l.id!=null && !_isCarryLog(l) && !fsIds.has(l.id) && !seen.has(l.id)) localOnly.push(l);
     push(l);  // ローカルにしか無い未同期ログも残す(重複は自動的に弾かれる)
   });
-  out.sort((a,b)=> new Date(b.date) - new Date(a.date));
+  out.sort((a,b)=> (a.date<b.date?1:a.date>b.date?-1:0));   // ISO文字列は辞書順=時刻順。Date生成を避けて大量ログでも軽い
   return { merged: out, localOnly };
 }
 
@@ -637,7 +693,7 @@ function startLogsRealtimeSync(updateFn) {
           const added = newLogs.filter(l => !existingIds.has(l.id));
           if(added.length === 0) return prev;
           const merged = [...added, ...(prev.logs||[])];
-          merged.sort((a,b) => new Date(b.date) - new Date(a.date));
+          merged.sort((a,b) => (a.date<b.date?1:a.date>b.date?-1:0));   // ISO文字列比較=時刻順。Date生成を避ける
                     return {...prev, logs: merged};
         });
       }, err => console.warn("Logs realtime sync error:", err));
@@ -1490,7 +1546,9 @@ const SaveGuardBanner = () => {
       boxShadow:"0 2px 10px rgba(0,0,0,.18)",display:"flex",alignItems:"center",gap:8,justifyContent:"center"}}>
       <span style={{flex:1}}>
         {fail
-          ? "⚠ クラウド保存に失敗中。変更はこの端末に残っています。通信環境を確認してください。"
+          ? (h.localFail
+              ? "⚠ この端末にデータを保存できません。プライベートモードを解除するか、ブラウザの空き容量を確認してください。"
+              : "⚠ クラウド保存に失敗中。変更はこの端末に残っています。通信環境を確認してください。")
           : `⚠ データ量が上限に近づいています（約${kb}KB）。古い記録は自動でまとめられます。`}
       </span>
       {!fail && <button onClick={()=>setClosed(true)} style={{background:"rgba(0,0,0,.12)",border:"none",borderRadius:8,padding:"3px 9px",fontWeight:800,fontSize:12,color:TEXT,cursor:"pointer",fontFamily:F,flexShrink:0}}>×</button>}
@@ -3173,11 +3231,14 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               {(()=>{
                 const pendingR=data.pendingRedemptions||[];
                 const approveR=(entry)=>{
+                  if(_processedRedemptionIds.has(entry.id)) return;   // 冪等化＝二重承認/復活後の再承認による二重減算を防ぐ
+                  _processedRedemptionIds.add(entry.id);
                   const log={id:uid(),cid:entry.cid,type:"reward",label:`${entry.rewardLabel}（${entry.rewardUnit}）`,pts:-entry.cost,rid:entry.rewardId,date:new Date().toISOString()};
                   addLogToFirestore(log);
                   update(d=>({...d,logs:[log,...d.logs],pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
                 };
                 const rejectR=(entry)=>{
+                  _processedRedemptionIds.add(entry.id);   // 却下済みも遅延スナップショットで復活させない
                   update(d=>({...d,pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
                 };
                 if(pendingR.length===0) return null;
@@ -3481,7 +3542,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [pressed, setPressed] = useState({});
   const [scrollY, setScrollY] = useState(0);   // iOS風 大きいタイトルのスクロール縮小用
   const [showTips, setShowTips] = useState(false);   // まめちしき(旧・学ぶタブ)を毎日タブ内で開閉
-  useEffect(()=>{ const on=()=>setScrollY(window.scrollY||0); window.addEventListener("scroll",on,{passive:true}); return ()=>window.removeEventListener("scroll",on); },[]);
+  // スクロール縮小演出。rAFで1フレーム1回に間引き＋56pxでクランプ＋同値なら更新しない。
+  // ※旧実装は毎スクロールイベントで巨大ChildScreen全体を再描画し、慣性スクロール中にログ全走査が多発してカクついた。
+  useEffect(()=>{ let raf=0;
+    const on=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const y=Math.min(56,window.scrollY||0); setScrollY(prev=> prev===y?prev:y); }); };
+    window.addEventListener("scroll",on,{passive:true});
+    return ()=>{ window.removeEventListener("scroll",on); if(raf) cancelAnimationFrame(raf); };
+  },[]);
   const [gachaRes, setGachaRes] = useState(null);
   const gachaBusyRef = useRef(false);   // ガチャ連打ガード(0.1秒更新中の二重発火/多重回しを防止)
   const [rewardPop, setRewardPop] = useState(null);
@@ -3500,9 +3567,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const [showZukan, setShowZukan] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
   const [showNews, setShowNews] = useState(false);
-  const [nowTs, setNowTs] = useState(Date.now());
   const [showExped, setShowExped] = useState(false);
-  useEffect(()=>{const id=setInterval(()=>setNowTs(Date.now()),20000);return()=>clearInterval(id);},[]);
+  // (削除) nowTs は一度も参照されない死んだstateで、20秒ごとに巨大ChildScreen全体を無意味に再描画していた。
   const [newsSeen, setNewsSeen] = useState(()=>{try{return localStorage.getItem("tane_news_seen")||"";}catch(e){return "";}});
   const hasNews = NEWS.length>0 && newsSeen!==NEWS[0].id;
   const openNews = ()=>{ setShowNews(true); try{localStorage.setItem("tane_news_seen",NEWS[0].id);}catch(e){} setNewsSeen(NEWS[0].id); };
@@ -3510,6 +3576,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const ageMode  = child.ageMode || "middle";
   const young    = ageMode === "young";
   const isJunior = child.displayMode === "junior"; // Junior/Teenモード分岐
+  // 「ためる」タブのセグメントが非表示化(投資OFF/junior/young)されたのにmonTabがそれを指したままだと
+  // コンテンツが1つも描画されず真っ白になる。表示可能な先頭"goals"へフォールバックする。
+  useEffect(()=>{
+    if(monTab==="oshi" && data.familySettings?.investOff) setMonTab("goals");
+    else if(monTab==="kakeibo" && isJunior) setMonTab("goals");   // kakeibo非表示はjuniorのみ。youngは使い道タブを使える(バウンスさせない)
+  },[data.familySettings?.investOff, monTab, isJunior]);
   // 保護者のゲーム強度設定(familySettings.gameMode): full=全部 / light=ガチャ育成はOKだがバトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
   const gameMode    = (data.familySettings?.gameMode) || "full";
   const showGacha   = gameMode !== "money";   // デイリーガチャ
@@ -3553,7 +3625,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   };
 
   const addLog = (entry) => {
-    update(d => ({ ...d, logs: [{ id:uid(), date:new Date().toISOString(), ...entry }, ...d.logs] }));
+    // ログはlogsサブコレクションが唯一の正＝Firestoreにも必ず送る。
+    // ※旧実装はローカルd.logsに積むだけでaddLogToFirestore未呼び出し。承認不要のごほうび交換(doRedeem)の
+    //   ポイント減算が他端末に伝播せず、300件超のslim化でcarryに畳まれて減算が恒久消失＝残高水増しになっていた。
+    const log = { id:uid(), date:new Date().toISOString(), ...entry };
+    update(d => ({ ...d, logs: [log, ...d.logs] }));
+    addLogToFirestore(log);
   };
 
   const doTask = task => {
@@ -3650,10 +3727,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const addExpense = () => {
     const amt=parseInt(kForm.amt); if(!kForm.label||isNaN(amt)||amt<=0)return;
+    markLocalUserDataEdit('expenses');
     update(d=>({...d,expenses:[{id:uid(),cid:child.id,catId:kForm.catId,label:kForm.label,amt,date:new Date().toISOString()},...(d.expenses||[])]}));
     setKForm({catId:"cat1",label:"",amt:""}); setKAdd(false);
   };
-  const delExpense = id => update(d=>({...d,expenses:(d.expenses||[]).filter(e=>e.id!==id)}));
+  const delExpense = id => { markLocalUserDataEdit('expenses'); update(d=>({...d,expenses:(d.expenses||[]).filter(e=>e.id!==id)})); };
 
   // Goals
   const [gForm,setGForm]=useState({emoji:"🎯",label:"",target:""});
@@ -3662,15 +3740,17 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const addGoal = () => {
     const t=parseInt(gForm.target); if(!gForm.label||isNaN(t)||t<=0)return;
+    markLocalUserDataEdit('goals');
     update(d=>({...d,goals:[...( d.goals||[]),{id:uid(),cid:child.id,emoji:gForm.emoji,label:gForm.label,target:t,done:false}]}));
     setGForm({emoji:"🎯",label:"",target:""}); setGAdd(false);
   };
   const markGoal = id => {
     const g=(data.goals||[]).find(x=>x.id===id);
+    markLocalUserDataEdit('goals');
     update(d=>({...d,goals:(d.goals||[]).map(x=>x.id===id?{...x,done:true,doneDate:new Date().toISOString()}:x)}));
     if(g) setGoalCelebration(g);
   };
-  const delGoal  = id => update(d=>({...d,goals:(d.goals||[]).filter(g=>g.id!==id)}));
+  const delGoal  = id => { markLocalUserDataEdit('goals'); update(d=>({...d,goals:(d.goals||[]).filter(g=>g.id!==id)})); };
 
   // MyTasks filter（マイタスクリスト＝メンバー専用リスト）
   // ・自分の専用リストがある→そのタスクだけ表示
@@ -3871,11 +3951,15 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {MAIN_TABS.map(([v,l])=>{
           // 控えめな金色ドット: 「今日まだのおてつだい」と「今日まだのガチャ」だけ(最大2個)。やり終えたら消える。
           const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone);
+          // juniorのタブは生キー(tasks/goals)だがeffectiveTabはエイリアス(activity/money)になるため、
+          // 比較用に同じ変換をかける。非juniorは tabAlias に無いので activeKey===v で従来通り。
+          const activeKey = tabAlias[v]||v;
+          const isActive = effectiveTab===activeKey;
           return (
           <button key={v} onClick={()=>setTab(v)}
-            style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:effectiveTab===v?`2.5px solid ${isJunior?GP:"#4ade80"}`:"2.5px solid transparent",background:"none",color:effectiveTab===v?(isJunior?GP:"#4ade80"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:effectiveTab===v?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+            style={{position:"relative",flex:1,padding:"7px 4px 7px",border:"none",borderBottom:isActive?`2.5px solid ${isJunior?GP:"#4ade80"}`:"2.5px solid transparent",background:"none",color:isActive?(isJunior?GP:"#4ade80"):(isJunior?MUTED:"rgba(255,255,255,0.35)"),fontWeight:isActive?700:500,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",minWidth:56,transition:"all .15s",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
             <span style={{position:"relative",display:"inline-flex"}}>
-              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:effectiveTab===v?1:0.4,filter:(!isJunior&&effectiveTab!==v)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent=TAB_FB[v]||"🌱";s.style.fontSize="20px";s.style.opacity=effectiveTab===v?"1":"0.5";e.target.replaceWith(s);}}/>
+              <img src={`/assets/tab_${v}.png`} alt="" style={{width:22,height:22,objectFit:"contain",opacity:isActive?1:0.4,filter:(!isJunior&&!isActive)?"brightness(0.6)":"none",transition:"opacity .15s"}} onError={e=>{const s=document.createElement("span");s.textContent=TAB_FB[v]||"🌱";s.style.fontSize="20px";s.style.opacity=isActive?"1":"0.5";e.target.replaceWith(s);}}/>
               {tabDot && <span style={{position:"absolute",top:-3,right:-6,width:9,height:9,borderRadius:"50%",background:GOLD,border:`1.5px solid ${isJunior?CARD:"#0f1a2e"}`}}/>}
             </span>
             {l.replace(/^\S+\s+/,"")}
@@ -4553,8 +4637,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── 図鑑セクション ── */}
-      {/* 📊 今週のまとめ(稼ぐ/使う/貯める＝お金の学びの振り返り) */}
-      {effectiveTab==="more" && (()=>{
+      {/* 📊 今週のまとめ(稼ぐ/使う/貯める＝お金の学びの振り返り)。juniorは「more」タブが無く、がんばりボタンからランキングだけ表示する */}
+      {effectiveTab==="more" && !isJunior && (()=>{
         const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
         const wl=myLogs.filter(l=>(l.date||"")>=wkAgo);
         const earned=wl.filter(l=>l.pts>0).reduce((s,l)=>s+l.pts,0);
@@ -4590,7 +4674,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       })()}
 
       {/* ── LOG ── */}
-      {effectiveTab==="more" && (
+      {effectiveTab==="more" && !isJunior && (
         <div style={{padding:16}}>
           {/* サブタブ: 履歴 / バッジ / ランキング（iOSセグメント統一） */}
           <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:darkBG?"rgba(255,255,255,0.08)":"rgba(120,120,128,0.14)",marginBottom:14}}>
@@ -4637,7 +4721,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
 
       {/* ── BADGES ── */}
-      {effectiveTab==="more"&&(["badges","ranking"].includes(moreOpen)?moreOpen:"log")==="badges"&&<BadgesSection child={child} data={data} update={update}/>}
+      {effectiveTab==="more"&&!isJunior&&(["badges","ranking"].includes(moreOpen)?moreOpen:"log")==="badges"&&<BadgesSection child={child} data={data} update={update}/>}
 
       {/* ── 記録タブ: ランキング ── */}
       {effectiveTab==="more"&&moreOpen==="ranking"&&(()=>{
@@ -4650,6 +4734,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const MEDAL=["🥇","🥈","🥉"];
         return(
           <div style={{padding:16}}>
+            {isJunior && <button onClick={()=>{taneHaptic("tap");setTab("daily");}} style={{background:"none",border:"none",color:GP,fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F,padding:"2px 0 12px",display:"flex",alignItems:"center",gap:4}}>‹ もどる</button>}
             <div style={{background:CARD,borderRadius:16,padding:"16px",border:`1px solid ${BORDER}`,boxShadow:"0 4px 16px rgba(24,35,29,0.06)"}}>
               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                 <span style={{fontSize:16}}>🌱</span>
@@ -5583,7 +5668,9 @@ function ParentScreen({ data, update, onBack }) {
     setShowAddChild(false); setNcName(""); setNcEmoji("😊"); setNcPin(""); setNcMode("middle");
   };
   const confirmDelChild = id => {
-    update(d=>({...d,children:d.children.filter(c=>c.id!==id),logs:d.logs.filter(l=>l.cid!==id),expenses:(d.expenses||[]).filter(e=>e.cid!==id),goals:(d.goals||[]).filter(g=>g.cid!==id)}));
+    // 意図的な一括削除。急減ガードを免除しないと logs/expenses が巻き戻り、孤児データが残ってblob肥大の二次被害になる。
+    markLocalUserDataEdit();   // goals/expenses 両方を消すので全フィールド保護（引数なし）
+    update(d=>({...d,children:d.children.filter(c=>c.id!==id),logs:d.logs.filter(l=>l.cid!==id),expenses:(d.expenses||[]).filter(e=>e.cid!==id),goals:(d.goals||[]).filter(g=>g.cid!==id)}), {allowShrink:true});
     setDelChild(null);
   };
 
@@ -6579,7 +6666,8 @@ function applyInterest(data,update,cid){
     if(cur<=0) return d;
     const interest=Math.floor(cur*d.interestRate);
     if(interest<=0) return d;
-    const _e={id:uid(),cid,type:"interest",label:`💹 週次利子（残高×${Math.round(d.interestRate*100)}%）`,pts:interest,date:new Date().toISOString()};
+    // idを「利子_cid_日付」で決定的に＝2端末が同時付与しても同一idになり、reconcile/onSnapshotの重複排除で1件に集約(二重加算防止)。
+    const _e={id:`interest_${cid}_${today}`,cid,type:"interest",label:`💹 週次利子（残高×${Math.round(d.interestRate*100)}%）`,pts:interest,date:new Date().toISOString()};
     addLogToFirestore(_e);
     return {...d, logs:[_e,...d.logs], interestLastDate:{...(d.interestLastDate||{}),[cid]:today}};
   });
@@ -6608,7 +6696,8 @@ function applyHoldingBonus(data,update,cid){
       totalBonus+=Math.round(toPts(st,st.price)*h.qty*rate);
     });
     if(totalBonus<=0) return d;
-    const _e={id:uid(),cid,type:"interest",label:`💰 配当（株を持っていると もらえる）`,pts:totalBonus,date:new Date().toISOString()};
+    // idを「配当_cid_週」で決定的に＝2端末同時付与でも同一idで1件に集約(二重加算防止)。
+    const _e={id:`dividend_${cid}_${week}`,cid,type:"interest",label:`💰 配当（株を持っていると もらえる）`,pts:totalBonus,date:new Date().toISOString()};
     addLogToFirestore(_e);
     return {...d, logs:[_e,...d.logs], holdBonusLastDate:{...(d.holdBonusLastDate||{}),[cid]:week}};
   });
@@ -7276,6 +7365,7 @@ function OshiKabu({child,data,update}){
   function cheer(){   // 応援する = 買う
     if(!selStock||qtyN<1||myBal<buyCost) return;
     if(!txGuard("oshi_buy_"+child.id)) return;
+    markLocalUserDataEdit('holdings');   // 保有株は原則サーバ優先マージ＝自端末の売買を12秒だけ保護
     update(d=>{
       const ex=(d.holdings?.[child.id]||[]).find(h=>h.stockId===selStock.id);
       let nh; const tq=(ex?.qty||0)+qtyN;
@@ -7291,6 +7381,7 @@ function OshiKabu({child,data,update}){
   function stopCheer(){   // 応援をやめる = 売る
     if(!selStock||!selHold) return;
     if(!txGuard("oshi_sell_"+child.id)) return;
+    markLocalUserDataEdit('holdings');   // 保有株は原則サーバ優先マージ＝自端末の売買を12秒だけ保護
     const q=Math.min(qtyN,selHold.qty);
     const get=Math.floor(unitPts*q*(1-FEE));
     const profit=Math.round(get-selHold.avgPrice*q);
@@ -7685,13 +7776,16 @@ function TipsSection({ageMode,child,data,update}){
     }
   };
   // 🔥 学習れんぞく＋きょうのミッション（毎日もどってくる理由＝子の継続フック）
-  const _todayISO=new Date().toISOString().slice(0,10);
-  const _yISO=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  // 日付キーはローカル暦(0時JST境界)で算出＝アプリ他機能(todayISO/isTodayLocal)と揃える。
+  // ※旧実装はUTC(toISOString)で、JST 0〜9時に「きょう」判定がズレ連続日数を誤カウントしていた。
+  const _dISO=(off)=>{const d=new Date();d.setDate(d.getDate()-off);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+  const _todayISO=_dISO(0);
+  const _yISO=_dISO(1);
   const ld=(data.learnDays||{})[child.id]||{last:"",streak:0,best:0,read:false,quiz:false};
   const ldToday=ld.last===_todayISO;
   const missRead=ldToday&&ld.read, missQuiz=ldToday&&ld.quiz, missDone=missRead&&missQuiz;
   const learnStreak=ld.last===_todayISO?ld.streak:(ld.last===_yISO?ld.streak:0);
-  const _d2ISO=new Date(Date.now()-2*86400000).toISOString().slice(0,10);
+  const _d2ISO=_dISO(2);
   const markLearn=(kind)=>update(d=>{
     const k=child.id; const cur=(d.learnDays||{})[k]||{last:"",streak:0,best:0,read:false,quiz:false,freeze:""};
     let {last,streak,best,read,quiz,freeze}=cur;
@@ -8768,7 +8862,13 @@ class ErrorBoundary extends React.Component {
           または下のボタンでリセットできます。
         </p>
         <button onClick={()=>{
-          try{localStorage.removeItem("tane_money_v9_local");}catch(e){}
+          // 実際のデータキーは code サフィックス付き（旧実装は素キー削除でno-op＝クラッシュ画面に閉じ込められていた）。
+          try{
+            const code=getFamilyCode()||"default";
+            [LOCAL_KEY+"_"+code, LOCAL_KEY2+"_"+code, LOCAL_KEY, LOCAL_KEY2].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+            // 保険: 別コードで書かれた残骸も一括削除
+            for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i); if(k&&(k.indexOf(LOCAL_KEY)===0||k.indexOf(LOCAL_KEY2)===0)) localStorage.removeItem(k);}
+          }catch(e){}
           window.location.reload();
         }} style={{background:"#34c77b",border:"none",borderRadius:12,padding:"12px 28px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",marginBottom:10}}>
           データをリセットして再起動
@@ -8798,6 +8898,7 @@ export default function App() {
   // リアルタイム同期＋5秒ポーリングの開始（マウント時と、セットアップ完了直後の両方から呼ぶ）
   // ※従来はマウントeffect内に閉じていたため、セットアップ完了後に同期が永遠に始まらないバグがあった
   const pollRef = useRef(null);
+  const pollKeyRef = useRef("");
   const startSync = useCallback(()=>{
     whenFirebaseReady(()=>{
       if(!getFamilyCode()) return;
@@ -8805,11 +8906,18 @@ export default function App() {
         setData(prev => typeof updater === 'function' ? updater(prev) : updater);
       });
       startLogsRealtimeSync(setData);
-      // 5秒ごとにFirestoreから最新ログを取得（確実な同期）
+      // 定期的にFirestoreから最新ログを取得（onSnapshotの取りこぼし・24h超・carry整合の backstop）。
+      // ※旧実装は5秒毎に全件fetch+全件reconcile+Dateソートを"変化の有無に関わらず"実行し、ログ多い家庭で
+      //   周期的にカクつき・通信/Firestore読取コストが嵩んでいた。非表示タブでは止め、サーバ変化時のみreconcileする。
       if(pollRef.current) clearInterval(pollRef.current);
       pollRef.current = setInterval(async()=>{
+        if(typeof document!=="undefined" && document.hidden) return;   // 非表示タブでは往復しない
         const firestoreLogs = await loadLogsFromFirestore();
         if(!firestoreLogs || firestoreLogs.length===0) return;
+        // サーバ側ログに変化が無ければ（件数＋最新date が前回と同じ）重いreconcile/setDataを丸ごとスキップ
+        const key = firestoreLogs.length + "|" + ((firestoreLogs[0] && firestoreLogs[0].date) || "");
+        if(key === pollKeyRef.current) return;
+        pollKeyRef.current = key;
         setData(prev=>{
           if(!prev) return prev;
           const had = (prev.logs||[]).length;
@@ -8819,7 +8927,7 @@ export default function App() {
           if(merged.length===had && !hadCarry) return prev;
           return {...prev, logs: merged};
         });
-      }, 5000);
+      }, 20000);
     });
   },[]);
 
@@ -8878,18 +8986,22 @@ export default function App() {
     };
   },[]);
 
+  // 実際のFirestore保存結果を同期バッジへ反映するコールバックを登録（楽観表示をやめる）
+  useEffect(()=>{ setSyncStCb(setSyncSt); return ()=>setSyncStCb(null); },[]);
+
   // Save to cloud whenever data changes
   useEffect(()=>{
     if (!data) return;
-    setSyncSt("saving");
-    cloudSave(data)
-      .then(()=>setSyncSt("saved"))
-      .catch(()=>setSyncSt("error"));
+    setSyncSt(s=>s==="saving"?s:"saving");   // 既にsavingなら再setStateしない(余分な再描画を防ぐ)
+    // 実完了は _notifySyncSt→setSyncSt("saved"/"error") が知らせる。ここで楽観的に"saved"にしない。
+    cloudSave(data);
   },[data]);
 
-  const update = useCallback(fn => setData(prev => {
+  const update = useCallback((fn, opts) => setData(prev => {
     if(!prev) return prev;
     const next = fn(prev);
+    // allowShrink: 意図的な一括削除(子メンバー削除など)は急減ガードを免除する。
+    if(opts && opts.allowShrink) return next;
     if(!next.logs||next.logs.length<(prev.logs||[]).length-2) next.logs=prev.logs;
     if(!next.expenses||next.expenses.length<(prev.expenses||[]).length-2) next.expenses=prev.expenses;
     if(next.rewards===undefined||next.rewards===null) next.rewards=prev.rewards;   // 空配列(全削除)は許可・undefinedのみ復元
