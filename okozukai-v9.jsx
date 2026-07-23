@@ -2551,8 +2551,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
-  const [settingsGroup, setSettingsGroup] = useState("quick");
-  const [settingsTab, setSettingsTab] = useState((data.pendingApprovals||[]).length>0?"approval":"grant");
+  // メニュー式ナビ: null=メニュー一覧、それ以外=各設定の詳細画面。承認待ちがある時だけ承認へ直行（親の主目的のため）
+  const [settingsTab, setSettingsTab] = useState(((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0?"approval":null);
   const [grantChild, setGrantChild] = useState(null);
   const [grantAmt, setGrantAmt] = useState("");
   const [taskAssignChild, setTaskAssignChild] = useState(null);
@@ -2582,7 +2582,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
       if(parentPinMatches(next, data)) {
         setTimeout(()=>{
           setAuthed(true);
-          if(parentPinIsDefault(data)){ setSettingsGroup("adv"); setSettingsTab("members"); }
+          if(parentPinIsDefault(data)){ setSettingsTab("members"); }
         }, 200);
       } else {
         setTimeout(()=>{setPinErr(true);setPin("");}, 300);
@@ -2590,9 +2590,33 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
     }
   };
 
-  const QUICK_TABS = [["grant","🎁 pt付与"],["approval","✅ 承認"]];
-  const ADV_TABS   = [["tasks","📋 タスク"],["assign","👤 割当"],["rewards","🎁 特典"],["interest","💹 利子"],["family","🏆 家族目標"],["plan","💳 プラン"],["members","🔐 PIN"],["transfer","🔄 引継"]];
-  const SETTING_TABS = settingsGroup==="quick" ? QUICK_TABS : ADV_TABS;
+  // 設定メニュー（一覧→詳細のメニュー式）。旧「よく使う/詳細設定＋横スクロールタブ」は
+  // 項目が横に溢れて見つからない・「割当」「引継」等が説明なしで分かりにくい問題があったため廃止。
+  const _pendingCount=(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
+  const MENU=[
+    {title:"よく使う", items:[
+      {key:"approval",emoji:"✅",label:"承認まち",desc:"子どものタスク完了・ごほうび交換にOKを出す"},
+      {key:"grant",emoji:"🎁",label:"ポイント付与",desc:"お小遣いやボーナスを手動でわたす"},
+    ]},
+    {title:"お手伝いとごほうび", items:[
+      {key:"tasks",emoji:"📝",label:"お手伝い項目",desc:"タスクの追加・編集・ポイント設定"},
+      {key:"assign",emoji:"👤",label:"担当わけ",desc:"だれにどのお手伝いを見せるか選ぶ"},
+      {key:"rewards",emoji:"🎀",label:"ごほうび（特典）",desc:"ポイントの交換メニューを編集"},
+    ]},
+    {title:"ためる・家族", items:[
+      {key:"interest",emoji:"💹",label:"利子",desc:"貯めているだけで少し増える設定"},
+      {key:"family",emoji:"🏆",label:"家族目標",desc:"家族みんなで達成するチャレンジ"},
+    ]},
+    {title:"メンバー・引き継ぎ", items:[
+      {key:"members",emoji:"🔐",label:"メンバー・PIN",desc:"名前・暗証番号・表示モードの変更"},
+      {key:"transfer",emoji:"🔄",label:"引き継ぎ・バックアップ",desc:"ファミリーコード・機種変更・データ保存"},
+      {key:"plan",emoji:"💳",label:"プラン",desc:"料金プランの確認・変更"},
+    ]},
+    {title:"ヘルプ", items:[
+      {key:"help",emoji:"📖",label:"チュートリアルをもう一度",desc:"使い方ガイドとヒントを再表示する"},
+    ]},
+  ];
+  const MENU_FLAT={}; MENU.forEach(s=>s.items.forEach(it=>{MENU_FLAT[it.key]=it;}));
 
   if(!authed) return (
     <div style={{position:"fixed",inset:0,background:"#000a",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
@@ -2628,34 +2652,73 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   return (
     <div style={{position:"fixed",inset:0,background:"#000a",zIndex:9999,display:"flex",alignItems:"flex-end",fontFamily:F}}>
       <div style={{background:CARD,borderRadius:"24px 24px 0 0",width:"100%",maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        {/* ヘッダー */}
-        <div style={{padding:"20px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-          <div>
-            <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 2px"}}><Ico name="gear" fb="⚙" size={17} style={{marginRight:5}}/>全体管理</h3>
-            <p style={{color:MUTED,fontSize:11,margin:0}}>家族全員のポイント・タスクを管理</p>
-          </div>
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:24,cursor:"pointer",color:MUTED}}>✕</button>
-        </div>
-        {/* グループ切り替え */}
-        <div style={{display:"flex",gap:6,padding:"12px 16px 0",flexShrink:0}}>
-          {[["quick","⚡ よく使う"],["adv","⚙ 詳細設定"]].map(([g,l])=>(
-            <button key={g} onClick={()=>{setSettingsGroup(g);setSettingsTab(g==="quick"?"grant":"tasks");}}
-              style={{flex:1,padding:"7px 0",borderRadius:10,border:"none",background:settingsGroup===g?GP:"transparent",color:settingsGroup===g?"#fff":MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>
-              {l}
-            </button>
-          ))}
-        </div>
-        {/* タブ */}
-        <div style={{display:"flex",gap:0,padding:"6px 16px 0",overflowX:"auto",flexShrink:0}}>
-          {SETTING_TABS.map(([v,l])=>(
-            <button key={v} onClick={()=>setSettingsTab(v)}
-              style={{padding:"8px 14px",border:"none",borderBottom:settingsTab===v?`3px solid ${Y}`:"3px solid transparent",background:"none",color:settingsTab===v?TEXT:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>
-              {l}{v==="approval"&&((data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length)>0&&<span style={{marginLeft:5,background:R,color:"#fff",borderRadius:999,padding:"0 5px",fontSize:11,fontWeight:900}}>{(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length}</span>}
-            </button>
-          ))}
+        {/* ヘッダー（一覧⇔詳細） */}
+        <div style={{padding:"18px 20px 12px",display:"flex",alignItems:"center",gap:8,justifyContent:"space-between",flexShrink:0,borderBottom:`1px solid ${BORDER}`}}>
+          {settingsTab===null ? (
+            <div>
+              <h3 style={{fontWeight:900,fontSize:18,color:TEXT,margin:"0 0 2px"}}><Ico name="gear" fb="⚙" size={17} style={{marginRight:5}}/>設定・管理</h3>
+              <p style={{color:MUTED,fontSize:11,margin:0}}>家族全員のポイント・タスクを管理</p>
+            </div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+              <button onClick={()=>setSettingsTab(null)} style={{background:"none",border:"none",color:GP,fontWeight:800,fontSize:15,cursor:"pointer",fontFamily:F,padding:"2px 6px 2px 0",flexShrink:0}}>‹ もどる</button>
+              <h3 style={{fontWeight:900,fontSize:16,color:TEXT,margin:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{(MENU_FLAT[settingsTab]||{}).emoji} {(MENU_FLAT[settingsTab]||{}).label||""}</h3>
+            </div>
+          )}
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:24,cursor:"pointer",color:MUTED,flexShrink:0}}>✕</button>
         </div>
         {/* コンテンツ */}
         <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"16px"}}>
+
+          {/* ── メニュー一覧（何がどこにあるか説明つきで一覧できる） ── */}
+          {settingsTab===null&&(
+            <div>
+              {MENU.map(sec=>(
+                <div key={sec.title} style={{marginBottom:18}}>
+                  <p style={{color:MUTED,fontSize:11.5,fontWeight:800,margin:"0 0 6px 4px"}}>{sec.title}</p>
+                  <div style={{background:BG,borderRadius:16,border:`1px solid ${BORDER}`,overflow:"hidden"}}>
+                    {sec.items.map((it,i)=>(
+                      <button key={it.key} onClick={()=>setSettingsTab(it.key)}
+                        style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"13px 14px",background:"none",border:"none",borderTop:i>0?`1px solid ${BORDER}`:"none",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                        <span style={{fontSize:20,flexShrink:0,width:26,textAlign:"center"}}>{it.emoji}</span>
+                        <span style={{flex:1,minWidth:0}}>
+                          <span style={{display:"block",fontWeight:800,fontSize:14,color:TEXT}}>{it.label}
+                            {it.key==="approval"&&_pendingCount>0&&<span style={{marginLeft:7,background:R,color:"#fff",borderRadius:999,padding:"1px 7px",fontSize:11,fontWeight:900}}>{_pendingCount}</span>}
+                          </span>
+                          <span style={{display:"block",fontSize:11,color:MUTED,marginTop:1}}>{it.desc}</span>
+                        </span>
+                        <span style={{color:MUTED,fontSize:16,flexShrink:0}}>›</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── ヘルプ：チュートリアル再表示 ── */}
+          {settingsTab==="help"&&(
+            <div>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>つかいかたの基本</p>
+              <div style={{background:BG,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"13px 15px",marginBottom:14}}>
+                {[["1","お手伝いをやったら、子どもが自分のページでタップして記録"],["2","（承認がONのとき）ここの「承認まち」で親がOKを出すとポイントが入る"],["3","たまったポイントは「ためる」タブでごほうびと交換"]].map(([n,t])=>(
+                  <div key={n} style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:7}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",background:GP,color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div>
+                    <div style={{fontSize:12.5,color:TEXT,fontWeight:700,lineHeight:1.6}}>{t}</div>
+                  </div>
+                ))}
+              </div>
+              <p style={{color:MUTED,fontSize:12,lineHeight:1.7,margin:"0 0 12px"}}>下のボタンを押すと、はじめてのチュートリアルと各タブのヒント💡が、家族みんなの画面でもう一度表示されるようになります（記録やポイントは消えません）。</p>
+              <button onClick={()=>{
+                // 空{}に戻すとmigrateが「既存家族は全員既読」と埋め戻すため、_replayマーカーを残して空にする
+                update(d=>({...d,tutorialSeen:{_replay:true},parentGuideDone:false}));
+                alert("チュートリアルとヒントを再表示するように設定しました。\n各メンバーが次にページを開くと表示されます。");
+              }}
+                style={{width:"100%",background:GP,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>
+                📖 チュートリアルとヒントを再表示する
+              </button>
+            </div>
+          )}
 
           {/* ── pt付与タブ ── */}
           {settingsTab==="grant"&&(
@@ -4471,6 +4534,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── KAKEIBO ── */}
       {effectiveTab==="money" && (
         <div style={{padding:"12px 16px 0"}}>
+          <TabHint id="money" text="目標をきめてコツコツためよう！たまったら「こうかん」でごほうびとチェンジ🎁" data={data} update={update} cid={child.id}/>
           {/* iOS 26 セグメントコントロール */}
           <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:isJunior?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
           {(isJunior
@@ -4676,6 +4740,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {/* ── LOG ── */}
       {effectiveTab==="more" && !isJunior && (
         <div style={{padding:16}}>
+          <TabHint id="more" text="これまでの記録がぜんぶ見られるよ。バッジやランキングもここでチェック🏅" data={data} update={update} cid={child.id}/>
           {/* サブタブ: 履歴 / バッジ / ランキング（iOSセグメント統一） */}
           <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:darkBG?"rgba(255,255,255,0.08)":"rgba(120,120,128,0.14)",marginBottom:14}}>
             {[["log","📋 履歴"],["badges","🎖 バッジ"],["ranking","🏅 ランキング"]].map(([k,l])=>{
@@ -6540,11 +6605,11 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
             </div>
             <p style={{color:MUTED,fontSize:12,margin:"0 0 18px"}}>最初に設定しておくと安心！</p>
             {[
-              {key:"pin",emoji:"🔐",title:"PINを変更する",desc:"おや管理 → 詳細設定 → PIN タブ",done:onboardChecks.pin,
-               action:()=>{setShowOnboardGuide(false);onParent();}},
-              {key:"tasks",emoji:"📋",title:"タスクを確認する",desc:"おや管理 → 詳細設定 → タスク タブ",done:onboardChecks.tasks,
+              {key:"pin",emoji:"🔐",title:"PINを変更する",desc:"右上の ⚙ 設定・管理 → メンバー・PIN",done:onboardChecks.pin,
+               action:()=>{setShowOnboardGuide(false);if(onSettings)onSettings();else onParent();}},
+              {key:"tasks",emoji:"📋",title:"タスクを確認する",desc:"おや管理 → タスク タブ",done:onboardChecks.tasks,
                action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),tasksOpened:true}}));setShowOnboardGuide(false);onParent();}},
-              {key:"rewards",emoji:"🎁",title:"特典を確認する",desc:"おや管理 → 詳細設定 → 特典 タブ",done:onboardChecks.rewards,
+              {key:"rewards",emoji:"🎁",title:"特典を確認する",desc:"おや管理 → 特典 タブ",done:onboardChecks.rewards,
                action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),rewardsOpened:true}}));setShowOnboardGuide(false);onParent();}},
             ].map(item=>(
               <div key={item.key} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 0",borderBottom:`1px solid ${BORDER}`}}>
@@ -8687,50 +8752,55 @@ function SetupWizard({ data, update, onComplete }) {
 const CHILD_TUTORIAL = [
   {
     emoji:"🌱", title:"3ステップだけ おぼえよう",
-    body:"① お手伝いをする → ② ポイントがたまる → ③ ためて 好きなものと交換！ これがTaneMoneyだよ。",
-    hint:"むずかしくないよ。15秒で読めるよ🌟"
+    body:"① お手伝いをする → ② ポイントがたまる → ③ ためて 好きなものと交換！ これがTane Moneyだよ。",
+    hint:"むずかしくないよ。30秒で読めるよ🌟"
   },
   {
-    emoji:"🏆", title:"① お手伝いでポイント",
-    body:"「活動」タブを開いて、やったお手伝いをタップ。ポイントがどんどん貯まるよ！",
+    emoji:"⭐", title:"① お手伝いでポイント",
+    body:"「かつどう（やること）」タブを開いて、やったお手伝いをタップ！おうちの人の確認がONのときは、OKが出るとポイントが入るよ。",
     hint:"正直に記録するのが いちばん大事💪"
   },
   {
-    emoji:"🐷", title:"② ためて ③ 交換しよう",
-    body:"すぐ使わず コツコツ貯めるのがコツ。「お金」タブで目標を決めて、貯まったら「こうかん」でご褒美と交換！",
-    hint:"目標を決めて貯めると達成感が大きいよ🎯"
+    emoji:"🌱", title:"② まいにちのタネ",
+    body:"1日1回「まいにち」タブでタネをひらくと、ボーナスポイントがもらえるよ。れんぞくで続けると少しずつ増える！",
+    hint:"毎日ひらくのを わすれずに🌞"
+  },
+  {
+    emoji:"🐷", title:"③ ためて 交換しよう",
+    body:"「ためる」タブで目標を決めて、コツコツ貯めよう。貯まったら「こうかん」でごほうびと交換できるよ！",
+    hint:"目標を決めて貯めると 達成感が大きいよ🎯"
   },
 ];
 
 const PARENT_TUTORIAL = [
   {
-    emoji:"🔐", title:"Tane Money 管理へようこそ",
-    body:"ここは親専用の管理画面です。子どものポイントや毎日タスク、ルールを設定できます。",
-    hint:"暗証番号：0000（初回は必ず変更してください）"
+    emoji:"🔐", title:"おや管理へようこそ",
+    body:"ここは親専用の管理画面です。子どもの様子の見守り・承認・タスクやごほうびの編集ができます。",
+    hint:"暗証番号の初期値は 0000。あとで必ず変更してください"
   },
   {
-    emoji:"👦", title:"子どもの設定",
-    body:"「こども」タブで名前・写真・暗証番号・ロックのON/OFFを設定できます。",
-    hint:"ロックOFFなら暗証番号なしで子どものページに入れます"
+    emoji:"✅", title:"承認とメンバー管理",
+    body:"「承認・管理」タブで、子どものタスク完了やごほうび交換にOKを出せます。名前・暗証番号などメンバーの設定もここから。",
+    hint:"承認まちがあるとバッジで知らせます"
   },
   {
-    emoji:"📋", title:"毎日タスクを設定しよう",
-    body:"「毎日」タブで、毎日こなすべきタスクを設定できます。全部クリアするとボーナスポイントがもらえます。",
-    hint:"お手伝い項目から選ぶか、手動で自由に追加できます"
+    emoji:"📋", title:"お手伝いと毎日タスク",
+    body:"「タスク」タブでお手伝い項目とポイントを編集。「毎日」タブで毎日やることセット（曜日別・休みモード）を作れます。",
+    hint:"子どもごとに個別ポイントも設定できます"
   },
   {
-    emoji:"🏆", title:"タスクとご褒美の管理",
-    body:"「タスク」タブでお手伝い項目を追加・編集。「特典」タブでご褒美の交換メニューを管理できます。",
-    hint:"子どもごとに個別ポイントを設定することもできます"
+    emoji:"🎁", title:"ごほうび（特典）",
+    body:"「特典」タブで、貯めたポイントの交換メニューを編集できます（例：ゲーム30分 = 100pt）。",
+    hint:"ポイントではなく「やくそく」型のごほうびも作れます"
   },
   {
-    emoji:"📊", title:"ランキングで家族を盛り上げよう",
-    body:"「ランキング」タブで今月の頑張りをみんなで確認！親も参加できるので家族全員で競いましょう。",
-    hint:"違反記録・利子設定・ポイント付与も管理画面から行えます"
+    emoji:"⚙", title:"全体の設定はトップの⚙から",
+    body:"トップ画面右上の⚙「設定・管理」に、ポイント付与・PIN変更・利子・家族目標・引き継ぎ（ファミリーコード）がまとまっています。",
+    hint:"困ったら ⚙ → ヘルプ でチュートリアルを再表示できます"
   },
 ];
 
-function Tutorial({ isParent, name, emoji, onDone, onBonus }) {
+function Tutorial({ isParent, name, emoji, onDone, onBonus, bonusEligible=true }) {
   const slides = isParent ? PARENT_TUTORIAL : CHILD_TUTORIAL;
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
@@ -8748,7 +8818,7 @@ function Tutorial({ isParent, name, emoji, onDone, onBonus }) {
       <div style={{fontSize:72,marginBottom:16}}>🎉</div>
       <h2 style={{fontWeight:900,fontSize:22,color:TEXT,margin:"0 0 8px"}}>チュートリアル完了！</h2>
       <p style={{color:MUTED,fontSize:14,textAlign:"center",marginBottom:24}}>さあ、Tane Moneyを始めよう！</p>
-      {!isParent && <div style={{background:`${G}20`,border:`2px solid ${G}`,borderRadius:16,padding:"12px 32px",fontWeight:900,fontSize:18,color:G}}>+100pt ゲット！🌟</div>}
+      {!isParent && bonusEligible && <div style={{background:`${G}20`,border:`2px solid ${G}`,borderRadius:16,padding:"12px 32px",fontWeight:900,fontSize:18,color:G}}>+100pt ゲット！🌟</div>}
     </div>
   );
 
@@ -9160,12 +9230,16 @@ export default function App() {
           isParent={false}
           name={activeChild.name}
           emoji={activeChild.emoji}
+          bonusEligible={!(data.logs||[]).some(l=>l&&l.cid===activeChild.id&&l.type==="grant"&&String(l.label||"").includes("チュートリアル完了ボーナス"))}
           onDone={()=>{ setScreen("child"); }}
           onBonus={()=>{
             update(d=>({
               ...d,
               tutorialSeen:{...(d.tutorialSeen||{}),[activeChild.id]:true},
-              logs:(()=>{const _e={id:uid(),cid:activeChild.id,type:"grant",label:"🎉 チュートリアル完了ボーナス！",pts:100,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
+              // ボーナスは1人1回だけ（ヘルプからチュートリアルを再表示→再完了しても二重取得できない）
+              logs:(d.logs||[]).some(l=>l&&l.cid===activeChild.id&&l.type==="grant"&&String(l.label||"").includes("チュートリアル完了ボーナス"))
+                ? d.logs
+                : (()=>{const _e={id:uid(),cid:activeChild.id,type:"grant",label:"🎉 チュートリアル完了ボーナス！",pts:100,date:new Date().toISOString()};addLogToFirestore(_e);return[_e,...d.logs];})(),
             }));
           }}
         />
