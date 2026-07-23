@@ -2452,7 +2452,7 @@ function TaskManagerSection({data, update}){
             border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 10px",marginBottom:5}}>
             <span style={{fontSize:18}}>{t.emoji}</span>
             <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:12,color:TEXT}}>{t.label}</div>
+              <div style={{fontWeight:700,fontSize:12,color:TEXT}}>{t.label}{(((data.myTaskIds||{})._stock)||[]).includes(t.id)&&<span style={{marginLeft:6,background:`${B}15`,color:B,borderRadius:6,padding:"1px 5px",fontSize:10,fontWeight:800}}>📦 作り置き</span>}</div>
               <div style={{fontSize:11,color:t.pts>0?G:R,fontWeight:700}}>{t.pts>0?"+":""}{t.pts}pt</div>
             </div>
             <button onClick={()=>doDelete(t.id)}
@@ -2559,6 +2559,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [copied, setCopied] = useState(false);
   const [smEditReward, setSmEditReward] = useState(null);
   const [smAddOpen, setSmAddOpen] = useState(false);
+  // 作り置き（ストック）タスク用
+  const [stAddOpen, setStAddOpen] = useState(false);
+  const [stEmoji, setStEmoji] = useState("⭐");
+  const [stLabel, setStLabel] = useState("");
+  const [stPts, setStPts] = useState("10");
+  const [stockPickOpen, setStockPickOpen] = useState(false);
   const [smREmoji, setSmREmoji] = useState("🎁");
   const [smRLabel, setSmRLabel] = useState("");
   const [smRCost, setSmRCost] = useState("5");
@@ -2600,7 +2606,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
     ]},
     {title:"お手伝いとごほうび", items:[
       {key:"tasks",emoji:"📝",label:"お手伝い項目",desc:"タスクの追加・編集・ポイント設定"},
-      {key:"assign",emoji:"👤",label:"担当わけ",desc:"だれにどのお手伝いを見せるか選ぶ"},
+      {key:"assign",emoji:"👤",label:"担当わけ・作り置き",desc:"タスクのストックを作って個人に当てはめる"},
       {key:"rewards",emoji:"🎀",label:"ごほうび（特典）",desc:"ポイントの交換メニューを編集"},
     ]},
     {title:"ためる・家族", items:[
@@ -2792,6 +2798,99 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {/* ── 個別タスク割り当てタブ ── */}
           {settingsTab==="assign"&&(
             <div>
+              {/* ── 作り置き（ストック）: 誰にも見せずに用意しておき、あとで個人に当てはめる ── */}
+              {(()=>{
+                const stockIds=((data.myTaskIds||{})._stock)||[];
+                const stockTasks=(data.goodTasks||[]).filter(t=>stockIds.includes(t.id));
+                const members=[...data.children,...(data.parents||[])];
+                // 当てはめON時、専用リスト未作成の子には「今見えている一覧＋このタスク」で初期化＝他のタスクが消えない
+                const visibleIdsFor=(mid)=>{
+                  const ids=(data.myTaskIds||{})[mid]||[];
+                  if(ids.length>0) return ids;
+                  const others=new Set();
+                  Object.entries(data.myTaskIds||{}).forEach(([k,v])=>{ if(k!==mid)(v||[]).forEach(id=>others.add(id)); });
+                  return [...(data.goodTasks||[]),...(data.badTasks||[])].map(t=>t.id).filter(id=>!others.has(id));
+                };
+                return(<div style={{marginBottom:4}}>
+                  <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 4px"}}>📦 作り置きタスク（ストック）</p>
+                  <p style={{color:MUTED,fontSize:11,lineHeight:1.6,margin:"0 0 10px"}}>ここに置いたタスクはまだ誰にも表示されません。メンバーをタップして当てはめると、その人のリストにだけ表示されます。</p>
+                  {stockTasks.length===0&&!stAddOpen&&(
+                    <p style={{color:MUTED,fontSize:12,textAlign:"center",background:BG,border:`1.5px dashed ${BORDER}`,borderRadius:12,padding:"14px 10px",margin:"0 0 10px",lineHeight:1.7}}>まだ作り置きはありません。<br/>「＋新しく作る」か「📥 既存タスクから」で追加できます</p>
+                  )}
+                  {stockTasks.map(t=>(
+                    <div key={t.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                        <span style={{fontSize:18}}>{t.emoji}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:13}}>{t.label}</div>
+                          <div style={{color:MUTED,fontSize:11}}>+{t.pts}pt</div>
+                        </div>
+                        <button onClick={()=>update(d=>({...d,myTaskIds:{...(d.myTaskIds||{}),_stock:(((d.myTaskIds||{})._stock)||[]).filter(id=>id!==t.id)}}))}
+                          style={{padding:"4px 9px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:8,color:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,flexShrink:0}}>
+                          ストック解除
+                        </button>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {members.map(m=>{
+                          const on=((data.myTaskIds||{})[m.id]||[]).includes(t.id);
+                          return(
+                            <button key={m.id} onClick={()=>update(d=>{
+                              const cur=(d.myTaskIds||{})[m.id]||[];
+                              const next=on?cur.filter(id=>id!==t.id):[...visibleIdsFor(m.id).filter(id=>id!==t.id),t.id];
+                              return{...d,myTaskIds:{...(d.myTaskIds||{}),[m.id]:next}};
+                            })} style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px 5px 6px",background:on?`${G}15`:BG,border:`1.5px solid ${on?G:BORDER}`,borderRadius:999,cursor:"pointer",fontFamily:F}}>
+                              <ChildAvatar child={m} size={20}/>
+                              <span style={{fontSize:11,fontWeight:700,color:on?G:MUTED}}>{m.name}{on?" ✓":""}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {stAddOpen?(
+                    <div style={{background:`${G}08`,border:`2px dashed ${G}`,borderRadius:12,padding:12,marginBottom:8}}>
+                      <div style={{display:"flex",gap:8,marginBottom:8}}>
+                        <input value={stEmoji} onChange={e=>setStEmoji(e.target.value)} style={{...INP,width:54}} placeholder="絵文字"/>
+                        <input value={stLabel} onChange={e=>setStLabel(e.target.value)} style={INP} placeholder="タスク名（例：くつをならべる）"/>
+                      </div>
+                      <input value={stPts} onChange={e=>setStPts(e.target.value)} type="number" style={{...INP,marginBottom:8}} placeholder="ポイント（例：10）"/>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{
+                          const pts=parseInt(stPts); if(!stLabel.trim()||isNaN(pts))return;
+                          const id=uid();
+                          markLocalDefEdit();
+                          update(d=>({...d,
+                            goodTasks:[...(d.goodTasks||[]),{id,emoji:stEmoji||"⭐",label:stLabel.trim(),pts,over:{}}],
+                            myTaskIds:{...(d.myTaskIds||{}),_stock:[...((((d.myTaskIds||{})._stock))||[]),id]},
+                          }));
+                          setStLabel("");setStPts("10");setStEmoji("⭐");setStAddOpen(false);
+                        }} style={{flex:1,background:G,border:"none",borderRadius:10,padding:"10px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>作り置きに追加</button>
+                        <button onClick={()=>setStAddOpen(false)} style={{padding:"10px 14px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:10,color:MUTED,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                      </div>
+                    </div>
+                  ):(
+                    <div style={{display:"flex",gap:8,marginBottom:8}}>
+                      <button onClick={()=>setStAddOpen(true)} style={{flex:1,background:`${G}12`,border:`1.5px solid ${G}`,borderRadius:10,padding:"9px 0",color:G,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>＋ 新しく作る</button>
+                      <button onClick={()=>setStockPickOpen(o=>!o)} style={{flex:1,background:stockPickOpen?`${B}12`:"none",border:`1.5px solid ${stockPickOpen?B:BORDER}`,borderRadius:10,padding:"9px 0",color:stockPickOpen?B:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>📥 既存タスクから</button>
+                    </div>
+                  )}
+                  {stockPickOpen&&(
+                    <div style={{background:BG,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:10,marginBottom:8,maxHeight:220,overflowY:"auto"}}>
+                      <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>タップするとストックへ移動します（当てはめるまで、リスト未作成のメンバーには表示されなくなります）</p>
+                      {(data.goodTasks||[]).filter(t=>!stockIds.includes(t.id)).map(t=>(
+                        <button key={t.id} onClick={()=>update(d=>({...d,myTaskIds:{...(d.myTaskIds||{}),_stock:[...((((d.myTaskIds||{})._stock))||[]),t.id]}}))}
+                          style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 12px",marginBottom:5,cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                          <span style={{fontSize:16}}>{t.emoji}</span>
+                          <span style={{flex:1,fontWeight:700,fontSize:12,color:TEXT}}>{t.label}</span>
+                          <span style={{color:MUTED,fontSize:11}}>+{t.pts}pt</span>
+                        </button>
+                      ))}
+                      {(data.goodTasks||[]).filter(t=>!stockIds.includes(t.id)).length===0&&<p style={{color:MUTED,fontSize:12,textAlign:"center",margin:"6px 0"}}>移動できるタスクがありません</p>}
+                    </div>
+                  )}
+                </div>);
+              })()}
+              <div style={{height:1,background:BORDER,margin:"14px 0 16px"}}/>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>メンバーごとのタスク割り当て</p>
               {[...data.children,...(data.parents||[])].map(member=>(
                 <div key={member.id} style={{marginBottom:12}}>
@@ -2814,11 +2913,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       <div style={{maxHeight:240,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
                         {(data.goodTasks||[]).map(t=>{
                           const assigned=((data.myTaskIds||{})[member.id]||[]).includes(t.id);
+                          const inStock=(((data.myTaskIds||{})._stock)||[]).includes(t.id);
                           return(
                             <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:assigned?`${G}10`:CARD,border:`1.5px solid ${assigned?G:BORDER}`,borderRadius:10,padding:"8px 12px"}}>
                               <span style={{fontSize:18}}>{t.emoji}</span>
                               <div style={{flex:1}}>
-                                <div style={{fontWeight:700,fontSize:12}}>{t.label}</div>
+                                <div style={{fontWeight:700,fontSize:12}}>{t.label}{inStock&&<span style={{marginLeft:6,background:`${B}15`,color:B,borderRadius:6,padding:"1px 5px",fontSize:10,fontWeight:800}}>📦 作り置き</span>}</div>
                                 <div style={{color:MUTED,fontSize:11}}>+{t.pts}pt</div>
                               </div>
                               <button onClick={()=>update(d=>{
@@ -6159,7 +6259,7 @@ function ParentScreen({ data, update, onBack }) {
                         <span style={{fontSize:20}}>{task.emoji}</span>
                         <div style={{flex:1}}>
                           <div style={{fontWeight:700,fontSize:14}}>{task.label}</div>
-                          <div style={{color:MUTED,fontSize:11}}>デフォルト: {task.pts}pt{Object.keys(task.over||{}).length>0&&<span style={{color:P}}> · 個別設定あり</span>}</div>
+                          <div style={{color:MUTED,fontSize:11}}>デフォルト: {task.pts}pt{Object.keys(task.over||{}).length>0&&<span style={{color:P}}> · 個別設定あり</span>}{(((data.myTaskIds||{})._stock)||[]).includes(task.id)&&<span style={{color:B,fontWeight:800}}> · 📦作り置き</span>}</div>
                         </div>
                         <div style={{display:"flex",gap:5}}>
                           <button onClick={()=>setOverModal({task:{...task,over:{...(task.over||{})}},kind})} style={{background:`${P}18`,border:`1px solid ${P}`,borderRadius:7,padding:"3px 7px",color:P,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>個別</button>
@@ -8175,16 +8275,19 @@ function TipsSection({ageMode,child,data,update}){
 // ── TaskCustomizer ────────────────────────────────────
 function TaskCustomizer({child,data,update,onClose}){
   useEffect(()=>{ const prev=document.body.style.overflow; document.body.style.overflow="hidden"; return ()=>{ document.body.style.overflow=prev; }; },[]);
-  const allGood=data.goodTasks||[];
-  const allBad=data.badTasks||[];
+  const _stockIds=new Set(((data.myTaskIds||{})._stock)||[]);
   const myIds=(data.myTaskIds||{})[child.id]||[];
+  // 作り置き(ストック)のタスクは、親が自分に当てはめた分だけ表示（それ以外は子のリスト編集に出さない）
+  const allGood=(data.goodTasks||[]).filter(t=>!_stockIds.has(t.id)||myIds.includes(t.id));
+  const allBad=data.badTasks||[];
   const isAll=myIds.length===0;
   const [selected,setSelected]=useState(isAll?[...allGood.map(t=>t.id),...allBad.map(t=>t.id)]:myIds);
   const [section,setSection]=useState("good");
   const toggle=id=>setSelected(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   const selectSection=kind=>{const ids=(kind==="good"?allGood:allBad).map(t=>t.id);setSelected(prev=>[...new Set([...prev,...ids])]);};
   const clearSection=kind=>{const ids=new Set((kind==="good"?allGood:allBad).map(t=>t.id));setSelected(prev=>prev.filter(id=>!ids.has(id)));};
-  const save=()=>{const allIds=[...allGood.map(t=>t.id),...allBad.map(t=>t.id)];const val=selected.length===allIds.length?[]:selected;update(d=>({...d,myTaskIds:{...(d.myTaskIds||{}),[child.id]:val}}));onClose();};
+  // 全選択でもストック当てはめ分があるときはフィルタを空に畳まない（空=共有全表示となり、当てはめたストックが消えるため）
+  const save=()=>{const allIds=[...allGood.map(t=>t.id),...allBad.map(t=>t.id)];const hasStock=selected.some(id=>_stockIds.has(id));const val=(selected.length===allIds.length&&!hasStock)?[]:selected;update(d=>({...d,myTaskIds:{...(d.myTaskIds||{}),[child.id]:val}}));onClose();};
   const goodSel=allGood.filter(t=>selected.includes(t.id)).length;
   const badSel=allBad.filter(t=>selected.includes(t.id)).length;
   const col=section==="good"?G:R;
