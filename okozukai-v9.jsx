@@ -8276,6 +8276,7 @@ function SetupWizard({ data, update, onComplete }) {
   const [joinMode, setJoinMode] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joinErr,  setJoinErr]  = useState("");
+  const [joinBusy, setJoinBusy] = useState(false);
 
   const CHILD_EMOJIS  = ["⚡","🌸","🌟","🦁","🐯","🐬","🦊","🐼","🐉","🌈","🎸","⚽","🚀","🎮","🦄","🐶","🐱","🍕"];
   const PARENT_EMOJIS = ["👨","👩","🧑","👨💼","👩💼","🧔","👴","👵","🦸","🧙","🎅","🦹"];
@@ -8399,20 +8400,49 @@ function SetupWizard({ data, update, onComplete }) {
           {joinMode&&(
             <div style={{width:"100%",maxWidth:320,background:CARD,borderRadius:18,padding:"20px",border:`1.5px solid ${BORDER}`,textAlign:"left",marginTop:4}}>
               <p style={{fontWeight:800,fontSize:14,color:TEXT,margin:"0 0 10px",textAlign:"center"}}>🔗 ファミリーコードを入力</p>
-              <input value={joinCode} onChange={e=>{setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g,""));setJoinErr("");}}
-                placeholder="TANE-XXXX-XXXX"
+              <input value={joinCode}
+                onChange={e=>{setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g,""));setJoinErr("");}}
+                placeholder="TANE-XXXX-XXXX" maxLength={20}
+                inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} enterKeyHint="go"
+                onKeyDown={e=>{ if(e.key==="Enter" && !joinBusy) e.currentTarget.blur(); }}
+                disabled={joinBusy}
                 style={{...{width:"100%",padding:"12px 14px",border:`1.5px solid ${joinErr?R:BORDER}`,borderRadius:10,fontSize:16,fontFamily:F,background:BG,outline:"none",textAlign:"center",letterSpacing:3,fontWeight:900,color:GP,boxSizing:"border-box"},marginBottom:8}}/>
               {joinErr&&<p style={{color:R,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>{joinErr}</p>}
-              <button onClick={()=>{
-                const code=joinCode.trim();
+              <button disabled={joinBusy} onClick={async()=>{
+                const code=joinCode.trim().toUpperCase();
                 if(!code||code.length<4){setJoinErr("コードを入力してください");return;}
-                try{localStorage.setItem(FAMILY_CODE_KEY,code);}catch(e){}
-                _familyCode=code;
-                onComplete("join");
-              }} style={{...btnStyle(joinCode.trim().length>=4),marginBottom:8}}>
-                参加する →
+                setJoinBusy(true); setJoinErr("");
+                try{
+                  // Firebaseの準備を待ってから、コードの家族が実在するか確認してから参加する。
+                  // ※以前は未確認のままコードを保存してリロードし、誤り/不通だと空データで固まって
+                  //   ウィザードにも戻れずロックアウトしていた（＝「コード入力がうまくいかない」の主因）。
+                  await new Promise(res=>whenFirebaseReady(res));
+                  try{localStorage.setItem(FAMILY_CODE_KEY,code);}catch(e){}
+                  _familyCode=code;
+                  const r=await forcePullFromCloud();   // 実在確認＋成功時はローカルにキャッシュ（リロード後は即表示）
+                  if(!r||!r.ok){
+                    // 見つからない/通信失敗 → コードを元に戻してエラー表示（ロックアウトしない）
+                    try{localStorage.removeItem(FAMILY_CODE_KEY);}catch(e){}
+                    _familyCode=null;
+                    setJoinBusy(false);
+                    setJoinErr(
+                      (r&&r.err==="empty") ? "このコードの家族が見つかりませんでした。入力をご確認ください。"
+                      : (r&&(r.err==="no_db"||r.err==="no_code")) ? "接続の準備ができませんでした。少し待って もう一度お試しください。"
+                      : "通信を確認して もう一度お試しください。"
+                    );
+                    return;
+                  }
+                  onComplete("join");   // 実在確認OK → リロードして正規のロード経路で同期開始
+                }catch(e){
+                  try{localStorage.removeItem(FAMILY_CODE_KEY);}catch(_e){}
+                  _familyCode=null;
+                  setJoinBusy(false);
+                  setJoinErr("通信を確認して もう一度お試しください。");
+                }
+              }} style={{...btnStyle(joinCode.trim().length>=4 && !joinBusy),marginBottom:8}}>
+                {joinBusy ? "確認中…" : "参加する →"}
               </button>
-              <button onClick={()=>{setJoinMode(false);setJoinCode("");setJoinErr("");}} style={{background:"none",border:"none",color:MUTED,fontSize:12,cursor:"pointer",fontFamily:F,width:"100%",textAlign:"center"}}>
+              <button disabled={joinBusy} onClick={()=>{setJoinMode(false);setJoinCode("");setJoinErr("");}} style={{background:"none",border:"none",color:MUTED,fontSize:12,cursor:joinBusy?"default":"pointer",fontFamily:F,width:"100%",textAlign:"center",opacity:joinBusy?0.5:1}}>
                 キャンセル
               </button>
             </div>
@@ -9055,6 +9085,29 @@ export default function App() {
           startSync();
           setScreen("home");
         }}/>
+      </ErrorBoundary>
+    );
+  }
+
+  // 復旧ハッチ：コードは設定済みなのに家族データが読めていない（子が0人＝参加失敗/不通/不正コード）。
+  // 以前はここで空のホーム画面に落ちてウィザードにも戻れずロックアウトしていた。コードを消して入れ直せるようにする。
+  if (!loading && getFamilyCode() && (!data || !((data.children||[]).length))) {
+    return (
+      <ErrorBoundary>
+        <div style={{minHeight:"100vh",background:BG,fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28,textAlign:"center"}}>
+          <div style={{fontSize:60,marginBottom:12}}>🔌</div>
+          <h2 style={{fontWeight:900,fontSize:20,color:TEXT,margin:"0 0 8px"}}>データを読み込めませんでした</h2>
+          <p style={{color:MUTED,fontSize:13,lineHeight:1.7,maxWidth:300,margin:"0 0 24px"}}>
+            ファミリーコード「<b style={{color:GP}}>{getFamilyCode()}</b>」の家族が見つからないか、通信が不安定です。<br/>コードを確認して入れ直すか、もう一度読み込んでください。
+          </p>
+          <button onClick={()=>location.reload()} style={{width:"100%",maxWidth:300,background:GP,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:900,fontSize:15,cursor:"pointer",fontFamily:F,marginBottom:10}}>
+            もう一度 読み込む
+          </button>
+          <button onClick={()=>{ try{localStorage.removeItem(FAMILY_CODE_KEY);}catch(e){} _familyCode=null; location.reload(); }}
+            style={{width:"100%",maxWidth:300,background:"transparent",border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"12px",color:TEXTS,fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>
+            コードを入れ直す（最初の画面へ）
+          </button>
+        </div>
       </ErrorBoundary>
     );
   }
