@@ -2614,7 +2614,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
       {key:"family",emoji:"🏆",label:"家族目標",desc:"家族みんなで達成するチャレンジ"},
     ]},
     {title:"メンバー・引き継ぎ", items:[
-      {key:"members",emoji:"🔐",label:"メンバー・PIN",desc:"名前・暗証番号・表示モードの変更"},
+      {key:"members",emoji:"🔐",label:"メンバー・PIN",desc:"顔写真・暗証番号・PINなし設定"},
       {key:"transfer",emoji:"🔄",label:"引き継ぎ・バックアップ",desc:"ファミリーコード・機種変更・データ保存"},
       {key:"plan",emoji:"💳",label:"プラン",desc:"料金プランの確認・変更"},
     ]},
@@ -3064,36 +3064,63 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>メンバーとPIN管理</p>
               {[{id:"parent",name:"おや管理",emoji:"🔐",isParent:true},...data.children,(data.parents||[])].flat().filter((x,i,a)=>x&&a.findIndex(y=>y&&y.id===x.id)===i).map(m=>{
                 if(!m) return null;
+                const isPseudoParent = m.isParent||m.id==="parent";
                 return(
-                  <div key={m.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-                    <Emo e={m.emoji} size={24}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
-                      <div style={{color:MUTED,fontSize:11}}>PIN: {'*'.repeat(4)}</div>
+                  <div key={m.id} style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <ChildAvatar child={m} size={30}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,fontSize:13}}>{m.name}</div>
+                        <div style={{color:MUTED,fontSize:11}}>PIN: {'*'.repeat(4)}</div>
+                      </div>
+                      <PromptModalButton btnLabel="PIN変更" title={`${m.name}の あたらしい PIN`} desc="4けたの すうじを いれてね" type="number" maxLen={4} placeholder="0000"
+                        btnStyle={{padding:"6px 12px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
+                        onSubmit={(np)=>{
+                          if(!np||np.length!==4){alert("4桁の数字を入力してください");return;}
+                          if(isPseudoParent) update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(np)};});
+                          else update(d=>({...d,children:d.children.map(c=>c.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(c):c),parents:(d.parents||[]).map(p=>p.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(p):p),pinChanged:{...(d.pinChanged||{}),[m.id]:true}}));
+                        }}/>
+                      {/* 親以外はPINなしトグル */}
+                      {!isPseudoParent&&(
+                        <button onClick={()=>{
+                          const noPinNow = !!(data.noPinIds||{})[m.id];
+                          update(d=>({...d,
+                            noPinIds:{...(d.noPinIds||{}),[m.id]:!noPinNow},
+                            pinChanged:{...(d.pinChanged||{}),[m.id]:true}, // 強制変更スキップ
+                            lockEnabled:{...(d.lockEnabled||{}),[m.id]:false}, // lockをOFFに
+                          }));
+                        }} style={{padding:"6px 12px",
+                          background:(data.noPinIds||{})[m.id]?`${R}15`:`${G}15`,
+                          border:`1.5px solid ${(data.noPinIds||{})[m.id]?R:G}`,
+                          borderRadius:8,color:(data.noPinIds||{})[m.id]?R:G,
+                          fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
+                          {(data.noPinIds||{})[m.id]?"🔓 PINなし":"🔒 PIN有り"}
+                        </button>
+                      )}
                     </div>
-                    <PromptModalButton btnLabel="PIN変更" title={`${m.name}の あたらしい PIN`} desc="4けたの すうじを いれてね" type="number" maxLen={4} placeholder="0000"
-                      btnStyle={{padding:"6px 12px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
-                      onSubmit={(np)=>{
-                        if(!np||np.length!==4){alert("4桁の数字を入力してください");return;}
-                        if(m.isParent||m.id==="parent") update(d=>{const{parentPin,...rest}=d;return{...rest,parentPinH:pinHash(np)};});
-                        else update(d=>({...d,children:d.children.map(c=>c.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(c):c),parents:(d.parents||[]).map(p=>p.id===m.id?(({pin,...r})=>({...r,pinh:pinHash(np)}))(p):p),pinChanged:{...(d.pinChanged||{}),[m.id]:true}}));
-                      }}/>
-                    {/* 親以外はPINなしトグル */}
-                    {!m.isParent&&m.id!=="parent"&&(
-                      <button onClick={()=>{
-                        const noPinNow = !!(data.noPinIds||{})[m.id];
-                        update(d=>({...d,
-                          noPinIds:{...(d.noPinIds||{}),[m.id]:!noPinNow},
-                          pinChanged:{...(d.pinChanged||{}),[m.id]:true}, // 強制変更スキップ
-                          lockEnabled:{...(d.lockEnabled||{}),[m.id]:false}, // lockをOFFに
-                        }));
-                      }} style={{padding:"6px 12px",
-                        background:(data.noPinIds||{})[m.id]?`${R}15`:`${G}15`,
-                        border:`1.5px solid ${(data.noPinIds||{})[m.id]?R:G}`,
-                        borderRadius:8,color:(data.noPinIds||{})[m.id]?R:G,
-                        fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
-                        {(data.noPinIds||{})[m.id]?"🔓 PINなし":"🔒 PIN有り"}
-                      </button>
+                    {/* 顔写真：トップページと本人ページに表示（だれのページか一目で分かる） */}
+                    {!isPseudoParent&&(
+                      <div style={{display:"flex",gap:8,marginTop:9,alignItems:"center"}}>
+                        <label style={{padding:"6px 12px",background:`${G}12`,border:`1.5px solid ${G}`,borderRadius:8,color:G,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
+                          📷 {m.avatar?"顔写真を変更":"顔写真を設定"}
+                          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                            const f=e.target.files&&e.target.files[0]; e.target.value="";
+                            taneAvatarFromFile(f,(url)=>update(d=>({...d,
+                              children:d.children.map(c=>c.id===m.id?{...c,avatar:url}:c),
+                              parents:(d.parents||[]).map(p=>p.id===m.id?{...p,avatar:url}:p),
+                            })));
+                          }}/>
+                        </label>
+                        {m.avatar&&(
+                          <button onClick={()=>update(d=>({...d,
+                            children:d.children.map(c=>c.id===m.id?(({avatar,...r})=>r)(c):c),
+                            parents:(d.parents||[]).map(p=>p.id===m.id?(({avatar,...r})=>r)(p):p),
+                          }))} style={{padding:"6px 12px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:8,color:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
+                            写真を削除
+                          </button>
+                        )}
+                        <span style={{fontSize:10,color:MUTED,flex:1}}>トップと本人のページに表示されます</span>
+                      </div>
                     )}
                   </div>
                 );
@@ -4005,7 +4032,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
-              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
+              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2,display:"flex",alignItems:"center",gap:5}}><ChildAvatar child={child} size={20}/>{child.name}</div>
               <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
                 <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
                 <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
@@ -4082,7 +4109,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 残高表示 */}
         <div style={{padding:"20px 20px 18px",position:"relative",zIndex:2,display:"flex",alignItems:"center",gap:12}}>
           <div style={{flex:1}}>
-            <div style={{color:"rgba(255,255,255,0.62)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5}}><Emo e={child.emoji} size={12} style={{marginRight:3}}/>{child.name}</div>
+            <div style={{color:"rgba(255,255,255,0.62)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5,display:"flex",alignItems:"center",gap:5}}><ChildAvatar child={child} size={20}/>{child.name}</div>
             <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4ade80",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
@@ -5987,7 +6014,7 @@ function ParentScreen({ data, update, onBack }) {
           {data.children.map(child=>(
             <div key={child.id} style={{background:CARD,border:`2px solid ${BORDER}`,borderRadius:20,padding:16,marginBottom:14}}>
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-                <Emo e={child.emoji} size={34}/>
+                <ChildAvatar child={child} size={40}/>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:15}}>{child.name} <span style={{background:`${P}20`,color:P,fontSize:11,fontWeight:700,padding:"2px 6px",borderRadius:8}}>{AGE_MODES[child.ageMode||"middle"].label}</span></div>
                   <div style={{fontWeight:900,fontSize:24,color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</div>
@@ -7184,7 +7211,7 @@ function PointTransferModal({ child, data, update, onClose }) {
         <div style={{background:GS,border:`2px solid ${G}`,borderRadius:18,padding:"20px 16px",marginBottom:20,textAlign:"center"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:18,marginBottom:14}}>
             <div style={{textAlign:"center"}}>
-              <div style={{lineHeight:1}}><Emo e={child.emoji} size={30}/></div>
+              <div style={{lineHeight:1,display:"flex",justifyContent:"center"}}><ChildAvatar child={child} size={34}/></div>
               <div style={{fontSize:11,fontWeight:700,color:TEXT,marginTop:4}}>{child.name}</div>
               <div style={{fontSize:11,color:R,fontWeight:700}}>-{amt.toLocaleString()}pt</div>
             </div>
@@ -9029,6 +9056,31 @@ function PinInput({onDone}) {
       </div>
     </div>
   );
+}
+
+// 顔写真をアバター用に変換：中央200px正方形クロップ→JPEG。保存blob(Firestore 900KB上限)保護のため大きければ追い圧縮。
+function taneAvatarFromFile(file, cb){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const canvas=document.createElement("canvas");
+        canvas.width=200; canvas.height=200;
+        const ctx=canvas.getContext("2d");
+        const s=Math.min(img.width,img.height);
+        const sx=(img.width-s)/2, sy=(img.height-s)/2;
+        ctx.drawImage(img,sx,sy,s,s,0,0,200,200);
+        let url=canvas.toDataURL("image/jpeg",0.8);
+        if(url.length>60000) url=canvas.toDataURL("image/jpeg",0.55);
+        cb(url);
+      }catch(e){ alert("画像を読み込めませんでした。別の写真でお試しください。"); }
+    };
+    img.onerror=()=>alert("画像を読み込めませんでした。別の写真でお試しください。");
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function ChildAvatar({ child, size=38, style={} }) {
