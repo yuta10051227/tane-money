@@ -2588,7 +2588,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
       if(parentPinMatches(next, data)) {
         setTimeout(()=>{
           setAuthed(true);
-          if(parentPinIsDefault(data)){ setSettingsTab("members"); }
+          // PIN初期値の変更促しよりも、承認待ち対応（親が開く主目的）を優先する
+          if(parentPinIsDefault(data) && _pendingCount===0){ setSettingsTab("members"); }
         }, 200);
       } else {
         setTimeout(()=>{setPinErr(true);setPin("");}, 300);
