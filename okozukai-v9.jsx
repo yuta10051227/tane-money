@@ -517,7 +517,21 @@ function startRealtimeSync(updateFn){
             // 1日のバトル回数: 今日の分は多い方を採用＝同期巻き戻しで上限を超えられないように
             if(prev.battleCountDay){merged.battleCountDay={...(merged.battleCountDay||{})};const _td=todayKey();Object.keys(prev.battleCountDay).forEach(cid=>{const p=prev.battleCountDay[cid]||{},m=merged.battleCountDay[cid]||{};const pT=p.date===_td,mT=m.date===_td;if(pT&&mT)merged.battleCountDay[cid]={date:_td,n:Math.max(p.n||0,m.n||0)};else if(pT)merged.battleCountDay[cid]=p;else if(!mT)merged.battleCountDay[cid]=p;});}
             if(prev.streak) merged.streak=prev.streak;
-            if(prev.dailyProgress) merged.dailyProgress=prev.dailyProgress;
+            // dailyProgress: 子ID×日付×タスク単位でユニオン(done優先/回数は最大)＝親端末でもリアルタイムに進捗が見え、
+            // 自端末の古いコピーで他の子の当日進捗を巻き戻さない（旧実装は無条件ローカル優先）
+            if(prev.dailyProgress){
+              merged.dailyProgress={...(merged.dailyProgress||{})};
+              Object.keys(prev.dailyProgress).forEach(cid=>{
+                const pd=prev.dailyProgress[cid]||{}, md={...(merged.dailyProgress[cid]||{})};
+                Object.keys(pd).forEach(day=>{
+                  const a=pd[day]||{}, b={...(md[day]||{})};
+                  Object.keys(a).forEach(k=>{ const av=a[k], bv=b[k];
+                    b[k]=(typeof av==="number"||typeof bv==="number")?Math.max(+av||0,+bv||0):(av||bv); });
+                  md[day]=b;
+                });
+                merged.dailyProgress[cid]=md;
+              });
+            }
             // モンスター進化/やり直し/転生：最終更新時刻(monsterStageAt)が新しい方を優先＝巻き戻り防止。
             // 段階では判定しない(系統を壊さない)。卵に戻す操作も新しければ保持される。
             {
@@ -1167,7 +1181,7 @@ const INIT = {
   },
   pendingApprovals: [],
   pendingRedemptions: [],
-  yakusokuDone: {},   // {childId:'YYYY-M-D'} ⭐やくそく全達成した日(翌日にごほうび解放)
+  yakusokuDone: {},   // {childId:['YYYY-M-D',...]} ⭐やくそく全達成した日(直近2日・翌日にごほうび解放)。旧形式は文字列1つ
 };
 
 function migrate(d) {
@@ -1444,10 +1458,20 @@ const calcMemberOperation = (memberId, data, type="total") => {
 
 // 今月の承認済み活動ptを計算（投資・為替除外）
 const ACTIVITY_TYPES = ["good","bad","daily"];
+// 有効ストリーク: last が今日/昨日でなければ 0（古いcurのまま「X日連続」と嘘を表示しない）
+const effStreak = (data, cid) => {
+  const st=((data&&data.streak)||{})[cid]; if(!st) return 0;
+  const td=todayKey(); const d=new Date(); d.setDate(d.getDate()-1);
+  const y=`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+  return (st.last===td||st.last===y)?(st.cur||0):0;
+};
+// 取り消し済み(revOfで参照される)ログのid集合＝ランキング/ミッション/バッジ集計から除外する
+const revokedLogIds = (logs) => { const s=new Set(); (logs||[]).forEach(l=>{ if(l&&l.revOf) s.add(l.revOf); }); return s; };
 const calcMonthlyActivity = (memberId, logs) => {
   const thisMonth = new Date().toISOString().slice(0,7);
+  const rv = revokedLogIds(logs);
   return (logs||[])
-    .filter(l=>l.cid===memberId && ACTIVITY_TYPES.includes(l.type) && (l.date||"").startsWith(thisMonth))
+    .filter(l=>l.cid===memberId && ACTIVITY_TYPES.includes(l.type) && (l.date||"").startsWith(thisMonth) && !rv.has(l.id))
     .reduce((s,l)=>s+(l.pts>0?l.pts:0),0);
 };
 const monthKey = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
@@ -2222,13 +2246,16 @@ function DailyTasks({ child, data, update }) {
   const toggleOpen = () => setOpenOverride(!open);
 
   const mkEntry = (label, pts) => ({ id:uid(), cid:child.id, type:"daily", label, pts, date:new Date().toISOString() });
-  const setDailyProg = (d, extra) => ({
-    ...d,
-    dailyProgress: {
-      ...d.dailyProgress,
-      [child.id]: { ...(d.dailyProgress?.[child.id]||{}), [today]: { ...((d.dailyProgress?.[child.id]?.[today])||{}), ...extra } }
-    }
-  });
+  const setDailyProg = (d, extra) => {
+    const tk = todayKey();   // 書き込み時に取り直す（0時を跨いで開きっぱなしでも前日キーに書かない＝二重取得防止）
+    return ({
+      ...d,
+      dailyProgress: {
+        ...d.dailyProgress,
+        [child.id]: { ...(d.dailyProgress?.[child.id]||{}), [tk]: { ...((d.dailyProgress?.[child.id]?.[tk])||{}), ...extra } }
+      }
+    });
+  };
 
   // 該当セットが全部終わったら、そのセットのボーナスを付与(1回だけ)
   const awardSetBonus = (setId, newProg) => {
@@ -2249,7 +2276,7 @@ function DailyTasks({ child, data, update }) {
           nd = { ...nd, logs:[bonusEntry, ...nd.logs] };
         }
         if (givesYaku) {                                     // 全クリアで翌日のごほうび(スマホ等)を解放
-          nd = { ...nd, yakusokuDone: { ...(nd.yakusokuDone||{}), [child.id]: today } };
+          nd = { ...nd, yakusokuDone: { ...(nd.yakusokuDone||{}), [child.id]: (()=>{const pv=(nd.yakusokuDone||{})[child.id];const arr=Array.isArray(pv)?pv:(pv?[pv]:[]);return [...arr.filter(x=>x!==today),today].slice(-2);})() } };
         }
         return nd;
       });
@@ -2262,7 +2289,7 @@ function DailyTasks({ child, data, update }) {
   const markYakusoku = d => {
     const info = getYakusokuInfo(d, child.id);
     if (!info.reqTasks.length || !info.allDone) return d;
-    return { ...d, yakusokuDone: { ...(d.yakusokuDone||{}), [child.id]: today } };
+    return { ...d, yakusokuDone: { ...(d.yakusokuDone||{}), [child.id]: (()=>{const pv=(d.yakusokuDone||{})[child.id];const arr=Array.isArray(pv)?pv:(pv?[pv]:[]);return [...arr.filter(x=>x!==today),today].slice(-2);})() } };
   };
 
   const handleCheck = t => {
@@ -3305,7 +3332,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:14,color:TEXT}}>タスク承認が必要</div>
-                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、子どものお手伝い記録を親が承認</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>ONにすると、子どものお手伝い記録を親が承認（※毎日タスクとまいにちのタネは対象外＝即時付与）</div>
                 </div>
                 <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),requireApproval:!fs.requireApproval}}))}
                   style={{position:"relative",width:48,height:26,borderRadius:13,background:fs.requireApproval?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
@@ -3326,11 +3353,10 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
               {/* ゲームの強さ設定: ガチャ/バトル/旅をどこまで見せるか */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
                 <div style={{fontWeight:800,fontSize:14,color:TEXT}}>ゲームの強さ</div>
-                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>遊びの要素をどこまで出すか選べます。お金の管理に集中させたいときは「ひかえめ」へ。</div>
+                <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:10}}>遊びの要素をどこまで出すか選べます。お金の管理に集中させたいときは「お小遣い帳中心」へ。</div>
                 {[
-                  {v:"full", t:"ぜんぶ", d:"ガチャ・バトル・とっくんの旅をすべて表示（標準）"},
-                  {v:"light",t:"バトル控えめ",d:"ガチャと育成はOK。バトル・とっくんの旅を非表示に"},
-                  {v:"money",t:"お小遣い帳中心",d:"ガチャ・バトル・旅・ミッションを隠して、お金の記録に集中"},
+                  {v:"full", t:"ぜんぶ", d:"まいにちのタネ・ミッションなど楽しい要素を表示（標準）"},
+                  {v:"money",t:"お小遣い帳中心",d:"タネ・ミッションを隠して、お金の記録に集中"},
                 ].map(o=>{
                   const sel=(fs.gameMode||"full")===o.v;
                   return (
@@ -3344,22 +3370,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     </button>
                   );
                 })}
-                {/* 1日のバトル回数(周回しすぎ防止) ※「ぜんぶ」のときだけ有効 */}
-                {(fs.gameMode||"full")==="full" && (
-                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${BORDER}`}}>
-                    <div style={{fontWeight:800,fontSize:13,color:TEXT}}>1日のバトル回数</div>
-                    <div style={{color:MUTED,fontSize:11,marginTop:2,marginBottom:8}}>やりすぎ(周回)が気になるときに上限を設定。とっくんの旅は時間でゆっくり進むので対象外です。</div>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                      {[{v:0,t:"なし"},{v:3,t:"3回"},{v:5,t:"5回"},{v:10,t:"10回"}].map(o=>{
-                        const sel=((fs.dailyBattleLimit)||0)===o.v;
-                        return (
-                          <button key={o.v} onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),dailyBattleLimit:o.v}}))}
-                            style={{flex:1,minWidth:60,background:sel?GP:CARD,border:sel?`2px solid ${GP}`:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 4px",color:sel?"#fff":TEXT,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{o.t}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+
               </div>
               {/* 投資ワールド設定: 投資のON/OFF・為替だけOFF・1日の売買回数(小中向けに親が手綱を握れる) */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
@@ -3900,7 +3911,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // eslint-disable-next-line
   },[_mLv]);
   const todayDone= data.gachaDate?.[child.id] === todayKey();
-  const curStreak= data.streak?.[child.id]?.cur || 0;
+  const curStreak= effStreak(data, child.id);
   const doneTodayIds = new Set(myLogs.filter(l=>l.rid&&isTodayLocal(l.date)).map(l=>l.rid));
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
@@ -4294,7 +4305,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const _yd = new Date(); _yd.setDate(_yd.getDate()-1);
         const yesterdayKey = `${_yd.getFullYear()}-${_yd.getMonth()+1}-${_yd.getDate()}`;
         const info = getYakusokuInfo(data, child.id);
-        const okToday = (data.yakusokuDone||{})[child.id] === yesterdayKey;
+        const okToday = (()=>{const v=(data.yakusokuDone||{})[child.id];return Array.isArray(v)?v.includes(yesterdayKey):v===yesterdayKey;})();   // 今日の達成で昨日の権利が消えない(2日分保持)
         if (info.reqTasks.length===0 && !okToday) return null;
         const privs = (data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
         const privStr = privs.length ? privs.map(p=>`${p.emoji}${p.label}`).join("・") : "おたのしみ";
@@ -4398,7 +4409,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && (()=>{
         const fs=data.familySettings||INIT.familySettings;
         if(!fs.familyMission?.enabled) return null;
-        const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
+        const _rvM=revokedLogIds(data.logs); const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())&&!_rvM.has(l.id)).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
         const target=fs.familyMission?.target||3000;
         const pct=Math.min(100,Math.floor(missionPts/target*100));
         return(
@@ -4666,14 +4677,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               })()}
               {/* 提供割合 */}
               <div style={{marginTop:8,background:darkBG?"rgba(255,255,255,0.04)":CARDS,borderRadius:12,padding:"8px 12px",border:`1px solid ${darkBG?"rgba(255,255,255,0.08)":BORDER}`}}>
-                <div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🎲 提供割合</div>
+                <div style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.35)":MUTED,fontWeight:700,marginBottom:6}}>🌱 ボーナスのしくみ（抽選なし・毎日かならず もらえる）</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {(data.gacha||[]).map(t=>(
-                    <div key={t.id} style={{display:"flex",alignItems:"center",gap:4,background:darkBG?"rgba(255,255,255,0.06)":CARD,borderRadius:8,padding:"3px 8px",border:`1px solid ${t.color}40`}}>
-                      <span style={{fontSize:11}}>{t.emoji}</span>
-                      <span style={{fontSize:11,fontWeight:700,color:t.color}}>{t.label}</span>
-                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.5)":MUTED}}>{t.rate}%</span>
-                      <span style={{fontSize:11,color:darkBG?"rgba(255,255,255,0.3)":MUTED}}>{t.min}〜{t.max}pt</span>
+                  {[["まいにち","+5pt"],["3日れんぞく","+3pt"],["7日","+5pt"],["14日","+10pt"],["30日","+15pt"]].map(([l,v])=>(
+                    <div key={l} style={{display:"flex",alignItems:"center",gap:4,background:darkBG?"rgba(255,255,255,0.06)":CARD,borderRadius:8,padding:"3px 8px",border:`1px solid ${BORDER}`}}>
+                      <span style={{fontSize:11,fontWeight:700,color:darkBG?"rgba(255,255,255,0.75)":TEXT}}>{l}</span>
+                      <span style={{fontSize:11,fontWeight:800,color:G}}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -5027,7 +5036,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const allMembers=[...data.children,...(data.parents||[])];
         const rank=[...allMembers]
           .filter(m=>m.visibility?.rankingParticipation!==false)
-          .map(m=>({member:m,pts:calcMonthlyActivity(m.id,data.logs),streak:(data.streak||{})[m.id]?.cur||0}))
+          .map(m=>({member:m,pts:calcMonthlyActivity(m.id,data.logs),streak:effStreak(data,m.id)}))
           .sort((a,b)=>b.pts-a.pts)
           .map((r,i)=>({...r,rank:i+1}));
         const MEDAL=["🥇","🥈","🥉"];
@@ -5135,6 +5144,7 @@ function ParentDailyTab({data,update,sb}){
     update(d=>({...d,
       dailyTaskSets:(d.dailyTaskSets||[]).filter(s=>s.id!==id),
       activeSetId: d.activeSetId===id ? (d.dailyTaskSets.find(s=>s.id!==id)?.id||"") : d.activeSetId,
+      activeSetIds:(d.activeSetIds||[]).filter(x=>x!==id),
     }));
     setSelSetId(null);
   };
@@ -5699,10 +5709,11 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
   const allMembers=[...data.children,...(data.parents||[])];
 
   // 活動ランキング（投資除外・承認済み活動のみ）
+  const _goalsDone=(mid)=>(data.goals||[]).filter(g=>g.cid===mid&&g.done).length;
   const actRank=[...allMembers]
     .filter(m=>m.visibility?.rankingParticipation!==false)
-    .map(m=>({member:m,pts:calcMonthlyActivity(m.id,data.logs),streak:(data.streak||{})[m.id]?.cur||0}))
-    .sort((a,b)=>b.pts-a.pts)
+    .map(m=>({member:m,pts:calcMonthlyActivity(m.id,data.logs),streak:effStreak(data,m.id),goals:_goalsDone(m.id)}))
+    .sort((a,b)=> metric==="streak" ? (b.streak-a.streak) : metric==="goals_completed" ? (b.goals-a.goals) : (b.pts-a.pts))
     .map((r,i)=>({...r,rank:i+1}));
 
   // 運用ランキング（手数料込み損益率）
@@ -5743,7 +5754,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
       <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:12}}>
         {/* 家族ミッション */}
         {fs.familyMission?.enabled&&(()=>{
-          const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
+          const _rvM=revokedLogIds(data.logs); const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())&&!_rvM.has(l.id)).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
           const target=fs.familyMission?.target||3000;
           const pct=Math.min(100,Math.floor(missionPts/target*100));
           return(
@@ -5787,8 +5798,8 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
                   <div style={{fontSize:11,color:MUTED}}>🔥 {r.streak}日連続</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontWeight:800,fontSize:14,color:G}}>+{r.pts}pt</div>
-                  <div style={{fontSize:11,color:MUTED}}>今月</div>
+                  <div style={{fontWeight:800,fontSize:14,color:G}}>{metric==="streak"?`${r.streak}日`:metric==="goals_completed"?`${r.goals}回`:`+${r.pts}pt`}</div>
+                  <div style={{fontSize:11,color:MUTED}}>{metric==="streak"?"連続":metric==="goals_completed"?"達成":"今月"}</div>
                 </div>
               </div>
             ))}
@@ -6052,7 +6063,7 @@ function ParentScreen({ data, update, onBack }) {
           const pBal=bal(data.logs,parentMember.id);
           const thisMonth=new Date().toISOString().slice(0,7);
           const pDelta=(data.logs||[]).filter(l=>l.cid===parentMember.id&&(l.date||"").startsWith(thisMonth)).reduce((s,l)=>s+l.pts,0);
-          const pStreak=(data.streak||{})[parentMember.id]?.cur||0;
+          const pStreak=effStreak(data, parentMember.id);
           const topGoal=(data.goals||[]).filter(g=>g.cid===parentMember.id&&!g.done)[0];
           const pct=topGoal?Math.min(100,Math.floor(pBal/topGoal.target*100)):0;
           return(
@@ -6175,7 +6186,7 @@ function ParentScreen({ data, update, onBack }) {
               const logs=(data.logs||[]).filter(l=>l.cid===child.id&&(l.date||"").startsWith(ym));
               const earned=logs.filter(l=>l.type==="good").reduce((s,l)=>s+l.pts,0);
               const spent=(data.expenses||[]).filter(e=>e.cid===child.id&&(e.date||"").startsWith(ym)).reduce((s,e)=>s+e.amt,0);
-              const streak=data.streak?.[child.id]?.cur||0;
+              const streak=effStreak(data, child.id);
               return (
                 <div key={child.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${BORDER}`}}>
                   <Emo e={child.emoji} size={24}/>
@@ -6773,7 +6784,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
                     <div style={{width:1,background:BORDER}}/>
                     <div style={{flex:1,textAlign:"center"}}>
                       <div style={{fontSize:24,fontWeight:900,color:gachaLeft.length>0?GOLD:MUTED,lineHeight:1.1}}>{gachaLeft.length}</div>
-                      <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>ガチャ まだ</div>
+                      <div style={{fontSize:12,color:MUTED,fontWeight:700,marginTop:2}}>タネ まだ</div>
                     </div>
                   </div>
                   {gachaLeft.length>0 && <div style={{fontSize:11,color:MUTED,marginTop:10,paddingTop:8,borderTop:`1px solid ${BORDER}`,lineHeight:1.5}}>🌱 タネが まだの子：<b style={{color:"#9a7000"}}>{gachaLeft.map(c=>c.name).join("、")}</b></div>}
@@ -7224,7 +7235,7 @@ function Buddy({ child, data, update, size=110, compact=false }) {
   // 表情を状態で出し分け（4表情を意味づけて使う）
   const hour = new Date().getHours();
   const doneToday = myLogs.some(l=>(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date));
-  const streak = (data.streak?.[child.id]?.cur)||0;
+  const streak = effStreak(data, child.id);
   let expr = "joy";
   if(hour>=21||hour<6) expr="sleepy";      // 夜はねむい
   else if(!doneToday) expr="go";           // まだ今日がんばってない→がんばれ！
@@ -7460,7 +7471,7 @@ function WeeklyReport({child,data,onClose}){
   const tipsWeek=logs.filter(l=>l.type==="tips").length;                                          // 今週読んだまめちしき
   const investWeek=logs.filter(l=>["invest_buy","invest_sell","forex_buy","forex_sell"].includes(l.type)).length; // 投資チャレンジ
   const goalsDone=(data.goals||[]).filter(g=>g.cid===child.id&&g.done).length;                    // 目標達成(累計)
-  const streakCur=(data.streak||{})[child.id]?.cur||0;
+  const streakCur=effStreak(data, child.id);
   const netWeek=earned-deducted;
   // おかねの学びスコア(0-100): 学び30+継続20+お手伝い20+お金の行動20+収支プラス10。週ごとの伸びを親が追える単一指標
   const sLearn=Math.round(quizMastered/ALL_TIPS.length*30);
@@ -7842,11 +7853,13 @@ function calcBadgeStats(child, data){
     tipsRead: logs.filter(l=>l.type==="tips").length,
     goalsDone: (data.goals||[]).filter(g=>g.cid===child.id&&g.done).length,
     maxStreak: (data.streak||{})[child.id]?.max||0,
-    curStreak: (data.streak||{})[child.id]?.cur||0,
+    curStreak: effStreak(data, child.id),
     maxBal,
     totalLogs: logs.length,
     balance: bal(data.logs, child.id),
+    // 全達成ボーナス付与フラグ(__bonus__::)＝その日パーフェクトの確定記録。旧素キー形式の日も後方互換で判定
     perfectDays: Object.values((data.dailyProgress||{})[child.id]||{}).filter(day=>{
+      if(Object.keys(day||{}).some(k=>k.startsWith("__bonus__::"))) return true;
       const tasks=(data.dailyTaskSets||[]).find(s=>s.id===data.activeSetId)?.tasks||data.dailyTasks||[];
       return tasks.length>0&&tasks.every(t=>t.type==="check"?!!day[t.id]:(day[t.id]||0)>=(t.target||1));
     }).length,
