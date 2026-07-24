@@ -1521,12 +1521,10 @@ const Btn = ({c,label,onClick,disabled,full,sm}) => (
 const SyncBadge = ({status}) => {
   const map = { saving:"💾 同期中…", saved:"☁ 同期済み", error:"⚠ オフライン" };
   const col  = { saving:B, saved:G, error:R };
-  const code = (()=>{try{return localStorage.getItem("tane_money_family_code")||"NO_CODE";}catch(e){return "ERR";}})();
+  // ※ファミリーコードの常時表示は廃止（全画面で内容に重なる・招待コードを子の画面に露出するため）。
+  //   コードは ⚙設定→メンバー・PIN / 引き継ぎ で確認できる。
   return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-      <span style={{fontSize:11, color:col[status]||MUTED, fontWeight:700, background:`${col[status]||MUTED}15`, padding:"2px 7px", borderRadius:10}}>{map[status]||status}</span>
-      <span style={{fontSize:11, color:MUTED, fontWeight:700, padding:"1px 5px"}}>{code}</span>
-    </div>
+    <span style={{fontSize:11, color:col[status]||MUTED, fontWeight:700, background:`${col[status]||MUTED}15`, padding:"2px 7px", borderRadius:10, fontFamily:F}}>{map[status]||status}</span>
   );
 };
 
@@ -2559,6 +2557,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [copied, setCopied] = useState(false);
   const [smEditReward, setSmEditReward] = useState(null);
   const [smAddOpen, setSmAddOpen] = useState(false);
+  // 顔写真の位置調整モーダル {src, memberId}
+  const [avAdjust, setAvAdjust] = useState(null);
   // 作り置き（ストック）タスク用
   const [stAddOpen, setStAddOpen] = useState(false);
   const [stEmoji, setStEmoji] = useState("⭐");
@@ -2657,6 +2657,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
 
   return (
     <div style={{position:"fixed",inset:0,background:"#000a",zIndex:9999,display:"flex",alignItems:"flex-end",fontFamily:F}}>
+      {avAdjust&&<AvatarAdjustModal src={avAdjust.src}
+        onCancel={()=>setAvAdjust(null)}
+        onDone={(url)=>{ const mid=avAdjust.memberId; setAvAdjust(null); update(d=>({...d,
+          children:d.children.map(c=>c.id===mid?{...c,avatar:url}:c),
+          parents:(d.parents||[]).map(p=>p.id===mid?{...p,avatar:url}:p),
+        })); }}/>}
       <div style={{background:CARD,borderRadius:"24px 24px 0 0",width:"100%",maxHeight:"90vh",overflow:"hidden",display:"flex",flexDirection:"column"}}>
         {/* ヘッダー（一覧⇔詳細） */}
         <div style={{padding:"18px 20px 12px",display:"flex",alignItems:"center",gap:8,justifyContent:"space-between",flexShrink:0,borderBottom:`1px solid ${BORDER}`}}>
@@ -3105,10 +3111,11 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                           📷 {m.avatar?"顔写真を変更":"顔写真を設定"}
                           <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
                             const f=e.target.files&&e.target.files[0]; e.target.value="";
-                            taneAvatarFromFile(f,(url)=>update(d=>({...d,
-                              children:d.children.map(c=>c.id===m.id?{...c,avatar:url}:c),
-                              parents:(d.parents||[]).map(p=>p.id===m.id?{...p,avatar:url}:p),
-                            })));
+                            if(!f) return;
+                            // 位置調整モーダルを開く（ドラッグ＆ズームで切り出し位置を決めてから保存）
+                            const reader=new FileReader();
+                            reader.onload=(ev)=>setAvAdjust({src:ev.target.result, memberId:m.id});
+                            reader.readAsDataURL(f);
                           }}/>
                         </label>
                         {m.avatar&&(
@@ -4007,7 +4014,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
-          <Buddy child={child} data={data} size={130} update={update}/>
+          <Buddy child={child} data={data} size={130} update={update} compact={effectiveTab!=="daily"}/>
         </div>
         {(()=>{
           const m=getMonState(data, child);
@@ -4119,7 +4126,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(52,199,123,0.14)",border:"1px solid rgba(52,199,123,0.3)",borderRadius:10,padding:"5px 13px",color:"#4ade80",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
           </div>
-          <Buddy child={child} data={data} size={118} update={update}/>
+          <Buddy child={child} data={data} size={118} update={update} compact={effectiveTab!=="daily"}/>
         </div>
         {/* 目標までの進捗バー(参考ゲームの進行感を健全に: 直近の未達成目標を1本だけ) */}
         {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
@@ -4624,7 +4631,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         return(<div style={{padding:16}}>
           <TabHint id="tasks" text="やったお手伝いをタップして記録しよう！✏リスト編集で自分用のタスクを選べるよ" data={data} update={update} cid={child.id}/>
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}>
-            <div style={{flex:1}}><SortBar options={[["default","デフォルト"],["pts_high","pt高い順"],["pts_low","pt低い順"],["name","名前順"]]} value={taskSort} onChange={setTaskSort}/></div>
+            <div style={{flex:1,minWidth:0,overflowX:"auto"}}><SortBar options={[["default","デフォルト"],["pts_high","pt高い順"],["pts_low","pt低い順"],["name","名前順"]]} value={taskSort} onChange={setTaskSort}/></div>
             <button onClick={()=>setShowCustomizer(true)} style={{flexShrink:0,padding:"5px 11px",border:`1.5px solid ${hasFilter?G:BORDER}`,borderRadius:20,background:hasFilter?`${G}15`:"transparent",color:hasFilter?G:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
               {hasFilter?`✏ ${myIds.length}個選択中`:"✏ リスト編集"}
             </button>
@@ -5812,6 +5819,7 @@ function ParentScreen({ data, update, onBack }) {
 
   // child mgmt
   const [editChild,     setEditChild]     = useState(null);
+  const [avAdjustP,     setAvAdjustP]     = useState(null);   // 顔写真の位置調整モーダル(src)
   const [showAddChild,  setShowAddChild]  = useState(false);
   const [delChild,      setDelChild]      = useState(null);
   const [ncName, setNcName] = useState(""); const [ncEmoji, setNcEmoji] = useState("😊");
@@ -5927,6 +5935,9 @@ function ParentScreen({ data, update, onBack }) {
 
   return (
     <div style={{minHeight:"100vh",background:BG,fontFamily:F,paddingBottom:80}}>
+      {avAdjustP&&<AvatarAdjustModal src={avAdjustP}
+        onCancel={()=>setAvAdjustP(null)}
+        onDone={(url)=>{ setAvAdjustP(null); setEditChild(c=>c?{...c,avatar:url}:c); }}/>}
       {/* 新ヘッダー */}
       <div style={{background:BG,padding:"52px 20px 0"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -6105,21 +6116,10 @@ function ParentScreen({ data, update, onBack }) {
                       <label style={{position:"absolute",bottom:-4,right:-4,width:24,height:24,borderRadius:"50%",background:B,border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,color:"#fff"}}>
                         +
                         <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-                          const file=e.target.files&&e.target.files[0]; if(!file) return;
+                          const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
+                          // 位置調整モーダルを開く（⚙設定と同じUX）
                           const reader=new FileReader();
-                          reader.onload=ev=>{
-                            const img=new Image();
-                            img.onload=()=>{
-                              const canvas=document.createElement("canvas");
-                              canvas.width=200; canvas.height=200;
-                              const ctx=canvas.getContext("2d");
-                              const s=Math.min(img.width,img.height);
-                              const sx=(img.width-s)/2, sy=(img.height-s)/2;
-                              ctx.drawImage(img,sx,sy,s,s,0,0,200,200);
-                              setEditChild(c=>({...c,avatar:canvas.toDataURL("image/jpeg",0.8)}));
-                            };
-                            img.src=ev.target.result;
-                          };
+                          reader.onload=ev=>setAvAdjustP(ev.target.result);
                           reader.readAsDataURL(file);
                         }}/>
                       </label>
@@ -6555,6 +6555,13 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
               <div style={{fontSize:11,color:MUTED,letterSpacing:.3}}>お金は、未来を育てるタネ。</div>
             </div>
           </div>
+          {showOnboard&&(
+            <button onClick={()=>setShowOnboardGuide(true)} title="初心者ガイド"
+              style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${GP}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)",position:"relative",marginRight:8,fontSize:17}}>
+              📋
+              {onboardRemaining>0&&<div style={{position:"absolute",top:-5,right:-5,width:17,height:17,borderRadius:"50%",background:R,color:"#fff",fontSize:10,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{onboardRemaining}</div>}
+            </button>
+          )}
           <button onClick={()=>onSettings&&onSettings()}
             style={{width:38,height:38,borderRadius:11,background:CARD,border:`1.5px solid ${BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 8px rgba(24,35,29,0.05)",position:"relative"}}>
             ⚙
@@ -6589,7 +6596,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
                     <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:600}}>こども</span>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||"中高生"}</span>
+                    <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||(member.displayMode==="junior"?"小学生":"中高生")}</span>
                     <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt</span>
                     {(()=>{const td=todayDelta(member.id);return td>0&&<span style={{fontSize:11,background:GOLDS,color:GOLD,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今日 +{td}pt</span>;})()}
                   </div>
@@ -6708,17 +6715,6 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
           </span>
         </div>
       </div>
-
-      {/* 初心者ガイド 浮きボタン（LINE Farm風） */}
-      {showOnboard&&(
-        <div style={{position:"fixed",left:10,top:220,zIndex:500}}>
-          <button onClick={()=>setShowOnboardGuide(true)} style={{background:CARD,border:`2px solid ${GP}`,borderRadius:20,padding:"10px 7px",boxShadow:`0 4px 18px ${GP}30`,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",fontFamily:F,position:"relative",width:54}}>
-            {onboardRemaining>0&&<div style={{position:"absolute",top:-7,right:-7,width:20,height:20,borderRadius:"50%",background:R,color:"#fff",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",border:"2px solid #fff"}}>{onboardRemaining}</div>}
-            <span style={{fontSize:22}}>📋</span>
-            <span style={{fontSize:11,fontWeight:800,color:GP,lineHeight:1.3,textAlign:"center"}}>初心者<br/>ガイド</span>
-          </button>
-        </div>
-      )}
 
       {/* 初心者ガイド モーダル */}
       {showOnboardGuide&&(
@@ -7105,7 +7101,7 @@ const BUDDY_ORDER = ["tame","nobi","tsukai","wake"];
 const BUDDY_HINT = { tame:"コツコツ ためる子", nobi:"チャレンジで ふやす子", tsukai:"かしこく つかう子", wake:"やさしく わける子" };
 const BUDDY_TALK = ["わ〜い！","えへへ♪","うれしい！","なでなで ありがと","きょうも がんばろ！","だいすき♡","ぷにぷに〜","いっしょに いこ！"];
 // 🐣 相棒タネモン：選んだ子を状態に応じた表情＋呼吸/タップ跳ね＋吹き出しで表示（絵は1枚をコードで動かす）
-function Buddy({ child, data, update, size=110 }) {
+function Buddy({ child, data, update, size=110, compact=false }) {
   const [bounce, setBounce] = useState(false);
   const [picking, setPicking] = useState(false);
   const [speech, setSpeech] = useState(null);
@@ -7123,6 +7119,8 @@ function Buddy({ child, data, update, size=110 }) {
   const pick = (id)=>{ update(d=>({...d,buddy:{...(d.buddy||{}),[child.id]:id}})); setPicking(false); taneHaptic("success"); };
 
   if(!buddy || picking){
+    // 未選択の大きな選択カードは「まいにち」タブだけに出す（他タブでは内容を押し下げないよう非表示）
+    if(compact && !picking) return null;
     return (
       <div style={{width:"100%",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:18,padding:"14px 12px"}}>
         <div style={{textAlign:"center",fontSize:14,fontWeight:900,color:"#fff",marginBottom:2}}>🌱 あいぼうの タネを えらぼう</div>
@@ -9081,6 +9079,63 @@ function taneAvatarFromFile(file, cb){
     img.src=ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// 顔写真の位置・ズーム調整モーダル：ドラッグで位置、スライダーで拡大。決定時に200px正方形へ切り出す。
+function AvatarAdjustModal({ src, onDone, onCancel }) {
+  const V=260;   // プレビュー一辺(px)
+  const [img,setImg]=useState(null);
+  const [zoom,setZoom]=useState(1);
+  const [off,setOff]=useState({x:0,y:0});
+  const dragRef=useRef(null);
+  useEffect(()=>{ const i=new Image(); i.onload=()=>setImg(i); i.onerror=()=>{alert("画像を読み込めませんでした");onCancel();}; i.src=src; },[src]);
+  if(!img) return null;
+  const s0=V/Math.min(img.width,img.height);
+  const s=s0*zoom;
+  const dw=img.width*s, dh=img.height*s;
+  const clamp=(o)=>{ const mx=Math.max(0,(dw-V)/2), my=Math.max(0,(dh-V)/2);
+    return {x:Math.max(-mx,Math.min(mx,o.x)), y:Math.max(-my,Math.min(my,o.y))}; };
+  const co=clamp(off);
+  const left=(V-dw)/2+co.x, top=(V-dh)/2+co.y;
+  const start=(x,y)=>{ dragRef.current={x,y,ox:co.x,oy:co.y}; };
+  const move=(x,y)=>{ const d=dragRef.current; if(!d)return; setOff(clamp({x:d.ox+(x-d.x), y:d.oy+(y-d.y)})); };
+  const end=()=>{ dragRef.current=null; };
+  const done=()=>{
+    try{
+      const canvas=document.createElement("canvas");
+      canvas.width=200; canvas.height=200;
+      const ctx=canvas.getContext("2d");
+      const sx=(0-left)/s, sy=(0-top)/s, sw=V/s;
+      ctx.drawImage(img,sx,sy,sw,sw,0,0,200,200);
+      let url=canvas.toDataURL("image/jpeg",0.8);
+      if(url.length>60000) url=canvas.toDataURL("image/jpeg",0.55);
+      onDone(url);
+    }catch(e){ alert("画像を処理できませんでした"); onCancel(); }
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000c",zIndex:10000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:F}}>
+      <div style={{background:"#fff",borderRadius:20,padding:"18px 18px 16px",width:"100%",maxWidth:320}}>
+        <p style={{fontWeight:900,fontSize:15,color:TEXT,margin:"0 0 4px",textAlign:"center"}}>写真の位置を調整</p>
+        <p style={{color:MUTED,fontSize:11,margin:"0 0 12px",textAlign:"center"}}>ドラッグで動かす・スライダーで拡大</p>
+        <div
+          onTouchStart={e=>{e.preventDefault();start(e.touches[0].clientX,e.touches[0].clientY);}}
+          onTouchMove={e=>{e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY);}}
+          onTouchEnd={end}
+          onMouseDown={e=>{e.preventDefault();start(e.clientX,e.clientY);}}
+          onMouseMove={e=>{if(dragRef.current)move(e.clientX,e.clientY);}}
+          onMouseUp={end} onMouseLeave={end}
+          style={{width:V,height:V,margin:"0 auto",position:"relative",overflow:"hidden",borderRadius:16,touchAction:"none",cursor:"grab",background:"#111"}}>
+          <img src={src} draggable={false} style={{position:"absolute",left,top,width:dw,height:dh,maxWidth:"none",userSelect:"none",pointerEvents:"none"}} alt=""/>
+          <div style={{position:"absolute",inset:0,borderRadius:"50%",boxShadow:"0 0 0 9999px rgba(0,0,0,0.45)",pointerEvents:"none"}}/>
+        </div>
+        <input type="range" min="1" max="3" step="0.01" value={zoom} onChange={e=>setZoom(parseFloat(e.target.value))} style={{width:"100%",margin:"14px 0 12px"}}/>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"none",border:`1.5px solid ${BORDER}`,borderRadius:12,padding:"11px",color:MUTED,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+          <button onClick={done} style={{flex:2,background:GP,border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F}}>この位置にする ✓</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ChildAvatar({ child, size=38, style={} }) {
