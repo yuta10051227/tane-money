@@ -2149,36 +2149,6 @@ function getYakusokuInfo(data, childId, dateObj) {
   } catch(e) { return { reqTasks:[], done:0, allDone:false }; }
 }
 
-// まいにちタブ用のごほうびストリップ：毎日タスクの直下で「あと少しで交換できる」を見せて動機づけ。
-// タップで既存の交換確認ポップアップ(rewardPop)を開く。
-function RewardStrip({ data, myBal, dark, onPick, onMore }){
-  const rewards=(data.rewards||[]);
-  if(!rewards.length) return null;
-  return (
-    <div style={{padding:"10px 16px 2px"}}>
-      <div style={{display:"flex",alignItems:"center",marginBottom:8}}>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:1,color:dark?"rgba(255,255,255,0.58)":MUTED}}>🎁 ごほうび と こうかん</div>
-        <button onClick={onMore} style={{marginLeft:"auto",background:"none",border:"none",color:dark?"#4ade80":GP,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F,padding:0}}>すべて見る ›</button>
-      </div>
-      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none"}}>
-        {rewards.slice(0,10).map(r=>{
-          const can=myBal>=r.cost;
-          return (
-            <button key={r.id} onClick={()=>onPick(r)}
-              style={{flexShrink:0,width:108,background:dark?"rgba(255,255,255,0.07)":CARD,
-                border:`2px solid ${can?(dark?"#4ade80":G):(dark?"rgba(255,255,255,0.14)":BORDER)}`,
-                borderRadius:14,padding:"10px 8px",cursor:"pointer",fontFamily:F,textAlign:"center",opacity:can?1:0.72}}>
-              <div style={{fontSize:24,lineHeight:1.2}}>{r.emoji}</div>
-              <div style={{fontWeight:700,fontSize:11,color:dark?"rgba(255,255,255,0.85)":TEXT,margin:"4px 0 2px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.label}</div>
-              <div style={{fontWeight:800,fontSize:11,color:can?(dark?"#4ade80":G):(dark?"rgba(255,255,255,0.4)":MUTED)}}>{r.cost.toLocaleString()}pt{can?" ✓":""}</div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function DailyTasks({ child, data, update }) {
   const today  = todayKey();
   // アクティブセットを取得（最大2セットを同時に。期間チェック・null安全）
@@ -4373,38 +4343,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
 
-      {/* ⭐ やくそくカード（ぜんぶクリアで あしたのおたのしみ解放。ポイントとは別） */}
-      {effectiveTab==="daily" && (()=>{
-        const _yd = new Date(); _yd.setDate(_yd.getDate()-1);
-        const yesterdayKey = `${_yd.getFullYear()}-${_yd.getMonth()+1}-${_yd.getDate()}`;
-        const info = getYakusokuInfo(data, child.id);
-        const okToday = (()=>{const v=(data.yakusokuDone||{})[child.id];return Array.isArray(v)?v.includes(yesterdayKey):v===yesterdayKey;})();   // 今日の達成で昨日の権利が消えない(2日分保持)
-        if (info.reqTasks.length===0 && !okToday) return null;
-        const privs = (data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
-        const privStr = privs.length ? privs.map(p=>`${p.emoji}${p.label}`).join("・") : "おたのしみ";
-        const hadReqYesterday = getYakusokuInfo(data, child.id, _yd).reqTasks.length>0;
-        return (
-          <div style={{padding:"10px 16px 0"}}>
-            <div style={{background:okToday?GS:(darkBG?"rgba(255,255,255,0.05)":CARD),border:`1.5px solid ${okToday?G:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,borderRadius:14,padding:"10px 14px"}}>
-              {okToday
-                ? <p style={{margin:0,fontWeight:900,fontSize:13,color:GP}}>🎉 きょうは {privStr} OK！</p>
-                : hadReqYesterday
-                  ? <p style={{margin:0,fontWeight:700,fontSize:11.5,lineHeight:1.5,color:darkBG?"rgba(255,255,255,0.55)":MUTED}}>きょうの おたのしみは おやすみ…きょうの やくそくで あしたゲット！</p>
-                  : null}
-              {info.reqTasks.length>0 && <>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:(okToday||hadReqYesterday)?"8px 0 4px":"0 0 4px"}}>
-                  <span style={{fontWeight:800,fontSize:12,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>⭐きょうの やくそく</span>
-                  <span style={{fontWeight:800,fontSize:12,color:info.allDone?G:MUTED}}>{info.done}/{info.reqTasks.length}</span>
-                </div>
-                <div style={{height:8,background:darkBG?"rgba(255,255,255,0.12)":BORDER,borderRadius:4,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${info.done/info.reqTasks.length*100}%`,background:info.allDone?G:GOLD,borderRadius:4,transition:"width .5s ease"}}/>
-                </div>
-                {info.allDone && <p style={{margin:"6px 0 0",fontWeight:900,fontSize:12,color:G}}>🎉 あしたは {privStr} つかえるよ！</p>}
-              </>}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* かぞく会議カードは廃止（ユーザー要望・シンプル化） */}
 
@@ -4658,13 +4596,54 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{color:"rgba(255,255,255,0.6)",fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
-          <RewardStrip data={data} myBal={myBal} dark={true} onPick={r=>setRewardPop(r)} onMore={()=>{setTab("money");setMonTab("rewards");}}/>
         </>}
         {isJunior && <>
           <TabHint id="daily" text="毎日タスクをチェックしよう！全部クリアするとボーナスポイントがもらえるよ🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
-          <RewardStrip data={data} myBal={myBal} dark={false} onPick={r=>setRewardPop(r)} onMore={()=>{setTab("goals");setMonTab("rewards");}}/>
         </>}
+      {/* ⭐ やくそくカード（ぜんぶクリアで あしたのおたのしみ解放。ポイントとは別） */}
+      {effectiveTab==="daily" && (()=>{
+        const _yd = new Date(); _yd.setDate(_yd.getDate()-1);
+        const yesterdayKey = `${_yd.getFullYear()}-${_yd.getMonth()+1}-${_yd.getDate()}`;
+        const info = getYakusokuInfo(data, child.id);
+        const okToday = (()=>{const v=(data.yakusokuDone||{})[child.id];return Array.isArray(v)?v.includes(yesterdayKey):v===yesterdayKey;})();   // 今日の達成で昨日の権利が消えない(2日分保持)
+        if (info.reqTasks.length===0 && !okToday) return null;
+        const privs = (data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
+        const privStr = privs.length ? privs.map(p=>`${p.emoji}${p.label}`).join("・") : "おたのしみ";
+        const hadReqYesterday = getYakusokuInfo(data, child.id, _yd).reqTasks.length>0;
+        return (
+          <div style={{padding:"10px 16px 0"}}>
+            <div style={{background:okToday?GS:(darkBG?"rgba(255,255,255,0.05)":CARD),border:`1.5px solid ${okToday?G:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,borderRadius:14,padding:"10px 14px"}}>
+              {okToday
+                ? <p style={{margin:0,fontWeight:900,fontSize:13,color:GP}}>🎉 きょうは {privStr} OK！</p>
+                : hadReqYesterday
+                  ? <p style={{margin:0,fontWeight:700,fontSize:11.5,lineHeight:1.5,color:darkBG?"rgba(255,255,255,0.55)":MUTED}}>きょうの おたのしみは おやすみ…きょうの やくそくで あしたゲット！</p>
+                  : null}
+              {/* あしたのおたのしみ（やくそくのごほうび）をチップで見せる */}
+              {privs.length>0 && (
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"8px 0 2px"}}>
+                  {privs.map(p=>(
+                    <span key={p.id||p.label} style={{display:"inline-flex",alignItems:"center",gap:4,background:okToday?"#fff":(darkBG?"rgba(255,255,255,0.08)":CARDS),border:`1.5px solid ${okToday?G:(darkBG?"rgba(255,255,255,0.14)":BORDER)}`,borderRadius:999,padding:"4px 10px",fontSize:12,fontWeight:800,color:okToday?GP:(darkBG?"rgba(255,255,255,0.8)":TEXT)}}>
+                      {p.emoji} {p.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {info.reqTasks.length>0 && <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:(okToday||hadReqYesterday)?"8px 0 4px":"0 0 4px"}}>
+                  <span style={{fontWeight:800,fontSize:12,color:darkBG?"rgba(255,255,255,0.85)":TEXT}}>⭐きょうの やくそく</span>
+                  <span style={{fontWeight:800,fontSize:12,color:info.allDone?G:MUTED}}>{info.done}/{info.reqTasks.length}</span>
+                </div>
+                <div style={{height:8,background:darkBG?"rgba(255,255,255,0.12)":BORDER,borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${info.done/info.reqTasks.length*100}%`,background:info.allDone?G:GOLD,borderRadius:4,transition:"width .5s ease"}}/>
+                </div>
+                {info.allDone && <p style={{margin:"6px 0 0",fontWeight:900,fontSize:12,color:G}}>🎉 あしたは {privStr} つかえるよ！</p>}
+              </>}
+            </div>
+          </div>
+        );
+      })()}
+
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
         {showGacha && <div style={{padding:"12px 16px 4px"}}>
           {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🌱 まいにちのタネ</div>}
