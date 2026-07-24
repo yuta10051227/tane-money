@@ -2458,6 +2458,14 @@ function TaskManagerSection({data, update}){
     markLocalDefEdit();
     update(d=>({...d,[key]:d[key].filter(t=>t.id!==id)}));
   };
+  // ▲▼で並び替え（子ども画面の「デフォルト」順に反映）
+  const moveT = (id, dir) => {
+    markLocalDefEdit();
+    update(d=>{ const arr=[...(d[key]||[])]; const i=arr.findIndex(t=>t.id===id); const j=i+dir;
+      if(i<0||j<0||j>=arr.length) return d; [arr[i],arr[j]]=[arr[j],arr[i]]; return {...d,[key]:arr}; });
+  };
+  // 子ども別の個別ポイント設定モーダル {id,emoji,label,pts,over}
+  const [overT, setOverT] = useState(null);
 
   return(
     <div style={{marginBottom:8}}>
@@ -2477,9 +2485,15 @@ function TaskManagerSection({data, update}){
       </div>
       {/* タスク一覧 */}
       <div style={{maxHeight:200,overflowY:"auto",marginBottom:8}}>
-        {tasks.map(t=>(
+        {tasks.map((t,idx)=>(
           <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:CARD,
             border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 10px",marginBottom:5}}>
+            {editT?.id!==t.id&&(
+              <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                <button onClick={()=>moveT(t.id,-1)} disabled={idx===0} style={{width:22,height:18,padding:0,border:`1px solid ${BORDER}`,borderRadius:5,background:idx===0?"transparent":BG,color:idx===0?BORDER:MUTED,fontSize:9,cursor:idx===0?"default":"pointer",lineHeight:1}}>▲</button>
+                <button onClick={()=>moveT(t.id,1)} disabled={idx===tasks.length-1} style={{width:22,height:18,padding:0,border:`1px solid ${BORDER}`,borderRadius:5,background:idx===tasks.length-1?"transparent":BG,color:idx===tasks.length-1?BORDER:MUTED,fontSize:9,cursor:idx===tasks.length-1?"default":"pointer",lineHeight:1}}>▼</button>
+              </div>
+            )}
             {editT?.id===t.id ? (
               <div style={{flex:1}}>
                 <div style={{display:"flex",gap:6,marginBottom:6}}>
@@ -2502,8 +2516,13 @@ function TaskManagerSection({data, update}){
             <span style={{fontSize:18}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:700,fontSize:12,color:TEXT}}>{t.label}{(((data.myTaskIds||{})._stock)||[]).includes(t.id)&&<span style={{marginLeft:6,background:`${B}15`,color:B,borderRadius:6,padding:"1px 5px",fontSize:10,fontWeight:800}}>📦 作り置き</span>}</div>
-              <div style={{fontSize:11,color:t.pts>0?G:R,fontWeight:700}}>{t.pts>0?"+":""}{t.pts}pt</div>
+              <div style={{fontSize:11,color:t.pts>0?G:R,fontWeight:700}}>{t.pts>0?"+":""}{t.pts}pt{Object.keys(t.over||{}).length>0&&<span style={{color:P,fontWeight:800}}> ·個別あり</span>}</div>
             </div>
+            <button onClick={()=>setOverT({id:t.id,emoji:t.emoji,label:t.label,pts:t.pts,over:{...(t.over||{})}})}
+              style={{padding:"3px 8px",background:`${P}15`,border:`1.5px solid ${P}`,
+                borderRadius:7,color:P,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>
+              個別
+            </button>
             <button onClick={()=>setEditT({id:t.id,emoji:t.emoji,label:t.label,pts:String(Math.abs(t.pts))})}
               style={{padding:"3px 8px",background:`${B}15`,border:`1.5px solid ${B}`,
                 borderRadius:7,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>
@@ -2518,6 +2537,30 @@ function TaskManagerSection({data, update}){
           </div>
         ))}
       </div>
+      {/* 子ども別の個別ポイント設定モーダル */}
+      {overT&&(
+        <div style={{position:"fixed",inset:0,background:"#0008",zIndex:10001,display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:F}}>
+          <div style={{background:"#fff",borderRadius:18,padding:"18px",width:"100%",maxWidth:320,maxHeight:"70vh",overflowY:"auto"}}>
+            <p style={{fontWeight:900,fontSize:15,margin:"0 0 4px",color:TEXT}}>{overT.emoji} {overT.label}</p>
+            <p style={{color:MUTED,fontSize:11,margin:"0 0 12px"}}>子どもごとにポイントを変えられます（空欄＝共通 {overT.pts}pt）</p>
+            {(data.children||[]).map(c=>(
+              <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <ChildAvatar child={c} size={26}/>
+                <span style={{flex:1,fontWeight:700,fontSize:13,color:TEXT}}>{c.name}</span>
+                <input type="number" placeholder={String(overT.pts)} value={(overT.over||{})[c.id]??""}
+                  onChange={e=>{
+                    const v=e.target.value===""?undefined:parseInt(e.target.value);
+                    setOverT(o=>({...o,over:{...(o.over||{}),[c.id]:v}}));
+                    markLocalDefEdit();
+                    update(d=>({...d,[key]:d[key].map(x=>x.id===overT.id?{...x,over:{...(x.over||{}),[c.id]:v}}:x)}));
+                  }}
+                  style={{width:90,padding:"7px 9px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,textAlign:"center",fontFamily:F,background:BG}}/>
+              </div>
+            ))}
+            <button onClick={()=>setOverT(null)} style={{width:"100%",marginTop:6,background:GP,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>完了</button>
+          </div>
+        </div>
+      )}
       {/* 追加フォーム */}
       {showAdd ? (
         <div style={{background:BG,borderRadius:12,padding:"12px",border:`1.5px solid ${tab==="good"?G:R}`}}>
