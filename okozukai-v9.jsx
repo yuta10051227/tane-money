@@ -2105,6 +2105,25 @@ function NewsModal({onClose}){
 // ═══════════════════════════════════════════════════════
 // ⭐やくそく: その日に表示される必須タスク(req:true)の達成状況を返す
 // (DailyTasksと同じセット自動選択＋曜日フィルタ。dateObj省略時は今日)
+// ⏰ あさスタート型(当日かいほう): 休みの日(土日 or 長期休みモード)に、しめきり時刻までに
+// 最初の「やること」(daily/good)を記録したら、その日のうちにごほうびOK（例:休みの日は8時に起きてやり始めたらスマホ・動画OK）
+function getMorningUnlock(data, cid){
+  const mu=(data.familySettings||{}).morningUnlock;
+  if(!mu||!mu.enabled) return {applies:false, unlocked:false, beforeDeadline:false, time:"08:30"};
+  const now=new Date();
+  const dow=now.getDay();
+  const isOff=dow===0||dow===6||!!(data.familySettings&&data.familySettings.vacationMode);
+  if((mu.days||"off")==="off" && !isOff) return {applies:false, unlocked:false, beforeDeadline:false, time:mu.time||"08:30"};
+  const parts=String(mu.time||"08:30").split(":");
+  const dlMin=(parseInt(parts[0])||8)*60+(parseInt(parts[1])||0);
+  const first=(data.logs||[])
+    .filter(l=>l&&l.cid===cid&&(l.type==="daily"||l.type==="good")&&isTodayLocal(l.date)&&!String(l.label||"").startsWith("🗑"))
+    .map(l=>new Date(l.date)).sort((a,b)=>a-b)[0];
+  const unlocked=!!first&&(first.getHours()*60+first.getMinutes())<=dlMin;
+  const nowMin=now.getHours()*60+now.getMinutes();
+  return {applies:true, unlocked, beforeDeadline:nowMin<=dlMin, time:mu.time||"08:30"};
+}
+
 function getYakusokuInfo(data, childId, dateObj) {
   try {
     const now = dateObj || new Date();
@@ -4606,8 +4625,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const _yd = new Date(); _yd.setDate(_yd.getDate()-1);
         const yesterdayKey = `${_yd.getFullYear()}-${_yd.getMonth()+1}-${_yd.getDate()}`;
         const info = getYakusokuInfo(data, child.id);
-        const okToday = (()=>{const v=(data.yakusokuDone||{})[child.id];return Array.isArray(v)?v.includes(yesterdayKey):v===yesterdayKey;})();   // 今日の達成で昨日の権利が消えない(2日分保持)
-        if (info.reqTasks.length===0 && !okToday) return null;
+        const okYesterday = (()=>{const v=(data.yakusokuDone||{})[child.id];return Array.isArray(v)?v.includes(yesterdayKey):v===yesterdayKey;})();   // 今日の達成で昨日の権利が消えない(2日分保持)
+        const morning = getMorningUnlock(data, child.id);
+        const okToday = okYesterday || morning.unlocked;   // 翌日型(昨日全クリア) or あさスタート型(当日) のどちらかでOK
+        if (info.reqTasks.length===0 && !okToday && !morning.applies) return null;
         const privs = (data.familySettings&&Array.isArray(data.familySettings.privileges))?data.familySettings.privileges:[];
         const privStr = privs.length ? privs.map(p=>`${p.emoji}${p.label}`).join("・") : "おたのしみ";
         const hadReqYesterday = getYakusokuInfo(data, child.id, _yd).reqTasks.length>0;
@@ -4615,10 +4636,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           <div style={{padding:"10px 16px 0"}}>
             <div style={{background:okToday?GS:(darkBG?"rgba(255,255,255,0.05)":CARD),border:`1.5px solid ${okToday?G:(darkBG?"rgba(255,255,255,0.1)":BORDER)}`,borderRadius:14,padding:"10px 14px"}}>
               {okToday
-                ? <p style={{margin:0,fontWeight:900,fontSize:13,color:GP}}>🎉 きょうは {privStr} OK！</p>
-                : hadReqYesterday
-                  ? <p style={{margin:0,fontWeight:700,fontSize:11.5,lineHeight:1.5,color:darkBG?"rgba(255,255,255,0.55)":MUTED}}>きょうの おたのしみは おやすみ…きょうの やくそくで あしたゲット！</p>
-                  : null}
+                ? <p style={{margin:0,fontWeight:900,fontSize:13,color:GP}}>🎉 きょうは {privStr} OK！{morning.unlocked&&!okYesterday?"（あさスタート たっせい⏰）":""}</p>
+                : morning.applies&&morning.beforeDeadline
+                  ? <p style={{margin:0,fontWeight:800,fontSize:12.5,lineHeight:1.6,color:darkBG?"#fde68a":"#9a7000"}}>⏰ あさ {morning.time} までに「きょうのやること」を1つやると、きょう {privStr} OK！</p>
+                  : hadReqYesterday
+                    ? <p style={{margin:0,fontWeight:700,fontSize:11.5,lineHeight:1.5,color:darkBG?"rgba(255,255,255,0.55)":MUTED}}>きょうの おたのしみは おやすみ…きょうの やくそくで あしたゲット！</p>
+                    : null}
               {/* あしたのおたのしみ（やくそくのごほうび）をチップで見せる */}
               {privs.length>0 && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"8px 0 2px"}}>
@@ -5293,6 +5316,42 @@ function ParentDailyTab({data,update,sb}){
             setNpv({emoji:"🎁",label:""});
           }} disabled={!npv.label} sm/>
         </div>
+        {/* ⏰ あさスタート型（当日かいほう）: 休みの日は朝はやく起きてやり始めたら その日OK */}
+        {(()=>{
+          const mu=(data.familySettings&&data.familySettings.morningUnlock)||{enabled:false,time:"08:30",days:"off"};
+          const setMu=(patch)=>update(d=>({...d,familySettings:{...(d.familySettings||{}),morningUnlock:{...(((d.familySettings||{}).morningUnlock)||{enabled:false,time:"08:30",days:"off"}),...patch}}}));
+          return(
+            <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${BORDER}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:13,color:TEXT}}>⏰ あさスタート型（その日 かいほう）</div>
+                  <div style={{color:MUTED,fontSize:11,marginTop:2,lineHeight:1.5}}>朝はやく起きて「きょうのやること」を始めたら、翌日を待たずその日のうちにごほうびOK（例：休みの日は8時に起きてやり始めたらスマホ・動画OK）</div>
+                </div>
+                <button onClick={()=>setMu({enabled:!mu.enabled})}
+                  style={{background:mu.enabled?G:BORDER,border:"none",borderRadius:16,width:46,height:26,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+                  <div style={{position:"absolute",top:3,left:mu.enabled?23:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+                </button>
+              </div>
+              {mu.enabled&&(
+                <div style={{marginTop:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:12,fontWeight:700,color:TEXTS,flexShrink:0}}>しめきり</span>
+                    <select value={mu.time||"08:30"} onChange={e=>setMu({time:e.target.value})} style={{...INP,width:96,padding:"7px 8px"}}>
+                      {["06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","11:00"].map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <span style={{fontSize:11,color:MUTED,lineHeight:1.4}}>までに最初のやることを記録すると その日OK</span>
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    {[["off","休みの日だけ（土日・長期休み）"],["all","毎日"]].map(([v,l])=>(
+                      <button key={v} onClick={()=>setMu({days:v})}
+                        style={{flex:1,padding:"8px 6px",border:`1.5px solid ${(mu.days||"off")===v?G:BORDER}`,borderRadius:10,background:(mu.days||"off")===v?`${G}12`:"transparent",color:(mu.days||"off")===v?G:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>);
     })()}
 
