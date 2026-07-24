@@ -284,7 +284,7 @@ function _slimForCloud(d){
     const dp={};
     for(const cid of Object.keys(saveD.dailyProgress)){
       const days=saveD.dailyProgress[cid]||{};
-      const ks=Object.keys(days).sort().slice(-21);
+      const ks=Object.keys(days).sort((a,b)=>new Date(a.replace(/-/g,"/"))-new Date(b.replace(/-/g,"/"))).slice(-21);   // キーはゼロ埋めなし=辞書順は10月以降壊れる
       const o={}; for(const k of ks) o[k]=days[k];
       dp[cid]=o;
     }
@@ -471,7 +471,9 @@ function startRealtimeSync(updateFn){
               if(prev.holdings&&Object.keys(prev.holdings).length&&(_rud('holdings')||!(merged.holdings&&Object.keys(merged.holdings).length))) merged.holdings=prev.holdings;
               if(prev.forexHoldings&&Object.keys(prev.forexHoldings).length&&(_rud('forexHoldings')||!(merged.forexHoldings&&Object.keys(merged.forexHoldings).length))) merged.forexHoldings=prev.forexHoldings;
             }
-            if(prev.claimedBadges) merged.claimedBadges=prev.claimedBadges;
+            // バッジ獲得済み・まめちしき既読は端末間ユニオン＝巻き戻りによる報酬の再付与を防ぐ
+            if(prev.claimedBadges){merged.claimedBadges={...(merged.claimedBadges||{})};Object.keys(prev.claimedBadges).forEach(cid=>{merged.claimedBadges[cid]=Array.from(new Set([...(merged.claimedBadges[cid]||[]),...(prev.claimedBadges[cid]||[])]));});}
+            if(prev.tipsRead){merged.tipsRead={...(merged.tipsRead||{})};Object.keys(prev.tipsRead).forEach(cid=>{merged.tipsRead[cid]=Array.from(new Set([...(merged.tipsRead[cid]||[]),...(prev.tipsRead[cid]||[])]));});}
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
             // お手伝い項目(タスク定義)は原則サーバ優先＝追加/編集/削除/並び替えが全端末へ必ず反映される。
             // ただし自端末が直近12秒に編集した場合だけ、保存がサーバへ伝播するまでローカルを保護(消えない)。
@@ -1401,9 +1403,9 @@ const calcMemberOperation = (memberId, data, type="total") => {
   const stockCurrentValue = holdings.reduce((s,h)=>{
     const st=stocks.find(x=>x.id===h.stockId);
     if(!st)return s;
-    const price=st.price;
-    const currency=st.currency;
-    const pts=currency==="JPY"?Math.round(price*h.qty):Math.round(price*h.qty*10);
+    // 売買・配当と同じpt換算(JPY: price/100, USD: price*1.5)。旧実装は100倍/6.7倍で運用成績が桁違いだった
+    const unit=st.currency==="USD"?Math.max(1,Math.round(st.price*1.5)):Math.max(1,Math.round(st.price/100));
+    const pts=unit*h.qty;
     return s + Math.floor(pts*0.98); // 売却時2%手数料を考慮
   },0);
   // 為替の損益計算
@@ -1451,7 +1453,7 @@ const calcMonthlyActivity = (memberId, logs) => {
 const monthKey = (d=new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
 const fmtDate  = iso => { const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`; };
 const uid      = () => Math.random().toString(36).slice(2,10);
-const bal      = (logs, cid) => (logs||[]).filter(l=>l.cid===cid).reduce((s,l)=>s+l.pts,0);
+const bal      = (logs, cid) => (logs||[]).filter(l=>l&&l.cid===cid).reduce((s,l)=>s+(+l.pts||0),0);   // NaN混入でも残高を壊さない
 const parentBal= (pLogs, pid) => ((pLogs||{})[pid]||[]).reduce((s,l)=>s+(l.pts||0),0);
 const weekKey  = (d=new Date())=>{const jan1=new Date(d.getFullYear(),0,1);const w=Math.ceil((((d-jan1)/86400000)+jan1.getDay()+1)/7);return `${d.getFullYear()}-${String(w).padStart(2,"0")}`;};
 const taskPts  = (task, cid) => task.over?.[cid] ?? task.pts;
@@ -2407,6 +2409,7 @@ function DailyTasks({ child, data, update }) {
 function TaskManagerSection({data, update}){
   const [tab, setTab] = useState("good"); // good | bad
   const [showAdd, setShowAdd] = useState(false);
+  const [editT, setEditT] = useState(null);   // {id,emoji,label,pts} タスク編集（旧おや管理から移植）
   const [newEmoji, setNewEmoji] = useState("⭐");
   const [newLabel, setNewLabel] = useState("");
   const [newPts, setNewPts] = useState("");
@@ -2419,11 +2422,13 @@ function TaskManagerSection({data, update}){
     const pts = parseInt(newPts);
     if(isNaN(pts)) return;
     const finalPts = tab==="bad" ? -Math.abs(pts) : Math.abs(pts);
+    markLocalDefEdit();
     update(d=>({...d,[key]:[...d[key],{id:uid(),emoji:newEmoji,label:newLabel.trim(),pts:finalPts,over:{}}]}));
     setNewLabel(""); setNewPts(""); setNewEmoji("⭐"); setShowAdd(false);
   };
 
   const doDelete = (id) => {
+    markLocalDefEdit();
     update(d=>({...d,[key]:d[key].filter(t=>t.id!==id)}));
   };
 
@@ -2448,16 +2453,41 @@ function TaskManagerSection({data, update}){
         {tasks.map(t=>(
           <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,background:CARD,
             border:`1.5px solid ${BORDER}`,borderRadius:10,padding:"8px 10px",marginBottom:5}}>
+            {editT?.id===t.id ? (
+              <div style={{flex:1}}>
+                <div style={{display:"flex",gap:6,marginBottom:6}}>
+                  <input value={editT.emoji} onChange={e=>setEditT(x=>({...x,emoji:e.target.value}))} style={{width:44,padding:"6px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:16,textAlign:"center",fontFamily:F,background:BG}}/>
+                  <input value={editT.label} onChange={e=>setEditT(x=>({...x,label:e.target.value}))} maxLength={20} style={{flex:1,padding:"6px 9px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,fontFamily:F,background:BG}}/>
+                  <input value={editT.pts} onChange={e=>setEditT(x=>({...x,pts:e.target.value}))} type="number" style={{width:64,padding:"6px",border:`1.5px solid ${BORDER}`,borderRadius:8,fontSize:13,textAlign:"center",fontFamily:F,background:BG}}/>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>{
+                    const pv=parseInt(editT.pts); if(!editT.label.trim()||isNaN(pv)) return;
+                    const fp=tab==="bad"?-Math.abs(pv):Math.abs(pv);
+                    markLocalDefEdit();
+                    update(d=>({...d,[key]:d[key].map(x=>x.id===t.id?{...x,emoji:editT.emoji||"⭐",label:editT.label.trim(),pts:fp}:x)}));
+                    setEditT(null);
+                  }} style={{padding:"5px 12px",background:G,border:"none",borderRadius:7,color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>保存</button>
+                  <button onClick={()=>setEditT(null)} style={{padding:"5px 12px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:7,color:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                </div>
+              </div>
+            ) : (<>
             <span style={{fontSize:18}}>{t.emoji}</span>
             <div style={{flex:1}}>
               <div style={{fontWeight:700,fontSize:12,color:TEXT}}>{t.label}{(((data.myTaskIds||{})._stock)||[]).includes(t.id)&&<span style={{marginLeft:6,background:`${B}15`,color:B,borderRadius:6,padding:"1px 5px",fontSize:10,fontWeight:800}}>📦 作り置き</span>}</div>
               <div style={{fontSize:11,color:t.pts>0?G:R,fontWeight:700}}>{t.pts>0?"+":""}{t.pts}pt</div>
             </div>
+            <button onClick={()=>setEditT({id:t.id,emoji:t.emoji,label:t.label,pts:String(Math.abs(t.pts))})}
+              style={{padding:"3px 8px",background:`${B}15`,border:`1.5px solid ${B}`,
+                borderRadius:7,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>
+              ✏ 編集
+            </button>
             <button onClick={()=>doDelete(t.id)}
               style={{padding:"3px 8px",background:`${R}15`,border:`1.5px solid ${R}`,
                 borderRadius:7,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
               削除
             </button>
+            </>)}
           </div>
         ))}
       </div>
@@ -2565,6 +2595,11 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
   const [stLabel, setStLabel] = useState("");
   const [stPts, setStPts] = useState("10");
   const [stockPickOpen, setStockPickOpen] = useState(false);
+  // 子ども追加（旧おや管理から移植）
+  const [mAddOpen, setMAddOpen] = useState(false);
+  const [mName, setMName] = useState("");
+  const [mEmoji, setMEmoji] = useState("😊");
+  const [mMode, setMMode] = useState("junior");
   const [smREmoji, setSmREmoji] = useState("🎁");
   const [smRLabel, setSmRLabel] = useState("");
   const [smRCost, setSmRCost] = useState("5");
@@ -2764,7 +2799,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                         <input value={grantAmt} onChange={e=>setGrantAmt(e.target.value)} type="number" placeholder="pt数" style={{...INP,flex:1}}/>
                         <button onClick={()=>{
                           const amt=parseInt(grantAmt);
-                          if(isNaN(amt)||amt===0) return;
+                          if(isNaN(amt)||amt<=0) return;   // 負数は意味が反転するため拒否
                           if(!txGuard("grant_"+member.id)) return;   // 連打ガード(二重付与防止)
                           (()=>{const _e={id:uid(),cid:member.id,type:"grant",label:`🎁 親からのポイント付与`,pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
                           setGrantAmt("");setGrantChild(null);
@@ -2775,7 +2810,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       <div style={{display:"flex",gap:8,marginTop:6}}>
                         <button onClick={()=>{
                           const amt=parseInt(grantAmt);
-                          if(isNaN(amt)||amt===0) return;
+                          if(isNaN(amt)||amt<=0) return;   // 負数は意味が反転するため拒否
                           if(!txGuard("deduct_"+member.id)) return;   // 連打ガード(二重減算防止)
                           (()=>{const _e={id:uid(),cid:member.id,type:"grant",label:`⚠ ポイント減算`,pts:-amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
                           setGrantAmt("");setGrantChild(null);
@@ -3033,16 +3068,16 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
                   {[1,2,3,5,10].map(r=>(
                     <button key={r} onClick={()=>update(d=>({...d,interestRate:r/100}))}
-                      style={{padding:"6px 14px",border:`1.5px solid ${Math.round((data.interestRate||0.05)*100)===r?G:BORDER}`,
-                        borderRadius:10,background:Math.round((data.interestRate||0.05)*100)===r?`${G}20`:"transparent",
-                        color:Math.round((data.interestRate||0.05)*100)===r?G:MUTED,
+                      style={{padding:"6px 14px",border:`1.5px solid ${Math.round((data.interestRate||0.01)*100)===r?G:BORDER}`,
+                        borderRadius:10,background:Math.round((data.interestRate||0.01)*100)===r?`${G}20`:"transparent",
+                        color:Math.round((data.interestRate||0.01)*100)===r?G:MUTED,
                         fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
                       {r}%
                     </button>
                   ))}
                 </div>
                 <div style={{fontSize:12,color:MUTED}}>
-                  現在の利率：<span style={{fontWeight:800,color:G}}>{Math.round((data.interestRate||0.05)*100)}%</span>
+                  現在の利率：<span style={{fontWeight:800,color:G}}>{Math.round((data.interestRate||0.01)*100)}%</span>
                 </div>
               </div>
               {/* 対象メンバー別残高と予想利子 */}
@@ -3050,7 +3085,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>次回付与予定（参考）</p>
                 {[...data.children,...(data.parents||[])].map(m=>{
                   const b=bal(data.logs,m.id);
-                  const interest=data.interestEnabled&&b>0?Math.floor(b*(data.interestRate||0.05)):0;
+                  const interest=data.interestEnabled&&b>0?Math.floor(b*(data.interestRate||0.01)):0;
                   return(
                     <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                       <Emo e={m.emoji} size={18}/>
@@ -3127,12 +3162,59 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                             写真を削除
                           </button>
                         )}
-                        <span style={{fontSize:10,color:MUTED,flex:1}}>トップと本人のページに表示されます</span>
+                        <PromptModalButton btnLabel="✏ 名前" title={`${m.name}の名前を変更`} desc="新しい名前を入力してください" type="text" maxLen={10} initial={m.name}
+                          btnStyle={{padding:"6px 12px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:8,color:TEXTS,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}
+                          onSubmit={(nm)=>{ if(!nm||!nm.trim())return; update(d=>({...d,
+                            children:d.children.map(c=>c.id===m.id?{...c,name:nm.trim()}:c),
+                            parents:(d.parents||[]).map(pp=>pp.id===m.id?{...pp,name:nm.trim()}:pp),
+                          })); }}/>
+                        {data.children.some(c=>c.id===m.id)&&data.children.length>1&&(
+                          <button onClick={()=>{
+                            if(!confirm(`${m.name} を削除しますか？\n履歴・家計簿・目標もすべて消えます（元に戻せません）`))return;
+                            markLocalUserDataEdit();
+                            update(d=>({...d,
+                              children:d.children.filter(c=>c.id!==m.id),
+                              logs:(d.logs||[]).filter(l=>l.cid!==m.id),
+                              expenses:(d.expenses||[]).filter(e=>e.cid!==m.id),
+                              goals:(d.goals||[]).filter(g=>g.cid!==m.id),
+                            }), {allowShrink:true});
+                          }} style={{padding:"6px 10px",background:"none",border:`1.5px solid ${R}40`,borderRadius:8,color:R,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>🗑</button>
+                        )}
+                        <span style={{fontSize:10,color:MUTED,flex:1}}>写真はトップと本人ページに表示</span>
                       </div>
                     )}
                   </div>
                 );
               })}
+              {mAddOpen ? (
+                <div style={{background:`${G}08`,border:`2px dashed ${G}`,borderRadius:12,padding:12,marginBottom:10}}>
+                  <div style={{display:"flex",gap:8,marginBottom:8}}>
+                    <input value={mEmoji} onChange={e=>setMEmoji(e.target.value)} style={{...INP,width:54}} placeholder="絵文字"/>
+                    <input value={mName} onChange={e=>setMName(e.target.value)} maxLength={10} style={INP} placeholder="なまえ（例：たろう）"/>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    {[["junior","小学生"],["teen","中高生"]].map(([k,l])=>(
+                      <button key={k} onClick={()=>setMMode(k)} style={{flex:1,padding:"8px 0",borderRadius:10,border:`1.5px solid ${mMode===k?GP:BORDER}`,background:mMode===k?`${GP}12`:"none",color:mMode===k?GP:MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>{
+                      if(!mName.trim())return;
+                      const nid=uid();
+                      update(d=>({...d,children:[...d.children,{
+                        id:nid, name:mName.trim(), emoji:mEmoji||"😊", pinh:pinHash("0000"), role:"child",
+                        displayMode:mMode, ageMode:mMode==="junior"?"young":"middle",
+                        gradeLabel:mMode==="junior"?"小学生":"中高生",
+                      }]}));
+                      setMName(""); setMEmoji("😊"); setMAddOpen(false);
+                    }} style={{flex:1,background:G,border:"none",borderRadius:10,padding:"10px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>追加する</button>
+                    <button onClick={()=>setMAddOpen(false)} style={{padding:"10px 14px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:10,color:MUTED,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+                  </div>
+                  <p style={{color:MUTED,fontSize:10.5,margin:"8px 0 0"}}>暗証番号は、本人がはじめてページを開くときに設定します</p>
+                </div>
+              ) : (
+                <button onClick={()=>setMAddOpen(true)} style={{width:"100%",background:`${G}12`,border:`1.5px solid ${G}`,borderRadius:10,padding:"10px 0",color:G,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F,marginBottom:10}}>＋ 子どもを追加</button>
+              )}
               {/* ファミリーコード */}
               <div style={{background:BG,borderRadius:12,padding:"12px 14px",marginTop:8,border:`1.5px solid ${BORDER}`}}>
                 <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 4px"}}>ファミリーコード</p>
@@ -3184,8 +3266,10 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
             const fs=data.familySettings||INIT.familySettings;
             const pending=data.pendingApprovals||[];
             const approve=(entry)=>{
+              if(_processedApprovalIds.has(entry.id)) return;   // 冪等化＝連打・2端末同時承認の二重付与防止
               _processedApprovalIds.add(entry.id);
-              const log={id:uid(),cid:entry.cid,type:"good",label:entry.taskLabel,pts:entry.pts,date:new Date().toISOString(),rid:entry.taskId};
+              // idを決定的(approve_申請id)に＝2端末同時承認でもreconcileで1件に集約
+              const log={id:`approve_${entry.id}`,cid:entry.cid,type:"good",label:entry.taskLabel,pts:entry.pts,date:new Date().toISOString(),rid:entry.taskId};
               addLogToFirestore(log);
               update(d=>({...d,logs:[log,...d.logs],pendingApprovals:(d.pendingApprovals||[]).filter(p=>p.id!==entry.id)}));
             };
@@ -3431,7 +3515,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 const approveR=(entry)=>{
                   if(_processedRedemptionIds.has(entry.id)) return;   // 冪等化＝二重承認/復活後の再承認による二重減算を防ぐ
                   _processedRedemptionIds.add(entry.id);
-                  const log={id:uid(),cid:entry.cid,type:"reward",label:`${entry.rewardLabel}（${entry.rewardUnit}）`,pts:-entry.cost,rid:entry.rewardId,date:new Date().toISOString()};
+                  if(bal(data.logs,entry.cid) < entry.cost && !confirm(`残高が足りません（残高${bal(data.logs,entry.cid)}pt < ${entry.cost}pt）。マイナスになりますが承認しますか？`)) return;
+                  const log={id:`redeem_${entry.id}`,cid:entry.cid,type:"reward",label:`${entry.rewardLabel}（${entry.rewardUnit}）`,pts:-entry.cost,rid:entry.rewardId,date:new Date().toISOString()};
                   addLogToFirestore(log);
                   update(d=>({...d,logs:[log,...d.logs],pendingRedemptions:(d.pendingRedemptions||[]).filter(p=>p.id!==entry.id)}));
                 };
@@ -3691,9 +3776,14 @@ function LogRow({ l, emoji, canDelete, child, update, showFlash }){
   const t=useRef({x:0,y:0,base:0,lock:null});
   const OPEN=-86;
   const deleteLog=()=>{
-    const rev={id:uid(),cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
-    addLogToFirestore(rev);
-    update(d=>({...d,logs:[rev,...d.logs]}));
+    // 逆仕訳は元ログと1:1で紐付け(revOf)＋id決定的(rev_元id)＝同じログは1回しか取り消せない。
+    // 連打・2端末同時実行もFirestore docId/reconcileの重複排除で1件に集約される（旧実装はuid()で無限増殖可能だった）。
+    const rev={id:`rev_${l.id}`,revOf:l.id,cid:child.id,type:"grant",label:`🗑 取り消し: ${l.label}`,pts:-l.pts,date:new Date().toISOString()};
+    update(d=>{
+      if((d.logs||[]).some(x=>x&&(x.revOf===l.id||x.id===`rev_${l.id}`))) return d;   // 取り消し済み
+      addLogToFirestore(rev);
+      return {...d,logs:[rev,...d.logs]};
+    });
     showFlash(-l.pts,"🗑");
     setConfirm(false); setDx(0);
   };
@@ -3866,6 +3956,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   const doRedeem = r => {
     if(!txGuard("redeem_"+child.id+"_"+r.id)) return;   // 連打ガード(二重交換/二重消費防止)
+    // 同じごほうびの多重申請を拒否＋申請中の合計を差し引いた残高で判定（承認前の申請は残高を減らさないため、無制限に申請できてしまうのを防ぐ）
+    const _myPend=(data.pendingRedemptions||[]).filter(p=>p.cid===child.id);
+    if(_myPend.some(p=>p.rewardId===r.id)){ setRewardPop(null); setFlash({pts:0,emoji:"⏳",pending:true}); setTimeout(()=>setFlash(null),1200); return; }
+    const _pendSum=_myPend.reduce((sum,p)=>sum+(p.cost||0),0);
+    if(bal(data.logs,child.id)-_pendSum < r.cost){ setRewardPop(null); alert("しんせい中のぶんをあわせると ポイントがたりないよ"); return; }
     setRewardPop(null);
     const _rfs = data.familySettings || INIT.familySettings;
     if(_rfs.rewardApproval) {
@@ -4303,7 +4398,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       {effectiveTab==="daily" && (()=>{
         const fs=data.familySettings||INIT.familySettings;
         if(!fs.familyMission?.enabled) return null;
-        const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0).reduce((s,l)=>s+l.pts,0);
+        const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
         const target=fs.familyMission?.target||3000;
         const pct=Math.min(100,Math.floor(missionPts/target*100));
         return(
@@ -4312,7 +4407,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <span style={{fontSize:14}}>❤</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:700,color:TEXT}}>家族ミッション</div>
-                <div style={{fontSize:11,color:MUTED}}>みんなであと{(target-missionPts).toLocaleString()}pt</div>
+                <div style={{fontSize:11,color:MUTED}}>{missionPts>=target?"🎉 今月のミッション達成！":`みんなであと${Math.max(0,target-missionPts).toLocaleString()}pt`}</div>
                 <div style={{background:BORDER,borderRadius:999,height:4,marginTop:5,overflow:"hidden"}}>
                   <div style={{width:`${pct}%`,height:"100%",background:G,borderRadius:999}}/>
                 </div>
@@ -4910,7 +5005,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 out.push(<div key={"d_"+key} style={{display:"flex",alignItems:"center",gap:8,margin:"14px 2px 8px"}}><div style={{height:1,flex:1,background:BORDER}}/><span style={{fontSize:11,fontWeight:900,color:MUTED,whiteSpace:"nowrap"}}>{lbl}</span><div style={{height:1,flex:1,background:BORDER}}/></div>);
               }
               const emoji=l.type==="transfer_out"?"💸":l.type==="transfer_in"?"💌":l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":l.type==="interest"?"💹":l.type==="invest_buy"?"📈":l.type==="invest_sell"?"📉":l.type==="tips"?"💡":([...(data.goodTasks||[]),...(data.badTasks||[])].find(t=>t.id===l.rid)?.emoji||"📌");
-              const canDelete=l.type!=="gacha"&&!(l.label||"").startsWith("🗑 取り消し:");
+              // 取り消し可否: ガチャ/逆仕訳/取り消し済みは不可。送金・株売買は対向仕訳や保有株を巻き戻せない(片側だけ返金される)ため不可。
+              const canDelete=l.type!=="gacha"
+                &&!["transfer_in","transfer_out","invest_buy","invest_sell"].includes(l.type)
+                &&!(l.label||"").startsWith("🗑 取り消し:")
+                &&!myLogs.some(x=>x&&(x.revOf===l.id||x.id===`rev_${l.id}`));
               out.push(<LogRow key={l.id} l={l} emoji={emoji} canDelete={canDelete} child={child} update={update} showFlash={showFlash}/>);
             });
             return out;
@@ -5361,7 +5460,7 @@ function ParentDailyTab({data,update,sb}){
             {data.children.map(child=>{
               const prog=(data.dailyProgress||{})[child.id]?.[today]||{};
               const vis=s.tasks.filter(t=>!Array.isArray(t.dow)||t.dow.length===0||t.dow.includes(new Date().getDay()));
-              const done=vis.filter(t=>t.type==="check"?!!prog[t.id]:(prog[t.id]||0)>=(t.target||1)).length;
+              const done=vis.filter(t=>{const k=`${s.id}::${t.id}`;return t.type==="check"?!!(prog[k]||prog[t.id]):((prog[k]??prog[t.id])||0)>=(t.target||1);}).length;
               const allD=done===vis.length&&vis.length>0;
               return(<div key={child.id} style={{display:"flex",alignItems:"center",gap:8,background:allD?"#e8faf0":BG,border:`1px solid ${allD?G:BORDER}`,borderRadius:10,padding:"7px 10px",marginBottom:6}}>
                 <ChildAvatar child={child} size={24}/>
@@ -5644,7 +5743,7 @@ function FamilyPublicScreen({data, viewerRole, onBack}){
       <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:12}}>
         {/* 家族ミッション */}
         {fs.familyMission?.enabled&&(()=>{
-          const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0).reduce((s,l)=>s+l.pts,0);
+          const missionPts=(data.logs||[]).filter(l=>["daily","good","bad"].includes(l.type)&&l.pts>0&&(l.date||"").startsWith(monthKey())).reduce((s,l)=>s+l.pts,0);   // 「今月の」表示どおり月次集計
           const target=fs.familyMission?.target||3000;
           const pct=Math.min(100,Math.floor(missionPts/target*100));
           return(
@@ -5856,7 +5955,7 @@ function ParentScreen({ data, update, onBack }) {
   const sb = (c,l,fn,dis) => <Btn c={c} label={l} onClick={fn} disabled={dis} sm/>;
 
   const doGrant = () => {
-    const amt=parseInt(grantAmt); if(!amt||!grantChild)return;
+    const amt=parseInt(grantAmt); if(!amt||amt<=0||!grantChild)return;   // 負数拒否
     if(!txGuard("grant2_"+grantChild.id)) return;   // 連打ガード(二重付与防止)
     (()=>{const _e={id:uid(),cid:grantChild.id,type:"grant",label:grantLabel||"おこづかい",pts:amt,date:new Date().toISOString()};update(d=>({...d,logs:[_e,...d.logs]}));addLogToFirestore(_e);})();
     setGrantChild(null); setGrantAmt(""); setGrantLabel("おこづかい");
@@ -6523,7 +6622,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
   const todayDelta = (memberId) => {
     const td = todayKey();
     return (data.logs||[])
-      .filter(l=>l.cid===memberId && (l.date||"").startsWith(td) && l.pts>0)
+      .filter(l=>l.cid===memberId && isTodayLocal(l.date) && l.pts>0)
       .reduce((s,l)=>s+l.pts,0);
   };
   const topGoal = (memberId) => {
@@ -6573,7 +6672,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
 
       {/* 未承認だけは緊急性が高いので 上部に細いアラートで残す */}
       {pendCount>0 && (
-        <div onClick={()=>onParent&&onParent()} style={{margin:"0 20px 12px",background:RS,border:`1.5px solid ${R}`,borderRadius:12,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+        <div onClick={()=>onSettings?onSettings():(onParent&&onParent())} style={{margin:"0 20px 12px",background:RS,border:`1.5px solid ${R}`,borderRadius:12,padding:"9px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
           <span style={{fontSize:16}}>🔔</span>
           <span style={{flex:1,fontSize:13,fontWeight:800,color:R}}>みしょうにんが {pendCount}けん あります</span>
           <span style={{fontSize:12,color:R,fontWeight:700}}>かくにん ›</span>
@@ -6649,7 +6748,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
         {data.children&&data.children.length>0 && (()=>{
           const td=todayKey();
           const kids=data.children||[];
-          const didToday=kids.filter(c=>(data.logs||[]).some(l=>l.cid===c.id&&(l.type==="good"||l.type==="daily")&&(l.date||"").startsWith(td)));
+          const didToday=kids.filter(c=>(data.logs||[]).some(l=>l.cid===c.id&&(l.type==="good"||l.type==="daily")&&isTodayLocal(l.date)));
           const gachaLeft=kids.filter(c=>(data.gachaDate?.[c.id])!==td);
           const wkAgo=(()=>{const d=new Date();d.setDate(d.getDate()-7);return d.toISOString();})();
           return (
@@ -6731,10 +6830,10 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
             {[
               {key:"pin",emoji:"🔐",title:"PINを変更する",desc:"右上の ⚙ 設定・管理 → メンバー・PIN",done:onboardChecks.pin,
                action:()=>{setShowOnboardGuide(false);if(onSettings)onSettings();else onParent();}},
-              {key:"tasks",emoji:"📋",title:"タスクを確認する",desc:"おや管理 → タスク タブ",done:onboardChecks.tasks,
-               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),tasksOpened:true}}));setShowOnboardGuide(false);onParent();}},
-              {key:"rewards",emoji:"🎁",title:"特典を確認する",desc:"おや管理 → 特典 タブ",done:onboardChecks.rewards,
-               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),rewardsOpened:true}}));setShowOnboardGuide(false);onParent();}},
+              {key:"tasks",emoji:"📋",title:"タスクを確認する",desc:"⚙ 設定・管理 → お手伝い項目",done:onboardChecks.tasks,
+               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),tasksOpened:true}}));setShowOnboardGuide(false);if(onSettings)onSettings();else onParent();}},
+              {key:"rewards",emoji:"🎁",title:"特典を確認する",desc:"⚙ 設定・管理 → ごほうび（特典）",done:onboardChecks.rewards,
+               action:()=>{if(update)update(d=>({...d,onboardingChecks:{...(d.onboardingChecks||{}),rewardsOpened:true}}));setShowOnboardGuide(false);if(onSettings)onSettings();else onParent();}},
             ].map(item=>(
               <div key={item.key} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 0",borderBottom:`1px solid ${BORDER}`}}>
                 <div style={{width:44,height:44,borderRadius:14,background:item.done?GS:BG,border:`2px solid ${item.done?G:BORDER}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
@@ -6784,6 +6883,10 @@ function FIcon({name,size=18,style}){
 function PinResetScreen({ data, update, onBack }) {
   const [target, setTarget] = useState(null);
   const [newPin, setNewPin]  = useState("");
+  // 本人確認：ファミリーコードの完全一致入力（無認証だと子どもが親PINを上書きして全権限を取得できてしまう）
+  const [gateCode, setGateCode] = useState("");
+  const [gateOk, setGateOk] = useState(false);
+  const realCode = (()=>{try{return localStorage.getItem(FAMILY_CODE_KEY)||"";}catch(e){return "";}})();
 
   const doReset = () => {
     if (newPin.length!==4) return;
@@ -6797,8 +6900,17 @@ function PinResetScreen({ data, update, onBack }) {
       <button onClick={onBack} style={{position:"absolute",top:20,left:20,background:"none",border:"none",fontSize:28,cursor:"pointer",color:MUTED}}>‹</button>
       <div style={{fontSize:46,marginBottom:8}}>🔑</div>
       <h2 style={{fontWeight:900,fontSize:20,margin:"0 0 6px"}}>PINを再設定</h2>
-      <p style={{color:MUTED,fontSize:12,marginBottom:22,textAlign:"center"}}>変更するアカウントを選んでください</p>
-      <div style={{width:"100%",maxWidth:340,marginBottom:18}}>
+      {!gateOk&&realCode&&(
+        <div style={{width:"100%",maxWidth:340,marginBottom:8}}>
+          <p style={{color:MUTED,fontSize:12,marginBottom:10,textAlign:"center",lineHeight:1.7}}>本人確認のため、<b>ファミリーコード</b>を入力してください<br/>（設定画面・招待メモで確認できます）</p>
+          <input value={gateCode} onChange={e=>setGateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g,""))} placeholder="TANE-XXXX-XXXX"
+            autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false}
+            style={{...INP,marginBottom:10,textAlign:"center",letterSpacing:2,fontWeight:800}}/>
+          <Btn c={GP} label="かくにんする" onClick={()=>{ if(gateCode.trim()===realCode){ setGateOk(true); } else { alert("ファミリーコードが一致しません"); } }} disabled={gateCode.trim().length<8} full/>
+        </div>
+      )}
+      {(gateOk||!realCode)&&<p style={{color:MUTED,fontSize:12,marginBottom:22,textAlign:"center"}}>変更するアカウントを選んでください</p>}
+      {(gateOk||!realCode)&&<div style={{width:"100%",maxWidth:340,marginBottom:18}}>
         {[{id:"parent",name:"おや管理画面",emoji:"🔐"},...data.children].map(item=>(
           <button key={item.id} onClick={()=>setTarget(item.id)}
             style={{width:"100%",background:target===item.id?"#fef9e0":CARD,border:`2px solid ${target===item.id?Y:BORDER}`,borderRadius:14,padding:"11px 15px",marginBottom:8,display:"flex",alignItems:"center",gap:12,cursor:"pointer",fontFamily:F}}>
@@ -6806,8 +6918,8 @@ function PinResetScreen({ data, update, onBack }) {
             <span style={{fontWeight:800,fontSize:14}}>{item.name}</span>
           </button>
         ))}
-      </div>
-      {target && (
+      </div>}
+      {(gateOk||!realCode)&&target && (
         <div style={{width:"100%",maxWidth:340}}>
           <p style={{color:MUTED,fontSize:13,fontWeight:700,marginBottom:8}}>新しい暗証番号（4けた）</p>
           <input value={newPin} onChange={e=>setNewPin(e.target.value.slice(0,4))} type="number" placeholder="0000" style={{...INP,marginBottom:14,fontSize:22,textAlign:"center",letterSpacing:10}}/>
@@ -7050,6 +7162,7 @@ async function fetchRealStockPrices(data,update){
       if(!meta||!closes) throw new Error("No data");
       const valid=closes.filter(v=>v!=null).slice(-30);
       const price=meta.regularMarketPrice||valid[valid.length-1];
+      if(!Number.isFinite(price)) continue;   // 価格不明銘柄はスキップ(NaN保存で残高計算まで壊れるのを防ぐ)
       const prev=meta.previousClose||valid[valid.length-2]||price;
       const currency=meta.currency||s.currency;
       stockResults[s.id]={
@@ -7172,6 +7285,8 @@ function PointTransferModal({ child, data, update, onClose }) {
   const amtOk      = !isNaN(amt) && amt >= 10 && amt <= myBal;
 
   const doTransfer = () => {
+    if(!txGuard("transfer_"+child.id)) return;   // 連打ガード(二重送金防止)
+    if(bal(data.logs,child.id) < amt) return;    // 実行時に残高を再チェック
     const now = new Date().toISOString();
     const outE = { id:uid(), cid:child.id,    type:"transfer_out", label:`💸 ${receiver.name}へ送金`,            pts:-amt, toId:receiver.id,  date:now };
     const inE  = { id:uid(), cid:receiver.id, type:"transfer_in",  label:`💌 ${child.name}からのプレゼント！`,   pts: amt, fromId:child.id,   date:now };
@@ -7338,7 +7453,7 @@ function WeeklyReport({child,data,onClose}){
   const taskCount=logs.filter(l=>l.type==="good").length;
   const gachaCount=logs.filter(l=>l.type==="gacha").length;
   const curBal=bal(data.logs,child.id);
-  const interest=data.interestEnabled?Math.floor(curBal*(data.interestRate||0.05)):0;
+  const interest=data.interestEnabled?Math.floor(curBal*(data.interestRate||0.01)):0;
   // ── C: お金の学び 計測指標 ──
   const validQuiz=new Set(ALL_TIPS.map(t=>t.id));
   const quizMastered=((data.tipsQuiz||{})[child.id]||[]).filter(id=>validQuiz.has(id)).length;  // クイズ正解(累計マスター)
@@ -8535,7 +8650,7 @@ function SetupWizard({ data, update, onComplete }) {
       logs:[bonusLog],
       gachaDate:{}, streak:{},
       firstActionPending:true,
-    }));
+    }), {allowShrink:true});   // ウィザードは意図的な全置換＝急減ガード免除(INITデモタスクへの巻き戻り防止)
     addLogToFirestore(bonusLog);
     onComplete("create");
   };
@@ -8908,18 +9023,18 @@ const PARENT_TUTORIAL = [
     hint:"暗証番号の初期値は 0000。あとで必ず変更してください"
   },
   {
-    emoji:"✅", title:"承認とメンバー管理",
-    body:"「承認・管理」タブで、子どものタスク完了やごほうび交換にOKを出せます。名前・暗証番号などメンバーの設定もここから。",
-    hint:"承認まちがあるとバッジで知らせます"
+    emoji:"✅", title:"承認はトップの⚙から",
+    body:"トップ画面右上の⚙「設定・管理」を開くと、承認まちがあれば最初に表示されます。ポイントの手動付与もここから。",
+    hint:"承認まちがあると⚙メニューにバッジが出ます"
   },
   {
     emoji:"📋", title:"お手伝いと毎日タスク",
-    body:"「タスク」タブでお手伝い項目とポイントを編集。「毎日」タブで毎日やることセット（曜日別・休みモード）を作れます。",
-    hint:"子どもごとに個別ポイントも設定できます"
+    body:"⚙「お手伝い項目」でタスクとポイントを編集。「毎日タスク管理」で毎日やることセット（曜日別・休みモード）も作れます。",
+    hint:"「担当わけ・作り置き」で子どもごとの割り当ても"
   },
   {
     emoji:"🎁", title:"ごほうび（特典）",
-    body:"「特典」タブで、貯めたポイントの交換メニューを編集できます（例：ゲーム30分 = 100pt）。",
+    body:"⚙「ごほうび（特典）」で、貯めたポイントの交換メニューを編集できます（例：ゲーム30分 = 100pt）。",
     hint:"ポイントではなく「やくそく」型のごほうびも作れます"
   },
   {
@@ -9005,7 +9120,7 @@ function Tutorial({ isParent, name, emoji, onDone, onBonus, bonusEligible=true }
 
 // ── TabHint ───────────────────────────────────────────
 function TabHint({ id, text, data, update, cid }) {
-  const seenKey = `hint_${id}`;
+  const seenKey = `hint_${cid||"all"}_${id}`;   // メンバー別に既読管理(1人が閉じても他の家族には初回表示される)
   const seen = (data.tutorialSeen||{})[seenKey];
   const [visible, setVisible] = useState(!seen);
 
