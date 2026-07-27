@@ -250,7 +250,7 @@ let _cloudSaveTimer=null, _cloudSavePending=null;
 // 「保存→自分のスナップショット→マージ→setData→保存…」の無限ループ／端末間ピンポンを断つ。
 let _lastWrittenJson=null;
 // 保存要求の世代カウンタ。await中に新しい編集が入ったら、古い保存の完了で「saved(緑)」を点けない（取りこぼし防止）。
-let _saveGen=0, _retryTimer=null;
+let _saveGen=0, _retryTimer=null, _fireCloudWrite=null;   // _fireCloudWrite: 待機中のFirestore書き込みを即時実行するための参照
 // 実際のFirestore保存結果を同期バッジ(SyncBadge)へ通知するコールバック。
 // ※旧実装は cloudSave 直後に楽観的に "saved" 表示していたため、無言拒否(900KB超)やオフラインでも「同期済み」の緑だった。
 let _syncStCb=null;
@@ -312,7 +312,7 @@ function _cloudPersist(d) {
   const near = byteLen(json) > SAVE_BYTE_WARN;
   reportSaveHealth({near, bytes:byteLen(json)});
   if(_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async function attempt(){
+  const attempt = async function attempt(){
     if(!code||code==="default"){ reportSaveHealth({ok:true, failStreak:0}); if(okToGreen())_notifySyncSt("saved"); return; }
     const db = getDB();
     if(!db){ reportSaveHealth({ok:true, failStreak:0}); if(okToGreen())_notifySyncSt("saved"); return; }
@@ -341,14 +341,23 @@ function _cloudPersist(d) {
         }
       }
     }
-  },1000); // 1秒デバウンス（目標・設定変更が素早く保存される）
+  };
+  _fireCloudWrite = attempt;
+  _saveTimer = setTimeout(attempt, 1000); // 1秒デバウンス（目標・設定変更が素早く保存される）
   // 3. Claude.ai内ならwindow.storageにも保存
   if (hasCloudStorage()) {
     try { window.storage.set(CLOUD_KEY, json); } catch(e) {}
   }
 }
 // アプリが閉じる/バックグラウンドに入るときは、デバウンス待ちの保存を確実に実行(取りこぼし防止)
-function flushCloudSave(){ if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null;} const dd=_cloudSavePending; _cloudSavePending=null; if(dd) _cloudPersist(dd); }
+function flushCloudSave(){
+  if(_cloudSaveTimer){clearTimeout(_cloudSaveTimer);_cloudSaveTimer=null;}
+  const dd=_cloudSavePending; _cloudSavePending=null; if(dd) _cloudPersist(dd);
+  // 1秒デバウンス待ちのFirestore書き込みも即時発火する。
+  // ※バックグラウンド移行でタイマーが凍結し、そのままアプリ終了すると書き込みが永久に失われていた
+  //   （＝「設定した顔写真が別端末や再起動で消える」の主因）。閉じる直前に送信を開始して間に合わせる。
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer=null; try{ _fireCloudWrite && _fireCloudWrite(); }catch(e){} }
+}
 if(typeof window!=="undefined"){
   window.addEventListener("pagehide", flushCloudSave);
   window.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushCloudSave(); });
@@ -472,6 +481,9 @@ function startRealtimeSync(updateFn){
               if(prev.forexHoldings&&Object.keys(prev.forexHoldings).length&&(_rud('forexHoldings')||!(merged.forexHoldings&&Object.keys(merged.forexHoldings).length))) merged.forexHoldings=prev.forexHoldings;
             }
             // バッジ獲得済み・まめちしき既読は端末間ユニオン＝巻き戻りによる報酬の再付与を防ぐ
+            // 顔写真: サーバ未反映ならローカルを保持（古い端末の全量上書きで消えない）。avatar:null は削除として尊重
+            merged.children=mergeMemberAvatars(merged.children, prev.children);
+            merged.parents =mergeMemberAvatars(merged.parents,  prev.parents);
             if(prev.claimedBadges){merged.claimedBadges={...(merged.claimedBadges||{})};Object.keys(prev.claimedBadges).forEach(cid=>{merged.claimedBadges[cid]=Array.from(new Set([...(merged.claimedBadges[cid]||[]),...(prev.claimedBadges[cid]||[])]));});}
             if(prev.tipsRead){merged.tipsRead={...(merged.tipsRead||{})};Object.keys(prev.tipsRead).forEach(cid=>{merged.tipsRead[cid]=Array.from(new Set([...(merged.tipsRead[cid]||[]),...(prev.tipsRead[cid]||[])]));});}
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
@@ -2107,6 +2119,17 @@ function NewsModal({onClose}){
 // (DailyTasksと同じセット自動選択＋曜日フィルタ。dateObj省略時は今日)
 // ⏰ あさスタート型(当日かいほう): 休みの日(土日 or 長期休みモード)に、しめきり時刻までに
 // 最初の「やること」(daily/good)を記録したら、その日のうちにごほうびOK（例:休みの日は8時に起きてやり始めたらスマホ・動画OK）
+// 顔写真の保護マージ: サーバ側メンバーにavatarキーが無い(＝まだ同期されていない/古い端末の上書き)場合は
+// ローカルの写真を保持する。明示削除は avatar:null で伝播し、nullなら削除を尊重する。
+function mergeMemberAvatars(serverArr, localArr){
+  if(!Array.isArray(serverArr)) return serverArr;
+  return serverArr.map(m=>{
+    if(!m || m.avatar!==undefined) return m;   // サーバに写真あり or null(明示削除)ならそのまま
+    const lm=(localArr||[]).find(x=>x&&x.id===m.id);
+    return (lm&&lm.avatar) ? {...m, avatar:lm.avatar} : m;
+  });
+}
+
 function getMorningUnlock(data, cid){
   const mu=(data.familySettings||{}).morningUnlock;
   if(!mu||!mu.enabled) return {applies:false, unlocked:false, beforeDeadline:false, time:"08:30"};
@@ -3245,8 +3268,8 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                         </label>
                         {m.avatar&&(
                           <button onClick={()=>update(d=>({...d,
-                            children:d.children.map(c=>c.id===m.id?(({avatar,...r})=>r)(c):c),
-                            parents:(d.parents||[]).map(p=>p.id===m.id?(({avatar,...r})=>r)(p):p),
+                            children:d.children.map(c=>c.id===m.id?{...c,avatar:null}:c),
+                            parents:(d.parents||[]).map(p=>p.id===m.id?{...p,avatar:null}:p),
                           }))} style={{padding:"6px 12px",background:"none",border:`1.5px solid ${BORDER}`,borderRadius:8,color:MUTED,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F}}>
                             写真を削除
                           </button>
@@ -6352,7 +6375,7 @@ function ParentScreen({ data, update, onBack }) {
                       <p style={{color:MUTED,fontSize:11,margin:"0 0 4px"}}>絵文字 / アバター（写真がない場合）</p>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         <input value={(editChild.emoji||"").startsWith("ico:")?"":editChild.emoji} placeholder="絵文字" onChange={e=>setEditChild(c=>({...c,emoji:e.target.value}))} style={{...INP,width:60}}/>
-                        {editChild.avatar&&<button onClick={()=>setEditChild(c=>({...c,avatar:undefined}))}
+                        {editChild.avatar&&<button onClick={()=>setEditChild(c=>({...c,avatar:null}))}
                           style={{padding:"5px 9px",border:`1px solid ${R}`,borderRadius:8,background:"transparent",color:R,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:F}}>
                           写真を削除
                         </button>}
@@ -9510,6 +9533,9 @@ export default function App() {
           if(lm.goodTasks) migrated.goodTasks=_uni(migrated.goodTasks, lm.goodTasks);
           if(lm.badTasks)  migrated.badTasks =_uni(migrated.badTasks,  lm.badTasks);
           if(lm.myTaskIds) migrated.myTaskIds={...(migrated.myTaskIds||{}),...lm.myTaskIds};
+          // 顔写真: サーバに未反映でもローカルの写真を守り、直後の保存でサーバへ再送する
+          migrated.children=mergeMemberAvatars(migrated.children, lm.children);
+          migrated.parents =mergeMemberAvatars(migrated.parents,  lm.parents);
           if(lm.dailyTaskSets&&lm.dailyTaskSets.length>(migrated.dailyTaskSets||[]).length) migrated.dailyTaskSets=lm.dailyTaskSets;
           if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
         }catch(e){}
