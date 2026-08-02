@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="6f50fae">
+<meta name="tane-version" content="24dabf4">
 </head>
 <body>
   <div id="root"></div>
@@ -484,7 +484,10 @@ useEffect(()=>{applyInterest(data,update,child.id);applyHoldingBonus(data,update
 const log={id:uid(),date:new Date().toISOString(),...entry};update(d=>({...d,logs:[log,...d.logs]}));addLogToFirestore(log);};const doTask=task=>{if(pressed[task.id])return;// 連打ガード(二重記録＆巨大state連続再描画でのフリーズ防止)
 const basePts=taskPts(task,child.id);// 転生ボーナス適用
 const reincBonus=data.reincarnationBonus?.[child.id];const reincActive=reincBonus&&new Date().toISOString()<reincBonus.until;const pts=reincActive&&basePts>0?Math.round(basePts*(1+reincBonus.rate)):basePts;const fs=data.familySettings||INIT.familySettings;const needApproval=fs.requireApproval&&pts>0;const alreadyPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);if(alreadyPending)return;setPressed(p=>({...p,[task.id]:true}));setTimeout(()=>setPressed(p=>{const n={...p};delete n[task.id];return n;}),500);if(needApproval){setFlash({pts:0,emoji:"⏳",pending:true});setTimeout(()=>setFlash(null),1400);const entry={id:uid(),cid:child.id,taskId:task.id,taskLabel:task.label,taskEmoji:task.emoji,pts,date:new Date().toISOString()};update(d=>({...d,pendingApprovals:[...(d.pendingApprovals||[]),entry]}));if(fs.approvalNotification&&"Notification"in window&&Notification.permission==="granted"){try{new Notification("承認リクエスト 📬",{body:`${child.name}が「${task.label}」を完了しました（+${pts}pt）`,icon:"/assets/tab_daily.png"});}catch(e){}}}else{showFlash(pts,task.emoji);// ログ追加＋お手伝いEXP(毎回フラット・日次上限のみ)を1回のupdateに統合(再描画を半減)
-update(d=>{const e={id:uid(),date:new Date().toISOString(),cid:child.id,type:pts>=0?"good":"bad",label:task.label,pts,rid:task.id};const withLog={...d,logs:[e,...d.logs]};if(pts>0){return careCap(withLog,child.id,0.25,Math.max(1,pts));}return withLog;});}};const doRedeem=r=>{if(!txGuard("redeem_"+child.id+"_"+r.id))return;// 連打ガード(二重交換/二重消費防止)
+// ※重要: logsサブコレクション(唯一の正)への送信を必ず行う。ここが唯一の送信漏れ経路で、
+//   お手伝いタップ(承認OFF)の履歴・ポイントが他端末に届かない大バグの原因だった。
+//   （受信側はblob内logsを破棄する設計のため、サブコレクションに無いログは他端末に永久に見えない）
+const e={id:uid(),date:new Date().toISOString(),cid:child.id,type:pts>=0?"good":"bad",label:task.label,pts,rid:task.id};addLogToFirestore(e);update(d=>{const withLog={...d,logs:[e,...d.logs]};if(pts>0){return careCap(withLog,child.id,0.25,Math.max(1,pts));}return withLog;});}};const doRedeem=r=>{if(!txGuard("redeem_"+child.id+"_"+r.id))return;// 連打ガード(二重交換/二重消費防止)
 // 同じごほうびの多重申請を拒否＋申請中の合計を差し引いた残高で判定（承認前の申請は残高を減らさないため、無制限に申請できてしまうのを防ぐ）
 const _myPend=(data.pendingRedemptions||[]).filter(p=>p.cid===child.id);if(_myPend.some(p=>p.rewardId===r.id)){setRewardPop(null);setFlash({pts:0,emoji:"⏳",pending:true});setTimeout(()=>setFlash(null),1200);return;}const _pendSum=_myPend.reduce((sum,p)=>sum+(p.cost||0),0);if(bal(data.logs,child.id)-_pendSum<r.cost){setRewardPop(null);alert("しんせい中のぶんをあわせると ポイントがたりないよ");return;}setRewardPop(null);const _rfs=data.familySettings||INIT.familySettings;if(_rfs.rewardApproval){const entry={id:uid(),cid:child.id,rewardId:r.id,rewardEmoji:r.emoji,rewardLabel:r.label,rewardUnit:r.unit,cost:r.cost,date:new Date().toISOString()};update(d=>({...d,pendingRedemptions:[...(d.pendingRedemptions||[]),entry]}));setFlash({pts:0,emoji:"⏳",pending:true});setTimeout(()=>setFlash(null),1400);}else{showFlash(-r.cost,r.emoji);addLog({cid:child.id,type:"reward",label:`${r.label}（${r.unit}）`,pts:-r.cost,rid:r.id});}};const hasTicket=(data.battleTickets?.[child.id]||0)>0;// 🌱 まいにちのタネ（ログインボーナス）：ランダム・レア・チケットを廃止し射幸性カット。
 //   毎日ひらく理由(開ける演出)は維持。ポイントは固定＋連続日数で少し増える。図鑑は順番に解放。
@@ -729,9 +732,11 @@ const pollRef=useRef(null);const pollKeyRef=useRef("");const startSync=useCallba
 // ※旧実装は5秒毎に全件fetch+全件reconcile+Dateソートを"変化の有無に関わらず"実行し、ログ多い家庭で
 //   周期的にカクつき・通信/Firestore読取コストが嵩んでいた。非表示タブでは止め、サーバ変化時のみreconcileする。
 if(pollRef.current)clearInterval(pollRef.current);pollRef.current=setInterval(async()=>{if(typeof document!=="undefined"&&document.hidden)return;// 非表示タブでは往復しない
-const firestoreLogs=await loadLogsFromFirestore();if(!firestoreLogs||firestoreLogs.length===0)return;// サーバ側ログに変化が無ければ（件数＋最新date が前回と同じ）重いreconcile/setDataを丸ごとスキップ
-const key=firestoreLogs.length+"|"+(firestoreLogs[0]&&firestoreLogs[0].date||"");if(key===pollKeyRef.current)return;pollKeyRef.current=key;setData(prev=>{if(!prev)return prev;const had=(prev.logs||[]).length;const hadCarry=(prev.logs||[]).some(_isCarryLog);const{merged}=reconcileFullLogs(prev.logs,firestoreLogs);// 件数が同じ＆carryも無い＝変化なし → 再描画しない
-if(merged.length===had&&!hadCarry)return prev;return{...prev,logs:merged};});},20000);});},[]);useEffect(()=>{// _familyCodeをlocalStorageから直接設定してからcloudLoadを呼ぶ
+const firestoreLogs=await loadLogsFromFirestore();if(!firestoreLogs||firestoreLogs.length===0)return;const key=firestoreLogs.length+"|"+(firestoreLogs[0]&&firestoreLogs[0].date||"");const serverChanged=key!==pollKeyRef.current;pollKeyRef.current=key;setData(prev=>{if(!prev)return prev;const had=(prev.logs||[]).length;const hadCarry=(prev.logs||[]).some(_isCarryLog);const{merged,localOnly}=reconcileFullLogs(prev.logs,firestoreLogs);// 🔧 自己修復: サブコレクションに無いローカルログを毎回押し上げる（docId=idで冪等＝重複しない）。
+// どこかの書き込み経路が送信を忘れても・オフライン中の記録でも、20秒以内に必ず全端末へ届く。
+// ※アプリ再起動時にしか押し上げない旧設計が「履歴が反映されたりされなかったりする」原因のひとつだった
+try{localOnly.forEach(l=>{if(l&&l.id&&!_isCarryLog(l))addLogToFirestore(l);});}catch(e){}// サーバ変化なし＆ローカルも変化なし → 再描画しない
+if(!serverChanged&&merged.length===had&&!hadCarry)return prev;if(merged.length===had&&!hadCarry)return prev;return{...prev,logs:merged};});},20000);});},[]);useEffect(()=>{// _familyCodeをlocalStorageから直接設定してからcloudLoadを呼ぶ
 try{const code=localStorage.getItem("tane_money_family_code");if(code){_familyCode=code;}}catch(e){}// ① ローカル即時表示：手元にデータがあればネットを待たずに描画（起動高速化）
 let shownLocal=false;let localData=null;// 起動時のFirestore上書きから お手伝い項目を守るため保持
 try{const local=localLoadSync();if(local){localData=local;setData(migrate(local));setLoading(false);shownLocal=true;}}catch(e){}// ② Firebase(遅延ロード)の準備ができ次第、Firestoreから最新を取得して上書き＋同期開始

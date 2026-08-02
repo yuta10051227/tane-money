@@ -4041,8 +4041,12 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     } else {
       showFlash(pts, task.emoji);
       // ログ追加＋お手伝いEXP(毎回フラット・日次上限のみ)を1回のupdateに統合(再描画を半減)
+      // ※重要: logsサブコレクション(唯一の正)への送信を必ず行う。ここが唯一の送信漏れ経路で、
+      //   お手伝いタップ(承認OFF)の履歴・ポイントが他端末に届かない大バグの原因だった。
+      //   （受信側はblob内logsを破棄する設計のため、サブコレクションに無いログは他端末に永久に見えない）
+      const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
+      addLogToFirestore(e);
       update(d=>{
-        const e={ id:uid(), date:new Date().toISOString(), cid:child.id, type: pts>=0?"good":"bad", label:task.label, pts, rid:task.id };
         const withLog={...d, logs:[e, ...d.logs]};
         if(pts>0){ return careCap(withLog,child.id,0.25,Math.max(1,pts)); }
         return withLog;
@@ -9489,16 +9493,20 @@ export default function App() {
         if(typeof document!=="undefined" && document.hidden) return;   // 非表示タブでは往復しない
         const firestoreLogs = await loadLogsFromFirestore();
         if(!firestoreLogs || firestoreLogs.length===0) return;
-        // サーバ側ログに変化が無ければ（件数＋最新date が前回と同じ）重いreconcile/setDataを丸ごとスキップ
         const key = firestoreLogs.length + "|" + ((firestoreLogs[0] && firestoreLogs[0].date) || "");
-        if(key === pollKeyRef.current) return;
+        const serverChanged = key !== pollKeyRef.current;
         pollKeyRef.current = key;
         setData(prev=>{
           if(!prev) return prev;
           const had = (prev.logs||[]).length;
           const hadCarry = (prev.logs||[]).some(_isCarryLog);
-          const { merged } = reconcileFullLogs(prev.logs, firestoreLogs);
-          // 件数が同じ＆carryも無い＝変化なし → 再描画しない
+          const { merged, localOnly } = reconcileFullLogs(prev.logs, firestoreLogs);
+          // 🔧 自己修復: サブコレクションに無いローカルログを毎回押し上げる（docId=idで冪等＝重複しない）。
+          // どこかの書き込み経路が送信を忘れても・オフライン中の記録でも、20秒以内に必ず全端末へ届く。
+          // ※アプリ再起動時にしか押し上げない旧設計が「履歴が反映されたりされなかったりする」原因のひとつだった
+          try{ localOnly.forEach(l=>{ if(l && l.id && !_isCarryLog(l)) addLogToFirestore(l); }); }catch(e){}
+          // サーバ変化なし＆ローカルも変化なし → 再描画しない
+          if(!serverChanged && merged.length===had && !hadCarry) return prev;
           if(merged.length===had && !hadCarry) return prev;
           return {...prev, logs: merged};
         });
