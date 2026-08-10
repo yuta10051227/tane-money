@@ -485,6 +485,8 @@ function startRealtimeSync(updateFn){
             merged.children=mergeMemberAvatars(merged.children, prev.children);
             merged.parents =mergeMemberAvatars(merged.parents,  prev.parents);
             if(prev.claimedBadges){merged.claimedBadges={...(merged.claimedBadges||{})};Object.keys(prev.claimedBadges).forEach(cid=>{merged.claimedBadges[cid]=Array.from(new Set([...(merged.claimedBadges[cid]||[]),...(prev.claimedBadges[cid]||[])]));});}
+            // ひみつの魔法使い解放フラグ: 一度trueになったら他端末の受信で巻き戻らない(OR union)
+            if(prev.secretCompanion){merged.secretCompanion={...(merged.secretCompanion||{}),...prev.secretCompanion};}
             if(prev.tipsRead){merged.tipsRead={...(merged.tipsRead||{})};Object.keys(prev.tipsRead).forEach(cid=>{merged.tipsRead[cid]=Array.from(new Set([...(merged.tipsRead[cid]||[]),...(prev.tipsRead[cid]||[])]));});}
             if(prev.noPinIds) merged.noPinIds=prev.noPinIds;
             // お手伝い項目(タスク定義)は原則サーバ優先＝追加/編集/削除/並び替えが全端末へ必ず反映される。
@@ -1291,6 +1293,7 @@ function migrate(d) {
   if(!d.parentLogs)    d.parentLogs={};
   if(!d.violations)    d.violations=[];
   if(!d.tutorialSeen)  d.tutorialSeen={};
+  if(!d.secretCompanion) d.secretCompanion={};   // {childId:true} ひみつコードで解放した隠しキャラ（相棒とは別枠）
   if(!d.pinChanged)    d.pinChanged={};
   if(!d.lockEnabled)   d.lockEnabled={};
   if(!d.parents)       d.parents=INIT.parents;
@@ -3924,6 +3927,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
+  const [showSecretCode, setShowSecretCode] = useState(false);   // 名前の長押しで開く、ひみつコード入力
+  const [showSecretMage, setShowSecretMage] = useState(false);   // ひみつの魔法使い 全画面ビュー
+  const secretLongPress = useLongPress(()=>{ taneHaptic("tap"); setShowSecretCode(true); }, 600);
   const [scrollY, setScrollY] = useState(0);   // iOS風 大きいタイトルのスクロール縮小用
   const [showTips, setShowTips] = useState(false);   // まめちしき(旧・学ぶタブ)を毎日タブ内で開閉
   // スクロール縮小演出。rAFで1フレーム1回に間引き＋56pxでクランプ＋同値なら更新しない。
@@ -4176,6 +4182,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
   return (
     <div style={{minHeight:"100vh",background:darkBG?"#040810":BG,fontFamily:F,paddingBottom:80}}>
+      {showSecretCode && <SecretCodeModal child={child} data={data} update={update} onClose={()=>setShowSecretCode(false)}/>}
+      {showSecretMage && <SecretMageModal child={child} data={data} onClose={()=>setShowSecretMage(false)}/>}
       {/* ヒーローエリア */}
       {isJunior ? (()=>{
         const h=new Date().getHours();
@@ -4235,7 +4243,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{position:"relative",zIndex:2,margin:"0 16px",background:"rgba(255,255,255,0.12)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:"18px 18px 0 0",border:"1px solid rgba(255,255,255,0.18)",borderBottom:"none",padding:"14px 18px 16px"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
-              <div style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2,display:"flex",alignItems:"center",gap:5}}><ChildAvatar child={child} size={20}/>{child.name}</div>
+              <div {...secretLongPress} data-testid="hero-name" style={{color:"rgba(255,255,255,0.65)",fontSize:11,fontWeight:600,marginBottom:2,display:"flex",alignItems:"center",gap:5,userSelect:"none",WebkitUserSelect:"none"}}><ChildAvatar child={child} size={20}/>{child.name}</div>
               <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
                 <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
                 <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
@@ -4312,7 +4320,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* 残高表示 */}
         <div style={{padding:"20px 20px 18px",position:"relative",zIndex:2,display:"flex",alignItems:"center",gap:12}}>
           <div style={{flex:1}}>
-            <div style={{color:"rgba(255,255,255,0.62)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5,display:"flex",alignItems:"center",gap:5}}><ChildAvatar child={child} size={20}/>{child.name}</div>
+            <div {...secretLongPress} data-testid="hero-name" style={{color:"rgba(255,255,255,0.62)",fontSize:11,fontWeight:700,marginBottom:4,letterSpacing:0.5,display:"flex",alignItems:"center",gap:5,userSelect:"none",WebkitUserSelect:"none"}}><ChildAvatar child={child} size={20}/>{child.name}</div>
             <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4ade80",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
@@ -4693,6 +4701,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
         );
       })()}
+
+      {/* 🔮 ひみつの魔法使い（ひみつコードで解放）: 未解放の間は何も出ない */}
+      {effectiveTab==="daily" && <SecretMageBar child={child} data={data} dark={!isJunior} onOpen={()=>setShowSecretMage(true)}/>}
 
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
         {showGacha && <div style={{padding:"12px 16px 4px"}}>
@@ -7422,6 +7433,159 @@ function Buddy({ child, data, update, size=110, compact=false }) {
   );
 }
 
+// ── ひみつの魔法使い（隠しコードで解放する隠しキャラ）─────────────────
+// 合言葉。半角/全角・大小文字・前後スペースを許容して照合する。
+const SECRET_COMPANION_CODE = "TANEMAGIC";
+function normSecretCode(s){
+  return String(s||"").trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).toUpperCase();
+}
+// Lv計算: 生涯獲得ポイントで決まる（新しい通貨は作らず、既存のがんばりをそのまま反映）
+function secretMageLevel(lifetimeEarned){
+  return Math.max(1, Math.floor((lifetimeEarned||0)/100) + 1);
+}
+
+// 名前/アイコンの長押し(600ms)で開く、ひみつコード入力モーダル
+function SecretCodeModal({ child, data, update, onClose }){
+  const already = !!(data.secretCompanion||{})[child.id];
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState(false);
+  const [ok, setOk] = useState(already);
+  const submit = () => {
+    if(normSecretCode(code) === SECRET_COMPANION_CODE){
+      update(d=>({...d, secretCompanion:{...(d.secretCompanion||{}), [child.id]:true}}));
+      taneHaptic("success");
+      setOk(true);
+    } else {
+      setErr(true); taneHaptic("warn");
+      setTimeout(()=>setErr(false), 900);
+    }
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"#000a",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",padding:24,fontFamily:F}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,padding:"28px 24px",width:"100%",maxWidth:320,textAlign:"center",boxShadow:"0 8px 40px #0004"}}>
+        {ok ? (<>
+          <img src="/assets/secretmage_idle1.png" alt="ひみつの魔法使い" style={{width:96,height:"auto",objectFit:"contain",imageRendering:"pixelated",margin:"0 auto 10px",display:"block",animation:"secretPop .4s cubic-bezier(.34,1.56,.64,1)"}}/>
+          <p style={{fontWeight:900,fontSize:16,color:GP,margin:"0 0 4px"}}>🔮 ひみつの魔法使い かいほう！</p>
+          <p style={{color:MUTED,fontSize:12,margin:"0 0 18px",lineHeight:1.6}}>「まいにち」タブの上に出てくるよ。育てて遊んでみよう！</p>
+          <button onClick={onClose} style={{width:"100%",background:GP,border:"none",borderRadius:12,padding:12,color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>とじる</button>
+        </>) : (<>
+          <div style={{fontSize:36,marginBottom:6}}>🔒</div>
+          <p style={{fontWeight:900,fontSize:15,color:TEXT,margin:"0 0 4px"}}>ひみつコード</p>
+          <p style={{color:MUTED,fontSize:11,margin:"0 0 14px"}}>あいことばを入力してね</p>
+          <input value={code} onChange={e=>{setCode(e.target.value);setErr(false);}} onKeyDown={e=>{if(e.key==="Enter")submit();}}
+            autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false}
+            style={{width:"100%",padding:"12px 14px",border:`1.5px solid ${err?R:BORDER}`,borderRadius:10,fontSize:16,fontFamily:F,textAlign:"center",letterSpacing:2,fontWeight:800,color:GP,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
+          {err && <p style={{color:R,fontSize:11,fontWeight:700,margin:"0 0 10px"}}>ちがうみたい…もう一度ためしてね</p>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onClose} style={{flex:1,background:"none",border:`1.5px solid ${BORDER}`,borderRadius:10,padding:11,color:MUTED,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>キャンセル</button>
+            <button onClick={submit} disabled={!code.trim()} style={{flex:1,background:code.trim()?GP:BORDER,border:"none",borderRadius:10,padding:11,color:"#fff",fontWeight:800,fontSize:13,cursor:code.trim()?"pointer":"default",fontFamily:F}}>けってい</button>
+          </div>
+        </>)}
+      </div>
+      <style>{`@keyframes secretPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+  );
+}
+
+// 名前/アイコンに仕込む長押しフック。600ms押し続けるとonHold発火。スクロール等の誤爆はmoveで解除。
+function useLongPress(onHold, ms=600){
+  const t = useRef(null);
+  const start = () => { if(t.current) clearTimeout(t.current); t.current = setTimeout(onHold, ms); };
+  const cancel = () => { if(t.current) { clearTimeout(t.current); t.current = null; } };
+  return { onTouchStart:start, onTouchEnd:cancel, onTouchMove:cancel, onTouchCancel:cancel, onMouseDown:start, onMouseUp:cancel, onMouseLeave:cancel };
+}
+
+// まいにちタブに出る折りたたみバー。タップで全画面モーダルを開く。
+function SecretMageBar({ child, data, onOpen, dark }){
+  if(!(data.secretCompanion||{})[child.id]) return null;
+  const lifetimeEarned = (data.logs||[]).filter(l=>l.cid===child.id&&l.pts>0).reduce((s,l)=>s+l.pts,0);
+  const lv = secretMageLevel(lifetimeEarned);
+  return (
+    <button onClick={onOpen} style={{display:"flex",alignItems:"center",gap:8,width:"calc(100% - 32px)",margin:"10px 16px 0",background:dark?"rgba(255,255,255,0.08)":"#fff",border:`1.5px solid ${dark?"rgba(255,255,255,0.16)":BORDER}`,borderRadius:14,padding:"8px 12px",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+      <img src="/assets/secretmage_idle1.png" alt="" style={{width:26,height:26,objectFit:"contain",imageRendering:"pixelated",flexShrink:0,animation:"buddyBreath 2.6s ease-in-out infinite"}} onError={e=>{e.target.style.display="none";}}/>
+      <span style={{flex:1,fontWeight:800,fontSize:12,color:dark?"#fff":TEXT}}>🔮 ひみつの魔法使い <span style={{color:dark?"#4ade80":GP}}>Lv.{lv}</span></span>
+      <span style={{color:dark?"rgba(255,255,255,0.4)":MUTED,fontSize:15}}>›</span>
+    </button>
+  );
+}
+
+// 全画面ビュー：呼吸/まばたきの待機ループ＋タップで まほう／ジャンプ／おさんぽ の演出
+function SecretMageModal({ child, data, onClose }){
+  const [action, setAction] = useState(null);   // null(待機) | 'magic' | 'jump' | 'walk'
+  const [blink, setBlink] = useState(false);
+  const [walkX, setWalkX] = useState(0);
+  const [flip, setFlip] = useState(1);
+  const lifetimeEarned = (data.logs||[]).filter(l=>l.cid===child.id&&l.pts>0).reduce((s,l)=>s+l.pts,0);
+  const lv = secretMageLevel(lifetimeEarned);
+
+  // 待機中はときどきまばたき
+  useEffect(()=>{
+    if(action) return;
+    const id = setInterval(()=>{ setBlink(true); setTimeout(()=>setBlink(false), 220); }, 3400+Math.random()*1800);
+    return ()=>clearInterval(id);
+  }, [action]);
+
+  const doMagic = () => { if(action) return; taneHaptic("tap"); setAction("magic"); setTimeout(()=>setAction(null), 1400); };
+  const doJump  = () => { if(action) return; taneHaptic("tap"); setAction("jump");  setTimeout(()=>setAction(null), 900); };
+  const doWalk  = () => {
+    if(action) return; taneHaptic("tap"); setAction("walk");
+    const goRight = flip>0;
+    setWalkX(goRight?70:-70);
+    setTimeout(()=>{ setFlip(f=>-f); setAction(null); }, 1600);
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"linear-gradient(180deg,#1a1030,#0d0a1a)",zIndex:9997,display:"flex",flexDirection:"column",fontFamily:F}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"52px 20px 0"}}>
+        <div>
+          <div style={{fontWeight:900,fontSize:16,color:"#fff"}}>🔮 ひみつの魔法使い</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",fontWeight:700,marginTop:2}}>Lv.{lv} ・ 生涯 {lifetimeEarned.toLocaleString()}pt でそだつ</div>
+        </div>
+        <button onClick={onClose} style={{background:"rgba(255,255,255,0.1)",border:"none",borderRadius:10,width:36,height:36,color:"#fff",fontSize:18,cursor:"pointer"}}>✕</button>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+        {/* 魔法エフェクト: 光る玉＋きらきら */}
+        {action==="magic" && (
+          <div style={{position:"absolute",top:"38%",left:"50%",transform:"translate(10px,-10px)",zIndex:2,pointerEvents:"none"}}>
+            <div style={{width:34,height:34,borderRadius:"50%",background:"radial-gradient(circle,#9fd8ff,#3478D4 70%)",boxShadow:"0 0 26px 10px rgba(80,160,255,0.65)",animation:"secretMagicOrb 1.3s ease-in-out"}}/>
+            {[0,1,2,3,4].map(i=>(
+              <span key={i} style={{position:"absolute",top:"50%",left:"50%",fontSize:13,animation:`secretSparkle 1.1s ease-out ${i*0.08}s`,transform:`rotate(${i*72}deg) translateY(-30px)`}}>✨</span>
+            ))}
+          </div>
+        )}
+        {/* 着地ダスト */}
+        {action==="jump" && (
+          <div style={{position:"absolute",bottom:"30%",left:"50%",width:60,height:16,borderRadius:"50%",background:"rgba(255,255,255,0.35)",transform:"translateX(-50%)",animation:"secretDust .5s ease-out .55s both"}}/>
+        )}
+        <img src={blink?"/assets/secretmage_idle2.png":"/assets/secretmage_idle1.png"} alt="ひみつの魔法使い"
+          style={{
+            width:180, height:"auto", objectFit:"contain", imageRendering:"pixelated",
+            transform:`scaleX(${flip})`,
+            transition: action==="walk" ? "transform 1.6s linear" : "none",
+            marginLeft: action==="walk" ? walkX : 0,
+            animation: action==="jump" ? "secretJump .9s cubic-bezier(.4,0,.2,1)"
+                      : action==="magic" ? "secretCastBob 1.4s ease-in-out"
+                      : action==="walk" ? "buddyBreath .5s ease-in-out infinite"
+                      : "buddyBreath 2.8s ease-in-out infinite",
+          }}
+          onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:"🧙",style:"font-size:100px"}));}}/>
+      </div>
+      <div style={{display:"flex",gap:10,padding:"0 20px 40px"}}>
+        <button onClick={doMagic} disabled={!!action} style={{flex:1,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.2)",borderRadius:14,padding:"14px 0",color:"#fff",fontWeight:800,fontSize:13,cursor:action?"default":"pointer",fontFamily:F,opacity:action?0.5:1}}>🪄 まほう</button>
+        <button onClick={doJump} disabled={!!action} style={{flex:1,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.2)",borderRadius:14,padding:"14px 0",color:"#fff",fontWeight:800,fontSize:13,cursor:action?"default":"pointer",fontFamily:F,opacity:action?0.5:1}}>🦘 ジャンプ</button>
+        <button onClick={doWalk} disabled={!!action} style={{flex:1,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.2)",borderRadius:14,padding:"14px 0",color:"#fff",fontWeight:800,fontSize:13,cursor:action?"default":"pointer",fontFamily:F,opacity:action?0.5:1}}>🚶 おさんぽ</button>
+      </div>
+      <style>{`
+        @keyframes secretJump{0%{transform:translateY(0) scaleY(1)}15%{transform:translateY(6px) scaleY(.85)}45%{transform:translateY(-46px) scaleY(1.06)}75%{transform:translateY(0) scaleY(.92)}100%{transform:translateY(0) scaleY(1)}}
+        @keyframes secretCastBob{0%,100%{transform:translateY(0)}20%{transform:translateY(-4px)}50%{transform:translateY(-8px)}80%{transform:translateY(-2px)}}
+        @keyframes secretMagicOrb{0%{transform:scale(0);opacity:0}25%{transform:scale(1);opacity:1}75%{transform:scale(1.15);opacity:1}100%{transform:scale(.4);opacity:0}}
+        @keyframes secretSparkle{0%{opacity:0}30%{opacity:1}100%{opacity:0;transform:rotate(var(--r,0deg)) translateY(-52px)}}
+        @keyframes secretDust{0%{opacity:.7;transform:translateX(-50%) scale(.4)}100%{opacity:0;transform:translateX(-50%) scale(1.6)}}
+      `}</style>
+    </div>
+  );
+}
+
 // ── Point Transfer Modal ───────────────────────────────
 function PointTransferModal({ child, data, update, onClose }) {
   const [toId,      setToId]      = useState(null);
@@ -9544,6 +9708,7 @@ export default function App() {
           // 顔写真: サーバに未反映でもローカルの写真を守り、直後の保存でサーバへ再送する
           migrated.children=mergeMemberAvatars(migrated.children, lm.children);
           migrated.parents =mergeMemberAvatars(migrated.parents,  lm.parents);
+          if(lm.secretCompanion) migrated.secretCompanion={...(migrated.secretCompanion||{}),...lm.secretCompanion};
           if(lm.dailyTaskSets&&lm.dailyTaskSets.length>(migrated.dailyTaskSets||[]).length) migrated.dailyTaskSets=lm.dailyTaskSets;
           if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
         }catch(e){}
