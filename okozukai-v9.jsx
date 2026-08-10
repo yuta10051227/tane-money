@@ -4218,7 +4218,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </button>
         </div>
         <div style={{textAlign:"center",position:"relative",zIndex:2,padding:"16px 0 4px"}}>
-          <Buddy child={child} data={data} size={130} update={update} compact={effectiveTab!=="daily"}/>
+          {(data.secretCompanion||{})[child.id]
+            ? <SecretMageHero size={130} onOpen={()=>setShowSecretMage(true)}/>
+            : <Buddy child={child} data={data} size={130} update={update} compact={effectiveTab!=="daily"}/>}
         </div>
         {(()=>{
           const m=getMonState(data, child);
@@ -4330,7 +4332,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <button onClick={()=>setShowTransfer(true)} style={{marginLeft:"auto",background:"rgba(52,199,123,0.14)",border:"1px solid rgba(52,199,123,0.3)",borderRadius:10,padding:"5px 13px",color:"#4ade80",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}><Ico name="billfly" fb="💸" size={14} style={{marginRight:3}}/>おくる</button>
             </div>
           </div>
-          <Buddy child={child} data={data} size={118} update={update} compact={effectiveTab!=="daily"}/>
+          {(data.secretCompanion||{})[child.id]
+            ? <SecretMageHero size={118} onOpen={()=>setShowSecretMage(true)}/>
+            : <Buddy child={child} data={data} size={118} update={update} compact={effectiveTab!=="daily"}/>}
         </div>
         {/* 目標までの進捗バー(参考ゲームの進行感を健全に: 直近の未達成目標を1本だけ) */}
         {(()=>{const ag=myGoals.find(g=>!g.done&&g.target>0);if(!ag)return null;const pct=Math.min(100,Math.round(myBal/ag.target*100));const rem=Math.max(0,ag.target-myBal);return(
@@ -4701,9 +4705,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           </div>
         );
       })()}
-
-      {/* 🔮 ひみつの魔法使い（ひみつコードで解放）: 未解放の間は何も出ない */}
-      {effectiveTab==="daily" && <SecretMageBar child={child} data={data} dark={!isJunior} onOpen={()=>setShowSecretMage(true)}/>}
 
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
         {showGacha && <div style={{padding:"12px 16px 4px"}}>
@@ -7496,16 +7497,24 @@ function useLongPress(onHold, ms=600){
 }
 
 // まいにちタブに出る折りたたみバー。タップで全画面モーダルを開く。
-function SecretMageBar({ child, data, onOpen, dark }){
-  if(!(data.secretCompanion||{})[child.id]) return null;
-  const lifetimeEarned = (data.logs||[]).filter(l=>l.cid===child.id&&l.pts>0).reduce((s,l)=>s+l.pts,0);
-  const lv = secretMageLevel(lifetimeEarned);
+// ヒーロー領域(相棒タネモンと同じ枠)に出す、ひみつの魔法使い。解放済みの子はここがタネモンの代わりになる。
+// タップで全画面ビュー(まほう/ジャンプ/おさんぽ)を開く。Buddyの「選択済み」表示と同じ見た目・アニメで統一。
+function SecretMageHero({ size=110, onOpen }){
+  const [blink, setBlink] = useState(false);
+  const [bounce, setBounce] = useState(false);
+  useEffect(()=>{
+    const id = setInterval(()=>{ setBlink(true); setTimeout(()=>setBlink(false), 200); }, 3200+Math.random()*2000);
+    return ()=>clearInterval(id);
+  }, []);
+  const onTap = () => { taneHaptic("tap"); setBounce(true); setTimeout(()=>setBounce(false), 480); onOpen && onOpen(); };
   return (
-    <button onClick={onOpen} style={{display:"flex",alignItems:"center",gap:8,width:"calc(100% - 32px)",margin:"10px 16px 0",background:dark?"rgba(255,255,255,0.08)":"#fff",border:`1.5px solid ${dark?"rgba(255,255,255,0.16)":BORDER}`,borderRadius:14,padding:"8px 12px",cursor:"pointer",fontFamily:F,textAlign:"left"}}>
-      <img src="/assets/secretmage_idle1.png" alt="" style={{width:26,height:26,objectFit:"contain",imageRendering:"pixelated",flexShrink:0,animation:"buddyBreath 2.6s ease-in-out infinite"}} onError={e=>{e.target.style.display="none";}}/>
-      <span style={{flex:1,fontWeight:800,fontSize:12,color:dark?"#fff":TEXT}}>🔮 ひみつの魔法使い <span style={{color:dark?"#4ade80":GP}}>Lv.{lv}</span></span>
-      <span style={{color:dark?"rgba(255,255,255,0.4)":MUTED,fontSize:15}}>›</span>
-    </button>
+    <div onClick={onTap} style={{position:"relative",width:size,height:size,cursor:"pointer",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <img src={blink?"/assets/secretmage_idle2.png":"/assets/secretmage_idle1.png"} alt="ひみつの魔法使い"
+        style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",transformOrigin:"bottom center",
+          animation:bounce?"buddyBounce .48s cubic-bezier(.34,1.56,.64,1)":"buddyBreath 2.8s ease-in-out infinite"}}
+        onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:"🧙",style:`font-size:${Math.round(size*0.6)}px`}));}}/>
+      <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}@keyframes buddyBounce{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.07)}62%{transform:translateY(0) scale(.93)}100%{transform:translateY(0) scale(1)}}`}</style>
+    </div>
   );
 }
 
@@ -7576,6 +7585,7 @@ function SecretMageModal({ child, data, onClose }){
         <button onClick={doWalk} disabled={!!action} style={{flex:1,background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.2)",borderRadius:14,padding:"14px 0",color:"#fff",fontWeight:800,fontSize:13,cursor:action?"default":"pointer",fontFamily:F,opacity:action?0.5:1}}>🚶 おさんぽ</button>
       </div>
       <style>{`
+        @keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}
         @keyframes secretJump{0%{transform:translateY(0) scaleY(1)}15%{transform:translateY(6px) scaleY(.85)}45%{transform:translateY(-46px) scaleY(1.06)}75%{transform:translateY(0) scaleY(.92)}100%{transform:translateY(0) scaleY(1)}}
         @keyframes secretCastBob{0%,100%{transform:translateY(0)}20%{transform:translateY(-4px)}50%{transform:translateY(-8px)}80%{transform:translateY(-2px)}}
         @keyframes secretMagicOrb{0%{transform:scale(0);opacity:0}25%{transform:scale(1);opacity:1}75%{transform:scale(1.15);opacity:1}100%{transform:scale(.4);opacity:0}}
