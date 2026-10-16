@@ -9652,6 +9652,7 @@ export default function App() {
   // ※従来はマウントeffect内に閉じていたため、セットアップ完了後に同期が永遠に始まらないバグがあった
   const pollRef = useRef(null);
   const pollKeyRef = useRef("");
+  const pollOnceRef = useRef(null);   // 直近のpollOnce関数（visibilitychange復帰時に待たず即実行するため）
   const startSync = useCallback(()=>{
     whenFirebaseReady(()=>{
       if(!getFamilyCode()) return;
@@ -9662,9 +9663,7 @@ export default function App() {
       // 定期的にFirestoreから最新ログを取得（onSnapshotの取りこぼし・24h超・carry整合の backstop）。
       // ※旧実装は5秒毎に全件fetch+全件reconcile+Dateソートを"変化の有無に関わらず"実行し、ログ多い家庭で
       //   周期的にカクつき・通信/Firestore読取コストが嵩んでいた。非表示タブでは止め、サーバ変化時のみreconcileする。
-      if(pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(async()=>{
-        if(typeof document!=="undefined" && document.hidden) return;   // 非表示タブでは往復しない
+      const pollOnce = async()=>{
         const firestoreLogs = await loadLogsFromFirestore();
         if(!firestoreLogs || firestoreLogs.length===0) return;
         const key = firestoreLogs.length + "|" + ((firestoreLogs[0] && firestoreLogs[0].date) || "");
@@ -9684,8 +9683,30 @@ export default function App() {
           if(merged.length===had && !hadCarry) return prev;
           return {...prev, logs: merged};
         });
+      };
+      pollOnceRef.current = pollOnce;
+      if(pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(()=>{
+        if(typeof document!=="undefined" && document.hidden) return;   // 非表示タブでは往復しない
+        pollOnce();
       }, 20000);
     });
+  },[]);
+
+  // 端末がバックグラウンド(ロック/他アプリ切替)から復帰した瞬間に即同期。
+  // ※バックグラウンド中はブラウザがsetIntervalを間引く/止めるため、20秒ポーリングの次回発火まで
+  //   最大20秒以上待たされ「一部の端末だけポイント反映が遅い」と感じる主因になっていた。
+  //   復帰を検知したら20秒を待たず、その場で1回分の同期を即実行して追いつかせる。
+  useEffect(()=>{
+    const onVisible = ()=>{
+      if(typeof document!=="undefined" && !document.hidden && pollOnceRef.current){ pollOnceRef.current(); }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);   // PCブラウザでタブ切替のみ(hidden変化なし)のケースも拾う
+    return ()=>{
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   },[]);
 
   useEffect(()=>{
@@ -9742,6 +9763,7 @@ export default function App() {
     // クリーンアップ：アンマウント時にポーリング・リスナー停止（Strict Mode二重マウント対策）
     return ()=>{
       if(pollRef.current){ clearInterval(pollRef.current); pollRef.current=null; }
+      pollOnceRef.current=null;
       try{ if(_unsubscribe){_unsubscribe();_unsubscribe=null;} }catch(e){}
       try{ if(_logsUnsubscribe){_logsUnsubscribe();_logsUnsubscribe=null;} }catch(e){}
     };
