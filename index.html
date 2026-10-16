@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<meta name="tane-version" content="ca3e290">
+<meta name="tane-version" content="87619e5">
 </head>
 <body>
   <div id="root"></div>
@@ -750,15 +750,21 @@ const[screen,setScreen]=useState("home");const[activeChild,setActiveChild]=useSt
 // Load from cloud on mount
 // リアルタイム同期＋5秒ポーリングの開始（マウント時と、セットアップ完了直後の両方から呼ぶ）
 // ※従来はマウントeffect内に閉じていたため、セットアップ完了後に同期が永遠に始まらないバグがあった
-const pollRef=useRef(null);const pollKeyRef=useRef("");const startSync=useCallback(()=>{whenFirebaseReady(()=>{if(!getFamilyCode())return;startRealtimeSync(updater=>{setData(prev=>typeof updater==='function'?updater(prev):updater);});startLogsRealtimeSync(setData);// 定期的にFirestoreから最新ログを取得（onSnapshotの取りこぼし・24h超・carry整合の backstop）。
+const pollRef=useRef(null);const pollKeyRef=useRef("");const pollOnceRef=useRef(null);// 直近のpollOnce関数（visibilitychange復帰時に待たず即実行するため）
+const startSync=useCallback(()=>{whenFirebaseReady(()=>{if(!getFamilyCode())return;startRealtimeSync(updater=>{setData(prev=>typeof updater==='function'?updater(prev):updater);});startLogsRealtimeSync(setData);// 定期的にFirestoreから最新ログを取得（onSnapshotの取りこぼし・24h超・carry整合の backstop）。
 // ※旧実装は5秒毎に全件fetch+全件reconcile+Dateソートを"変化の有無に関わらず"実行し、ログ多い家庭で
 //   周期的にカクつき・通信/Firestore読取コストが嵩んでいた。非表示タブでは止め、サーバ変化時のみreconcileする。
-if(pollRef.current)clearInterval(pollRef.current);pollRef.current=setInterval(async()=>{if(typeof document!=="undefined"&&document.hidden)return;// 非表示タブでは往復しない
-const firestoreLogs=await loadLogsFromFirestore();if(!firestoreLogs||firestoreLogs.length===0)return;const key=firestoreLogs.length+"|"+(firestoreLogs[0]&&firestoreLogs[0].date||"");const serverChanged=key!==pollKeyRef.current;pollKeyRef.current=key;setData(prev=>{if(!prev)return prev;const had=(prev.logs||[]).length;const hadCarry=(prev.logs||[]).some(_isCarryLog);const{merged,localOnly}=reconcileFullLogs(prev.logs,firestoreLogs);// 🔧 自己修復: サブコレクションに無いローカルログを毎回押し上げる（docId=idで冪等＝重複しない）。
+const pollOnce=async()=>{const firestoreLogs=await loadLogsFromFirestore();if(!firestoreLogs||firestoreLogs.length===0)return;const key=firestoreLogs.length+"|"+(firestoreLogs[0]&&firestoreLogs[0].date||"");const serverChanged=key!==pollKeyRef.current;pollKeyRef.current=key;setData(prev=>{if(!prev)return prev;const had=(prev.logs||[]).length;const hadCarry=(prev.logs||[]).some(_isCarryLog);const{merged,localOnly}=reconcileFullLogs(prev.logs,firestoreLogs);// 🔧 自己修復: サブコレクションに無いローカルログを毎回押し上げる（docId=idで冪等＝重複しない）。
 // どこかの書き込み経路が送信を忘れても・オフライン中の記録でも、20秒以内に必ず全端末へ届く。
 // ※アプリ再起動時にしか押し上げない旧設計が「履歴が反映されたりされなかったりする」原因のひとつだった
 try{localOnly.forEach(l=>{if(l&&l.id&&!_isCarryLog(l))addLogToFirestore(l);});}catch(e){}// サーバ変化なし＆ローカルも変化なし → 再描画しない
-if(!serverChanged&&merged.length===had&&!hadCarry)return prev;if(merged.length===had&&!hadCarry)return prev;return{...prev,logs:merged};});},20000);});},[]);useEffect(()=>{// _familyCodeをlocalStorageから直接設定してからcloudLoadを呼ぶ
+if(!serverChanged&&merged.length===had&&!hadCarry)return prev;if(merged.length===had&&!hadCarry)return prev;return{...prev,logs:merged};});};pollOnceRef.current=pollOnce;if(pollRef.current)clearInterval(pollRef.current);pollRef.current=setInterval(()=>{if(typeof document!=="undefined"&&document.hidden)return;// 非表示タブでは往復しない
+pollOnce();},20000);});},[]);// 端末がバックグラウンド(ロック/他アプリ切替)から復帰した瞬間に即同期。
+// ※バックグラウンド中はブラウザがsetIntervalを間引く/止めるため、20秒ポーリングの次回発火まで
+//   最大20秒以上待たされ「一部の端末だけポイント反映が遅い」と感じる主因になっていた。
+//   復帰を検知したら20秒を待たず、その場で1回分の同期を即実行して追いつかせる。
+useEffect(()=>{const onVisible=()=>{if(typeof document!=="undefined"&&!document.hidden&&pollOnceRef.current){pollOnceRef.current();}};document.addEventListener("visibilitychange",onVisible);window.addEventListener("focus",onVisible);// PCブラウザでタブ切替のみ(hidden変化なし)のケースも拾う
+return()=>{document.removeEventListener("visibilitychange",onVisible);window.removeEventListener("focus",onVisible);};},[]);useEffect(()=>{// _familyCodeをlocalStorageから直接設定してからcloudLoadを呼ぶ
 try{const code=localStorage.getItem("tane_money_family_code");if(code){_familyCode=code;}}catch(e){}// ① ローカル即時表示：手元にデータがあればネットを待たずに描画（起動高速化）
 let shownLocal=false;let localData=null;// 起動時のFirestore上書きから お手伝い項目を守るため保持
 try{const local=localLoadSync();if(local){localData=local;setData(migrate(local));setLoading(false);shownLocal=true;}}catch(e){}// ② Firebase(遅延ロード)の準備ができ次第、Firestoreから最新を取得して上書き＋同期開始
@@ -768,7 +774,7 @@ migrated.children=mergeMemberAvatars(migrated.children,lm.children);migrated.par
 const firestoreLogs=await loadLogsFromFirestore();if(firestoreLogs&&firestoreLogs.length>0){const{merged,localOnly}=reconcileFullLogs(migrated.logs,firestoreLogs);migrated.logs=merged;// ローカルにしか無い(未同期の)ログをFirestoreへ送り、他端末にも反映させる
 try{localOnly.forEach(l=>{if(l&&l.id&&!_isCarryLog(l))addLogToFirestore(l);});}catch(e){}}setData(migrated);if(!shownLocal)setLoading(false);startSync();}).catch(()=>{// Firestore失敗時：ローカル未表示のときだけINITで起動（ローカル表示済みなら維持）
 if(!shownLocal){setData({...INIT});setLoading(false);}});});// クリーンアップ：アンマウント時にポーリング・リスナー停止（Strict Mode二重マウント対策）
-return()=>{if(pollRef.current){clearInterval(pollRef.current);pollRef.current=null;}try{if(_unsubscribe){_unsubscribe();_unsubscribe=null;}}catch(e){}try{if(_logsUnsubscribe){_logsUnsubscribe();_logsUnsubscribe=null;}}catch(e){}};},[]);// 実際のFirestore保存結果を同期バッジへ反映するコールバックを登録（楽観表示をやめる）
+return()=>{if(pollRef.current){clearInterval(pollRef.current);pollRef.current=null;}pollOnceRef.current=null;try{if(_unsubscribe){_unsubscribe();_unsubscribe=null;}}catch(e){}try{if(_logsUnsubscribe){_logsUnsubscribe();_logsUnsubscribe=null;}}catch(e){}};},[]);// 実際のFirestore保存結果を同期バッジへ反映するコールバックを登録（楽観表示をやめる）
 useEffect(()=>{setSyncStCb(setSyncSt);return()=>setSyncStCb(null);},[]);// Save to cloud whenever data changes
 useEffect(()=>{if(!data)return;setSyncSt(s=>s==="saving"?s:"saving");// 既にsavingなら再setStateしない(余分な再描画を防ぐ)
 // 実完了は _notifySyncSt→setSyncSt("saved"/"error") が知らせる。ここで楽観的に"saved"にしない。
