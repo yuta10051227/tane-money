@@ -4744,6 +4744,36 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   ? <span style={{color:darkBG?"#bff0c8":G}}>🌱 きょうのお手伝い {todayChores}こ・タネが げんき！</span>
                   : <span style={{color:darkBG?"#ffd9a8":"#9a7000"}}>💪 まいにち ひらいて 連続を のばそう！</span>)}
               </div>
+              {(()=>{
+                // 今週(月〜日)のスタンプ：まいにちのタネを開いた日を可視化（ポイント付与なし＝表示のみ）
+                const ymd=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                const now=new Date(); const dow=(now.getDay()+6)%7;   // 月=0 … 日=6
+                const opened=new Set(myLogs.filter(l=>l.type==="gacha").map(l=>{ const d=new Date(l.date); return isNaN(d)?"":ymd(d); }));
+                const days=["月","火","水","木","金","土","日"].map((label,i)=>{
+                  const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow+i);
+                  return {label, done:opened.has(ymd(d)), isToday:i===dow, future:i>dow};
+                });
+                const cnt=days.filter(x=>x.done).length;
+                return(<div style={{marginTop:10,background:darkBG?"rgba(255,255,255,0.05)":CARDS,border:`1.5px solid ${darkBG?"rgba(255,255,255,0.1)":BORDER}`,borderRadius:14,padding:"10px 12px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:11,fontWeight:800,color:darkBG?"rgba(255,255,255,0.6)":TEXTS}}>
+                    <span>📅 今週のスタンプ</span><span>{cnt}/7日</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:4}}>
+                    {days.map((x,i)=>(
+                      <div key={i} style={{flex:1,textAlign:"center"}}>
+                        <div style={{width:32,height:32,margin:"0 auto",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+                          background:x.done?G:"transparent",
+                          border:x.done?"none":`2px ${x.isToday?"solid":"dashed"} ${x.isToday?GOLD:(darkBG?"rgba(255,255,255,0.2)":BORDER)}`,
+                          opacity:x.future?0.45:1}}>
+                          {x.done?"🌱":(x.isToday?"？":"")}
+                        </div>
+                        <div style={{marginTop:3,fontSize:10,fontWeight:x.isToday?900:700,color:x.isToday?(darkBG?"#fbbf24":GOLD):(darkBG?"rgba(255,255,255,0.4)":MUTED)}}>{x.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {cnt===7&&<div style={{marginTop:8,textAlign:"center",fontSize:12,fontWeight:900,color:darkBG?"#4ade80":GP}}>🎉 今週は まいにち ひらけたよ！</div>}
+                </div>);
+              })()}
               {monthGacha.length>0&&(
                 <div style={{marginTop:8,fontSize:11,color:darkBG?"rgba(255,255,255,0.45)":MUTED,fontWeight:700}}>
                   🌱 今月 {monthGacha.length}日 ひらいた
