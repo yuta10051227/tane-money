@@ -974,34 +974,89 @@ function fmtTimeRemain(ms){
   return `あと${h}時間`;
 }
 
+// ── 回数上限(1日/週/月)と月の換金上限の判定（新ポイント設計） ──
+function pdPeriodStart(kind){
+  const n=new Date();
+  if(kind==="day") return new Date(n.getFullYear(),n.getMonth(),n.getDate()).getTime();
+  if(kind==="week"){ const dow=(n.getDay()+6)%7; return new Date(n.getFullYear(),n.getMonth(),n.getDate()-dow).getTime(); }
+  return new Date(n.getFullYear(),n.getMonth(),1).getTime();
+}
+function pdLimitMsg(data, cid, task){
+  const rules=[["day",task.dailyMax,"きょう"],["week",task.weeklyMax,"こんしゅう"],["month",task.monthlyMax,"こんげつ"]];
+  for(const [kind,max,word] of rules){
+    if(!max) continue;
+    const from=pdPeriodStart(kind);
+    const done=(data.logs||[]).filter(l=>l.cid===cid&&l.rid===task.id&&l.pts>0&&new Date(l.date).getTime()>=from).length
+      +(data.pendingApprovals||[]).filter(p=>p.cid===cid&&p.taskId===task.id&&new Date(p.date).getTime()>=from).length;
+    if(done>=max) return `${word}は ${max}回まで だよ（もう ${done}回 やったよ）`;
+  }
+  return "";
+}
+function pdCashLeft(data, cid, cashYen){
+  const cap=((data.familySettings||{}).monthlyCashCap||{})[cid];
+  if(!cap||cap<=0) return null;
+  const from=pdPeriodStart("month");
+  const cashIds=new Set((data.rewards||[]).filter(r=>r.cashYen).map(r=>r.id));
+  const yenOf=id=>((data.rewards||[]).find(r=>r.id===id)||{}).cashYen||cashYen||0;
+  const used=(data.logs||[]).filter(l=>l.cid===cid&&l.type==="reward"&&cashIds.has(l.rid)&&new Date(l.date).getTime()>=from).reduce((a,l)=>a+yenOf(l.rid),0)
+    +(data.pendingRedemptions||[]).filter(p=>p.cid===cid&&cashIds.has(p.rewardId)).reduce((a,p)=>a+yenOf(p.rewardId),0);
+  return {cap,used,left:Math.max(0,cap-used)};
+}
 // ── 新ポイント設計（2026-11-26）で追加する項目。INITと「適用」ボタンで共用 ──
 const PD_NEW_TASKS = [
-  {id:"g37",emoji:"🛏",label:"朝の部屋セット(床・机・服・制服・カバン)",pts:60,over:{}},
-  {id:"g38",emoji:"🧹",label:"床だけOK(部屋セットと同日は不可)",pts:20,over:{}},
-  {id:"g39",emoji:"🎒",label:"明日の準備(忘れ物の連絡なし)",pts:10,over:{}},
-  {id:"g40",emoji:"💃",label:"ダンスの練習15分",pts:20,over:{}},
-  {id:"g41",emoji:"🎹",label:"ピアノの練習15分",pts:20,over:{}},
-  {id:"g42",emoji:"🔤",label:"英語の練習15分",pts:20,over:{}},
-  {id:"g43",emoji:"🎤",label:"週1の見せる日(家族の前で披露)",pts:50,over:{}},
-  {id:"g44",emoji:"📖",label:"英語レッスンの宿題を期限内に",pts:30,over:{}},
-  {id:"g45",emoji:"📚",label:"休日の自主勉30分",pts:50,over:{}},
-  {id:"g46",emoji:"🌙",label:"0時までに寝る",pts:20,over:{}},
+  {id:"g37",emoji:"🛏",label:"朝の部屋セット(床・机・服・制服・カバン)",pts:60,dailyMax:1,over:{}},
+  {id:"g38",emoji:"🧹",label:"床だけOK(部屋セットと同日は不可)",pts:20,dailyMax:1,over:{}},
+  {id:"g39",emoji:"🎒",label:"明日の準備(忘れ物の連絡なし)",pts:10,dailyMax:1,over:{}},
+  {id:"g40",emoji:"💃",label:"ダンスの練習15分",pts:20,dailyMax:1,over:{}},
+  {id:"g41",emoji:"🎹",label:"ピアノの練習15分",pts:20,dailyMax:1,over:{}},
+  {id:"g42",emoji:"🔤",label:"英語の練習15分",pts:20,dailyMax:1,over:{}},
+  {id:"g43",emoji:"🎤",label:"週1の見せる日(家族の前で披露)",pts:50,weeklyMax:1,over:{}},
+  {id:"g44",emoji:"📖",label:"英語レッスンの宿題を期限内に",pts:30,weeklyMax:1,over:{}},
+  {id:"g45",emoji:"📚",label:"休日の自主勉30分",pts:50,dailyMax:1,over:{}},
+  {id:"g46",emoji:"🌙",label:"0時までに寝る",pts:20,dailyMax:1,over:{}},
+  {id:"g47",emoji:"🧼",label:"週リセット(部屋の5点チェック)",pts:100,weeklyMax:1,approve:true,over:{}},
+  {id:"g48",emoji:"🗂",label:"月1の不要物整理(10個か1袋)",pts:200,monthlyMax:1,approve:true,over:{}},
+  {id:"g49",emoji:"📬",label:"今週の宿題・提出物をすべて期限内に",pts:100,weeklyMax:1,approve:true,over:{}},
+  {id:"g50",emoji:"📈",label:"定期テスト 前回より+5点(教科ごと)",pts:100,approve:true,over:{}},
+  {id:"g51",emoji:"🎯",label:"定期テスト 目標点を達成(教科ごと)",pts:200,approve:true,over:{}},
+  {id:"g52",emoji:"📜",label:"検定を受験する(英検・テックス・ピアノ検定など)",pts:200,approve:true,over:{}},
+  {id:"g53",emoji:"🎓",label:"検定に合格する",pts:1000,approve:true,over:{}},
+  {id:"g54",emoji:"💃",label:"ダンス: 振付を覚えて先生OK",pts:100,approve:true,over:{}},
+  {id:"g55",emoji:"🎹",label:"ピアノ: 1曲を先生の合格まで",pts:200,approve:true,over:{}},
+  {id:"g56",emoji:"🎪",label:"発表会に出る",pts:300,approve:true,over:{}},
+  {id:"g57",emoji:"🎼",label:"コンクールに出場する",pts:300,approve:true,over:{}},
+  {id:"g58",emoji:"🏆",label:"コンクールで入賞する",pts:500,approve:true,over:{}},
+  {id:"g59",emoji:"⭐",label:"通知表 ◎1個ごと",pts:40,approve:true,over:{}},
+  {id:"g60",emoji:"⭐",label:"通知表 ○1個ごと",pts:15,approve:true,over:{}},
+  {id:"g61",emoji:"📈",label:"通知表 前より◎が増えた・△が減った1個ごと",pts:50,approve:true,over:{}},
+  {id:"g62",emoji:"🏓",label:"県大会で1勝ごと",pts:1000,approve:true,over:{}},
+  {id:"g63",emoji:"🏓",label:"小さい大会で1勝ごと",pts:500,approve:true,over:{}},
+  {id:"g64",emoji:"🏓",label:"大会に出場する(負けても)",pts:100,approve:true,over:{}},
+  {id:"g65",emoji:"🏓",label:"レギュラー入り",pts:500,approve:true,over:{}},
+  {id:"g66",emoji:"🏓",label:"ランキング戦・校内順位が上がる",pts:300,approve:true,over:{}},
 ]; 
 const PD_EDIT_GOOD = {
   g08:{label:"猫の吐いたものの片付け",pts:30},
   g09:{label:"お風呂洗い",pts:50},
-  g10:{label:"猫のうんち取り",pts:60},
-  g11:{label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150},
+  g10:{label:"猫のうんち取り",pts:60,dailyMax:2},
+  g11:{label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150,weeklyMax:1},
+  g12:{dailyMax:1}, g13:{dailyMax:1}, g29:{dailyMax:10},
 };
 const PD_EDIT_BAD = { b11:{pts:-50} };
-const PD_EDIT_REWARD = { r07:{cost:1500} };
-const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44"]; // 妹だけ（習い事）
-const PD_ONLY_BROTHER = ["g46"];                        // 兄だけ（0時就寝）
+const PD_EDIT_REWARD = { r07:{cost:1500,cashYen:500} };
+const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44","g54","g55","g56","g57","g58","g59","g60","g61"]; // 妹だけ（習い事・通知表）
+const PD_ONLY_BROTHER = ["g46","g62","g63","g64","g65","g66"]; // 兄だけ（0時就寝・部活）
 function pdApply(d, sisId, broId){
-  const bak = d.pointDesign2026Backup || {goodTasks:d.goodTasks, badTasks:d.badTasks, rewards:d.rewards, myTaskIds:d.myTaskIds||{}};
+  const fsOld = d.familySettings||{};
+  const bak = d.pointDesign2026Backup || {goodTasks:d.goodTasks, badTasks:d.badTasks, rewards:d.rewards, myTaskIds:d.myTaskIds||{}, approvalThreshold:fsOld.approvalThreshold, monthlyCashCap:fsOld.monthlyCashCap};
   const have = new Set((d.goodTasks||[]).map(t=>t.id));
-  const good = (d.goodTasks||[]).map(t=>PD_EDIT_GOOD[t.id]?{...t,...PD_EDIT_GOOD[t.id]}:t)
-    .concat(PD_NEW_TASKS.filter(t=>!have.has(t.id)));
+  const newMap = Object.fromEntries(PD_NEW_TASKS.map(t=>[t.id,t]));
+  const pickLim = n => { const o={}; ["dailyMax","weeklyMax","monthlyMax","approve"].forEach(k=>{ if(n[k]!==undefined) o[k]=n[k]; }); return o; };
+  const good = (d.goodTasks||[]).map(t=>{
+    let r = PD_EDIT_GOOD[t.id]?{...t,...PD_EDIT_GOOD[t.id]}:t;
+    if(newMap[t.id]) r = {...r,...pickLim(newMap[t.id])};
+    return r;
+  }).concat(PD_NEW_TASKS.filter(t=>!have.has(t.id)));
   const bad = (d.badTasks||[]).map(t=>PD_EDIT_BAD[t.id]?{...t,...PD_EDIT_BAD[t.id]}:t);
   const rewards = (d.rewards||[]).map(r=>PD_EDIT_REWARD[r.id]?{...r,...PD_EDIT_REWARD[r.id]}:r);
   const allIds = [...good.map(t=>t.id),...bad.map(t=>t.id)];
@@ -1021,14 +1076,19 @@ function pdApply(d, sisId, broId){
     if(!cid) return;
     my[cid] = [...new Set([...visibleNow(cid),...newIds])].filter(id=>!excl.includes(id));
   });
-  return {...d, goodTasks:good, badTasks:bad, rewards, myTaskIds:my,
-    pointDesign2026:{appliedAt:new Date().toISOString(), sisId, broId}, pointDesign2026Backup:bak};
+  const cap = {...(fsOld.monthlyCashCap||{})};
+  if(sisId&&cap[sisId]===undefined) cap[sisId]=5000;
+  if(broId&&cap[broId]===undefined) cap[broId]=10000;
+  const fs = {...fsOld, approvalThreshold:fsOld.approvalThreshold>0?fsOld.approvalThreshold:100, monthlyCashCap:cap};
+  return {...d, goodTasks:good, badTasks:bad, rewards, myTaskIds:my, familySettings:fs,
+    pointDesign2026:{appliedAt:(d.pointDesign2026||{}).appliedAt||new Date().toISOString(), version:2, sisId, broId}, pointDesign2026Backup:bak};
 }
 function pdRestore(d){
   const b = d.pointDesign2026Backup;
   if(!b) return d;
   const {pointDesign2026,pointDesign2026Backup,...rest} = d;
-  return {...rest, goodTasks:b.goodTasks, badTasks:b.badTasks, rewards:b.rewards, myTaskIds:b.myTaskIds||{}};
+  const fs = {...(rest.familySettings||{}), approvalThreshold:b.approvalThreshold, monthlyCashCap:b.monthlyCashCap};
+  return {...rest, goodTasks:b.goodTasks, badTasks:b.badTasks, rewards:b.rewards, myTaskIds:b.myTaskIds||{}, familySettings:fs};
 }
 
 const INIT = {
@@ -1055,8 +1115,8 @@ const INIT = {
     {id:"g07",emoji:"💧",label:"水のボトルに水を入れる",pts:10,over:{}},
     {id:"g08",emoji:"🐱",label:"猫の吐いたものの片付け",pts:30,over:{}},
     {id:"g09",emoji:"🛁",label:"お風呂洗い",pts:50,over:{}},
-    {id:"g10",emoji:"🐱",label:"猫のうんち取り",pts:60,over:{}},
-    {id:"g11",emoji:"🚽",label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150,over:{}},
+    {id:"g10",emoji:"🐱",label:"猫のうんち取り",pts:60,dailyMax:2,over:{}},
+    {id:"g11",emoji:"🚽",label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150,weeklyMax:1,over:{}},
     {id:"g12",emoji:"🌙",label:"23時までに寝る",pts:20,over:{}},
     {id:"g13",emoji:"🌙",label:"22時までに寝る",pts:30,over:{}},
     {id:"g14",emoji:"👕",label:"自分の乾いた洗濯物を片付ける",pts:5,over:{}},
@@ -1104,7 +1164,7 @@ const INIT = {
     {id:"r04",emoji:"🎬",label:"Netflix 30分",cost:200,unit:"Netflix視聴+30分"},
     {id:"r05",emoji:"📺",label:"YouTube 30分",cost:200,unit:"YouTube視聴+30分"},
     {id:"r06",emoji:"🎮",label:"ゲーム30分",cost:200,unit:"ゲーム時間+30分"},
-    {id:"r07",emoji:"💴",label:"500円交換",cost:1500,unit:"現金500円と交換"},
+    {id:"r07",emoji:"💴",label:"500円交換",cost:1500,cashYen:500,unit:"現金500円と交換"},
   ],
   gacha: [
     { id: "gc1", emoji: "⚪", label: "ノーマル",     color: "#9a917a", rate: 60, min: 1,  max: 10  },
@@ -2541,9 +2601,10 @@ function PointDesignSection({data, update}){
   const kids = data.children||[];
   const guessSis = (kids.find(c=>c.displayMode==="junior")||{}).id||"";
   const guessBro = (kids.find(c=>c.id!==guessSis&&(c.displayMode==="teen"||/高校/.test(c.gradeLabel||"")))||{}).id||"";
-  const [sis,setSis]=useState(guessSis);
-  const [bro,setBro]=useState(guessBro);
+  const [sis,setSis]=useState((data.pointDesign2026||{}).sisId||guessSis);
+  const [bro,setBro]=useState((data.pointDesign2026||{}).broId||guessBro);
   const applied = data.pointDesign2026;
+  const needV2 = !!applied && (applied.version||1)<2;
   const goodMap = Object.fromEntries((data.goodTasks||[]).map(t=>[t.id,t]));
   const badMap = Object.fromEntries((data.badTasks||[]).map(t=>[t.id,t]));
   const rewMap = Object.fromEntries((data.rewards||[]).map(r=>[r.id,r]));
@@ -2572,7 +2633,7 @@ function PointDesignSection({data, update}){
   return(
     <div style={{background:CARD,border:`2px solid ${GOLD}`,borderRadius:14,padding:"12px 14px",marginBottom:16}}>
       <p style={{margin:"0 0 6px",fontWeight:900,fontSize:13,color:TEXT}}>🌱 新ポイント設計の適用（2026-11-26）</p>
-      {applied?(
+      {applied&&!needV2?(
         <div>
           <p style={{margin:"0 0 8px",fontSize:12,color:TEXTS,lineHeight:1.7}}>適用ずみ（{String(applied.appliedAt||"").slice(0,10)}）。兄={nameOf(applied.broId)} / 妹={nameOf(applied.sisId)}</p>
           {btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当を適用前の状態に戻します。\n適用後に付いたポイントの記録は消えません。戻しますか？")) update(pdRestore); })}
@@ -2582,14 +2643,17 @@ function PointDesignSection({data, update}){
           <p style={{margin:0,fontSize:11,color:TEXTS,lineHeight:1.7}}>変わること（いまの項目にあるものだけ）:</p>
           <ul style={{margin:0,paddingLeft:18,fontSize:11,color:TEXT,lineHeight:1.7}}>
             {lines.map((l,i)=><li key={i}>{l}</li>)}
-            <li>新しい項目を{addCount}個追加（部屋セット・習い事の練習・見せる日・0時就寝など）</li>
+            <li>新しい項目を{addCount}個追加（部屋セット・習い事・大会・検定・通知表など）</li>
+            <li>100pt以上の項目は親の承認が必要に／同じ項目の回数上限（1日・週・月）</li>
+            <li>月の現金交換の上限: 妹5,000円・兄10,000円（あとで変更できます）</li>
           </ul>
           {sel(sis,setSis,"妹")}
           {sel(bro,setBro,"兄")}
           <p style={{margin:0,fontSize:10,color:MUTED,lineHeight:1.6}}>習い事の項目は妹だけ、0時就寝は兄だけに表示されます。いま「割り当て」が空の子は、いま見えている項目に新しい項目を足した専用リストになります（見え方は変わりません）。適用前の内容はこの家のデータ内に保存され、「適用前に戻す」で戻せます。</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {btn(B,"いまの内容を書き出す",download)}
-            {btn(GP,"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) update(d=>pdApply(d,sis,bro)); },!sis||!bro||sis===bro)}
+            {needV2&&btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当・上限の設定を適用前の状態に戻します。戻しますか？")) update(pdRestore); })}
+            {btn(GP,needV2?"追加分を適用する":"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) update(d=>pdApply(d,sis,bro)); },!sis||!bro||sis===bro)}
           </div>
         </div>
       )}
@@ -3547,6 +3611,26 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                   <div style={{position:"absolute",top:3,left:fs.requireApproval?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
                 </button>
               </div>
+              {/* 100pt以上だけ承認／月の換金上限 */}
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>大きいポイントだけ承認</div>
+                <div style={{color:MUTED,fontSize:11,margin:"2px 0 8px",lineHeight:1.6}}>入れたpt以上の項目だけ、親の承認が必要になります（0で使わない）。大会や検定など、確認したい項目向けです。</div>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}>
+                  <input type="number" min="0" value={fs.approvalThreshold||0} onChange={e=>{const v=Math.max(0,parseInt(e.target.value||"0",10)||0);update(d=>({...d,familySettings:{...(d.familySettings||{}),approvalThreshold:v}}));}} style={{width:90,padding:"6px 8px",borderRadius:8,border:`1.5px solid ${BORDER}`,fontFamily:F,fontSize:13}}/>
+                  <span style={{fontSize:12,color:TEXTS,fontWeight:700}}>pt以上</span>
+                </div>
+                <div style={{fontWeight:800,fontSize:14,color:TEXT}}>月の現金交換の上限</div>
+                <div style={{color:MUTED,fontSize:11,margin:"2px 0 8px",lineHeight:1.6}}>1か月に現金へ交換できる金額の上限です。超えた分のポイントは貯めておいて、翌月に使えます（0で上限なし）。</div>
+                {(data.children||[]).map(c=>{
+                  const cl=pdCashLeft(data,c.id,500);
+                  return(<div key={c.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                    <span style={{width:64,fontSize:12,fontWeight:700,color:TEXT}}>{c.name}</span>
+                    <input type="number" min="0" step="500" value={((fs.monthlyCashCap||{})[c.id])||0} onChange={e=>{const v=Math.max(0,parseInt(e.target.value||"0",10)||0);update(d=>({...d,familySettings:{...(d.familySettings||{}),monthlyCashCap:{...((d.familySettings||{}).monthlyCashCap||{}),[c.id]:v}}}));}} style={{width:90,padding:"6px 8px",borderRadius:8,border:`1.5px solid ${BORDER}`,fontFamily:F,fontSize:13}}/>
+                    <span style={{fontSize:12,color:TEXTS,fontWeight:700}}>円／月</span>
+                    {cl&&<span style={{fontSize:11,color:MUTED}}>今月のこり{cl.left}円</span>}
+                  </div>);
+                })}
+              </div>
               {/* ガチャ演出をシンプルに（暗転・段階成長をOFF） */}
               <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{flex:1}}>
@@ -4151,9 +4235,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     const reincActive = reincBonus && new Date().toISOString() < reincBonus.until;
     const pts = (reincActive && basePts > 0) ? Math.round(basePts * (1 + reincBonus.rate)) : basePts;
     const fs = data.familySettings || INIT.familySettings;
-    const needApproval = fs.requireApproval && pts > 0;
+    const needApproval = (fs.requireApproval || task.approve || (fs.approvalThreshold>0 && pts>=fs.approvalThreshold)) && pts > 0;
     const alreadyPending = (data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===task.id);
     if(alreadyPending) return;
+    const _limMsg = pdLimitMsg(data, child.id, task);
+    if(_limMsg){ alert(_limMsg); return; }
     setPressed(p=>({...p,[task.id]:true}));
     setTimeout(()=>setPressed(p=>{const n={...p};delete n[task.id];return n;}),500);
     if(needApproval) {
@@ -4187,6 +4273,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
     if(_myPend.some(p=>p.rewardId===r.id)){ setRewardPop(null); setFlash({pts:0,emoji:"⏳",pending:true}); setTimeout(()=>setFlash(null),1200); return; }
     const _pendSum=_myPend.reduce((sum,p)=>sum+(p.cost||0),0);
     if(bal(data.logs,child.id)-_pendSum < r.cost){ setRewardPop(null); alert("しんせい中のぶんをあわせると ポイントがたりないよ"); return; }
+    if(r.cashYen){
+      const _cl = pdCashLeft(data, child.id, r.cashYen);
+      if(_cl && r.cashYen > _cl.left){ setRewardPop(null); alert(`今月の げんきん交換は ${_cl.cap}円まで だよ（のこり ${_cl.left}円）。ポイントは 来月に つかえるよ`); return; }
+    }
     setRewardPop(null);
     const _rfs = data.familySettings || INIT.familySettings;
     if(_rfs.rewardApproval) {
