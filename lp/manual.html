@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>タネマネー あたらしいルール マニュアル</title>
+<style>
+:root{--gp:#187A4E;--g:#34C77B;--gs:#DDF3E7;--gold:#E8B83E;--golds:#FFF1CB;--r:#D95C55;--rs:#FCE6E4;--b:#3478D4;--bs:#E5F0FF;--p:#7B61C9;--ps:#EFEAFE;--bg:#F7F5EF;--card:#fff;--text:#18231D;--texts:#59645E;--muted:#929B95;--border:#E8E3D8}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic",sans-serif;line-height:1.75;font-size:15px}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px 60px}
+header{background:linear-gradient(135deg,var(--gp),var(--g));color:#fff;padding:34px 18px 28px;text-align:center}
+header .seed{font-size:44px}
+header h1{margin:6px 0 4px;font-size:22px;line-height:1.4}
+header p{margin:0;opacity:.92;font-size:13px}
+nav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+nav .in{max-width:640px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
+nav a{flex:0 0 auto;text-decoration:none;color:var(--gp);background:var(--gs);border-radius:999px;padding:5px 12px;font-weight:800;font-size:12.5px;white-space:nowrap}
+section{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:18px 16px;margin:16px 0;scroll-margin-top:56px}
+h2{margin:0 0 4px;font-size:19px;display:flex;align-items:center;gap:8px}
+h2 .no{background:var(--gp);color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 28px}
+.lead{color:var(--texts);margin:0 0 12px;font-size:14px}
+h3{margin:16px 0 6px;font-size:15px;color:var(--gp)}
+.fig{background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:12px;margin:10px 0}
+.fig .t{font-weight:900;font-size:13px;margin-bottom:8px}
+.row{display:flex;gap:6px;align-items:stretch}
+.col{display:flex;flex-direction:column;gap:6px}
+.box{flex:1;border:2px solid var(--g);background:var(--gs);border-radius:14px;padding:8px 10px;text-align:center;font-weight:800;font-size:13px;line-height:1.5}
+.box.gold{border-color:var(--gold);background:var(--golds)}
+.box.red{border-color:var(--r);background:var(--rs)}
+.box.blue{border-color:var(--b);background:var(--bs)}
+.box.purple{border-color:var(--p);background:var(--ps)}
+.box.gray{border-color:var(--muted);background:#eee}
+.box small{display:block;font-weight:600;color:var(--texts);font-size:11.5px}
+.big{font-size:22px;font-weight:900}
+.arrow{text-align:center;color:var(--muted);font-weight:900;line-height:1}
+.arrowr{display:flex;align-items:center;color:var(--muted);font-weight:900}
+.tag{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:800;color:#fff;background:var(--gp)}
+.tag.g{background:var(--g)}.tag.gold{background:var(--gold)}.tag.r{background:var(--r)}.tag.b{background:var(--b)}.tag.p{background:var(--p)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--border);padding:6px 6px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-size:11.5px;font-weight:800}
+td.num,th.num{text-align:right;white-space:nowrap}
+.note{background:var(--golds);border-radius:12px;padding:9px 12px;font-size:13px;margin:10px 0}
+.warn{background:var(--rs);border-radius:12px;padding:9px 12px;font-size:13px;margin:10px 0}
+.ok{background:var(--gs);border-radius:12px;padding:9px 12px;font-size:13px;margin:10px 0}
+.circle{width:30px;height:30px;border-radius:50%;background:var(--g);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex:0 0 30px}
+.days{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.q{font-weight:900;color:var(--gp);margin-top:12px}
+.a{margin:2px 0 0 0;color:var(--texts);font-size:14px}
+.parent{border:2px dashed var(--b);background:#fff}
+.parent h2{color:var(--b)}
+ol.steps{margin:6px 0;padding-left:0;list-style:none;counter-reset:s}
+ol.steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start;margin:8px 0}
+ol.steps li::before{content:counter(s);background:var(--b);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex:0 0 24px;margin-top:2px}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
+.print{display:inline-block;margin-top:10px;background:#fff;color:var(--gp);border:none;border-radius:999px;padding:6px 14px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit}
+@media (max-width:520px){.row:has(.arrowr){flex-direction:column}.row:has(.arrowr) .arrowr{justify-content:center;transform:rotate(90deg);height:18px}}
+@media print{nav,.print{display:none}body{background:#fff}section{break-inside:avoid;border-color:#ccc}header{color:#000;background:#fff;border-bottom:2px solid #000}}
+</style>
+</head>
+<body>
+<header>
+  <div class="seed">🌱</div>
+  <h1>タネマネー<br>あたらしい ルール マニュアル</h1>
+  <p>2026年11月26日 の 大きな こうしん</p>
+  <button class="print" onclick="window.print()">🖨 印刷する</button>
+</header>
+<nav><div class="in">
+  <a href="#s1">1 ポイント</a><a href="#s2">2 まいにち</a><a href="#s3">3 ふやす</a><a href="#s4">4 れんぞく</a><a href="#s5">5 こうかん</a><a href="#s6">6 タネ貯金</a><a href="#s7">7 画面</a><a href="#s9">8 Q&amp;A</a><a href="#s8">おうちの人へ</a>
+</div></nav>
+<div class="wrap">
+
+<!-- 1 -->
+<section id="s1">
+  <h2><span class="no">1</span>ポイントと お金</h2>
+  <p class="lead">ポイントは、がんばった ぶんだけ もらえる「タネ」です。お金にも かえられます。</p>
+  <div class="fig">
+    <div class="t">💴 3ポイント ＝ 1円</div>
+    <div class="row" style="justify-content:center;align-items:center">
+      <div class="box gold" style="flex:0 0 90px"><span class="big">3pt</span></div>
+      <div style="font-weight:900;font-size:20px">＝</div>
+      <div class="box" style="flex:0 0 90px"><span class="big">1円</span></div>
+    </div>
+    <p style="text-align:center;margin:8px 0 0;font-size:13px">れい：<b>30pt</b> は <b>10円</b>ぶん ／ <b>300pt</b> は <b>100円</b>ぶん ／ <b>1,500pt</b> は <b>500円</b>ぶん</p>
+  </div>
+  <div class="ok">✅ アプリの ポイントの よこに「<b>≒ ○○円</b>」と 出ます。いま どれだけの お金に あたるか、すぐ わかります。<br>（3で わって、小さい はんぱは すてています）</div>
+  <div class="fig">
+    <div class="t">🔄 ポイントの ぐるぐる</div>
+    <div class="col">
+      <div class="row"><div class="box">🧹 おてつだい・日課<small>がんばる</small></div></div>
+      <div class="arrow">▼</div>
+      <div class="row"><div class="box gold">⭐ ポイントが ふえる<small>手元に たまる</small></div></div>
+      <div class="arrow">▼</div>
+      <div class="row">
+        <div class="box purple">🎁 こうかん<small>ごほうび・500円</small></div>
+        <div class="box">🌱 タネ貯金<small>あずけて ふやす</small></div>
+        <div class="box blue">🎯 もくひょう<small>ほしい物の ために</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="s2">
+  <h2><span class="no">2</span>まいにちの 日課（やくそく）</h2>
+  <p class="lead">日課は「今日 やること」です。<b>⭐やくそく</b>は、ぜんぶ できると 次の日に スマホなどの ごほうびが つかえる だいじな やくそくです。</p>
+
+  <h3>📅 平日と 休日で ちがう</h3>
+  <div class="fig">
+    <div class="t">平日 ＝ 月〜金 ／ 休日 ＝ 土・日・祝日（11月23日も 休日！）</div>
+    <p style="margin:0;font-size:13px">アプリが その日に あった 日課を 自動で 出してくれます。</p>
+  </div>
+
+  <h3>👥 だれが 何を する？（担当）</h3>
+  <div class="fig">
+    <div class="t">平日</div>
+    <table>
+      <tr><th style="width:84px"></th><th>やること</th></tr>
+      <tr><td><b>🌸 妹</b></td><td>🍽 食洗機（夕食のあと）／ 🧻 テーブルを ふく か お風呂を あらう／ 👔 洗濯物を ほす</td></tr>
+      <tr><td><b>🏓 兄</b><br><small>部活の日</small></td><td>🍽 食洗機（帰ってから）／ 🐱 猫の うんち取り（夜）</td></tr>
+      <tr><td><b>🏓 兄</b><br><small>部活なし</small></td><td>妹と おなじ ぶん ＋ 🐱 猫の うんち取り</td></tr>
+    </table>
+    <div class="t" style="margin-top:10px">休日・祝日</div>
+    <table>
+      <tr><td style="width:84px"><b>ふたり</b></td><td>🍽 食洗機 1人 1回 ／ 👔 洗濯物ほし 1人 1回ぶん</td></tr>
+      <tr><td><b>🏓 兄</b></td><td>🛁 お風呂あらい ／ 🧹 そうじき（1部屋）／ 🐱 猫の うんち（2回）</td></tr>
+      <tr><td><b>🌸 妹</b></td><td>🧻 テーブルふき</td></tr>
+    </table>
+  </div>
+  <div class="note">💡 <b>担当は「さいていライン」</b>です。やらないと、次の日は スマホが つかえません。だれかの ぶんを たすけたら、えらい！（ボーナスは じゅんびちゅう）</div>
+
+  <h3>🏓「今日は 部活なし」ボタン（兄）</h3>
+  <div class="fig">
+    <div class="row">
+      <div class="box blue">部活の日<small>🍽 食洗機（帰宅後）<br>🐱 猫の うんち</small></div>
+      <div class="arrowr">⇨</div>
+      <div class="box gold">ボタンを おす<br>🏓 部活なし！</div>
+      <div class="arrowr">⇨</div>
+      <div class="box">妹と おなじ ぶん<br>＋ 🐱 猫の うんち</div>
+    </div>
+  </div>
+  <div class="warn">⚠️ おしたら その日は <b>もどせません</b>。おす前に「いいですか？」と 出ます。つぎの日は 自動で もとに もどります。</div>
+</section>
+
+<!-- 3 -->
+<section id="s3">
+  <h2><span class="no">3</span>ポイントを ふやす</h2>
+  <p class="lead">ホームの「おてつだい」から、やった ことを タップして 記録します。あたらしい 項目が 約30こ ふえました。</p>
+
+  <h3>🧹 まいにち できる もの（ふたり）</h3>
+  <table>
+    <tr><th>やること</th><th class="num">ポイント</th><th class="num">円ぶん</th></tr>
+    <tr><td>🛏 朝の部屋セット（床・机・服・制服・カバン）</td><td class="num">60</td><td class="num">20円</td></tr>
+    <tr><td>🧹 床だけ OK</td><td class="num">20</td><td class="num">≒6円</td></tr>
+    <tr><td>🎒 明日の準備</td><td class="num">10</td><td class="num">≒3円</td></tr>
+    <tr><td>📚 休日の自主勉 30分</td><td class="num">50</td><td class="num">≒16円</td></tr>
+    <tr><td>🐱 猫の うんち取り（1日2回まで）</td><td class="num">60</td><td class="num">20円</td></tr>
+    <tr><td>🛁 お風呂洗い</td><td class="num">50</td><td class="num">≒16円</td></tr>
+    <tr><td>🐱 猫の はいたものの 片づけ</td><td class="num">30</td><td class="num">10円</td></tr>
+  </table>
+
+  <h3>🌸 妹だけ（習いごと）</h3>
+  <table>
+    <tr><th>やること</th><th class="num">ポイント</th></tr>
+    <tr><td>💃🎹🔤 ダンス／ピアノ／英語の 練習 15分（各）</td><td class="num">20</td></tr>
+    <tr><td>🎤 週1の 見せる日（家族の前で）</td><td class="num">50</td></tr>
+    <tr><td>📖 英語レッスンの宿題（期限内）</td><td class="num">30</td></tr>
+    <tr><td>💃 振付を おぼえて 先生 OK</td><td class="num">100</td></tr>
+    <tr><td>🎹 ピアノ 1曲を 先生の 合格まで</td><td class="num">200</td></tr>
+    <tr><td>🎪 発表会に 出る</td><td class="num">300</td></tr>
+    <tr><td>🎼 コンクール 出場 ／ 入賞</td><td class="num">300 ／ 500</td></tr>
+    <tr><td>⭐ 通知表（◎ 1こ／○ 1こ／前より 良くなった 1こ）</td><td class="num">40 ／ 15 ／ 50</td></tr>
+  </table>
+
+  <h3>🏓 兄だけ（部活・夜）</h3>
+  <table>
+    <tr><th>やること</th><th class="num">ポイント</th></tr>
+    <tr><td>🌙 0時までに 寝る</td><td class="num">20</td></tr>
+    <tr><td>🏓 大会に 出場（負けても）</td><td class="num">100</td></tr>
+    <tr><td>🏓 小さい大会で 1勝ごと</td><td class="num">500</td></tr>
+    <tr><td>🏓 県大会で 1勝ごと</td><td class="num">1,000</td></tr>
+    <tr><td>🏓 レギュラー入り</td><td class="num">500</td></tr>
+    <tr><td>🏓 ランキング戦・校内順位が 上がる</td><td class="num">300</td></tr>
+  </table>
+
+  <h3>🌟 ふたりとも（しっかり もの）</h3>
+  <table>
+    <tr><th>やること</th><th class="num">ポイント</th></tr>
+    <tr><td>🧼 週リセット（部屋の 5点チェック）／週1</td><td class="num">100</td></tr>
+    <tr><td>🗂 月1の 不要物整理（10個か 1袋）／月1</td><td class="num">200</td></tr>
+    <tr><td>📬 今週の 宿題・提出物を ぜんぶ 期限内に／週1</td><td class="num">100</td></tr>
+    <tr><td>📈 定期テスト 前回より +5点（教科ごと）</td><td class="num">100</td></tr>
+    <tr><td>🎯 定期テスト 目標点を 達成（教科ごと）</td><td class="num">200</td></tr>
+    <tr><td>📜 検定を 受験 ／ 🎓 合格</td><td class="num">200 ／ 1,000</td></tr>
+  </table>
+
+  <h3>🔁 やりすぎ ストップ（回数の 上限）</h3>
+  <div class="fig">
+    <div class="row">
+      <div class="box">🐱 猫の うんち取り<br><small>1日 2回まで</small></div>
+      <div class="arrowr">⇨</div>
+      <div class="box red">3回目を おすと<br><small>「きょうは 2回まで だよ」</small></div>
+    </div>
+  </div>
+
+  <h3>✅ 100pt以上は おうちの人が OK</h3>
+  <div class="fig">
+    <div class="row">
+      <div class="box">📲 じぶんで<br>タップ</div>
+      <div class="arrowr">⇨</div>
+      <div class="box gold">✋ しんせい中<br><small>おうちの人に とどく</small></div>
+      <div class="arrowr">⇨</div>
+      <div class="box">✅ OK で<br>ポイントが 入る</div>
+    </div>
+  </div>
+  <div class="warn">⚠️ うそを つくと <b>-500pt</b>。「やった」ことを ごまかすのは ぜったいに ダメです。日曜の 朝9時に おうちの人が ぬきうちで 見ることが あります。</div>
+  <div class="note">机まわりの 減点は <b>-200 → -50pt</b> に かるく なりました。</div>
+</section>
+
+<!-- 4 -->
+<section id="s4">
+  <h2><span class="no">4</span>🔥 やくそく 7日れんぞく</h2>
+  <p class="lead">⭐やくそくを ぜんぶ できた日が 7日 つづくと、<b>+100pt</b>（約33円）！</p>
+  <div class="fig">
+    <div class="t">つづけると…</div>
+    <div class="days">
+      <span class="circle">1</span><span class="circle">2</span><span class="circle">3</span><span class="circle">4</span><span class="circle">5</span><span class="circle">6</span>
+      <span class="tag gold" style="font-size:13px;padding:4px 12px">7日目 🎁 +100pt</span>
+    </div>
+    <p style="margin:8px 0 4px;font-size:12.5px;color:var(--texts)">14日目、21日目 にも +100pt（7日ごと）</p>
+    <div class="days" style="margin-top:6px">
+      <span class="circle">1</span><span class="circle">2</span><span class="circle">3</span>
+      <span class="tag r">✕ できない日</span><span style="color:var(--muted)">→</span><span class="tag gold">また 1日目から</span>
+    </div>
+  </div>
+  <div class="ok">🔥「まいにち」の ページに「やくそく 3日れんぞく ・ あと4日で +100pt」と 出ます。</div>
+</section>
+
+<!-- 5 -->
+<section id="s5">
+  <h2><span class="no">5</span>こうかんと 月の 上限</h2>
+  <p class="lead">ポイントは、ごほうびや お金に かえられます。</p>
+  <div class="fig">
+    <div class="t">💴 げんきん こうかん</div>
+    <div class="row">
+      <div class="box purple"><span class="big">1,500pt</span><small>＝ 現金 500円</small></div>
+    </div>
+    <p style="margin:6px 0 0;font-size:12.5px;color:var(--texts)">（前は 2,000pt でした。3pt＝1円に そろえました）</p>
+  </div>
+  <div class="fig">
+    <div class="t">🔒 げんきん こうかんは 月に ここまで</div>
+    <table>
+      <tr><td style="width:60px"><b>🌸 妹</b></td><td><div style="background:var(--g);height:16px;width:50%;border-radius:99px"></div></td><td class="num">5,000円（15,000pt）</td></tr>
+      <tr><td><b>🏓 兄</b></td><td><div style="background:var(--b);height:16px;width:100%;border-radius:99px"></div></td><td class="num">10,000円（30,000pt）</td></tr>
+    </table>
+    <p style="margin:6px 0 0;font-size:12.5px;color:var(--texts)">こえた ぶんは <b>きえません</b>。ポイントは そのまま のこり、<b>来月</b>に つかえます。</p>
+  </div>
+  <div class="note">🎯 もくひょう（ほしい物）の「あと ○○pt」にも、円ぶんが 出ます。ごほうびの ねだんにも ≒円が 出ます。</div>
+</section>
+
+<!-- 6 -->
+<section id="s6">
+  <h2><span class="no">6</span>🌱 タネ貯金（あずけて ふやす）</h2>
+  <p class="lead">ポイントを あずけると、毎月 利息（ふえた ぶん）が もらえます。ぎんこうの ちょきんと おなじです。「ためる」タブから つかいます。</p>
+
+  <div class="fig">
+    <div class="t">📅 1か月の ながれ</div>
+    <table>
+      <tr><td style="width:106px"><span class="tag g" style="display:block;text-align:center">1〜3日 🔓</span></td><td>あずける・出す ができる</td></tr>
+      <tr><td><span class="tag" style="display:block;text-align:center;background:var(--muted)">4日〜月末 🔒</span></td><td>あずけたまま。おてつだいを がんばる</td></tr>
+      <tr><td><span class="tag gold" style="display:block;text-align:center">つぎの月 1日 🌱</span></td><td>先月ぶんの 利息が 入る</td></tr>
+    </table>
+  </div>
+
+  <div class="fig">
+    <div class="t">🌱 れい：10,000pt を あずけると</div>
+    <div class="col">
+      <div class="box">12月1日に <b>10,000pt</b>（約3,333円）を あずける</div>
+      <div class="arrow">▼</div>
+      <div class="row">
+        <div class="box gray">おてつだいが 目標に とどかない<br><b>利率 4%</b> ＝ +400pt</div>
+        <div class="box gold">目標に とどいた！<br><b>利率 5%</b> ＝ +500pt</div>
+      </div>
+      <div class="arrow">▼ 1月1日、利息を どうする？（じぶんで えらぶ）</div>
+      <div class="row">
+        <div class="box">🌱 ふやす<br>あずけが <b>10,500pt</b> に<small>→ 来月は 利息にも 利息！</small></div>
+        <div class="box gold">💰 手元に うけとる<br><b>+500pt</b> すぐ つかえる<small>あずけは 10,000pt のまま</small></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>📏 ルール</h3>
+  <table>
+    <tr><td style="width:150px"><b>あずける 金額</b></td><td>ぜんぶで <b>10,000pt 〜 30,000pt</b>（1,000ptずつ）</td></tr>
+    <tr><td><b>あずける・出す</b></td><td>毎月 <b>1日〜3日</b> だけ</td></tr>
+    <tr><td><b>利息が 入る日</b></td><td>月が かわった 最初の日（先月ぶん）</td></tr>
+    <tr><td><b>いつもの 利率</b></td><td>月 <b>4%</b></td></tr>
+    <tr><td><b>ボーナス</b></td><td>その月の おてつだいポイントが 目標に とどくと <b>+1%（月5%）</b><br>目標：<b>妹 10,000pt ／ 兄 8,000pt</b><br><small>数えるのは 100pt みまんの おてつだい・日課だけ（大会・テスト・検定は 数えない）</small></td></tr>
+    <tr><td><b>利息が つく 上限</b></td><td>あずけた額（ふやした分も ふくめて）<b>3万pt まで</b></td></tr>
+  </table>
+
+  <div class="fig">
+    <div class="t">🔮 どれくらい ふえる？（1年・目安）</div>
+    <table>
+      <tr><th></th><th class="num">ふやす 4%</th><th class="num">ふやす 5%</th><th class="num">手元 5%</th></tr>
+      <tr><td><b>10,000pt</b></td><td class="num">+6,004</td><td class="num">+7,952</td><td class="num">+6,000</td></tr>
+      <tr><td><b>30,000pt</b></td><td class="num">+14,400</td><td class="num">+18,000</td><td class="num">+18,000</td></tr>
+    </table>
+    <p style="margin:6px 0 0;font-size:12px;color:var(--muted)">アプリの「みらいシミュレーター」で、あずける額を うごかして 3か月後・6か月後・1年後が 見られます。</p>
+  </div>
+  <div class="warn">⚠️ あずけた ポイントは、出すまで ごほうびや げんきん交換に つかえません（手元から へります）。</div>
+</section>
+
+<!-- 7 -->
+<section id="s7">
+  <h2><span class="no">7</span>画面の 見かた</h2>
+  <div class="fig">
+    <div class="t">🏠 ホーム</div>
+    <div class="row" style="align-items:center;justify-content:center">
+      <div class="box" style="background:var(--text);border-color:var(--text);color:#fff;flex:0 0 auto;padding:10px 18px">
+        <span class="big" style="color:#fff">12,345</span> <span style="color:#4ade80">pt</span> <span style="color:#cbd5d1;font-size:13px">≒4,115円</span>
+      </div>
+    </div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--texts)">いま もっている ポイントと、お金に すると どれくらいか が 並んで 出ます。</p>
+  </div>
+  <table>
+    <tr><th>どこ？</th><th>何が 見える？</th></tr>
+    <tr><td>📋 まいにち</td><td>今日の 日課・やくそく・🔥れんぞく・🏓部活なしボタン</td></tr>
+    <tr><td>✅ やること／活動</td><td>おてつだいを タップして 記録</td></tr>
+    <tr><td>🌱 ためる</td><td>🎯もくひょう・🎁こうかん・🌱タネ貯金・🌟推し株</td></tr>
+    <tr><td>📢 おしらせ</td><td>あたらしい 機能の 図つき せつめい</td></tr>
+  </table>
+</section>
+
+<!-- Q&A -->
+<section id="s9">
+  <h2><span class="no">8</span>よくある 質問</h2>
+  <div class="q">Q. 「今日は 部活なし」を まちがえて おしちゃった！</div>
+  <p class="a">その日は もどせません（ほかの スマホと ずれないように するため）。おうちの人に 言ってください。つぎの日は 自動で もとに もどります。</p>
+  <div class="q">Q. げんきん交換が できない。</div>
+  <p class="a">その月の 上限（妹 5,000円／兄 10,000円）を つかいきった かもしれません。ポイントは きえません。来月の 1日から また できます。</p>
+  <div class="q">Q. 100pt以上の 項目を おしたら「しんせい中」に なった。</div>
+  <p class="a">おうちの人が OKすると ポイントが 入ります。大きい ポイントは かくにん して から です。</p>
+  <div class="q">Q. 「きょうは ○回まで だよ」と 出た。</div>
+  <p class="a">その項目は 1日（や 1週間・1か月）に できる 回数が きまっています。また あした！</p>
+  <div class="q">Q. タネ貯金の 利息が 入ってない。</div>
+  <p class="a">利息は 月が かわった 最初の日に 入ります。アプリを ひらくと 先月ぶんが 入ります。10,000pt 以上 あずけて いるか、あずけたのは 1日〜3日 だったか も 見てみてください。</p>
+  <div class="q">Q. あずけた ポイントを 出したい。</div>
+  <p class="a">毎月 1日〜3日 だけ 出せます。それ以外の 日は、おうちの人に そうだん してください。</p>
+  <div class="q">Q. 毎月 すこしずつ ふえる「週次利子」は？</div>
+  <p class="a">タネ貯金を はじめると、これまでの「ぜんぶの ポイントに 毎週 1%」は おわります。かわりに、あずけた ぶんに 利息が つきます。</p>
+</section>
+
+<!-- Parent -->
+<section id="s8" class="parent">
+  <h2><span class="no" style="background:var(--b)">👨‍👩‍👧</span>おうちの人へ（はじめかた）</h2>
+  <p class="lead">アプリの 設定は、ぜんぶ 親の画面で 行います。<b>先に バックアップ</b>を とってから すすめてください。</p>
+  <ol class="steps">
+    <li><div><b>バックアップを とる</b><br>設定・管理 → 「お手伝い項目」→ 一番上の「新ポイント設計」カード →「いまの内容を書き出す」。<br><small>（JSONファイルが ダウンロードされます。大事に 保管）</small></div></li>
+    <li><div><b>新ポイント設計の 適用</b>（まだの ときだけ）<br>妹と兄を えらんで「適用する」。500円交換 1,500pt・月の上限・新しい 項目が 入ります。<br><small>→ 戻すときは「適用前に戻す」</small></div></li>
+    <li><div><b>日課セットを 入れる</b><br>同じカードの「日課セットを入れる」。平日用／休日用の 日課に 切りかわります。<br><small>→ 戻すときは「日課を元に戻す」</small></div></li>
+    <li><div><b>タネ貯金を 始める</b>（<b>12月1日の 前</b>が おすすめ）<br>同じカードの「タネ貯金を始める」。妹と兄で つかえるように なり、<b>既存の 週次利子（残高×1%）は OFF</b> に なります。<br><small>元の 利子設定は 保存されます。設定の「利子」から もどせます。</small></div></li>
+    <li><div><b>家族で 1回 話す</b><br>「言われなくなる」「お金の れんしゅう」「携帯の 条件が 見える」。親の やくそく：<i>ガミガミ 言わない かわりに 記録を 見る</i>。</div></li>
+  </ol>
+  <div class="fig">
+    <div class="t">🔍 確認の しくみ（親の ふたん を へらす）</div>
+    <table>
+      <tr><td>毎日</td><td>子どもが 自分で 記録（自己申告）。毎日は かくにん しない</td></tr>
+      <tr><td>日曜 朝9時</td><td>ぬきうち チェック（夫婦で こうたい）</td></tr>
+      <tr><td>100pt以上</td><td>アプリの「承認まち」で OK を おす</td></tr>
+      <tr><td>月の 現金上限</td><td>妹 5,000円／兄 10,000円（設定の 承認タブで 変更できます）</td></tr>
+    </table>
+  </div>
+  <div class="warn">⚠️ <b>気をつけること</b><br>・日課と お手伝い項目に 同じ家事が あるので、どちらを 押すか 決めてください（両方 押すと ポイントが 二重に 付きます）。<br>・タネ貯金の 預け入れと 引き出しは 毎月 1日〜3日 だけです。<br>・「今日は 部活なし」は おしたら もどせません（その日だけ）。<br>・タネ貯金に ポイントが ある子は、画面から 外せません。<br>・祝日は 2027年まで 入っています。</div>
+  <div class="ok">🔄 いつでも もどせます：「適用前に戻す」「日課を元に戻す」。バックアップの JSONも 残っています。</div>
+</section>
+
+<footer>🌱 Tane Money ・ 2026-11-26 版</footer>
+</div>
+</body>
+</html>

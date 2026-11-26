@@ -1730,6 +1730,11 @@ const Pt = ({v,sz=14}) => (
   </span>
 );
 const Yen = Pt;
+// 3ポイント＝1円。ポイントの横に「≒○円」を出す(端数は切り捨て)
+const PT_PER_YEN = 3;
+const ptToYen = pts => Math.trunc((+pts||0)/PT_PER_YEN);
+const yenText = pts => `≒${ptToYen(pts).toLocaleString()}円`;
+const YenNote = ({pts,sz=11,c}) => <span style={{fontSize:sz,color:c||MUTED,fontWeight:700,marginLeft:4,whiteSpace:"nowrap"}}>{yenText(pts)}</span>;
 
 const Btn = ({c,label,onClick,disabled,full,sm}) => (
   <button onClick={onClick} disabled={!!disabled}
@@ -2364,6 +2369,11 @@ function NewsModal({onClose}){
           <button onClick={onClose} style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:10,color:TEXT,padding:"6px 12px",fontWeight:800,cursor:"pointer",fontFamily:F}}>とじる</button>
         </div>
         <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"12px 16px calc(20px + env(safe-area-inset-bottom))"}}>
+          <a href="/lp/manual.html" target="_blank" rel="noopener" style={{display:"flex",alignItems:"center",gap:10,textDecoration:"none",background:GS,border:`1.5px solid ${G}`,borderRadius:14,padding:"11px 14px",marginBottom:12,color:GP,fontFamily:F}}>
+            <span style={{fontSize:24}}>📖</span>
+            <span style={{flex:1}}><span style={{display:"block",fontWeight:900,fontSize:14}}>あたらしいルールの マニュアル</span><span style={{display:"block",fontSize:11.5,fontWeight:600,color:TEXTS}}>図で わかる！ ポイント・日課・タネ貯金</span></span>
+            <span style={{fontWeight:900}}>›</span>
+          </a>
           {NEWS.map((n,i)=>(
             <div key={n.id} style={{background:CARD,border:`1.5px solid ${i===0?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:10}}>
               <div style={{display:"flex",gap:11,alignItems:"center"}}>
@@ -2891,6 +2901,7 @@ function TaneChokin({child,data,update}){
   const num=(label,v,sub,c)=>(<div style={{flex:1,textAlign:"center",minWidth:0}}>
     <div style={{fontSize:10.5,color:MUTED,fontWeight:700}}>{label}</div>
     <div style={{fontSize:19,fontWeight:900,color:c||TEXT,margin:"2px 0"}}>{Number(v).toLocaleString()}<span style={{fontSize:11}}>pt</span></div>
+    <div style={{fontSize:10,color:MUTED,fontWeight:700}}>{yenText(v)}</div>
     {sub&&<div style={{fontSize:10,color:MUTED}}>{sub}</div>}
   </div>);
   const chipBtn=(on,label,fn,c)=>(<button onClick={fn} style={{flex:1,padding:"9px 6px",borderRadius:12,border:`2px solid ${on?(c||GP):BORDER}`,background:on?`${c||GP}15`:CARD,color:on?(c||GP):MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{label}</button>);
@@ -2927,7 +2938,7 @@ function TaneChokin({child,data,update}){
       <div style={card}>
         <p style={{margin:"0 0 8px",fontWeight:900,fontSize:13,color:TEXT}}>{win?"✅ いま あずけたり 出したり できるよ（毎月1日〜3日）":`⏳ あずける・出すのは 毎月1日〜3日だけ（次は ${now.getMonth()+2>12?1:now.getMonth()+2}月1日）`}</p>
         <div style={{opacity:win?1:0.45,pointerEvents:win?"auto":"none"}}>
-          <p style={{margin:"0 0 4px",fontSize:11.5,color:TEXTS}}>あずける（いまの手元 {myBal.toLocaleString()}pt）</p>
+          <p style={{margin:"0 0 4px",fontSize:11.5,color:TEXTS}}>あずける（いまの手元 {myBal.toLocaleString()}pt {yenText(myBal)}）</p>
           <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
             <button onClick={()=>setAmt(v=>Math.max(TC_UNIT,v-TC_UNIT))} style={{width:36,height:36,borderRadius:10,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:900,fontSize:18,cursor:"pointer"}}>−</button>
             <div style={{flex:1,textAlign:"center",fontWeight:900,fontSize:18,color:TEXT}}>{amt.toLocaleString()}pt</div>
@@ -3469,7 +3480,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <ChildAvatar child={member} size={36}/>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:700,fontSize:14}}>{member.name}</div>
-                      <div style={{color:MUTED,fontSize:11}}>{bal(data.logs,member.id).toLocaleString()}pt</div>
+                      <div style={{color:MUTED,fontSize:11}}>{bal(data.logs,member.id).toLocaleString()}pt<YenNote pts={bal(data.logs,member.id)}/></div>
                     </div>
                     <button onClick={()=>setGrantChild(grantChild===member.id?null:member.id)}
                       style={{padding:"6px 14px",background:Y,border:"none",borderRadius:10,fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:F,color:TEXT}}>
@@ -3702,7 +3713,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                       {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                       <div style={{flex:1}}>
                         <div style={{fontWeight:700,fontSize:13}}>{r.label}</div>
-                        <div style={{color:MUTED,fontSize:11}}>{r.cost}pt · {r.unit}</div>
+                        <div style={{color:MUTED,fontSize:11}}>{r.cost}pt（{yenText(r.cost)}） · {r.unit}</div>
                       </div>
                       <button onClick={()=>setSmEditReward({...r,cost:String(r.cost)})}
                         style={{padding:"4px 10px",background:`${B}15`,border:`1.5px solid ${B}`,borderRadius:8,color:B,fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:F,marginRight:4}}>編集</button>
@@ -3782,7 +3793,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                     <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                       <Emo e={m.emoji} size={18}/>
                       <div style={{flex:1,fontWeight:700,fontSize:12,color:TEXT}}>{m.name}</div>
-                      <div style={{fontSize:12,color:MUTED}}>{b.toLocaleString()}pt</div>
+                      <div style={{fontSize:12,color:MUTED}}>{b.toLocaleString()}pt<YenNote pts={b} sz={10.5}/></div>
                       <div style={{fontSize:12,fontWeight:700,color:interest>0?G:MUTED}}>
                         {interest>0?`+${interest}pt`:"−"}
                       </div>
@@ -4853,6 +4864,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               <div style={{display:"flex",alignItems:"flex-end",gap:5}}>
                 <span style={{color:"#fff",fontSize:30,fontWeight:900,lineHeight:1,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
                 <span style={{color:"rgba(255,255,255,0.7)",fontSize:12,fontWeight:600,marginBottom:3}}>pt</span>
+                <span style={{color:"rgba(255,255,255,0.75)",fontSize:12,fontWeight:700,marginBottom:3,marginLeft:4}}>{yenText(myBal)}</span>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
                 <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>今月</span>
@@ -4930,6 +4942,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div style={{display:"flex",alignItems:"flex-end",gap:8,marginBottom:2}}>
               <span style={{color:"#fff",fontSize:38,fontWeight:900,lineHeight:1,letterSpacing:-2}}>{myBal.toLocaleString()}</span>
               <span style={{color:"#4ade80",fontSize:15,fontWeight:700,marginBottom:5}}>pt</span>
+              <span style={{color:"rgba(255,255,255,0.75)",fontSize:13,fontWeight:700,marginBottom:5}}>{yenText(myBal)}</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
               <span style={{color:"rgba(255,255,255,0.5)",fontSize:11,fontWeight:700}}>今月 <span style={{color:monthDelta>=0?"#4ade80":"#f87171",fontWeight:800}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}</span><span style={{color:"rgba(255,255,255,0.28)"}}> · </span>つうさん <span style={{color:"#4ade80",fontWeight:800}}>{lifetimeEarned.toLocaleString()}</span></span>
@@ -5147,7 +5160,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div style={{background:BG,borderRadius:12,padding:"10px 14px",marginBottom:16}}>
               <p style={{fontWeight:800,fontSize:16,margin:0}}>{rewardPop.cost.toLocaleString()}pt つかう</p>
               {myBal >= rewardPop.cost
-                ? <p style={{color:MUTED,fontSize:12,margin:"4px 0 0"}}>残高: {myBal.toLocaleString()}pt → <span style={{color:G,fontWeight:800}}>{(myBal-rewardPop.cost).toLocaleString()}pt</span></p>
+                ? <p style={{color:MUTED,fontSize:12,margin:"4px 0 0"}}>残高: {myBal.toLocaleString()}pt{" "}<span style={{fontSize:11}}>{yenText(myBal)}</span> → <span style={{color:G,fontWeight:800}}>{(myBal-rewardPop.cost).toLocaleString()}pt</span></p>
                 : <p style={{color:R,fontWeight:700,fontSize:13,margin:"4px 0 0"}}>残高がたりないよ</p>}
             </div>
             <div style={{display:"flex",gap:10}}>
@@ -5633,7 +5646,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <div style={{height:13,background:BORDER,borderRadius:7,overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:`${pct}%`,background:g.done?G:Y,borderRadius:7,transition:"width .6s"}}/></div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
                   <span style={{color:Y,fontWeight:800}}>{pct}% 達成</span>
-                  {!g.done && <span style={{color:MUTED}}>あと {Math.max(0,g.target-myBal).toLocaleString()}pt</span>}
+                  {!g.done && <span style={{color:MUTED}}>あと {Math.max(0,g.target-myBal).toLocaleString()}pt<YenNote pts={Math.max(0,g.target-myBal)} sz={10.5}/></span>}
                 </div>
                 {!g.done && myBal>=g.target && <button onClick={()=>markGoal(g.id)} style={{marginTop:10,width:"100%",background:G,border:"none",borderRadius:10,padding:"10px",color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F}}>🎉 目標達成！おめでとう！</button>}
               </div>
@@ -5671,7 +5684,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                   <div style={{display:"flex",alignItems:"center",gap:14,width:"100%"}}>
                     {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:48,height:48,objectFit:"contain",borderRadius:10,flexShrink:0}} alt=""/>:<span style={{fontSize:34}}>{r.emoji}</span>}
                     <div style={{flex:1,minWidth:0}}><div style={{fontWeight:800,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12,marginTop:2}}>{r.unit}</div></div>
-                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:11,color:pending?GOLD:ok?G:R,fontWeight:700}}>{pending?"✋ しんせい中":ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
+                    <div style={{textAlign:"right",flexShrink:0}}><div style={{fontWeight:900,fontSize:16,color:ok?P:MUTED}}>{r.cost.toLocaleString()}pt</div><div style={{fontSize:10.5,color:MUTED,fontWeight:700}}>{yenText(r.cost)}</div><div style={{fontSize:11,color:pending?GOLD:ok?G:R,fontWeight:700}}>{pending?"✋ しんせい中":ok?"こうかんできる":`あと ${rem.toLocaleString()}pt`}</div></div>
                   </div>
                   {/* 達成メーター：ごほうびが貯まるまでの割合を視覚化 */}
                   <div style={{width:"100%",display:"flex",alignItems:"center",gap:8}}>
@@ -5685,7 +5698,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             })}
           </div>
           <div style={{marginTop:14,background:"#fef9e0",border:`1.5px solid ${Y}`,borderRadius:14,padding:"11px 14px"}}>
-            <p style={{margin:0,fontSize:13,fontWeight:700}}><Ico name="coin" fb="💰" size={15} style={{marginRight:4}}/>いまの残高: <span style={{fontSize:16,color:G}}>{myBal.toLocaleString()}pt</span></p>
+            <p style={{margin:0,fontSize:13,fontWeight:700}}><Ico name="coin" fb="💰" size={15} style={{marginRight:4}}/>いまの残高: <span style={{fontSize:16,color:G}}>{myBal.toLocaleString()}pt</span><YenNote pts={myBal} sz={12}/></p>
           </div>
         </div>
       )}
@@ -5715,6 +5728,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
                 <div style={{flex:1,textAlign:"center",background:darkBG?"rgba(74,158,255,0.12)":BS,borderRadius:12,padding:"8px 4px"}}>
                   <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":TEXTS,fontWeight:700}}>のこり残高</div>
                   <div style={{fontSize:17,fontWeight:900,color:B}}>{myBal.toLocaleString()}</div>
+                  <div style={{fontSize:10,color:darkBG?"rgba(255,255,255,0.5)":MUTED,fontWeight:700}}>{yenText(myBal)}</div>
                 </div>
               </div>
               <div style={{display:"flex",justifyContent:"space-around",fontSize:11,color:darkBG?"rgba(255,255,255,0.6)":TEXTS,fontWeight:700}}>
@@ -6674,6 +6688,11 @@ function FamilyGuardianScreen({data, onBack, onPublicView}){
         </button>
       </div>
       <div style={{padding:"0 20px",display:"flex",flexDirection:"column",gap:12}}>
+        {(()=>{ const tot=children.reduce((a,m)=>a+bal(data.logs,m.id),0); return (
+          <div style={{background:GS,border:`1.5px solid ${G}40`,borderRadius:14,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:12,fontWeight:800,color:GP}}>👨‍👩‍👧 みんなの ポイント合計</span>
+            <span style={{fontWeight:900,fontSize:16,color:GP}}>{tot.toLocaleString()}pt<YenNote pts={tot} sz={12} c={GP}/></span>
+          </div>); })()}
         <div style={{fontSize:11,fontWeight:700,color:MUTED,letterSpacing:.5}}>子どもの詳細状況</div>
         {children.map((m,idx)=>{
           const b=bal(data.logs,m.id);
@@ -6691,6 +6710,7 @@ function FamilyGuardianScreen({data, onBack, onPublicView}){
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontWeight:800,fontSize:18,color:TEXT}}>{b.toLocaleString()}pt</div>
+                  <div style={{fontSize:11,color:MUTED,fontWeight:700}}>{yenText(b)}</div>
                   <div style={{fontSize:11,color:G,fontWeight:600}}>+{monthAct}pt 今月</div>
                 </div>
               </div>
@@ -6939,7 +6959,7 @@ function ParentScreen({ data, update, onBack }) {
                 <ChildAvatar child={child} size={40}/>
                 <div style={{flex:1}}>
                   <div style={{fontWeight:800,fontSize:15}}>{child.name} <span style={{background:`${P}20`,color:P,fontSize:11,fontWeight:700,padding:"2px 6px",borderRadius:8}}>{AGE_MODES[child.ageMode||"middle"].label}</span></div>
-                  <div style={{fontWeight:900,fontSize:24,color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</div>
+                  <div style={{fontWeight:900,fontSize:24,color:G}}>{bal(data.logs,child.id).toLocaleString()}pt<YenNote pts={bal(data.logs,child.id)} sz={12}/></div>
                 </div>
               </div>
               {grantChild?.id===child.id ? (
@@ -7096,7 +7116,7 @@ function ParentScreen({ data, update, onBack }) {
                     <ChildAvatar child={child} size={40}/>
                     <div style={{flex:1}}>
                       <div style={{fontWeight:800,fontSize:15}}>{child.name}</div>
-                      <div style={{color:MUTED,fontSize:12}}>{AGE_MODES[child.ageMode||"middle"].emoji} {AGE_MODES[child.ageMode||"middle"].label} · {bal(data.logs,child.id).toLocaleString()}pt</div>
+                      <div style={{color:MUTED,fontSize:12}}>{AGE_MODES[child.ageMode||"middle"].emoji} {AGE_MODES[child.ageMode||"middle"].label} · {bal(data.logs,child.id).toLocaleString()}pt<YenNote pts={bal(data.logs,child.id)}/></div>
                     </div>
                     <div style={{display:"flex",gap:6}}>{sb(B,"✏",()=>setEditChild({...child,pin:"",lockEnabled:!!(data.lockEnabled&&data.lockEnabled[child.id])}))}
                     {sb(R,"🗑",()=>setDelChild(child.id))}</div>
@@ -7144,7 +7164,7 @@ function ParentScreen({ data, update, onBack }) {
             <div style={{position:"fixed",inset:0,background:"#0008",zIndex:800,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
               <div style={{background:CARD,borderRadius:20,padding:24,width:"100%",maxWidth:340,fontFamily:F}}>
                 <h3 style={{fontWeight:900,fontSize:16,margin:"0 0 4px"}}>{overModal.task.emoji} {overModal.task.label}</h3>
-                <p style={{color:MUTED,fontSize:12,margin:"0 0 16px"}}>こどもごとに金額を個別設定（空欄=デフォルト {overModal.task.pts}円）</p>
+                <p style={{color:MUTED,fontSize:12,margin:"0 0 16px"}}>こどもごとにポイントを個別設定（空欄=デフォルト {overModal.task.pts}pt）</p>
                 {data.children.map(child=>(
                   <div key={child.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
                     <Emo e={child.emoji} size={20}/>
@@ -7253,7 +7273,7 @@ function ParentScreen({ data, update, onBack }) {
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   {/^r0\d$/.test(r.id)?<img src={`/assets/reward_${r.id}.png`} style={{width:30,height:30,objectFit:"contain",borderRadius:6,flexShrink:0}} alt=""/>:<span style={{fontSize:22}}>{r.emoji}</span>}
                   <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{r.label}</div><div style={{color:MUTED,fontSize:12}}>{r.unit}</div></div>
-                  <span style={{fontWeight:800,color:P,marginRight:6}}>{r.cost.toLocaleString()}pt</span>
+                  <span style={{fontWeight:800,color:P,marginRight:6}}>{r.cost.toLocaleString()}pt<YenNote pts={r.cost} sz={10.5}/></span>
                   <div style={{display:"flex",gap:5}}>{sb(B,"✏",()=>setEditReward({...r,cost:String(r.cost)}))}{sb(R,"🗑",()=>delReward(r.id))}</div>
                 </div>
               )}
@@ -7390,7 +7410,7 @@ function ParentScreen({ data, update, onBack }) {
             const logs=data.logs.filter(l=>l.cid===child.id).slice(0,20);
             return (
               <div key={child.id} style={{marginBottom:24}}>
-                <p style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}><Emo e={child.emoji} size={13} style={{marginRight:3}}/>{child.name}　<span style={{color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</span></p>
+                <p style={{fontWeight:800,fontSize:13,color:MUTED,marginBottom:8}}><Emo e={child.emoji} size={13} style={{marginRight:3}}/>{child.name}　<span style={{color:G}}>{bal(data.logs,child.id).toLocaleString()}pt</span><YenNote pts={bal(data.logs,child.id)} sz={12}/></p>
                 {logs.map(l=>{
                   const emoji=l.type==="grant"?"🎁":l.type==="gacha"?"🎰":l.type==="reward"?"🎁":([...data.goodTasks,...data.badTasks].find(t=>t.id===l.rid)?.emoji||"📌");
                   return (
@@ -7508,7 +7528,7 @@ function HomeScreen({ data, update, onChild, onParent, onParentCard, onSettings 
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:11,color:MUTED}}>{member.gradeLabel||(member.displayMode==="junior"?"小学生":"中高生")}</span>
-                    <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt</span>
+                    <span style={{fontSize:11,background:GS,color:GP,padding:"2px 7px",borderRadius:999,fontWeight:700}}>累計 {bal(data.logs,member.id).toLocaleString()}pt {yenText(bal(data.logs,member.id))}</span>
                     {(()=>{const td=todayDelta(member.id);return td>0&&<span style={{fontSize:11,background:GOLDS,color:GOLD,padding:"2px 7px",borderRadius:999,fontWeight:700}}>今日 +{td}pt</span>;})()}
                   </div>
                 </div>
@@ -8334,7 +8354,7 @@ function PointTransferModal({ child, data, update, onClose }) {
           <button onClick={onClose} style={{background:BG,border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:16,color:MUTED,fontFamily:F}}>✕</button>
         </div>
         <div style={{fontSize:12,color:MUTED,marginBottom:16}}>
-          💰 いまの残高: <strong style={{color:GP,fontSize:14}}>{myBal.toLocaleString()}pt</strong>
+          💰 いまの残高: <strong style={{color:GP,fontSize:14}}>{myBal.toLocaleString()}pt</strong><YenNote pts={myBal} sz={12}/>
         </div>
 
         {/* メンバー選択 */}
@@ -8451,7 +8471,7 @@ function WeeklyReport({child,data,onClose}){
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:MUTED}}>✕</button>
         </div>
         <div style={{background:`linear-gradient(135deg,${Y}30,${G}20)`,borderRadius:16,padding:"14px 18px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div><div style={{color:MUTED,fontSize:12,fontWeight:700}}>現在の残高</div><div style={{fontWeight:900,fontSize:28,color:TEXT}}>{curBal.toLocaleString()}pt</div></div>
+          <div><div style={{color:MUTED,fontSize:12,fontWeight:700}}>現在の残高</div><div style={{fontWeight:900,fontSize:28,color:TEXT}}>{curBal.toLocaleString()}pt<YenNote pts={curBal} sz={13}/></div></div>
           {data.interestEnabled&&interest>0&&<div style={{textAlign:"right"}}><div style={{color:MUTED,fontSize:11,fontWeight:700}}>次回利子（予定）</div><div style={{fontWeight:900,fontSize:18,color:G}}>+{interest}pt</div></div>}
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
