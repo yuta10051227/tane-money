@@ -1046,6 +1046,62 @@ const PD_EDIT_BAD = { b11:{pts:-50} };
 const PD_EDIT_REWARD = { r07:{cost:1500,cashYen:500} };
 const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44","g54","g55","g56","g57","g58","g59","g60","g61"]; // 妹だけ（習い事・通知表）
 const PD_ONLY_BROTHER = ["g46","g62","g63","g64","g65","g66"]; // 兄だけ（0時就寝・部活）
+// ── 第2段階(後半): 祝日=休日扱い・日課の担当(who)・部活なし・平日用/休日用セット ──
+const PD_HOLIDAYS = new Set(["2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20","2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06","2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23","2026-10-12","2026-11-03","2026-11-23","2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-21","2027-03-22","2027-04-29","2027-05-03","2027-05-04","2027-05-05","2027-07-19","2027-08-11","2027-09-20","2027-09-23","2027-10-11","2027-11-03","2027-11-23"]); // 2027年まで。以降は土日のみ休日扱い
+function pdIsOffDay(dt){
+  const d = dt || new Date(); const w = d.getDay();
+  if(w===0||w===6) return true;
+  return PD_HOLIDAYS.has(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+}
+const PD_NOCLUB_KEY = "__noclub";   // dailyProgress[子][日付] の中。その日だけ有効(__bonus__ とは別名)
+// 日課タスクの担当: who=子のID配列(空/なし=全員)。noClubToo=「部活なし」の子にも出す。clubOnly=「部活なし」の日は出さない
+function pdWhoOk(t, cid, noClub){
+  if(!t) return false;
+  if(t.clubOnly && noClub) return false;
+  const w = t.who;
+  if(!Array.isArray(w)||w.length===0) return true;
+  if(w.includes(cid)) return true;
+  return !!(t.noClubToo && noClub);
+}
+function pdDailySets(sisId, broId){
+  const mk=(id,emoji,label,pts,extra)=>({id,emoji,label,type:"check",pts,target:1,req:true,...extra});
+  const S=[sisId], B=[broId], SB=[sisId,broId];
+  return [
+    {id:"pd_wd", name:"平日用（新ポイント設計）", emoji:"🌱", bonus:0, startDate:"", endDate:"", active:true, tasks:[
+      mk("pdw1","🍽","食洗機を回す(夕食のあと)",30,{who:S,noClubToo:true}),
+      mk("pdw2","🧻","テーブルを拭く か お風呂を洗う(どちらか)",30,{who:S,noClubToo:true}),
+      mk("pdw3","👔","洗濯物を干す",50,{who:S,noClubToo:true}),
+      mk("pdw4","🍽","食洗機を回す(帰ってから)",30,{who:B,clubOnly:true}),
+      mk("pdw5","🐱","猫のうんち取り(夜)",60,{who:B}),
+    ]},
+    {id:"pd_off", name:"休日用（新ポイント設計）", emoji:"🌴", bonus:0, startDate:"", endDate:"", active:true, tasks:[
+      mk("pdh1","🍽","食洗機を回す(1人1回)",30,{who:SB}),
+      mk("pdh2","👔","洗濯物を干す(1人1回ぶん)",50,{who:SB}),
+      mk("pdh3","🧻","テーブルを拭く",30,{who:S}),
+      mk("pdh4","🛁","お風呂を洗う",50,{who:B}),
+      mk("pdh5","🧹","掃除機をかける(1部屋)",50,{who:B}),
+      mk("pdh6","🐱","猫のうんち取り(2回)",60,{who:B,type:"count",target:2}),
+    ]},
+  ];
+}
+function pdDailyApply(d){
+  const pd = d.pointDesign2026||{};
+  if(!pd.sisId||!pd.broId) return d;
+  const prev = d.pointDesign2026Daily || {activeSetIds:d.activeSetIds||[], activeSetId:d.activeSetId||"", vacationMode:!!(d.familySettings||{}).vacationMode};
+  const news = pdDailySets(pd.sisId, pd.broId).map(x=>({...x,updatedAt:Date.now()}));
+  const ids = news.map(x=>x.id);
+  const sets = [...(d.dailyTaskSets||[]).filter(x=>!ids.includes(x.id)), ...news];
+  return {...d, dailyTaskSets:sets, activeSetIds:ids, activeSetId:ids[0], pointDesign2026Daily:{...prev, appliedAt:new Date().toISOString(), ids}};
+}
+function pdDailyRestore(d){
+  const b = d.pointDesign2026Daily;
+  if(!b) return d;
+  const {pointDesign2026Daily,...rest} = d;
+  const sets = (rest.dailyTaskSets||[]).filter(x=>!(b.ids||[]).includes(x.id));
+  let act = (b.activeSetIds||[]).filter(id=>sets.some(x=>x.id===id));
+  if(act.length===0 && sets[0]) act=[sets[0].id];
+  return {...rest, dailyTaskSets:sets, activeSetIds:act, activeSetId:act[0]||""};
+}
 function pdApply(d, sisId, broId){
   const fsOld = d.familySettings||{};
   const bak = d.pointDesign2026Backup || {goodTasks:d.goodTasks, badTasks:d.badTasks, rewards:d.rewards, myTaskIds:d.myTaskIds||{}, approvalThreshold:fsOld.approvalThreshold, monthlyCashCap:fsOld.monthlyCashCap};
@@ -2297,16 +2353,17 @@ function getYakusokuInfo(data, childId, dateObj) {
       chosen = chosen.slice(0,4);
     }
     // その日のセット自動選択(DailyTasksの_pickTodayと同じ)
-    const wkend = [0,6].includes(day);
+    const wkend = pdIsOffDay(now);
     const pick = (vac && chosen[0] && chosen[0].vacation) ? chosen[0] : (() => {
       const wk  = chosen.find(s=>(s.name||"").includes("平日"));
       const hol = chosen.find(s=>/休|週末|土日/.test(s.name||""));
       return (wkend ? (hol||wk) : (wk||hol)) || chosen[0] || null;
     })();
     if (!pick) return { reqTasks:[], done:0, allDone:false };
-    const dowOk = t => !Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(day);
-    const reqTasks = (Array.isArray(pick.tasks)?pick.tasks:[]).filter(t => t.req===true && dowOk(t));
     const p = (data.dailyProgress?.[childId]?.[key]) || {};
+    const _nc = !!p[PD_NOCLUB_KEY];
+    const dowOk = t => (!Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(day)) && pdWhoOk(t, childId, _nc);
+    const reqTasks = (Array.isArray(pick.tasks)?pick.tasks:[]).filter(t => t.req===true && dowOk(t));
     const done = reqTasks.filter(t => t.type==="check" ? !!p[`${pick.id}::${t.id}`] : (p[`${pick.id}::${t.id}`]||0) >= (t.target||1)).length;
     return { reqTasks, done, allDone: reqTasks.length>0 && done===reqTasks.length };
   } catch(e) { return { reqTasks:[], done:0, allDone:false }; }
@@ -2349,7 +2406,7 @@ function DailyTasks({ child, data, update }) {
   })();
   const activeSet = activeSets[0] || null;   // 後方互換(ヘッダ表示等)
   // 平日/休日タブ: 1セットずつ表示。今日に合うセットを自動選択(手動でも切替可)
-  const _isWeekend = [0,6].includes(new Date().getDay());
+  const _isWeekend = pdIsOffDay();
   const _pickToday = () => {
     if (vacMode && activeSets[0] && activeSets[0].vacation) return activeSets[0].id;   // 長期休み中は先頭の長期休み用セット
     const wk  = activeSets.find(s=>(s.name||"").includes("平日"));
@@ -2360,7 +2417,8 @@ function DailyTasks({ child, data, update }) {
   const selId   = (selSetId && activeSets.some(s=>s.id===selSetId)) ? selSetId : _pickToday();
   const viewSet = activeSets.find(s=>s.id===selId) || activeSets[0] || null;
   // 曜日指定(dow)タスクは今日の曜日だけ表示。dowなし/空=毎日(後方互換)
-  const dowOk = t => !Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(new Date().getDay());
+  const _noClub = !!((data.dailyProgress?.[child.id]?.[today]||{})[PD_NOCLUB_KEY]);
+  const dowOk = t => (!Array.isArray(t.dow) || t.dow.length===0 || t.dow.includes(new Date().getDay())) && pdWhoOk(t, child.id, _noClub);
   // 完了キーは「セットID::タスクID」で名前空間化(ID衝突回避)
   const tasks = (viewSet
     ? (Array.isArray(viewSet.tasks)?viewSet.tasks:[]).map(t =>
@@ -2538,6 +2596,16 @@ function DailyTasks({ child, data, update }) {
         {tasks.length===0&&<p style={{color:MUTED,fontSize:12,margin:"8px 0 0"}}>アクティブなタスクセットがないよ</p>}
       </div>
 
+      {/* 🏓 今日は部活なし(部活の日と家事の分担が変わる項目があるときだけ表示) */}
+      {(()=>{
+        const hid = (viewSet&&Array.isArray(viewSet.tasks)?viewSet.tasks:[]).some(t=>t.noClubToo&&Array.isArray(t.who)&&t.who.length>0&&!t.who.includes(child.id));
+        if(!hid) return null;
+        return <button onClick={()=>update(d=>setDailyProg(d,{[PD_NOCLUB_KEY]:!_noClub}))}
+          style={{width:"100%",marginBottom:12,padding:"11px 14px",borderRadius:14,border:`2px solid ${_noClub?G:BORDER}`,background:_noClub?`${G}18`:CARD,color:_noClub?GP:TEXT,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>
+          {_noClub?"✅ 今日は部活なし（おしてもどす）":"🏓 今日は部活なし（おしてね）"}
+        </button>;
+      })()}
+
       {/* Task list（開いているときだけ表示。セットごとに見出しを付けて2セットまとめ表示） */}
       {open && <>
       {tasks.length === 0 && (
@@ -2636,7 +2704,18 @@ function PointDesignSection({data, update}){
       {applied&&!needV2?(
         <div>
           <p style={{margin:"0 0 8px",fontSize:12,color:TEXTS,lineHeight:1.7}}>適用ずみ（{String(applied.appliedAt||"").slice(0,10)}）。兄={nameOf(applied.broId)} / 妹={nameOf(applied.sisId)}</p>
-          {btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当を適用前の状態に戻します。\n適用後に付いたポイントの記録は消えません。戻しますか？")) update(pdRestore); })}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {btn(B,"いまの内容を書き出す",download)}
+            {btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当を適用前の状態に戻します。\n適用後に付いたポイントの記録は消えません。戻しますか？")) update(pdRestore); })}
+          </div>
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
+            <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>📅 毎日の日課に「平日用／休日用」を入れる</p>
+            <p style={{margin:"0 0 8px",fontSize:11,color:TEXTS,lineHeight:1.7}}>平日用は 妹: 食洗機(夕食後)・テーブルかお風呂・洗濯干し／兄: 食洗機(帰宅後)・猫のうんち。兄が「今日は部活なし」を押すと妹と同じ分担になります。休日用は 洗濯干しと食洗機を1人1回、お風呂・掃除機・猫のうんちは兄。祝日は休日用になります。いまの日課セットは保存され、あとで戻せます。</p>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {btn(GP,data.pointDesign2026Daily?"日課セットを入れ直す":"日課セットを入れる",()=>{ if(window.confirm("毎日の日課を「平日用／休日用」に切り替えます。いまのセットは残り、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdDailyApply); } })}
+              {data.pointDesign2026Daily&&btn(R,"日課を元に戻す",()=>{ if(window.confirm("日課を切り替え前に戻します。戻しますか？")){ markLocalDefEdit(); update(pdDailyRestore); } })}
+            </div>
+          </div>
         </div>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -5802,6 +5881,19 @@ function ParentDailyTab({data,update,sb}){
                       style={{marginLeft:2,padding:"4px 9px",borderRadius:999,border:`1.5px solid ${t.req?Y:BORDER}`,background:t.req?`${Y}25`:CARD,color:t.req?"#9a7000":MUTED,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>
                       ⭐やくそく{t.req?"✓":""}
                     </button>
+                  </div>
+                  {/* 担当(who)・部活なし */}
+                  <div style={{display:"flex",gap:4,marginTop:6,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,color:MUTED,fontWeight:700}}>担当</span>
+                    {(data.children||[]).map(c=>{
+                      const on=Array.isArray(t.who)&&t.who.includes(c.id);
+                      return(<button key={c.id} onClick={()=>updateTaskInSet(s.id,t.id,tt=>{const cur=Array.isArray(tt.who)?tt.who:[];return {...tt,who:cur.includes(c.id)?cur.filter(x=>x!==c.id):[...cur,c.id]};})}
+                        style={{padding:"3px 9px",borderRadius:999,border:`1.5px solid ${on?GP:BORDER}`,background:on?GP:CARD,color:on?"#fff":MUTED,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>{c.name}</button>);
+                    })}
+                    <button onClick={()=>updateTaskInSet(s.id,t.id,tt=>({...tt,noClubToo:!tt.noClubToo}))}
+                      style={{padding:"3px 9px",borderRadius:999,border:`1.5px solid ${t.noClubToo?B:BORDER}`,background:t.noClubToo?`${B}18`:CARD,color:t.noClubToo?B:MUTED,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>🏓部活なしの子にも出す{t.noClubToo?"✓":""}</button>
+                    <button onClick={()=>updateTaskInSet(s.id,t.id,tt=>({...tt,clubOnly:!tt.clubOnly}))}
+                      style={{padding:"3px 9px",borderRadius:999,border:`1.5px solid ${t.clubOnly?R:BORDER}`,background:t.clubOnly?`${R}15`:CARD,color:t.clubOnly?R:MUTED,fontWeight:800,fontSize:11,cursor:"pointer",fontFamily:F}}>部活の日だけ{t.clubOnly?"✓":""}</button>
                   </div>
                   <p style={{color:MUTED,fontSize:10,margin:"5px 0 0"}}>曜日：なにも選ばないと毎日 ／ ⭐やくそく＝あしたのごほうびの条件</p>
                 </div>}
