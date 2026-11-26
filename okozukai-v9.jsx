@@ -531,6 +531,8 @@ function startRealtimeSync(updateFn){
             // 1日のバトル回数: 今日の分は多い方を採用＝同期巻き戻しで上限を超えられないように
             if(prev.battleCountDay){merged.battleCountDay={...(merged.battleCountDay||{})};const _td=todayKey();Object.keys(prev.battleCountDay).forEach(cid=>{const p=prev.battleCountDay[cid]||{},m=merged.battleCountDay[cid]||{};const pT=p.date===_td,mT=m.date===_td;if(pT&&mT)merged.battleCountDay[cid]={date:_td,n:Math.max(p.n||0,m.n||0)};else if(pT)merged.battleCountDay[cid]=p;else if(!mT)merged.battleCountDay[cid]=p;});}
             if(prev.streak) merged.streak=prev.streak;
+            // やくそく連続: lastが新しい方(同日なら連続が多い方)を採用＝同期の巻き戻しでボーナスを二重に出さない
+            if(prev.yakusokuStreak){merged.yakusokuStreak={...(merged.yakusokuStreak||{})};Object.keys(prev.yakusokuStreak).forEach(cid=>{const p=prev.yakusokuStreak[cid]||{},m=merged.yakusokuStreak[cid]||{};if(String(p.last||"")>String(m.last||"")||(p.last===m.last&&(p.cur||0)>(m.cur||0)))merged.yakusokuStreak[cid]=p;});}
             // dailyProgress: 子ID×日付×タスク単位でユニオン(done優先/回数は最大)＝親端末でもリアルタイムに進捗が見え、
             // 自端末の古いコピーで他の子の当日進捗を巻き戻さない（旧実装は無条件ローカル優先）
             if(prev.dailyProgress){
@@ -1241,6 +1243,7 @@ const INIT = {
   goals: [],     // {id,cid,emoji,label,target,done,doneDate?}
   gachaDate: {}, // {[cid]: "YYYY-M-D"}
   streak: {},    // {[cid]: {cur,max,last}}
+  yakusokuStreak: {},   // ⭐やくそくが全部できた日の連続日数 {[cid]: {cur,max,last(YYYY-MM-DD)}}。7日ごとに100pt
   // daily tasks: checklist or count, reset each day
   dailyTasks: [
     { id: "d1", emoji: "🧹", label: "部屋の片付け",       type: "check", pts: 30, target: 1 },
@@ -1381,6 +1384,7 @@ function migrate(d) {
   if (!d.cats)         d.cats=INIT.cats;
   if (!d.gachaDate)    d.gachaDate={};
   if (!d.streak)       d.streak={};
+  if (!d.yakusokuStreak) d.yakusokuStreak={};
   if (!d.dailyTasks)   d.dailyTasks=INIT.dailyTasks;
   if(d.dailyBonus===undefined) d.dailyBonus=50;
   if(!d.forexHoldings) d.forexHoldings={};
@@ -2515,6 +2519,33 @@ function DailyTasks({ child, data, update }) {
     return { ...d, yakusokuDone: { ...(d.yakusokuDone||{}), [child.id]: (()=>{const pv=(d.yakusokuDone||{})[child.id];const arr=Array.isArray(pv)?pv:(pv?[pv]:[]);return [...arr.filter(x=>x!==today),today].slice(-2);})() } };
   };
 
+  // ⭐やくそくを全部できた日を数えて、7日ごとに100pt。1日抜けたら1からやり直し(その日の最初の達成で1回だけ判定)
+  const _isoOf = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+  const awardYakusokuStreak = (newProg) => {
+    try{
+      const sim = {...data, dailyProgress:{...(data.dailyProgress||{}), [child.id]:{...((data.dailyProgress||{})[child.id]||{}), [today]:newProg}}};
+      const info = getYakusokuInfo(sim, child.id);
+      if(!info.reqTasks.length || !info.allDone) return;
+      const iso = todayISO();
+      const prevSt = (data.yakusokuStreak||{})[child.id] || {cur:0,max:0,last:""};
+      if(prevSt.last===iso) return;
+      const yd = new Date(); yd.setDate(yd.getDate()-1);
+      const cur = prevSt.last===_isoOf(yd) ? (prevSt.cur||0)+1 : 1;
+      const bonus = cur%7===0 ? 100 : 0;
+      const entry = bonus ? mkEntry(`🔥 やくそく${cur}日れんぞく ボーナス！`, bonus) : null;
+      setTimeout(()=>{
+        update(d=>{
+          const p2 = (d.yakusokuStreak||{})[child.id] || {};
+          if(p2.last===iso) return d;
+          let nd = {...d, yakusokuStreak:{...(d.yakusokuStreak||{}), [child.id]:{cur, max:Math.max(p2.max||0,cur), last:iso}}};
+          if(entry) nd = {...nd, logs:[entry,...nd.logs]};
+          return nd;
+        });
+        if(entry){ addLogToFirestore(entry); setFlash({pts:bonus, emoji:"🔥", yaku:false}); setTimeout(()=>setFlash(null),1400); }
+      }, 900);
+    }catch(e){}
+  };
+
   const handleCheck = t => {
     if (isDone(t)) return;
     showFlash(t.pts, t.emoji, (t.pts||0)===0&&t.req);
@@ -2523,6 +2554,7 @@ function DailyTasks({ child, data, update }) {
     update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:true}), logs:[entry,...d.logs] }, child.id, 0.2, Math.max(1,t.pts))));
     addLogToFirestore(entry);
     awardSetBonus(t._setId, { ...prog, [t._k]: true });
+    awardYakusokuStreak({ ...prog, [t._k]: true });
   };
 
   const handleCount = t => {
@@ -2535,6 +2567,7 @@ function DailyTasks({ child, data, update }) {
     update(d => markYakusoku(careCap({ ...setDailyProg(d, {[t._k]:nxt}), logs:[entry,...d.logs] }, child.id, 0.12, Math.max(1, t.pts))));
     addLogToFirestore(entry);
     if (nxt>=(t.target||1)) awardSetBonus(t._setId, { ...prog, [t._k]: nxt });
+    awardYakusokuStreak({ ...prog, [t._k]: nxt });
   };
 
   return (
@@ -2602,10 +2635,18 @@ function DailyTasks({ child, data, update }) {
       {(()=>{
         const hid = (viewSet&&Array.isArray(viewSet.tasks)?viewSet.tasks:[]).some(t=>t.noClubToo&&Array.isArray(t.who)&&t.who.length>0&&!t.who.includes(child.id));
         if(!hid) return null;
-        return <button onClick={()=>update(d=>setDailyProg(d,{[PD_NOCLUB_KEY]:!_noClub}))}
-          style={{width:"100%",marginBottom:12,padding:"11px 14px",borderRadius:14,border:`2px solid ${_noClub?G:BORDER}`,background:_noClub?`${G}18`:CARD,color:_noClub?GP:TEXT,fontWeight:800,fontSize:13,cursor:"pointer",fontFamily:F}}>
-          {_noClub?"✅ 今日は部活なし（おしてもどす）":"🏓 今日は部活なし（おしてね）"}
+        return <button disabled={_noClub} onClick={()=>{ if(window.confirm("今日は部活がなかった、でいいですか？（おしたら、きょうは もどせません）")) update(d=>setDailyProg(d,{[PD_NOCLUB_KEY]:true})); }}
+          style={{width:"100%",marginBottom:12,padding:"11px 14px",borderRadius:14,border:`2px solid ${_noClub?G:BORDER}`,background:_noClub?`${G}18`:CARD,color:_noClub?GP:TEXT,fontWeight:800,fontSize:13,cursor:_noClub?"default":"pointer",fontFamily:F}}>
+          {_noClub?"✅ 今日は部活なし（妹と同じ分担）":"🏓 今日は部活なし（おしてね）"}
         </button>;
+      })()}
+      {/* 🔥 やくそく れんぞく（きのうまで続いているときだけ） */}
+      {(()=>{
+        const ys=(data.yakusokuStreak||{})[child.id]; if(!ys||!(ys.cur>0)) return null;
+        const yd=new Date(); yd.setDate(yd.getDate()-1);
+        if(ys.last!==_todayISO && ys.last!==_isoOf(yd)) return null;
+        const rest=7-(ys.cur%7);
+        return <div style={{marginBottom:12,padding:"8px 12px",borderRadius:12,background:`${GOLD}22`,color:"#9a7000",fontWeight:800,fontSize:12.5,textAlign:"center"}}>🔥 やくそく {ys.cur}日れんぞく{ys.last===_todayISO?"（きょうも クリア！）":""} ・ あと{rest===7?7:rest}日で +100pt</div>;
       })()}
 
       {/* Task list（開いているときだけ表示。セットごとに見出しを付けて2セットまとめ表示） */}
