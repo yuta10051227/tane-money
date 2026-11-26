@@ -531,6 +531,8 @@ function startRealtimeSync(updateFn){
             // 1日のバトル回数: 今日の分は多い方を採用＝同期巻き戻しで上限を超えられないように
             if(prev.battleCountDay){merged.battleCountDay={...(merged.battleCountDay||{})};const _td=todayKey();Object.keys(prev.battleCountDay).forEach(cid=>{const p=prev.battleCountDay[cid]||{},m=merged.battleCountDay[cid]||{};const pT=p.date===_td,mT=m.date===_td;if(pT&&mT)merged.battleCountDay[cid]={date:_td,n:Math.max(p.n||0,m.n||0)};else if(pT)merged.battleCountDay[cid]=p;else if(!mT)merged.battleCountDay[cid]=p;});}
             if(prev.streak) merged.streak=prev.streak;
+            // タネ貯金: 口座は更新回数(rev)が多い方、設定(ON/基準pt)はsrevが新しい方を採用＝同期の巻き戻しでポイントが増減しない
+            if(prev.taneChokin){const pt=prev.taneChokin,mt=merged.taneChokin||{};const ac={...(mt.accounts||{})};Object.keys(pt.accounts||{}).forEach(cid=>{if(((pt.accounts[cid]||{}).rev||0)>=((ac[cid]||{}).rev||0))ac[cid]=pt.accounts[cid];});merged.taneChokin={...((pt.srev||0)>=(mt.srev||0)?pt:mt),accounts:ac};}
             // やくそく連続: lastが新しい方(同日なら連続が多い方)を採用＝同期の巻き戻しでボーナスを二重に出さない
             if(prev.yakusokuStreak){merged.yakusokuStreak={...(merged.yakusokuStreak||{})};Object.keys(prev.yakusokuStreak).forEach(cid=>{const p=prev.yakusokuStreak[cid]||{},m=merged.yakusokuStreak[cid]||{};if(String(p.last||"")>String(m.last||"")||(p.last===m.last&&(p.cur||0)>(m.cur||0)))merged.yakusokuStreak[cid]=p;});}
             // dailyProgress: 子ID×日付×タスク単位でユニオン(done優先/回数は最大)＝親端末でもリアルタイムに進捗が見え、
@@ -1243,6 +1245,7 @@ const INIT = {
   goals: [],     // {id,cid,emoji,label,target,done,doneDate?}
   gachaDate: {}, // {[cid]: "YYYY-M-D"}
   streak: {},    // {[cid]: {cur,max,last}}
+  taneChokin: {enabled:{},accounts:{},threshold:{},srev:0},   // 🌱タネ貯金 accounts[cid]={principal,mode,paidThrough,rev}
   yakusokuStreak: {},   // ⭐やくそくが全部できた日の連続日数 {[cid]: {cur,max,last(YYYY-MM-DD)}}。7日ごとに100pt
   // daily tasks: checklist or count, reset each day
   dailyTasks: [
@@ -1385,6 +1388,7 @@ function migrate(d) {
   if (!d.gachaDate)    d.gachaDate={};
   if (!d.streak)       d.streak={};
   if (!d.yakusokuStreak) d.yakusokuStreak={};
+  if (!d.taneChokin) d.taneChokin={enabled:{},accounts:{},threshold:{},srev:0};
   if (!d.dailyTasks)   d.dailyTasks=INIT.dailyTasks;
   if(d.dailyBonus===undefined) d.dailyBonus=50;
   if(!d.forexHoldings) d.forexHoldings={};
@@ -2253,8 +2257,9 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n29", e:"🌱", t:"「タネ貯金」ができました（あずけて、ふやす）", b:"【なにができる？】\nポイントを「タネ貯金」にあずけておくと、毎月、利息（ふえるポイント）がもらえます。「ためる」タブの「🌱 タネ貯金」から使います（おうちの人が始めると出ます）。\n\n【ルール】\n・あずけられるのは、ぜんぶで 10,000pt 〜 30,000pt。1,000pt ずつ えらびます。\n・あずける・出すのは、毎月1日〜3日だけ。思いつきで出し入れしないための ルールです。\n・利息は、月が変わった最初の日に、先月ぶんが入ります。基本は月4%。その月の「おてつだいポイント」が目標（妹 10,000pt／兄 8,000pt）に届くと +1% で、月5%。\n・おてつだいポイントに数えるのは、100pt未満のおてつだい・日課だけ。大会・テスト・検定などは数えません。\n・利息がつくのは、あずけた額（ふやした分も入れて）3万ptまで。\n・利息は、「ふやす（あずけに足す＝利息にも利息がつく）」か「手元にうけとる（すぐ使える）」を、自分で えらべます。\n・つかえるポイントの「手元」から あずけた分は、出すまで げんきん交換には つかえません。\n\n【どのくらいふえる？（1年・目安）】\n・10,000pt をふやす：月5%で約 +7,952pt／月4%で約 +6,004pt\n・10,000pt を手元にうけとる：月5%で +6,000pt\n・30,000pt：月5%で毎月 1,500pt（1年で 18,000pt）\n画面の「みらいシミュレーター」で、あずける額を動かして 3か月後・6か月後・1年後を見られます。\n\n【なんのために？】\n・ためる力をつけるため：使うだけでなく、ためると ふえる体験を、少ないポイントから してほしい。\n・毎日のおてつだいが、ふえる利率にもつながるように：5%にするには、その月のおてつだいを続ける必要があります。\n・お金の使いすぎを防ぐため：月初の3日間だけ出し入れできるので、「いま使う」と「あとで増やす」を、落ち着いて選べます。\n\n【おうちの人へ】\n・設定の「お手伝い項目」の新ポイント設計カードに「タネ貯金を始める」があります。押すと、妹と兄でタネ貯金が使えるようになり、これまでの「週次利子（残高×1%）」はOFFになります（元の設定は保存され、設定の「利子」から戻せます）。\n・預けているポイントがある子は、画面からタネ貯金を外せません。\n・利息は、月に1回だけ付くしくみで、複数の端末で開いても二重には付きません。"},
   {id:"n28", e:"🏓", t:"日課の担当・部活なしボタン・祝日が休日に", b:"【なにが変わった？】\n・🗓 祝日も「休日」あつかいに：土日だけでなく祝日（2027年まで）も、「休日用」のおてつだいが自動で出ます。\n・👤 おてつだいに「担当」ができた：だれのおてつだいか決められます。決めていないものは、これまでどおり全員に出ます。\n・🏓「今日は部活なし」ボタン（兄）：部活がない日に押すと、妹と同じ分担のおてつだいが出ます。その日だけ有効で、次の日は元にもどります。部活のある日だけの「帰ってから食洗機」は、この日は消えます。\n・🌱 平日用／休日用のセット：おうちの人が「日課セットを入れる」を押すと、下の内容になります。\n　＜平日＞妹：食洗機（夕食のあと）・テーブルかお風呂・洗濯物を干す／兄：食洗機（帰ってから）・猫のうんち取り\n　＜休日・祝日＞食洗機と洗濯干しは1人1回ずつ／お風呂洗い・掃除機・猫のうんち（2回）は兄／テーブルは妹\n・📤 設定の「いまの内容を書き出す」が、適用のあとでも使えるように。\n\n【なんのために？】\n・「担当だけやる」から「だれかの分もやる」へ：担当は最低ライン。どちらかが休みや部活でも、家事が止まらないようにするためです。\n・兄は平日、部活で帰りがおそい日が多いので、部活がない日に分担がずれて「それは担当じゃない」とならないように、ボタン1つで切り替わるようにしました。\n・平日と休日で、やることの量がちがうのは自然なこと。休日は人手が多いので、重い家事を兄が受け持ち、平日は妹の負担を軽くします。\n・おうちの人が毎日チェックしなくても回る仕組みにしたい。ボタンを押すだけで、ふたりの分担が見える状態を目指しています。\n\n【おうちの人へ】\n・入れる前に「いまの内容を書き出す」で控えをとってください。「日課を元に戻す」でいつでも戻せます（いまのセットは消えません）。\n・日課の点数は、いまのお手伝い項目とそろえてあります。同じ家事を日課とお手伝い項目の両方で押すと二重にポイントが付くので、どちらで押すか家族で決めてください。\n・内容は設定の「毎日タスク管理」で、担当や点数を自由に変えられます。"},
-  {id:"n27", e:"🌱", t:"ポイントのしくみを見直しました（3pt＝1円・新しい項目・上限）", b:"2026年11月26日、ポイントのしくみを大きく見直しました。\n\n【なにが変わった？】\n・💴 3ポイント＝1円：500円交換は 1,500pt になります（前は 2,000pt）。\n・🔒 月の現金交換の上限：妹 5,000円／兄 10,000円まで。超えたぶんは消えず、ポイントは来月に使えます。\n・🆕 あたらしいお手伝いが約30こ：\n　朝の部屋セット(60pt)・床だけOK(20pt)・明日の準備(10pt)\n　妹：ダンス／ピアノ／英語の練習15分(各20pt)・週1の見せる日(50pt)・英語レッスンの宿題(30pt)・振付(100pt)・ピアノ1曲(200pt)・発表会(300pt)・コンクール(出場300pt／入賞500pt)・通知表(◎40pt／○15pt／成長50pt)\n　兄：0時までに寝る(20pt)・部活の大会（出場100pt／1勝500pt・県大会は1000pt）・レギュラー入り(500pt)・順位アップ(300pt)\n　ふたり：週リセット(100pt)・月1の整理(200pt)・提出物(100pt)・定期テスト（前回より+5点で100pt／目標点で200pt）・検定（受験200pt／合格1000pt）\n・🐱 猫とお風呂の点数を見直し：猫のうんち取り 60pt（1日2回まで）／お風呂洗い 50pt／猫の吐いたものの片づけ 30pt／猫のトイレ丸洗い 150pt（親と一緒・週1回）。\n・⚖ 机まわりの減点を -200 から -50 に軽くしました（きびしすぎて見なくなるのを防ぐため）。\n・✅ 100pt以上は親の承認が必要に。\n・🔁 同じ項目の回数上限：1日・週・月ごとに「あと何回」が決まります。上限に来ると「きょうは○回まで」と表示されます。\n\n【なんのために？】\n・自分のためになることでポイントが貯まるように：部屋の片づけ、家事、勉強、習い事、部活、テスト。それぞれの努力が、ちゃんとポイントになります。\n・毎日ひらく理由をつくるため：毎日少しずつ貯まる項目を増やし、「今日は何をやろう」とアプリを見る習慣にしたい。\n・おうちの人の確認をふやさないため：毎日は確認せず、自己申告＋日曜の朝9時に抜き打ち（夫婦で交代）。大きいポイント（100pt以上）だけ承認。うそをつくと -500pt です。\n・もらいすぎ・やらなくなるのを防ぐため：月の上限と、同じ項目の回数上限で、ポイントが際限なく増えるのを止めます。\n\n【これから】\n・🌱 タネ貯金（じゅんびちゅう）：ポイントを貯めておくと、毎月ふえる貯金です。基本の利息は月4%。毎日のお手伝いのポイントが月の目標（妹 10,000pt／兄 8,000pt）に届くと +1% で、最大5%。利息がつくのは3万ptまで。ふやすか手元に受け取るかは自分で選び、引き出しは毎月1〜3日だけです。\n・🌟 担当より多くやったときの「自主ボーナス」（1.5倍）や、7日連続ボーナスも、じゅんびちゅうです。\n\n【おうちの人へ】\n・設定の「お手伝い項目」にある「新ポイント設計の適用」から、いつでも「適用前に戻す」で元の内容にもどせます（適用後に付いたポイントの記録は消えません）。\n・承認のしきい値と、月の現金上限は、設定の承認のタブで変えられます。"},
+  {id:"n27", e:"🌱", t:"ポイントのしくみを見直しました（3pt＝1円・新しい項目・上限）", b:"2026年11月26日、ポイントのしくみを大きく見直しました。\n\n【なにが変わった？】\n・💴 3ポイント＝1円：500円交換は 1,500pt になります（前は 2,000pt）。\n・🔒 月の現金交換の上限：妹 5,000円／兄 10,000円まで。超えたぶんは消えず、ポイントは来月に使えます。\n・🆕 あたらしいお手伝いが約30こ：\n　朝の部屋セット(60pt)・床だけOK(20pt)・明日の準備(10pt)\n　妹：ダンス／ピアノ／英語の練習15分(各20pt)・週1の見せる日(50pt)・英語レッスンの宿題(30pt)・振付(100pt)・ピアノ1曲(200pt)・発表会(300pt)・コンクール(出場300pt／入賞500pt)・通知表(◎40pt／○15pt／成長50pt)\n　兄：0時までに寝る(20pt)・部活の大会（出場100pt／1勝500pt・県大会は1000pt）・レギュラー入り(500pt)・順位アップ(300pt)\n　ふたり：週リセット(100pt)・月1の整理(200pt)・提出物(100pt)・定期テスト（前回より+5点で100pt／目標点で200pt）・検定（受験200pt／合格1000pt）\n・🐱 猫とお風呂の点数を見直し：猫のうんち取り 60pt（1日2回まで）／お風呂洗い 50pt／猫の吐いたものの片づけ 30pt／猫のトイレ丸洗い 150pt（親と一緒・週1回）。\n・⚖ 机まわりの減点を -200 から -50 に軽くしました（きびしすぎて見なくなるのを防ぐため）。\n・✅ 100pt以上は親の承認が必要に。\n・🔁 同じ項目の回数上限：1日・週・月ごとに「あと何回」が決まります。上限に来ると「きょうは○回まで」と表示されます。\n\n【なんのために？】\n・自分のためになることでポイントが貯まるように：部屋の片づけ、家事、勉強、習い事、部活、テスト。それぞれの努力が、ちゃんとポイントになります。\n・毎日ひらく理由をつくるため：毎日少しずつ貯まる項目を増やし、「今日は何をやろう」とアプリを見る習慣にしたい。\n・おうちの人の確認をふやさないため：毎日は確認せず、自己申告＋日曜の朝9時に抜き打ち（夫婦で交代）。大きいポイント（100pt以上）だけ承認。うそをつくと -500pt です。\n・もらいすぎ・やらなくなるのを防ぐため：月の上限と、同じ項目の回数上限で、ポイントが際限なく増えるのを止めます。\n\n【これから】\n・🌱 タネ貯金（できました。おしらせ「タネ貯金」を見てね）：ポイントを貯めておくと、毎月ふえる貯金です。基本の利息は月4%。毎日のお手伝いのポイントが月の目標（妹 10,000pt／兄 8,000pt）に届くと +1% で、最大5%。利息がつくのは3万ptまで。ふやすか手元に受け取るかは自分で選び、引き出しは毎月1〜3日だけです。\n・🌟 担当より多くやったときの「自主ボーナス」（1.5倍）や、7日連続ボーナスも、じゅんびちゅうです。\n\n【おうちの人へ】\n・設定の「お手伝い項目」にある「新ポイント設計の適用」から、いつでも「適用前に戻す」で元の内容にもどせます（適用後に付いたポイントの記録は消えません）。\n・承認のしきい値と、月の現金上限は、設定の承認のタブで変えられます。"},
   {id:"n26", e:"🌟", t:"タネマネーが 新しくなりました！", b:"アプリを「ためる・推し株」中心に シンプルにリニューアル！✨\n・🌟推し株：すきな会社を「推し」にえらんで おうえんできる（ためるタブから）\n・🌱まいにちのタネ：毎日ひらくと かならずボーナスpt。連続でちょっとずつ増えるよ（ランダムのガチャは卒業！）\n・🏠ホームもスッキリ：タネモンが 大きく主役に\n・お手伝いの ならびかえ（親の設定で ≡ をドラッグ）や、履歴の左スワイプ取り消しも できるように！\nモンスター育成とバトルは おやすみに入りました。これまで育ててくれて ありがとう🌱"},
   {id:"n04", e:"🎨", t:"アプリのアイコンがドット絵に", b:"ホームの統計や見出しのアイコンを、オリジナルのドット絵に変更中。メンバー編集から“ドット絵アバター”も選べます。"},
   {id:"n03", e:"📅", t:"おてつだいが 平日/休日タブに", b:"毎日のおてつだいを、平日／休日のタブで切り替えられるようになりました。今日に合うタブが自動で開きます。"},
@@ -2708,6 +2713,178 @@ function DailyTasks({ child, data, update }) {
 // ── SettingsModal（親PIN認証後に表示） ────────────────
 // ── お手伝い・マイナスタスク管理コンポーネント ──
 // ── 新ポイント設計を本番データへ一回だけ適用する（親のみ・元に戻せる） ──
+// ── 🌱 タネ貯金（兄・小6）: 預け入れ/引き出しは毎月1〜3日だけ。利息は月末に1回、預け額(複利分含め3万ptまで)×(4% + 基準達成で+1%) ──
+const TC_MIN=10000, TC_CAP=30000, TC_BASE=0.04, TC_BONUS=0.01, TC_UNIT=1000;
+const tcMk = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
+const tcAddMonth = (mk,n) => { const [y,m]=mk.split("-").map(Number); return tcMk(new Date(y,m-1+n,1)); };
+const tcInWindow = (now) => (now||new Date()).getDate()<=3;
+const tcOn = (d,cid) => !!(((d.taneChokin||{}).enabled||{})[cid]);
+const tcAcct = (d,cid) => ({principal:0,mode:"compound",paidThrough:"",rev:0,...((((d.taneChokin||{}).accounts)||{})[cid]||{})});
+const tcThr = (d,cid) => { const t=((d.taneChokin||{}).threshold||{})[cid]; return t>0?t:10000; };
+// 日常pt: お手伝い/日課のうち100pt未満のプラス(大会・テスト・検定・利息などの成果は数えない)
+const tcDaily = (logs,cid,mk) => (logs||[]).filter(l=>l&&l.cid===cid&&(l.type==="good"||l.type==="daily")&&(+l.pts||0)>0&&(+l.pts||0)<100&&l.date&&tcMk(new Date(l.date))===mk).reduce((s,l)=>s+(+l.pts||0),0);
+const tcRate = (d,cid,mk) => TC_BASE+(tcDaily(d.logs,cid,mk)>=tcThr(d,cid)?TC_BONUS:0);
+const tcSave = (d,cid,a,extra) => ({...d,...(extra||{}),taneChokin:{...(d.taneChokin||{}),accounts:{...(((d.taneChokin||{}).accounts)||{}),[cid]:{...a,rev:(a.rev||0)+1}}}});
+// 先月までの利息を付ける(月に1回・idは固定なので端末が重なっても1件に集約)。預け入れ/引き出しの前に必ず呼ぶ
+function tcRoll(d,cid,now){
+  if(!tcOn(d,cid)) return d;
+  const a0=tcAcct(d,cid); if(!a0.paidThrough) return d;
+  const last=tcAddMonth(tcMk(now||new Date()),-1);
+  if(a0.paidThrough>=last) return d;
+  const a={...a0}; const adds=[]; let guard=0;
+  while(a.paidThrough<last && guard++<36){
+    const m=tcAddMonth(a.paidThrough,1);
+    const rate=tcRate(d,cid,m);
+    const interest=Math.floor(Math.min(a.principal,TC_CAP)*rate);
+    if(interest>0){
+      adds.push({id:`tc_int_${cid}_${m}`,cid,type:"interest",pts:a.mode==="cash"?interest:0,date:(now||new Date()).toISOString(),
+        label:`🌱 タネ貯金の利息（${m.replace("-","年")}月・${Math.round(rate*1000)/10}%）+${interest}pt ${a.mode==="cash"?"→ 手元に":"→ 預け金に組み入れ"}`});
+      if(a.mode!=="cash") a.principal+=interest;
+    }
+    a.paidThrough=m;
+  }
+  adds.forEach(e=>addLogToFirestore(e));
+  return tcSave(adds.length?{...d,logs:[...adds.slice().reverse(),...(d.logs||[])]}:d,cid,a);
+}
+// 預け入れ(kind:"in")/引き出し(kind:"out")のチェック。問題があればメッセージ、なければ""
+function tcCheck(d,cid,kind,amt,now){
+  if(!tcOn(d,cid)) return "タネ貯金は まだ つかえないよ";
+  if(!tcInWindow(now)) return "預け入れと引き出しは 毎月1日〜3日だけ だよ";
+  amt=Math.floor(+amt||0);
+  const a=tcAcct(d,cid);
+  if(kind==="in"){
+    if(amt<TC_UNIT||amt%TC_UNIT!==0) return `${TC_UNIT}ptずつ えらんでね`;
+    if(a.principal+amt<TC_MIN) return `はじめは ぜんぶで ${TC_MIN}pt以上 あずけてね`;
+    if(a.principal+amt>TC_CAP) return `あずけられるのは ${TC_CAP}ptまで だよ`;
+    if(bal(d.logs,cid)<amt) return "ポイントが たりないよ";
+    return "";
+  }
+  if(amt<=0) return "ひきだす ポイントを えらんでね";
+  if(amt>a.principal) return "あずけている ポイントより おおいよ";
+  return "";
+}
+function tcMove(d,cid,kind,amt,eid,now){
+  d=tcRoll(d,cid,now);
+  if(tcCheck(d,cid,kind,amt,now)) return d;
+  amt=Math.floor(+amt);
+  const a=tcAcct(d,cid);
+  const e = kind==="in"
+    ? {id:eid,cid,type:"transfer_out",label:`🌱 タネ貯金に預ける（${amt}pt）`,pts:-amt,date:(now||new Date()).toISOString()}
+    : {id:eid,cid,type:"transfer_in", label:`🌱 タネ貯金から出す（${amt}pt）`,pts: amt,date:(now||new Date()).toISOString()};
+  if((d.logs||[]).some(l=>l&&l.id===eid)) return d;   // 同じ操作の二重実行を防ぐ
+  addLogToFirestore(e);
+  const next={...a,principal:kind==="in"?a.principal+amt:a.principal-amt,paidThrough:a.paidThrough||tcAddMonth(tcMk(now||new Date()),-1)};
+  return tcSave({...d,logs:[e,...(d.logs||[])]},cid,next);
+}
+const tcSetMode = (d,cid,mode) => { const a=tcAcct(d,cid); return a.mode===mode?d:tcSave(d,cid,{...a,mode}); };
+// 親の画面: タネ貯金を始める(妹・兄をON・基準ptを入れ・既存の週次利子をOFF。元の利子設定は保存)
+function tcStart(d){
+  const pd=d.pointDesign2026||{}; const t=d.taneChokin||{};
+  const en={...(t.enabled||{})}, thr={...(t.threshold||{})};
+  if(pd.sisId){ en[pd.sisId]=true; if(!(thr[pd.sisId]>0)) thr[pd.sisId]=10000; }
+  if(pd.broId){ en[pd.broId]=true; if(!(thr[pd.broId]>0)) thr[pd.broId]=8000; }
+  return {...d, interestEnabled:false, taneChokin:{...t, accounts:t.accounts||{}, enabled:en, threshold:thr, backup:t.backup||{interestEnabled:d.interestEnabled}, srev:(t.srev||0)+1}};
+}
+
+function TaneChokin({child,data,update}){
+  const now=new Date();
+  const a=tcAcct(data,child.id);
+  const cur=tcMk(now);
+  const win=tcInWindow(now);
+  const daily=tcDaily(data.logs,child.id,cur), thr=tcThr(data,child.id);
+  const rate=TC_BASE+(daily>=thr?TC_BONUS:0);
+  const base=Math.min(a.principal,TC_CAP);
+  const dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const monthEnd=Math.floor(base*rate);
+  const grown=Math.floor(monthEnd*now.getDate()/dim);
+  const myBal=bal(data.logs,child.id);
+  const [amt,setAmt]=useState(10000);
+  const [outAmt,setOutAmt]=useState(0);
+  const [simAmt,setSimAmt]=useState(a.principal>0?Math.min(a.principal,TC_CAP):10000);
+  const eidRef=useRef(null);
+  useEffect(()=>{ update(d=>tcRoll(d,child.id)); },[]);
+  const card={background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:12};
+  const num=(label,v,sub,c)=>(<div style={{flex:1,textAlign:"center",minWidth:0}}>
+    <div style={{fontSize:10.5,color:MUTED,fontWeight:700}}>{label}</div>
+    <div style={{fontSize:19,fontWeight:900,color:c||TEXT,margin:"2px 0"}}>{Number(v).toLocaleString()}<span style={{fontSize:11}}>pt</span></div>
+    {sub&&<div style={{fontSize:10,color:MUTED}}>{sub}</div>}
+  </div>);
+  const chipBtn=(on,label,fn,c)=>(<button onClick={fn} style={{flex:1,padding:"9px 6px",borderRadius:12,border:`2px solid ${on?(c||GP):BORDER}`,background:on?`${c||GP}15`:CARD,color:on?(c||GP):MUTED,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>{label}</button>);
+  const go=(kind,n)=>{
+    const msg=tcCheck(data,child.id,kind,n);
+    if(msg){ alert(msg); return; }
+    if(!window.confirm(kind==="in"?`${Number(n).toLocaleString()}pt を タネ貯金に あずけます。\n来月の1日〜3日まで 出せません。いいですか？`:`${Number(n).toLocaleString()}pt を 手元に もどします。いいですか？`)) return;
+    if(!eidRef.current) eidRef.current=`tc_${child.id}_${Date.now()}_${uid()}`;
+    const eid=eidRef.current;
+    update(d=>tcMove(d,child.id,kind,n,eid));
+    eidRef.current=null; setOutAmt(0);
+  };
+  // みらいシミュレーター
+  const sim=(p0,r,n,compound)=>{ let p=p0,cash=0; for(let i=0;i<n;i++){ const it=Math.floor(Math.min(p,TC_CAP)*r); if(compound) p+=it; else cash+=it; } return compound?p-p0:cash; };
+  const simRow=(n)=>(<tr key={n}><td style={{padding:"4px 6px",fontWeight:700}}>{n}か月後</td>
+    <td style={{padding:"4px 6px",textAlign:"right"}}>+{sim(simAmt,TC_BASE,n,true).toLocaleString()}</td>
+    <td style={{padding:"4px 6px",textAlign:"right",color:GP,fontWeight:800}}>+{sim(simAmt,TC_BASE+TC_BONUS,n,true).toLocaleString()}</td>
+    <td style={{padding:"4px 6px",textAlign:"right",color:MUTED}}>+{sim(simAmt,TC_BASE+TC_BONUS,n,false).toLocaleString()}</td></tr>);
+  return(
+    <div style={{padding:"12px 16px"}}>
+      <div style={{...card,border:`2px solid ${GOLD}`}}>
+        <p style={{margin:"0 0 8px",fontWeight:900,fontSize:14,color:TEXT}}>🌱 タネ貯金</p>
+        <div style={{display:"flex",gap:6}}>
+          {num("あずけたポイント",a.principal)}
+          {num("今日までに 育った分",grown,`${now.getMonth()+1}月の見こみ`,GP)}
+          {num("今月末に もらえる",monthEnd,`利率 ${Math.round(rate*1000)/10}%`,GP)}
+        </div>
+        <div style={{marginTop:10,fontSize:11.5,color:TEXTS,lineHeight:1.7}}>
+          🌟 今月の おてつだいポイント <b>{daily.toLocaleString()}</b> / {thr.toLocaleString()}pt{daily>=thr?"　→ ボーナス +1% ゲット！":`　あと ${(thr-daily).toLocaleString()}pt で +1%（利率5%）`}
+          <div style={{height:7,background:CARDS,borderRadius:99,marginTop:5,overflow:"hidden"}}><div style={{width:`${Math.min(100,Math.round(daily/thr*100))}%`,height:"100%",background:daily>=thr?G:GOLD}}/></div>
+          <div style={{marginTop:6,color:MUTED,fontSize:10.5}}>※ 100pt未満のおてつだい・日課だけ数えます（大会・テスト・検定などは数えません）／ 利息がつくのは3万ptまで</div>
+        </div>
+      </div>
+      <div style={card}>
+        <p style={{margin:"0 0 8px",fontWeight:900,fontSize:13,color:TEXT}}>{win?"✅ いま あずけたり 出したり できるよ（毎月1日〜3日）":`⏳ あずける・出すのは 毎月1日〜3日だけ（次は ${now.getMonth()+2>12?1:now.getMonth()+2}月1日）`}</p>
+        <div style={{opacity:win?1:0.45,pointerEvents:win?"auto":"none"}}>
+          <p style={{margin:"0 0 4px",fontSize:11.5,color:TEXTS}}>あずける（いまの手元 {myBal.toLocaleString()}pt）</p>
+          <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
+            <button onClick={()=>setAmt(v=>Math.max(TC_UNIT,v-TC_UNIT))} style={{width:36,height:36,borderRadius:10,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:900,fontSize:18,cursor:"pointer"}}>−</button>
+            <div style={{flex:1,textAlign:"center",fontWeight:900,fontSize:18,color:TEXT}}>{amt.toLocaleString()}pt</div>
+            <button onClick={()=>setAmt(v=>Math.min(TC_CAP,v+TC_UNIT))} style={{width:36,height:36,borderRadius:10,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:900,fontSize:18,cursor:"pointer"}}>＋</button>
+          </div>
+          <button onClick={()=>go("in",amt)} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:GP,color:"#fff",fontWeight:900,fontSize:14,cursor:"pointer",fontFamily:F,marginBottom:12}}>🌱 あずける</button>
+          {a.principal>0&&<>
+            <p style={{margin:"0 0 4px",fontSize:11.5,color:TEXTS}}>手元に もどす（あずけ中 {a.principal.toLocaleString()}pt）</p>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input type="number" value={outAmt||""} placeholder="もどす ポイント" onChange={e=>setOutAmt(Math.max(0,Math.floor(+e.target.value||0)))} style={{flex:1,padding:"9px 10px",borderRadius:10,border:`1.5px solid ${BORDER}`,fontFamily:F,fontSize:14}}/>
+              <button onClick={()=>setOutAmt(a.principal)} style={{padding:"9px 10px",borderRadius:10,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:F}}>ぜんぶ</button>
+              <button onClick={()=>go("out",outAmt)} style={{padding:"9px 12px",borderRadius:10,border:"none",background:R,color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer",fontFamily:F}}>出す</button>
+            </div>
+          </>}
+        </div>
+      </div>
+      <div style={card}>
+        <p style={{margin:"0 0 8px",fontWeight:900,fontSize:13,color:TEXT}}>月末の利息を どうする？</p>
+        <div style={{display:"flex",gap:8}}>
+          {chipBtn(a.mode!=="cash","🌱 ふやす（あずけに 足す）",()=>update(d=>tcSetMode(d,child.id,"compound")))}
+          {chipBtn(a.mode==="cash","💰 手元に うけとる",()=>update(d=>tcSetMode(d,child.id,"cash")),GOLD)}
+        </div>
+        <p style={{margin:"8px 0 0",fontSize:10.5,color:MUTED,lineHeight:1.6}}>「ふやす」は 利息にも 利息が つく（複利）。「手元」は すぐ つかえるポイントに入ります（げんきん交換は 月の上限まで）。</p>
+      </div>
+      <div style={card}>
+        <p style={{margin:"0 0 6px",fontWeight:900,fontSize:13,color:TEXT}}>🔮 みらいシミュレーター</p>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
+          <button onClick={()=>setSimAmt(v=>Math.max(TC_MIN,v-TC_UNIT))} style={{width:32,height:32,borderRadius:9,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:900,cursor:"pointer"}}>−</button>
+          <div style={{flex:1,textAlign:"center",fontWeight:900,color:TEXT}}>{simAmt.toLocaleString()}pt を あずけたら</div>
+          <button onClick={()=>setSimAmt(v=>Math.min(TC_CAP,v+TC_UNIT))} style={{width:32,height:32,borderRadius:9,border:`1.5px solid ${BORDER}`,background:CARD,fontWeight:900,cursor:"pointer"}}>＋</button>
+        </div>
+        <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+          <thead><tr style={{color:MUTED,fontSize:10.5}}><th style={{textAlign:"left",padding:"2px 6px"}}></th><th style={{textAlign:"right",padding:"2px 6px"}}>ふやす 4%</th><th style={{textAlign:"right",padding:"2px 6px"}}>ふやす 5%</th><th style={{textAlign:"right",padding:"2px 6px"}}>手元 5%</th></tr></thead>
+          <tbody>{[3,6,12].map(simRow)}</tbody>
+        </table>
+        <p style={{margin:"6px 0 0",fontSize:10.5,color:MUTED}}>ふえる ポイントの見こみです（毎月 目標をクリアすると5%）。</p>
+      </div>
+    </div>
+  );
+}
+
 function PointDesignSection({data, update}){
   const kids = data.children||[];
   const guessSis = (kids.find(c=>c.displayMode==="junior")||{}).id||"";
@@ -2758,6 +2935,16 @@ function PointDesignSection({data, update}){
               {btn(GP,data.pointDesign2026Daily?"日課セットを入れ直す":"日課セットを入れる",()=>{ if(window.confirm("毎日の日課を「平日用／休日用」に切り替えます。いまのセットは残り、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdDailyApply); } })}
               {data.pointDesign2026Daily&&btn(R,"日課を元に戻す",()=>{ if(window.confirm("日課を切り替え前に戻します。戻しますか？")){ markLocalDefEdit(); update(pdDailyRestore); } })}
             </div>
+          </div>
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
+            <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🌱 タネ貯金（妹・兄）</p>
+            <p style={{margin:"0 0 8px",fontSize:11,color:TEXTS,lineHeight:1.7}}>ポイントを預けると、月末に利息がつきます（基本4%、毎日のお手伝いが基準に届けば+1%で5%。利息がつくのは3万ptまで）。預け入れ・引き出しは毎月1日〜3日だけ。<b>始めると、いまの「週次利子」（残高×1%）はOFFになります。</b>元の設定は保存され、設定の「利子」から戻せます。</p>
+            {(data.taneChokin&&data.taneChokin.enabled&&Object.values(data.taneChokin.enabled).some(Boolean))?(
+              <div style={{fontSize:12,color:TEXT,lineHeight:1.8}}>
+                {kids.filter(c=>tcOn(data,c.id)).map(c=>{ const ac=tcAcct(data,c.id); return <div key={c.id}>・{c.name}：預け {ac.principal.toLocaleString()}pt／利息は{ac.mode==="cash"?"手元":"ふやす"}／基準 {tcThr(data,c.id).toLocaleString()}pt</div>; })}
+                <p style={{margin:"6px 0 0",fontSize:10.5,color:MUTED}}>預けているポイントがあるため、子どもの画面からは外せません。</p>
+              </div>
+            ):btn(GP,"タネ貯金を始める",()=>{ if(window.confirm("妹と兄でタネ貯金を始めます。いまの週次利子はOFFになります。よろしいですか？")){ update(tcStart); } })}
           </div>
         </div>
       ):(
@@ -4296,6 +4483,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // コンテンツが1つも描画されず真っ白になる。表示可能な先頭"goals"へフォールバックする。
   useEffect(()=>{
     if(monTab==="oshi" && data.familySettings?.investOff) setMonTab("goals");
+    else if(monTab==="chokin" && !tcOn(data,child.id)) setMonTab("goals");
     else if(monTab==="kakeibo" && isJunior) setMonTab("goals");   // kakeibo非表示はjuniorのみ。youngは使い道タブを使える(バウンスさせない)
   },[data.familySettings?.investOff, monTab, isJunior]);
   // 保護者のゲーム強度設定(familySettings.gameMode): full=全部 / light=ガチャ育成はOKだがバトル・旅オフ / money=お小遣い帳中心(ゲーム要素オフ)
@@ -4333,7 +4521,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
   // Apply interest on open
-  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); },[]);
+  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); update(d=>tcRoll(d,child.id)); },[]);
 
   const showFlash = (pts, emoji) => {
     taneHaptic(pts>=0?"success":"warn");
@@ -5255,8 +5443,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {/* iOS 26 セグメントコントロール */}
           <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:isJunior?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
           {(isJunior
-            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
+            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
           ).map(([k,l])=>{
             const on=monTab===k;
             return (
@@ -5274,6 +5462,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         </div>
       )}
       {/* 🌟 推し株：moneyタブ内にインライン表示（街づくり・全画面ワールドは廃止） */}
+      {effectiveTab==="money" && monTab==="chokin" && tcOn(data,child.id) && <TaneChokin child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="oshi" && !data.familySettings?.investOff && <OshiKabu child={child} data={data} update={update}/>}
       {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
         // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
