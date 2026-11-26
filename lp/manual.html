@@ -57,6 +57,14 @@ ol.steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start;mar
 ol.steps li::before{content:counter(s);background:var(--b);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex:0 0 24px;margin-top:2px}
 footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
 .print{display:inline-block;margin-top:10px;background:#fff;color:var(--gp);border:none;border-radius:999px;padding:6px 14px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit}
+.path{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:6px 0 8px}
+.path span{background:#fff;border:1.5px solid var(--g);border-radius:10px;padding:3px 9px;font-weight:800;font-size:12.5px;color:var(--gp)}
+.path span.p{border-color:var(--b);color:var(--b)}
+.path i{font-style:normal;color:var(--muted);font-weight:900}
+.guide{border:1.5px solid var(--border);border-radius:16px;padding:12px 12px 8px;margin:12px 0;background:#fff}
+.guide h4{margin:0 0 4px;font-size:14.5px}
+.guide ol{margin:6px 0 4px;padding-left:20px;font-size:13.5px}
+.guide ol li{margin:4px 0}
 @media (max-width:520px){.row:has(.arrowr){flex-direction:column}.row:has(.arrowr) .arrowr{justify-content:center;transform:rotate(90deg);height:18px}}
 @media print{nav,.print{display:none}body{background:#fff}section{break-inside:avoid;border-color:#ccc}header{color:#000;background:#fff;border-bottom:2px solid #000}}
 </style>
@@ -69,7 +77,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
   <button class="print" onclick="window.print()">🖨 印刷する</button>
 </header>
 <nav><div class="in">
-  <a href="#s1">1 ポイント</a><a href="#s2">2 まいにち</a><a href="#s3">3 ふやす</a><a href="#s4">4 れんぞく</a><a href="#s5">5 こうかん</a><a href="#s6">6 タネ貯金</a><a href="#s7">7 画面</a><a href="#s9">8 Q&amp;A</a><a href="#s8">おうちの人へ</a>
+  <a href="#s1">1 ポイント</a><a href="#s2">2 まいにち</a><a href="#s3">3 ふやす</a><a href="#s4">4 れんぞく</a><a href="#s5">5 こうかん</a><a href="#s6">6 タネ貯金</a><a href="#s7">7 画面</a><a href="#how">8 やりかた</a><a href="#s9">9 Q&amp;A</a><a href="#s8">おうちの人へ</a>
 </div></nav>
 <div class="wrap">
 
@@ -264,7 +272,13 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
 <!-- 6 -->
 <section id="s6">
   <h2><span class="no">6</span>🌱 タネ貯金（あずけて ふやす）</h2>
-  <p class="lead">ポイントを あずけると、毎月 利息（ふえた ぶん）が もらえます。ぎんこうの ちょきんと おなじです。「ためる」タブから つかいます。</p>
+  <p class="lead">ポイントを あずけると、毎月 利息（ふえた ぶん）が もらえます。ぎんこうの ちょきんと おなじです。</p>
+  <div class="ok"><b>📍 どこから つかう？</b>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>🌱 ためる</span><i>›</i><span>🌱 タネ貯金</span></div>
+    「ためる」を ひらくと、上に ならぶ ボタン（🎯 目標・🎁 こうかん・<b>🌱 タネ貯金</b>…）の 中に あります。<br>
+    <b>ボタンが 見えない とき</b>は、おうちの人が まだ「タネ貯金を始める」を おしていません。おうちの人に 言ってね。<br>
+    <b>あずける・出す</b>が できるのは 毎月 <b>1日〜3日</b>。ほかの 日は ボタンが うすく なって おせません。
+  </div>
 
   <div class="fig">
     <div class="t">📅 1か月の ながれ</div>
@@ -335,9 +349,65 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
   </table>
 </section>
 
+<!-- 操作ガイド -->
+<section id="how">
+  <h2><span class="no">8</span>やりかた（操作ガイド）</h2>
+  <p class="lead">「どこを おして いくか」を じゅんばんに 書きました。<br>画面の いちばん下の ボタンで ページを かえます。中高生は「毎日・活動・ためる・記録」、小学生は「まいにち・やること・ためる」です。</p>
+
+  <div class="guide">
+    <h4>🧹 おてつだいを 記録する</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>✅ やること<small>（中高生は「活動」）</small></span><i>›</i><span>やった 項目を タップ</span></div>
+    <ol><li>やった おてつだいの ボタンを タップ。</li><li>ポイントが 入って「+30pt」のように 出ます。</li><li><b>100pt以上</b>は「しんせい中」に なります。おうちの人が ✅OKすると ポイントが 入ります。</li><li>「きょうは ○回まで だよ」と 出たら、その項目は もう おしまい。</li></ol>
+    <div class="warn" style="margin:6px 0 8px">まちがえて おしたら、おうちの人に 言ってね（じぶんでは けせません）。</div>
+  </div>
+
+  <div class="guide">
+    <h4>📋 まいにちの 日課と ⭐やくそく</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>📋 まいにち<small>（中高生は「毎日」）</small></span></div>
+    <ol><li>今日の 日課が 出ます（平日と 休日で かわります）。</li><li>やったら チェックを タップ。数を かぞえる 日課は タップ ごとに 1回 ふえます。</li><li>⭐やくそくを ぜんぶ できると、🔥れんぞく が 1日 ふえます。</li><li>上に「🔥 やくそく ○日れんぞく ・ あと○日で +100pt」が 出ます。</li></ol>
+  </div>
+
+  <div class="guide">
+    <h4>🏓「今日は 部活なし」（兄）</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>📋 まいにち</span><i>›</i><span>🏓 今日は 部活なし</span></div>
+    <ol><li>「まいにち」の 上の ほうに 出ている ボタンを おす。</li><li>「今日は 部活が なかった、で いいですか？」と 出るので OK。</li><li>妹と おなじ 日課が 出ます。<b>その日は もどせません</b>。</li></ol>
+  </div>
+
+  <div class="guide">
+    <h4>🎁 ごほうびと こうかん</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>🌱 ためる</span><i>›</i><span>🎁 こうかん</span></div>
+    <ol><li>ほしい ごほうびを タップ。ねだんと「≒○円」が 出ます。</li><li>ポイントが たりて いれば「こうかん」ボタンが 出ます。</li><li>おうちの人の OKが いる ときは「しんせい中」に なります。</li><li><b>500円交換（1,500pt）</b>は、月の 上限まで。こえると「今月の げんきん交換は ○円まで だよ」と 出ます。</li></ol>
+  </div>
+
+  <div class="guide">
+    <h4>🌱 タネ貯金に あずける ／ 出す</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>🌱 ためる</span><i>›</i><span>🌱 タネ貯金</span></div>
+    <ol>
+      <li><b>日にちを 見る</b>：毎月 <b>1日〜3日</b> だけ。ほかの 日は 上に「⏳ あずける・出すのは 毎月1日〜3日だけ」と 出ます。</li>
+      <li><b>あずける</b>：「あずける」の <b>＋ / －</b> で 金額を えらぶ（1,000ptずつ。ぜんぶで 10,000〜30,000pt）→ <b>🌱 あずける</b> → 「いいですか？」で OK。</li>
+      <li><b>利息を えらぶ</b>：「月末の利息を どうする？」で <b>🌱 ふやす</b> か <b>💰 手元に うけとる</b>。いつでも かえられます。</li>
+      <li><b>出す</b>：「手元に もどす」の 欄に ポイントを いれる（<b>ぜんぶ</b> ボタンも ある）→ <b>出す</b> → OK。</li>
+      <li><b>見る</b>：「あずけた ポイント」「今日までに 育った分」「今月末に もらえる」と、目標までの バー。下の「🔮 みらいシミュレーター」で ふえかたを 見られます。</li>
+    </ol>
+    <div class="note" style="margin:6px 0 8px">「あずけられるのは 30000ptまで だよ」「ポイントが たりないよ」と 出たら、金額を かえて やりなおし。</div>
+  </div>
+
+  <div class="guide">
+    <h4>🎯 もくひょうを つくる</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>🌱 ためる</span><i>›</i><span>🎯 目標</span><i>›</i><span>＋ 追加</span></div>
+    <ol><li>ほしい 物の なまえと、ひつような ポイントを いれる。</li><li>のこりの ポイントと「≒○円」が バーで 見えます。</li></ol>
+  </div>
+
+  <div class="guide">
+    <h4>📢 おしらせと マニュアルを 見る</h4>
+    <div class="path"><span>🏠 ホーム</span><i>›</i><span>📢 おしらせ</span><i>›</i><span>📖 マニュアル</span></div>
+    <ol><li>ホームの「📢 おしらせ」を タップ。図つきの せつめいが 出ます。</li><li>いちばん上の「📖 あたらしいルールの マニュアル」を タップすると、この ページが ひらきます。</li></ol>
+  </div>
+</section>
+
 <!-- Q&A -->
 <section id="s9">
-  <h2><span class="no">8</span>よくある 質問</h2>
+  <h2><span class="no">9</span>よくある 質問</h2>
   <div class="q">Q. 「今日は 部活なし」を まちがえて おしちゃった！</div>
   <p class="a">その日は もどせません（ほかの スマホと ずれないように するため）。おうちの人に 言ってください。つぎの日は 自動で もとに もどります。</p>
   <div class="q">Q. げんきん交換が できない。</div>
@@ -365,6 +435,39 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
     <li><div><b>タネ貯金を 始める</b>（<b>12月1日の 前</b>が おすすめ）<br>同じカードの「タネ貯金を始める」。妹と兄で つかえるように なり、<b>既存の 週次利子（残高×1%）は OFF</b> に なります。<br><small>元の 利子設定は 保存されます。設定の「利子」から もどせます。</small></div></li>
     <li><div><b>家族で 1回 話す</b><br>「言われなくなる」「お金の れんしゅう」「携帯の 条件が 見える」。親の やくそく：<i>ガミガミ 言わない かわりに 記録を 見る</i>。</div></li>
   </ol>
+  <h3>📍 おうちの人の 操作ガイド（どこから？）</h3>
+  <div class="note">設定は ぜんぶ、ホームの <b>右上の ⚙</b> から。<b>おや用PIN</b>（初期は 0000。かならず 変更してください）を いれると ひらきます。<br>子どもの 画面から ⚙ を おしても、PINが ないと 入れません。</div>
+  <div class="guide">
+    <h4>🌱 タネ貯金を 始める（これで 子どもの「ためる」に 出ます）</h4>
+    <div class="path"><span class="p">⚙ 設定・管理</span><i>›</i><span class="p">📝 お手伝い項目</span><i>›</i><span class="p">一番上の「新ポイント設計」</span><i>›</i><span class="p">タネ貯金を始める</span></div>
+    <ol><li>先に「いまの内容を書き出す」で バックアップ。</li><li>「タネ貯金を始める」→ 確認で OK。</li><li>妹と兄の「ためる」に 🌱タネ貯金 が 出ます。<b>既存の 週次利子は OFF</b> に なります。</li></ol>
+  </div>
+  <div class="guide">
+    <h4>📅 日課セット（平日用／休日用）を 入れる ／ 戻す</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">📝 お手伝い項目</span><i>›</i><span class="p">「日課セットを入れる」／「日課を元に戻す」</span></div>
+    <ol><li>日課の 中身（担当・点数）は、同じ ページの 下の「毎日タスク管理」で 変えられます。</li><li>各タスクの 下の ボタンで「担当（妹・兄）」「部活なしの子にも出す」「部活の日だけ」を えらべます。</li></ol>
+  </div>
+  <div class="guide">
+    <h4>✅ 承認する</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">✅ 承認まち</span><i>›</i><span class="p">✅ 承認 ／ ❌ 却下</span></div>
+    <ol><li>子どもの しんせい（100pt以上の おてつだい・ごほうびの こうかん）が ならびます。</li><li>「✅ 承認」で ポイントが 入る（交換は ポイントが へる）。「❌ 却下」で ことわる。</li><li>承認が たまると ⚙ に バッジが 出ます。</li></ol>
+  </div>
+  <div class="guide">
+    <h4>🔒 げんきんの 月の 上限・承認の しきい値を 変える</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">✅ 承認まち</span><i>›</i><span class="p">下へ スクロール</span></div>
+    <ol><li>「大きいポイントだけ承認」で、何pt 以上を 承認に するか（初期 100pt）。</li><li>子どもごとの「げんきん 月の上限（円）」と「今月のこり」。</li></ol>
+  </div>
+  <div class="guide">
+    <h4>🎁 ポイントを あげる／お手伝い項目・ごほうびを 変える</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">🎁 ポイント付与</span></div>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">📝 お手伝い項目</span><i>›</i><span class="p">✏ 編集 ／ 個別 ／ ＋ 追加</span></div>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">🎀 ごほうび（特典）</span></div>
+  </div>
+  <div class="guide">
+    <h4>💾 バックアップと 戻す</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">📝 お手伝い項目</span><i>›</i><span class="p">いまの内容を書き出す ／ 適用前に戻す</span></div>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">🔄 引き継ぎ・バックアップ</span><i>›</i><span class="p">ファミリーコード</span></div>
+  </div>
   <div class="fig">
     <div class="t">🔍 確認の しくみ（親の ふたん を へらす）</div>
     <table>
