@@ -2257,9 +2257,10 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
-  {id:"n29", e:"🌱", t:"「タネ貯金」ができました（あずけて、ふやす）", b:"【なにができる？】\nポイントを「タネ貯金」にあずけておくと、毎月、利息（ふえるポイント）がもらえます。「ためる」タブの「🌱 タネ貯金」から使います（おうちの人が始めると出ます）。\n\n【ルール】\n・あずけられるのは、ぜんぶで 10,000pt 〜 30,000pt。1,000pt ずつ えらびます。\n・あずける・出すのは、毎月1日〜3日だけ。思いつきで出し入れしないための ルールです。\n・利息は、月が変わった最初の日に、先月ぶんが入ります。基本は月4%。その月の「おてつだいポイント」が目標（妹 10,000pt／兄 8,000pt）に届くと +1% で、月5%。\n・おてつだいポイントに数えるのは、100pt未満のおてつだい・日課だけ。大会・テスト・検定などは数えません。\n・利息がつくのは、あずけた額（ふやした分も入れて）3万ptまで。\n・利息は、「ふやす（あずけに足す＝利息にも利息がつく）」か「手元にうけとる（すぐ使える）」を、自分で えらべます。\n・つかえるポイントの「手元」から あずけた分は、出すまで げんきん交換には つかえません。\n\n【どのくらいふえる？（1年・目安）】\n・10,000pt をふやす：月5%で約 +7,952pt／月4%で約 +6,004pt\n・10,000pt を手元にうけとる：月5%で +6,000pt\n・30,000pt：月5%で毎月 1,500pt（1年で 18,000pt）\n画面の「みらいシミュレーター」で、あずける額を動かして 3か月後・6か月後・1年後を見られます。\n\n【なんのために？】\n・ためる力をつけるため：使うだけでなく、ためると ふえる体験を、少ないポイントから してほしい。\n・毎日のおてつだいが、ふえる利率にもつながるように：5%にするには、その月のおてつだいを続ける必要があります。\n・お金の使いすぎを防ぐため：月初の3日間だけ出し入れできるので、「いま使う」と「あとで増やす」を、落ち着いて選べます。\n\n【おうちの人へ】\n・設定の「お手伝い項目」の新ポイント設計カードに「タネ貯金を始める」があります。押すと、妹と兄でタネ貯金が使えるようになり、これまでの「週次利子（残高×1%）」はOFFになります（元の設定は保存され、設定の「利子」から戻せます）。\n・預けているポイントがある子は、画面からタネ貯金を外せません。\n・利息は、月に1回だけ付くしくみで、複数の端末で開いても二重には付きません。"},
-  {id:"n28", e:"🏓", t:"日課の担当・部活なしボタン・祝日が休日に", b:"【なにが変わった？】\n・🗓 祝日も「休日」あつかいに：土日だけでなく祝日（2027年まで）も、「休日用」のおてつだいが自動で出ます。\n・👤 おてつだいに「担当」ができた：だれのおてつだいか決められます。決めていないものは、これまでどおり全員に出ます。\n・🏓「今日は部活なし」ボタン（兄）：部活がない日に押すと、妹と同じ分担のおてつだいが出ます。その日だけ有効で、次の日は元にもどります。部活のある日だけの「帰ってから食洗機」は、この日は消えます。\n・🌱 平日用／休日用のセット：おうちの人が「日課セットを入れる」を押すと、下の内容になります。\n　＜平日＞妹：食洗機（夕食のあと）・テーブルかお風呂・洗濯物を干す／兄：食洗機（帰ってから）・猫のうんち取り\n　＜休日・祝日＞食洗機と洗濯干しは1人1回ずつ／お風呂洗い・掃除機・猫のうんち（2回）は兄／テーブルは妹\n・📤 設定の「いまの内容を書き出す」が、適用のあとでも使えるように。\n\n【なんのために？】\n・「担当だけやる」から「だれかの分もやる」へ：担当は最低ライン。どちらかが休みや部活でも、家事が止まらないようにするためです。\n・兄は平日、部活で帰りがおそい日が多いので、部活がない日に分担がずれて「それは担当じゃない」とならないように、ボタン1つで切り替わるようにしました。\n・平日と休日で、やることの量がちがうのは自然なこと。休日は人手が多いので、重い家事を兄が受け持ち、平日は妹の負担を軽くします。\n・おうちの人が毎日チェックしなくても回る仕組みにしたい。ボタンを押すだけで、ふたりの分担が見える状態を目指しています。\n\n【おうちの人へ】\n・入れる前に「いまの内容を書き出す」で控えをとってください。「日課を元に戻す」でいつでも戻せます（いまのセットは消えません）。\n・日課の点数は、いまのお手伝い項目とそろえてあります。同じ家事を日課とお手伝い項目の両方で押すと二重にポイントが付くので、どちらで押すか家族で決めてください。\n・内容は設定の「毎日タスク管理」で、担当や点数を自由に変えられます。"},
-  {id:"n27", e:"🌱", t:"ポイントのしくみを見直しました（3pt＝1円・新しい項目・上限）", b:"2026年11月26日、ポイントのしくみを大きく見直しました。\n\n【なにが変わった？】\n・💴 3ポイント＝1円：500円交換は 1,500pt になります（前は 2,000pt）。\n・🔒 月の現金交換の上限：妹 5,000円／兄 10,000円まで。超えたぶんは消えず、ポイントは来月に使えます。\n・🆕 あたらしいお手伝いが約30こ：\n　朝の部屋セット(60pt)・床だけOK(20pt)・明日の準備(10pt)\n　妹：ダンス／ピアノ／英語の練習15分(各20pt)・週1の見せる日(50pt)・英語レッスンの宿題(30pt)・振付(100pt)・ピアノ1曲(200pt)・発表会(300pt)・コンクール(出場300pt／入賞500pt)・通知表(◎40pt／○15pt／成長50pt)\n　兄：0時までに寝る(20pt)・部活の大会（出場100pt／1勝500pt・県大会は1000pt）・レギュラー入り(500pt)・順位アップ(300pt)\n　ふたり：週リセット(100pt)・月1の整理(200pt)・提出物(100pt)・定期テスト（前回より+5点で100pt／目標点で200pt）・検定（受験200pt／合格1000pt）\n・🐱 猫とお風呂の点数を見直し：猫のうんち取り 60pt（1日2回まで）／お風呂洗い 50pt／猫の吐いたものの片づけ 30pt／猫のトイレ丸洗い 150pt（親と一緒・週1回）。\n・⚖ 机まわりの減点を -200 から -50 に軽くしました（きびしすぎて見なくなるのを防ぐため）。\n・✅ 100pt以上は親の承認が必要に。\n・🔁 同じ項目の回数上限：1日・週・月ごとに「あと何回」が決まります。上限に来ると「きょうは○回まで」と表示されます。\n\n【なんのために？】\n・自分のためになることでポイントが貯まるように：部屋の片づけ、家事、勉強、習い事、部活、テスト。それぞれの努力が、ちゃんとポイントになります。\n・毎日ひらく理由をつくるため：毎日少しずつ貯まる項目を増やし、「今日は何をやろう」とアプリを見る習慣にしたい。\n・おうちの人の確認をふやさないため：毎日は確認せず、自己申告＋日曜の朝9時に抜き打ち（夫婦で交代）。大きいポイント（100pt以上）だけ承認。うそをつくと -500pt です。\n・もらいすぎ・やらなくなるのを防ぐため：月の上限と、同じ項目の回数上限で、ポイントが際限なく増えるのを止めます。\n\n【これから】\n・🌱 タネ貯金（できました。おしらせ「タネ貯金」を見てね）：ポイントを貯めておくと、毎月ふえる貯金です。基本の利息は月4%。毎日のお手伝いのポイントが月の目標（妹 10,000pt／兄 8,000pt）に届くと +1% で、最大5%。利息がつくのは3万ptまで。ふやすか手元に受け取るかは自分で選び、引き出しは毎月1〜3日だけです。\n・🌟 担当より多くやったときの「自主ボーナス」（1.5倍）や、7日連続ボーナスも、じゅんびちゅうです。\n\n【おうちの人へ】\n・設定の「お手伝い項目」にある「新ポイント設計の適用」から、いつでも「適用前に戻す」で元の内容にもどせます（適用後に付いたポイントの記録は消えません）。\n・承認のしきい値と、月の現金上限は、設定の承認のタブで変えられます。"},
+  {id:"n30", fig:"streak", e:"🔥", t:"やくそく 7日れんぞくで +100pt！", b:"【なにが できるように なった？】\nその日の「⭐やくそく」を ぜんぶ できた日が 7日つづくと、ごほうびに +100pt もらえます！\n\n【れい】\n・月曜〜日曜の 7日間、まいにち やくそくを ぜんぶ できた → 7日目に +100pt\n・そのまま つづけて 14日目にも +100pt、21日目にも +100pt…（7日ごとに もらえる）\n・水曜に できなかった日が あると、つぎの日は「1日目」から やりなおし\n\n【どこで見られる？】\n「まいにち」の ページに「🔥 やくそく 3日れんぞく ・ あと4日で +100pt」のように 出ます。きのうまで つづいている ときだけ 出ます。\n\n【なんのために？】\n1日だけ がんばるより、毎日 すこしずつ つづける ほうが、自分のためになるからです。つづける力を おうえんする ボーナスです。\n\n【おうちの人へ】\n・「やくそく」は、日課の中の ⭐やくそく に なっている 項目です（日課セットを入れると、食洗機などが ⭐に なります）。\n・ボーナスは 7日ごとに 100pt（1か月で 約400pt＝約133円）。他の端末で開いても 二重には 付きません。"},
+  {id:"n29", fig:"chokin", e:"🌱", t:"「タネ貯金」ができました（あずけて、ふやす）", b:"【なにが できる？】\nポイントを「タネ貯金」に あずけておくと、毎月、ふえた分（利息）が もらえます。ぎんこうの ちょきんと おなじ ですね。「ためる」タブの「🌱 タネ貯金」から つかいます（おうちの人が はじめると 出ます）。\n\n【れい（10,000pt を あずけた とき）】\n・12月1日に 10,000pt を あずける\n・1月1日に、12月ぶんの 利息が 入る → 4%なら +400pt、5%なら +500pt\n・「ふやす」を えらんだら、あずけた分が 10,400pt（5%なら 10,500pt）に なる → つぎの月は、その ふえた分にも 利息が つく\n・「手元に うけとる」を えらんだら、400pt が すぐ つかえる ポイントに 入る\n・1年 つづけると、「ふやす」で 約 +7,952pt（5%の とき）。「手元」だと +6,000pt（5%の とき）。\n\n【ルール】\n・あずけられるのは、ぜんぶで 10,000pt 〜 30,000pt。1,000pt ずつ えらびます。\n・あずける・出すのは、毎月 1日〜3日 だけ。思いつきで 出し入れしないための ルールです。\n・利息は、月が かわった 最初の日に、先月ぶんが 入ります。いつもは 月4%。\n・その月の「おてつだいポイント」が 目標に とどくと、+1% で 月5%！ 目標は、妹 10,000pt／兄 8,000pt です。\n　（れい：妹が その月 おてつだいで 10,000pt ためた → 利息が 5%）\n・おてつだいポイントに 数えるのは、1つが 100pt みまんの おてつだい・日課だけ。大会・テスト・検定などの 大きいポイントは 数えません。\n・利息が つくのは、あずけた額（ふやした分も ふくめて）3万pt まで。3万pt あずけると、5%で 毎月 1,500pt（1年で 18,000pt）です。\n・あずけた ポイントは「手元」から へります。出すまで、ごほうびや げんきん交換には つかえません。\n\n【なんのために？】\n・ためると ふえる、を 体験して ほしいから。すこしの ポイントでも、じっと 待つと 大きく そだちます（タネと おなじ！）。\n・毎日の おてつだいが、利息の 5% にも つながるように するため。\n・つかいすぎを ふせぐため。月の はじめの 3日だけ 出し入れ できるので、「いま つかう」か「あとで ふやす」かを おちついて えらべます。\n\n【画面の見かた】\n・あずけた ポイント／今日までに 育った分／今月末に もらえる分 の 3つが 見られます。\n・「みらいシミュレーター」で、あずける額を うごかして、3か月後・6か月後・1年後に どれくらい ふえるか 見られます。\n\n【おうちの人へ】\n・設定「お手伝い項目」の 新ポイント設計カードの「タネ貯金を始める」を押すと、妹と兄で使えるようになり、これまでの「週次利子（残高×1%）」はOFFになります（元の設定は保存。設定の「利子」から戻せます）。\n・預けているポイントがある子は、画面からタネ貯金を外せません。\n・利息は 月に1回だけ付き、複数の端末で開いても二重には付きません。アプリを開かない月があっても、次に開いたときに順に付きます。"},
+  {id:"n28", fig:"bunntan", e:"🏓", t:"日課の担当・部活なしボタン・祝日が休日に", b:"【なにが かわった？】\n・🗓 祝日も「休日」に なりました：土日だけでなく、祝日（2027年まで）も「休日用」の おてつだいが 自動で 出ます。（れい：11月23日 勤労感謝の日は 休日用）\n・👤 おてつだいに「担当」が できました：「これは だれの おてつだいか」を 決められます。決めて いないものは、これまで どおり 全員に 出ます。\n・🏓「今日は 部活なし」ボタン（兄）：部活が ない日に おすと、妹と おなじ ぶんたんの おてつだいが 出ます。おした日だけ 有効で、つぎの日は もとに もどります。まちがえて おしても その日は もどせないので、おす前に かくにんが 出ます。\n・🌱 平日用／休日用の セット：おうちの人が「日課セットを入れる」を おすと、下の ように なります。\n\n【れい】\n＜平日＞\n　妹：食洗機（夕食のあと）・テーブルを ふくか お風呂を あらう・洗濯物を ほす\n　兄（部活の日）：食洗機（帰ってから）・猫の うんち取り\n　兄（部活なしボタンを おした日）：妹と おなじ ぶん ＋ 猫の うんち取り\n＜休日・祝日＞\n　ふたり：食洗機と 洗濯物ほしを 1人 1回ずつ\n　兄：お風呂あらい・そうじき（1部屋）・猫の うんち（2回）　妹：テーブルふき\n\n【なんのために？】\n・「担当だけ やる」で なく、おたがいが たすけ あえるように。担当は「さいていライン」です。\n・兄は 平日、部活で 帰りが おそい日が 多いので、部活が ない日に ぶんたんが ずれて「それは 担当じゃない」と ならないよう、ボタン1つで かわるように しました。\n・休日は 人手が 多いので、重い 家事を 兄が 受けもち、平日は 妹の ふたんを かるく します。\n\n【おうちの人へ】\n・入れる前に「いまの内容を書き出す」で 控えを とってください（適用後も 使えます）。「日課を元に戻す」で いつでも 戻せます（いまの セットは 消えません）。\n・日課の点数は、いまの お手伝い項目と そろえて あります。同じ家事を 日課と お手伝い項目の 両方で おすと 二重に ポイントが 付くので、どちらで おすか 家族で 決めてください。\n・担当や 点数は 設定の「毎日タスク管理」で 自由に 変えられます。"},
+  {id:"n27", fig:"points", e:"🌱", t:"ポイントのしくみを見直しました（3pt＝1円・新しい項目・上限）", b:"2026年11月26日、ポイントの しくみを 大きく 見なおしました。\n\n【1. 3ポイント ＝ 1円 に なりました】\n・500円こうかんは 1,500pt。\n・れい：30pt の おてつだいを すると、10円ぶん。100pt なら 約33円ぶん。\n・げんきん交換は、月ごとの 上限が あります：妹 5,000円（15,000pt）／兄 10,000円（30,000pt）。上限を こえた ぶんは きえません。ポイントは 来月に つかえます。\n\n【2. あたらしい おてつだいが 約30こ ふえました】\nふたり：朝の部屋セット(60pt)・床だけOK(20pt)・明日の準備(10pt)・週リセット(100pt)・月1の整理(200pt)・提出物(100pt)・定期テスト（前回より+5点で100pt／目標点で200pt）・検定（受験200pt／合格1000pt）\n妹：ダンス／ピアノ／英語の練習15分(各20pt)・週1の見せる日(50pt)・英語レッスンの宿題(30pt)・振付(100pt)・ピアノ1曲(200pt)・発表会(300pt)・コンクール（出場300pt／入賞500pt）・通知表（◎40pt／○15pt／成長50pt）\n兄：0時までに寝る(20pt)・部活の大会（出場100pt／1勝500pt・県大会は1勝1000pt）・レギュラー入り(500pt)・順位アップ(300pt)\n\n【3. 猫と お風呂の 点数を 見なおし】\n猫の うんち取り 60pt（1日 2回まで）／お風呂洗い 50pt／猫の はいたものの 片づけ 30pt／猫の トイレ丸洗い 150pt（親と いっしょ・週1回）。\n\n【4. 「やりすぎ」を ふせぐ しくみ】\n・同じ おてつだいを 何回でも おせないように、1日・1週間・1か月ごとの 上限が あります。\n　れい：猫の うんち取りは 1日 2回まで。3回目を おすと「きょうは 2回まで だよ」と 出ます。\n・100pt以上の 大きな ポイントは、おうちの人が OKして から もらえます。\n　れい：検定に 合格(1000pt)→ おうちの人が OKを おすと もらえる。\n\n【5. 机まわりの へらす点を かるく しました】\n「勉強机の まわりに 不要な ものが 落ちている」は -200pt から -50pt に。きびしすぎて アプリを 見なくなるのを ふせぐため です。\n\n【なんのために？】\n・自分の ためになる ことで、ポイントが たまるように：へやの かたづけ、家事、勉強、習いごと、部活、テスト。それぞれの がんばりが、ちゃんと ポイントに なります。\n・毎日 アプリを ひらく 理由を つくるため：すこしずつ たまる 項目を ふやしました。\n・おうちの人の かくにんを ふやさないため：毎日は かくにんせず、じぶんで 記録（自己申告）＋ 日曜の朝9時に ぬきうち チェック（夫婦で こうたい）。うそを つくと -500pt です。\n・もらいすぎ・やらなく なるのを ふせぐため：月の上限と、回数の上限で、ポイントが きりなく ふえるのを とめます。\n\n【これから】\n・🌱 タネ貯金：できました（おしらせ「タネ貯金」を 見てね）。\n・🔥 やくそく 7日れんぞくボーナス：できました（おしらせ「やくそく 7日れんぞく」を 見てね）。\n・🌟 担当より 多く やった ときの「自主ボーナス」（1.5倍）は、じゅんびちゅう です。\n\n【おうちの人へ】\n・設定の「お手伝い項目」の「新ポイント設計の適用」から、いつでも「適用前に戻す」で 元の 内容に もどせます（適用後に付いた ポイントの記録は消えません）。\n・承認の しきい値と、月の 現金上限は、設定の 承認の タブで 変えられます。"},
   {id:"n26", e:"🌟", t:"タネマネーが 新しくなりました！", b:"アプリを「ためる・推し株」中心に シンプルにリニューアル！✨\n・🌟推し株：すきな会社を「推し」にえらんで おうえんできる（ためるタブから）\n・🌱まいにちのタネ：毎日ひらくと かならずボーナスpt。連続でちょっとずつ増えるよ（ランダムのガチャは卒業！）\n・🏠ホームもスッキリ：タネモンが 大きく主役に\n・お手伝いの ならびかえ（親の設定で ≡ をドラッグ）や、履歴の左スワイプ取り消しも できるように！\nモンスター育成とバトルは おやすみに入りました。これまで育ててくれて ありがとう🌱"},
   {id:"n04", e:"🎨", t:"アプリのアイコンがドット絵に", b:"ホームの統計や見出しのアイコンを、オリジナルのドット絵に変更中。メンバー編集から“ドット絵アバター”も選べます。"},
   {id:"n03", e:"📅", t:"おてつだいが 平日/休日タブに", b:"毎日のおてつだいを、平日／休日のタブで切り替えられるようになりました。今日に合うタブが自動で開きます。"},
@@ -2271,6 +2272,88 @@ const MISSIONS = [
   {id:"m_learn",  e:"💡", label:"まめちしきを 読む", goal:1, metric:"learn", exp:8},
   {id:"m_battle", e:"⚔", label:"バトルに 1かい かつ", goal:1, metric:"battle", exp:12},
 ];
+// お知らせの図解(画像ではなくアプリ内で描く＝文字より先に見て分かる)。NEWSの fig:"キー" で指定
+function NewsFig({k}){
+  const box=(c,children,st)=>(<div style={{background:`${c}14`,border:`1.5px solid ${c}`,borderRadius:12,padding:"7px 9px",textAlign:"center",fontSize:11.5,fontWeight:800,color:TEXT,lineHeight:1.45,...(st||{})}}>{children}</div>);
+  const arrow=(<div style={{textAlign:"center",color:MUTED,fontWeight:900,fontSize:15,lineHeight:1}}>▼</div>);
+  const wrap=(title,children)=>(<div style={{background:CARDS,border:`1px solid ${BORDER}`,borderRadius:14,padding:"10px 10px 12px",margin:"8px 0 10px"}}>
+    <div style={{fontWeight:900,fontSize:12,color:TEXT,marginBottom:8}}>{title}</div>{children}</div>);
+  if(k==="streak"){
+    return wrap("🔥 やくそくを ぜんぶ できた日が つづくと…",
+      <div>
+        <div style={{display:"flex",gap:4,justifyContent:"space-between"}}>
+          {[1,2,3,4,5,6].map(i=>(<div key={i} style={{width:28,height:28,flexShrink:0,borderRadius:"50%",background:G,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:13}}>{i}</div>))}
+          <div style={{flex:1,minWidth:0,height:28,borderRadius:99,background:GOLD,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:11,whiteSpace:"nowrap"}}>7日🎁+100</div>
+        </div>
+        <div style={{fontSize:10.5,color:MUTED,textAlign:"center",margin:"4px 0 8px"}}>1日ずつ ✅ が ふえていく → 7日目に ごほうび！（14日目・21日目も +100pt）</div>
+        <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800}}>
+          <span style={{background:G,color:"#fff",borderRadius:99,padding:"2px 8px"}}>1</span><span style={{background:G,color:"#fff",borderRadius:99,padding:"2px 8px"}}>2</span><span style={{background:G,color:"#fff",borderRadius:99,padding:"2px 8px"}}>3</span>
+          <span style={{background:R,color:"#fff",borderRadius:99,padding:"2px 8px",whiteSpace:"nowrap"}}>✕ できない日</span>
+          <span style={{color:MUTED}}>→</span><span style={{background:GOLD,color:"#fff",borderRadius:99,padding:"2px 8px",whiteSpace:"nowrap"}}>1日目から</span>
+        </div>
+      </div>);
+  }
+  if(k==="chokin"){
+    return (<div>
+      {wrap("📅 1か月の ながれ",
+        <div>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{width:92,flexShrink:0,background:G,color:"#fff",borderRadius:8,padding:"5px 0",textAlign:"center",fontWeight:900,fontSize:11}}>1〜3日 🔓</span><span style={{fontSize:11,fontWeight:700,color:TEXT}}>あずける・出す ができる</span></div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{width:92,flexShrink:0,background:BORDER,color:TEXTS,borderRadius:8,padding:"5px 0",textAlign:"center",fontWeight:900,fontSize:11}}>4日〜月末 🔒</span><span style={{fontSize:11,fontWeight:700,color:TEXT}}>あずけたまま。おてつだいを がんばる</span></div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{width:92,flexShrink:0,background:GOLD,color:"#fff",borderRadius:8,padding:"5px 0",textAlign:"center",fontWeight:900,fontSize:11}}>つぎの月1日 🌱</span><span style={{fontSize:11,fontWeight:700,color:TEXT}}>先月ぶんの 利息が 入る</span></div>
+          </div>
+        </div>)}
+      {wrap("🌱 れい：10,000pt を あずけると",
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {box(G,<>12月1日に <b>10,000pt</b> を あずける</>)}
+          {arrow}
+          <div style={{display:"flex",gap:6}}>
+            {box(MUTED,<>おてつだいが 目標に<br/>とどかない<br/><b>利率 4%</b>＝+400pt</>,{flex:1})}
+            {box(GOLD,<>目標に とどいた！<br/>（妹10,000pt／兄8,000pt）<br/><b>利率 5%</b>＝+500pt</>,{flex:1})}
+          </div>
+          {arrow}
+          <div style={{fontSize:11,fontWeight:800,color:TEXT,textAlign:"center"}}>1月1日、利息を どうする？（じぶんで えらぶ）</div>
+          <div style={{display:"flex",gap:6}}>
+            {box(GP,<>🌱 ふやす<br/>あずけが <b>10,500pt</b> に<br/><span style={{fontWeight:600,fontSize:10.5}}>→ 来月は 利息にも 利息！</span></>,{flex:1})}
+            {box(GOLD,<>💰 手元に うけとる<br/><b>+500pt</b> すぐ つかえる<br/><span style={{fontWeight:600,fontSize:10.5}}>あずけは 10,000pt のまま</span></>,{flex:1})}
+          </div>
+          <div style={{fontSize:10.5,color:MUTED,textAlign:"center",marginTop:2}}>1年つづけると（5%）：ふやす 約 +7,952pt ／ 手元 +6,000pt</div>
+        </div>)}
+    </div>);
+  }
+  if(k==="bunntan"){
+    const cell=(c,t)=>(<div style={{flex:1,background:`${c}18`,border:`1.5px solid ${c}`,borderRadius:10,padding:"6px 6px",fontSize:10.5,fontWeight:700,color:TEXT,lineHeight:1.5}}>{t}</div>);
+    const row=(label,cs)=>(<div style={{display:"flex",gap:5,alignItems:"stretch"}}><div style={{width:64,flexShrink:0,fontSize:11,fontWeight:900,color:TEXT,display:"flex",alignItems:"center"}}>{label}</div>{cs}</div>);
+    return wrap("👥 だれが 何を する？",
+      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+        <div style={{fontSize:10.5,fontWeight:900,color:GP}}>平日</div>
+        {row("🌸 妹",cell(G,<>🍽 食洗機（夕食のあと）<br/>🧻 テーブルか お風呂<br/>👔 洗濯物を ほす</>))}
+        {row(<>🏓 兄<br/>部活の日</>,cell(B,<>🍽 食洗機（帰ってから）<br/>🐱 猫の うんち取り</>))}
+        {row(<>🏓 兄<br/>部活なし</>,cell(GOLD,<>「今日は部活なし」を おすと<br/>妹と おなじ ぶん ＋ 🐱 猫の うんち取り</>))}
+        <div style={{fontSize:10.5,fontWeight:900,color:P,marginTop:4}}>休日・祝日</div>
+        {row("ふたり",cell(P,<>🍽 食洗機 1人1回　👔 洗濯物ほし 1人1回</>))}
+        {row("🏓 兄",cell(B,<>🛁 お風呂あらい　🧹 そうじき（1部屋）　🐱 猫の うんち（2回）</>))}
+        {row("🌸 妹",cell(G,<>🧻 テーブルふき</>))}
+      </div>);
+  }
+  if(k==="points"){
+    return wrap("💴 ポイントと お金",
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",justifyContent:"center"}}>
+          {box(GOLD,<span style={{fontSize:15}}>3pt</span>)}<span style={{fontWeight:900}}>＝</span>{box(G,<span style={{fontSize:15}}>1円</span>)}
+          <span style={{color:MUTED,fontSize:11}}>→</span>{box(P,<>500円 こうかん<br/><b>1,500pt</b></>)}
+        </div>
+        <div style={{fontSize:10.5,fontWeight:900,color:TEXT,marginTop:4}}>🔒 げんきん交換は 月に ここまで（超えた分は 来月に）</div>
+        <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:800}}><span style={{width:36,flexShrink:0}}>🌸 妹</span><div style={{width:80,height:16,background:G,borderRadius:99,flexShrink:0}}/><span style={{fontSize:10.5}}>5,000円</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:800}}><span style={{width:36,flexShrink:0}}>🏓 兄</span><div style={{width:160,height:16,background:B,borderRadius:99,flexShrink:0}}/><span style={{fontSize:10.5}}>10,000円</span></div>
+        <div style={{display:"flex",gap:6,marginTop:4}}>
+          {box(R,<>🔁 回数の上限<br/><span style={{fontWeight:600,fontSize:10.5}}>猫のうんち取りは<br/>1日 2回まで</span></>,{flex:1})}
+          {box(P,<>✅ 100pt以上は<br/><span style={{fontWeight:600,fontSize:10.5}}>おうちの人が OK<br/>してから もらえる</span></>,{flex:1})}
+        </div>
+      </div>);
+  }
+  return null;
+}
 function NewsModal({onClose}){
   useEffect(()=>{ const prev=document.body.style.overflow; document.body.style.overflow="hidden"; return ()=>{ document.body.style.overflow=prev; }; },[]);
   return (
@@ -2282,15 +2365,16 @@ function NewsModal({onClose}){
         </div>
         <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"12px 16px calc(20px + env(safe-area-inset-bottom))"}}>
           {NEWS.map((n,i)=>(
-            <div key={n.id} style={{background:CARD,border:`1.5px solid ${i===0?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:10,display:"flex",gap:11}}>
-              <div style={{fontSize:26,flexShrink:0}}>{n.e}</div>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div key={n.id} style={{background:CARD,border:`1.5px solid ${i===0?G:BORDER}`,borderRadius:16,padding:"13px 14px",marginBottom:10}}>
+              <div style={{display:"flex",gap:11,alignItems:"center"}}>
+                <div style={{fontSize:26,flexShrink:0}}>{n.e}</div>
+                <div style={{flex:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                   <span style={{fontWeight:900,fontSize:14,color:TEXT}}>{n.t}</span>
                   {i===0&&<span style={{fontSize:10,fontWeight:900,color:"#fff",background:R,borderRadius:999,padding:"1px 6px"}}>NEW</span>}
                 </div>
-                <div style={{fontSize:12.5,color:TEXTS,lineHeight:1.6,marginTop:4,whiteSpace:"pre-line"}}>{n.b}</div>
               </div>
+              {n.fig&&<NewsFig k={n.fig}/>}
+              <div style={{fontSize:12.5,color:TEXTS,lineHeight:1.6,marginTop:6,whiteSpace:"pre-line"}}>{n.b}</div>
             </div>
           ))}
           <div style={{textAlign:"center",color:MUTED,fontSize:11,marginTop:6}}>🌱 Tane Money は どんどん あたらしくなるよ</div>
