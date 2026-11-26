@@ -974,6 +974,63 @@ function fmtTimeRemain(ms){
   return `あと${h}時間`;
 }
 
+// ── 新ポイント設計（2026-11-26）で追加する項目。INITと「適用」ボタンで共用 ──
+const PD_NEW_TASKS = [
+  {id:"g37",emoji:"🛏",label:"朝の部屋セット(床・机・服・制服・カバン)",pts:60,over:{}},
+  {id:"g38",emoji:"🧹",label:"床だけOK(部屋セットと同日は不可)",pts:20,over:{}},
+  {id:"g39",emoji:"🎒",label:"明日の準備(忘れ物の連絡なし)",pts:10,over:{}},
+  {id:"g40",emoji:"💃",label:"ダンスの練習15分",pts:20,over:{}},
+  {id:"g41",emoji:"🎹",label:"ピアノの練習15分",pts:20,over:{}},
+  {id:"g42",emoji:"🔤",label:"英語の練習15分",pts:20,over:{}},
+  {id:"g43",emoji:"🎤",label:"週1の見せる日(家族の前で披露)",pts:50,over:{}},
+  {id:"g44",emoji:"📖",label:"英語レッスンの宿題を期限内に",pts:30,over:{}},
+  {id:"g45",emoji:"📚",label:"休日の自主勉30分",pts:50,over:{}},
+  {id:"g46",emoji:"🌙",label:"0時までに寝る",pts:20,over:{}},
+]; 
+const PD_EDIT_GOOD = {
+  g08:{label:"猫の吐いたものの片付け",pts:30},
+  g09:{label:"お風呂洗い",pts:50},
+  g10:{label:"猫のうんち取り",pts:60},
+  g11:{label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150},
+};
+const PD_EDIT_BAD = { b11:{pts:-50} };
+const PD_EDIT_REWARD = { r07:{cost:1500} };
+const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44"]; // 妹だけ（習い事）
+const PD_ONLY_BROTHER = ["g46"];                        // 兄だけ（0時就寝）
+function pdApply(d, sisId, broId){
+  const bak = d.pointDesign2026Backup || {goodTasks:d.goodTasks, badTasks:d.badTasks, rewards:d.rewards, myTaskIds:d.myTaskIds||{}};
+  const have = new Set((d.goodTasks||[]).map(t=>t.id));
+  const good = (d.goodTasks||[]).map(t=>PD_EDIT_GOOD[t.id]?{...t,...PD_EDIT_GOOD[t.id]}:t)
+    .concat(PD_NEW_TASKS.filter(t=>!have.has(t.id)));
+  const bad = (d.badTasks||[]).map(t=>PD_EDIT_BAD[t.id]?{...t,...PD_EDIT_BAD[t.id]}:t);
+  const rewards = (d.rewards||[]).map(r=>PD_EDIT_REWARD[r.id]?{...r,...PD_EDIT_REWARD[r.id]}:r);
+  const allIds = [...good.map(t=>t.id),...bad.map(t=>t.id)];
+  const newIds = PD_NEW_TASKS.map(t=>t.id);
+  const orig = d.myTaskIds||{};
+  const my = {...orig};
+  // 割当が空の子は「他の誰の専用リストにも入っていない項目」だけが見える仕様(_stockも他扱い)。
+  // その見え方を保ったまま、新しい項目を足す。
+  const visibleNow = cid => {
+    const cur = orig[cid]||[];
+    if(cur.length>0) return cur;
+    const others = new Set();
+    Object.entries(orig).forEach(([k,v])=>{ if(k!==cid)(v||[]).forEach(id=>others.add(id)); });
+    return allIds.filter(id=>!others.has(id)&&!newIds.includes(id));
+  };
+  [[sisId,PD_ONLY_BROTHER],[broId,PD_ONLY_SISTER]].forEach(([cid,excl])=>{
+    if(!cid) return;
+    my[cid] = [...new Set([...visibleNow(cid),...newIds])].filter(id=>!excl.includes(id));
+  });
+  return {...d, goodTasks:good, badTasks:bad, rewards, myTaskIds:my,
+    pointDesign2026:{appliedAt:new Date().toISOString(), sisId, broId}, pointDesign2026Backup:bak};
+}
+function pdRestore(d){
+  const b = d.pointDesign2026Backup;
+  if(!b) return d;
+  const {pointDesign2026,pointDesign2026Backup,...rest} = d;
+  return {...rest, goodTasks:b.goodTasks, badTasks:b.badTasks, rewards:b.rewards, myTaskIds:b.myTaskIds||{}};
+}
+
 const INIT = {
   parentPinH: pinHash("0000"),
   children: [
@@ -996,10 +1053,10 @@ const INIT = {
     {id:"g05",emoji:"👟",label:"玄関の靴を全てきれいに並べる",pts:10,over:{}},
     {id:"g06",emoji:"🤖",label:"ルンバのゴミを捨てる",pts:10,over:{}},
     {id:"g07",emoji:"💧",label:"水のボトルに水を入れる",pts:10,over:{}},
-    {id:"g08",emoji:"🐱",label:"猫の汚物の掃除",pts:30,over:{}},
-    {id:"g09",emoji:"🛁",label:"お風呂掃除をする",pts:20,over:{}},
-    {id:"g10",emoji:"🐱",label:"猫の排泄物を掃除する",pts:50,over:{}},
-    {id:"g11",emoji:"🚽",label:"猫のトイレ掃除を手伝う",pts:100,over:{}},
+    {id:"g08",emoji:"🐱",label:"猫の吐いたものの片付け",pts:30,over:{}},
+    {id:"g09",emoji:"🛁",label:"お風呂洗い",pts:50,over:{}},
+    {id:"g10",emoji:"🐱",label:"猫のうんち取り",pts:60,over:{}},
+    {id:"g11",emoji:"🚽",label:"猫のトイレ丸洗い(親と一緒・週1)",pts:150,over:{}},
     {id:"g12",emoji:"🌙",label:"23時までに寝る",pts:20,over:{}},
     {id:"g13",emoji:"🌙",label:"22時までに寝る",pts:30,over:{}},
     {id:"g14",emoji:"👕",label:"自分の乾いた洗濯物を片付ける",pts:5,over:{}},
@@ -1025,6 +1082,7 @@ const INIT = {
     {id:"g34",emoji:"🗑",label:"落ちているゴミを2個捨てる",pts:5,over:{}},
     {id:"g35",emoji:"👶",label:"おむつを捨てる",pts:5,over:{}},
     {id:"g36",emoji:"📝",label:"テストで満点を取る",pts:1000,over:{}},
+    ...PD_NEW_TASKS,
   ],
   badTasks: [
     {id:"b01",emoji:"📺",label:"勝手にYouTubeを見る",pts:-50,over:{}},
@@ -1037,7 +1095,7 @@ const INIT = {
     {id:"b08",emoji:"👕",label:"服・パジャマの置きっぱなし",pts:-20,over:{}},
     {id:"b09",emoji:"😮",label:"口を5回開ける",pts:-500,over:{}},
     {id:"b10",emoji:"🤥",label:"嘘をつく",pts:-500,over:{}},
-    {id:"b11",emoji:"📚",label:"勉強机の周りに不要なものが落ちている",pts:-200,over:{}},
+    {id:"b11",emoji:"📚",label:"勉強机の周りに不要なものが落ちている",pts:-50,over:{}},
   ],
   rewards: [
     {id:"r01",emoji:"🎮",label:"スイッチオンライン代(毎月1日)",cost:200,unit:"毎月の支払いに充てる"},
@@ -1046,7 +1104,7 @@ const INIT = {
     {id:"r04",emoji:"🎬",label:"Netflix 30分",cost:200,unit:"Netflix視聴+30分"},
     {id:"r05",emoji:"📺",label:"YouTube 30分",cost:200,unit:"YouTube視聴+30分"},
     {id:"r06",emoji:"🎮",label:"ゲーム30分",cost:200,unit:"ゲーム時間+30分"},
-    {id:"r07",emoji:"💴",label:"500円交換",cost:2000,unit:"現金500円と交換"},
+    {id:"r07",emoji:"💴",label:"500円交換",cost:1500,unit:"現金500円と交換"},
   ],
   gacha: [
     { id: "gc1", emoji: "⚪", label: "ノーマル",     color: "#9a917a", rate: 60, min: 1,  max: 10  },
@@ -2478,6 +2536,67 @@ function DailyTasks({ child, data, update }) {
 // ═══════════════════════════════════════════════════════
 // ── SettingsModal（親PIN認証後に表示） ────────────────
 // ── お手伝い・マイナスタスク管理コンポーネント ──
+// ── 新ポイント設計を本番データへ一回だけ適用する（親のみ・元に戻せる） ──
+function PointDesignSection({data, update}){
+  const kids = data.children||[];
+  const guessSis = (kids.find(c=>c.displayMode==="junior")||{}).id||"";
+  const guessBro = (kids.find(c=>c.id!==guessSis&&(c.displayMode==="teen"||/高校/.test(c.gradeLabel||"")))||{}).id||"";
+  const [sis,setSis]=useState(guessSis);
+  const [bro,setBro]=useState(guessBro);
+  const applied = data.pointDesign2026;
+  const goodMap = Object.fromEntries((data.goodTasks||[]).map(t=>[t.id,t]));
+  const badMap = Object.fromEntries((data.badTasks||[]).map(t=>[t.id,t]));
+  const rewMap = Object.fromEntries((data.rewards||[]).map(r=>[r.id,r]));
+  const lines = [];
+  Object.entries(PD_EDIT_GOOD).forEach(([id,e])=>{ const t=goodMap[id]; if(t) lines.push(`${t.label}(${t.pts}pt) → ${e.label}(${e.pts}pt)`); });
+  Object.entries(PD_EDIT_BAD).forEach(([id,e])=>{ const t=badMap[id]; if(t) lines.push(`${t.label} ${t.pts}pt → ${e.pts}pt`); });
+  Object.entries(PD_EDIT_REWARD).forEach(([id,e])=>{ const r=rewMap[id]; if(r) lines.push(`${r.label} ${r.cost}pt → ${e.cost}pt`); });
+  const addCount = PD_NEW_TASKS.filter(t=>!goodMap[t.id]).length;
+  const nameOf = id=>(kids.find(c=>c.id===id)||{}).name||"未選択";
+  const download = ()=>{
+    try{
+      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{}},null,2)],{type:"application/json"});
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`tane-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+    }catch(e){ alert("書き出しに失敗しました"); }
+  };
+  const btn=(c,l,fn,dis)=><button disabled={dis} onClick={fn} style={{padding:"8px 14px",background:dis?CARDS:`${c}15`,border:`1.5px solid ${dis?BORDER:c}`,borderRadius:10,color:dis?MUTED:c,fontWeight:800,fontSize:12,cursor:dis?"default":"pointer",fontFamily:F}}>{l}</button>;
+  const sel=(val,set,label)=>(
+    <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,fontWeight:700,color:TEXT}}>
+      <span style={{width:36}}>{label}</span>
+      <select value={val} onChange={e=>set(e.target.value)} style={{flex:1,padding:"6px 8px",borderRadius:8,border:`1.5px solid ${BORDER}`,fontFamily:F,fontSize:12}}>
+        <option value="">選ぶ</option>
+        {kids.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    </label>
+  );
+  return(
+    <div style={{background:CARD,border:`2px solid ${GOLD}`,borderRadius:14,padding:"12px 14px",marginBottom:16}}>
+      <p style={{margin:"0 0 6px",fontWeight:900,fontSize:13,color:TEXT}}>🌱 新ポイント設計の適用（2026-11-26）</p>
+      {applied?(
+        <div>
+          <p style={{margin:"0 0 8px",fontSize:12,color:TEXTS,lineHeight:1.7}}>適用ずみ（{String(applied.appliedAt||"").slice(0,10)}）。兄={nameOf(applied.broId)} / 妹={nameOf(applied.sisId)}</p>
+          {btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当を適用前の状態に戻します。\n適用後に付いたポイントの記録は消えません。戻しますか？")) update(pdRestore); })}
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <p style={{margin:0,fontSize:11,color:TEXTS,lineHeight:1.7}}>変わること（いまの項目にあるものだけ）:</p>
+          <ul style={{margin:0,paddingLeft:18,fontSize:11,color:TEXT,lineHeight:1.7}}>
+            {lines.map((l,i)=><li key={i}>{l}</li>)}
+            <li>新しい項目を{addCount}個追加（部屋セット・習い事の練習・見せる日・0時就寝など）</li>
+          </ul>
+          {sel(sis,setSis,"妹")}
+          {sel(bro,setBro,"兄")}
+          <p style={{margin:0,fontSize:10,color:MUTED,lineHeight:1.6}}>習い事の項目は妹だけ、0時就寝は兄だけに表示されます。いま「割り当て」が空の子は、いま見えている項目に新しい項目を足した専用リストになります（見え方は変わりません）。適用前の内容はこの家のデータ内に保存され、「適用前に戻す」で戻せます。</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {btn(B,"いまの内容を書き出す",download)}
+            {btn(GP,"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) update(d=>pdApply(d,sis,bro)); },!sis||!bro||sis===bro)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskManagerSection({data, update}){
   const [tab, setTab] = useState("good"); // good | bad
   const [showAdd, setShowAdd] = useState(false);
@@ -2945,6 +3064,7 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {settingsTab==="tasks"&&(
             <div>
               {/* お手伝い項目管理 */}
+              <PointDesignSection data={data} update={update}/>
               <TaskManagerSection data={data} update={update}/>
               {/* 毎日タスク管理 */}
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"16px 0 8px"}}>📋 毎日タスク管理</p>
