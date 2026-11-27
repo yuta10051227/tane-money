@@ -2262,6 +2262,7 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+  {id:"n33", e:"💬", t:"画面が LINE のような 見た目に なりました", b:"【なにが かわった？】\nアプリの 見た目を、LINEのように 明るくて さわりやすい 形に しました。\n・いちばん 上に、じぶんの 名前と ポイントと「≒○円」が 大きく 出ます。\n・その下の まるい ボタンで、「おくる」「こうかん」「タネ貯金（もくひょう）」「おしらせ」に すぐ 行けます。\n・ページを かえる ボタンは、画面の いちばん下に 固定されました（毎日・活動・ためる・記録）。\n・ページの なまえは、上の まんなかに 出ます。\n\n【なんのために？】\n・毎日 ひらく アプリは、ふだん つかう LINEと おなじ ような 形の ほうが まよいません。\n・ポイントと お金（円）を、いちばん 目に 入る ところに おいて、いくら あるか すぐ わかるように するため です。\n\n【おうちの人へ】\n・内容（ポイント・日課・タネ貯金など）は 何も かわりません。見た目だけの 変更です。\n・もとの 暗い ゲーム風の 見た目に 戻したい ときは、⚙ →「見た目」で 切りかえられます（家族みんなに 反映）。"},
   {id:"n32", e:"🌟", t:"「推し株」は おしまい（買った分は ポイントに もどります）", b:"【なにが かわる？】\n「ためる」の中の「🌟 推し株」は、おしまいに なります。（おうちの人が きりかえると、「ためる」から きえます）\n\n【もっていた 株は どうなる？】\n・いま もっている 株は、買った ときの ねだん で ポイントに もどります。\n　れい：100pt で 2かぶ ＋ 55pt で 1かぶ 買っていた → 255pt（約85円）が もどる\n・ねあがり・ねさがりは 出しません。「買った ぶん」だけ ぜんぶ かえってきます。\n・もどった ポイントは、そのまま ごほうびや タネ貯金に つかえます。\n\n【なんのために？】\n・タネ貯金の ほうが、ふえるしくみが かんたんで、わかりやすいから。\n・ねさがりで ポイントが へって、ガッカリする ことを なくすため。\n\n【おうちの人へ】\n設定「お手伝い項目」の新ポイント設計カードに「推し株をおわりにして払い戻す」があります。押す前に、子どもごとの払い戻し額が表示されます。押すと元には戻せません。"},
   {id:"n31", e:"🕒", t:"きょうの ぶんは きょう（タイムカードの ルール）", b:"【ルール】\nきょうの ぶんの ポイントは、きょう の うちに つけます。きのうの ぶんを きょう つける ことは できません。\n（「まいにち」の ページの 上に「きょうの ぶんは きょうの 24時まで」と 出ます）\n\n【れい】\n・月曜に おてつだいを したのに 記録を わすれた → 火曜に なったら、月曜ぶんは つけられません。\n・100pt以上の おてつだいを 月曜の 夜に おして「しんせい中」に した → おうちの人が 火曜に OKしても、記録は「月曜」の ぶんに なります。\n\n【なんのために？】\n・タイムカードと おなじです。しゃかいに 出ると、会社では タイムカードを その日の うちに おさないと、はたらいた ことに ならない ことが あります。その日の うちに おす くせを つけます。\n・「1週間 前の ぶんを あとから いれる」を はじめると、きりが ありません。何が ほんとうか わからなくなり、うそも まぎれこみやすく なります。\n・毎日 すこしずつ つづける ことが、いちばん 大切 だからです。わすれた 日が あっても、つぎの日 また がんばれば だいじょうぶ（わすれた 日の ばつは ありません）。\n\n【おうちの人へ】\n・どうしても 特別な ときだけ、おうちの人が ⚙ →「ポイント付与」で わたせます（ふつうの 記録とは わけて 考えてください）。\n・承認が 翌日に なっても、記録の 日付は 子どもが 押した 日に なります。"},
   {id:"n30", fig:"streak", e:"🔥", t:"やくそく 7日れんぞくで +100pt！", b:"【なにが できるように なった？】\nその日の「⭐やくそく」を ぜんぶ できた日が 7日つづくと、ごほうびに +100pt もらえます！\n\n【れい】\n・月曜〜日曜の 7日間、まいにち やくそくを ぜんぶ できた → 7日目に +100pt\n・そのまま つづけて 14日目にも +100pt、21日目にも +100pt…（7日ごとに もらえる）\n・水曜に できなかった日が あると、つぎの日は「1日目」から やりなおし\n\n【どこで見られる？】\n「まいにち」の ページに「🔥 やくそく 3日れんぞく ・ あと4日で +100pt」のように 出ます。きのうまで つづいている ときだけ 出ます。\n\n【なんのために？】\n1日だけ がんばるより、毎日 すこしずつ つづける ほうが、自分のためになるからです。つづける力を おうえんする ボーナスです。\n\n【おうちの人へ】\n・「やくそく」は、日課の中の ⭐やくそく に なっている 項目です（日課セットを入れると、食洗機などが ⭐に なります）。\n・ボーナスは 7日ごとに 100pt（1か月で 約400pt＝約133円）。他の端末で開いても 二重には 付きません。"},
@@ -3400,6 +3401,9 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
       {key:"transfer",emoji:"🔄",label:"引き継ぎ・バックアップ",desc:"ファミリーコード・機種変更・データ保存"},
       {key:"plan",emoji:"💳",label:"プラン",desc:"料金プランの確認・変更"},
     ]},
+    {title:"見た目", items:[
+      {key:"look",emoji:"🎨",label:"見た目（LINE風 ⇔ もとの見た目）",desc:"子どもの画面のデザインを切りかえる"},
+    ]},
     {title:"ヘルプ", items:[
       {key:"help",emoji:"📖",label:"チュートリアルをもう一度",desc:"使い方ガイドとヒントを再表示する"},
     ]},
@@ -3491,6 +3495,19 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           )}
 
           {/* ── ヘルプ：チュートリアル再表示 ── */}
+          {settingsTab==="look"&&(()=>{
+            const on=(data.familySettings||{}).uiStyle!=="classic";
+            const pick=(v)=>update(d=>({...d,familySettings:{...(d.familySettings||{}),uiStyle:v}}));
+            return(<div>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 10px"}}>子どもの画面の見た目</p>
+              <div style={{display:"flex",gap:8}}>
+                {[["line","💬 LINE風（明るい・下にタブ）",on],["classic","🌌 もとの見た目（暗い・ゲーム風）",!on]].map(([k,l,sel])=>(
+                  <button key={k} onClick={()=>pick(k)} style={{flex:1,padding:"14px 8px",borderRadius:14,border:`2px solid ${sel?G:BORDER}`,background:sel?GS:CARD,color:sel?GP:TEXTS,fontWeight:800,fontSize:12.5,cursor:"pointer",fontFamily:F,lineHeight:1.5}}>{l}{sel?" ✓":""}</button>
+                ))}
+              </div>
+              <p style={{margin:"10px 0 0",fontSize:11,color:MUTED,lineHeight:1.7}}>家族みんなに反映されます。いつでも切りかえられます。</p>
+            </div>);
+          })()}
           {settingsTab==="help"&&(
             <div>
               <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 12px"}}>つかいかたの基本</p>
@@ -4837,14 +4854,68 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const effectiveTab = tabAlias[tab] || tab;
   // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
   const TAB_FB = {daily:"☀",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
-  const darkBG = !isJunior; // teen/adultはダークモード
+  const lineUI = (data.familySettings||{}).uiStyle !== "classic";   // LINE風の見た目(設定でもとに戻せる)
+  const LINE_BG = "#F2F3F5", LINE_LINE = "#E5E7EB";
+  const lightUI = isJunior || lineUI;
+  const darkBG = !isJunior && !lineUI; // teen/adultはダークモード(LINE風のときは明るい)
 
   return (
-    <div style={{minHeight:"100vh",background:darkBG?"#040810":BG,fontFamily:F,paddingBottom:80}}>
+    <div style={{minHeight:"100vh",background:lineUI?LINE_BG:(darkBG?"#040810":BG),fontFamily:F,paddingBottom:lineUI?92:80}}>
       {showSecretCode && <SecretCodeModal child={child} data={data} update={update} onClose={()=>setShowSecretCode(false)}/>}
       {showSecretMage && <SecretMageModal child={child} data={data} onClose={()=>setShowSecretMage(false)}/>}
       {/* ヒーローエリア */}
-      {isJunior ? (()=>{
+      {lineUI ? (()=>{
+        const titleMapL={daily:"きょう",activity:"かつどう",tasks:"やること",money:"ためる",goals:"ためる",learn:"まなぶ",more:"きろく"};
+        const titleL=titleMapL[effectiveTab]||"Tane Money";
+        const pendN=(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
+        const agL=myGoals.find(g=>!g.done&&g.target>0);
+        const goMoney=(sub)=>{ setTab(isJunior?"goals":"money"); setMonTab(sub); };
+        const act=(emoji,label,fn,dot)=>(
+          <button key={label} onClick={fn} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,padding:"6px 0 2px"}}>
+            <span style={{position:"relative",width:48,height:48,borderRadius:"50%",background:GS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{emoji}
+              {dot&&<span style={{position:"absolute",top:2,right:2,width:10,height:10,borderRadius:"50%",background:R,border:"2px solid #fff"}}/>}
+            </span>
+            <span style={{fontSize:11,fontWeight:700,color:TEXT}}>{label}</span>
+          </button>);
+        return (
+      <div style={{background:"#fff",borderBottom:`1px solid ${LINE_LINE}`}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(env(safe-area-inset-top,0px),44px) 14px 6px"}}>
+          <button onClick={onBack} style={{width:36,height:36,border:"none",background:"none",fontSize:26,color:TEXT,cursor:"pointer",lineHeight:1}}>‹</button>
+          <div style={{fontWeight:900,fontSize:17,color:TEXT}}>{titleL}</div>
+          <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,border:"none",background:"none",fontSize:20,color:TEXTS,cursor:"pointer",position:"relative"}}>
+            ⚙
+            {pendN>0&&(<span style={{position:"absolute",top:2,right:0,minWidth:16,height:16,borderRadius:999,background:R,color:"#fff",fontSize:10,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{pendN}</span>)}
+          </button>
+        </div>
+        <div style={{padding:"6px 16px 12px",display:"flex",alignItems:"center",gap:12}}>
+          <ChildAvatar child={child} size={54}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div {...secretLongPress} data-testid="hero-name" style={{fontWeight:900,fontSize:15,color:TEXT,userSelect:"none",WebkitUserSelect:"none"}}>{child.name}</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap",lineHeight:1.15}}>
+              <span style={{fontSize:30,fontWeight:900,color:TEXT,letterSpacing:-1}}>{myBal.toLocaleString()}</span>
+              <span style={{fontSize:13,fontWeight:800,color:GP}}>pt</span>
+              <span style={{fontSize:13,fontWeight:800,color:TEXTS,whiteSpace:"nowrap"}}>{yenText(myBal)}</span>
+            </div>
+            <div style={{fontSize:11,color:MUTED,fontWeight:700,marginTop:2}}>今月 <span style={{color:monthDelta>=0?GP:R}}>{monthDelta>=0?"+":""}{monthDelta.toLocaleString()}pt</span>{curStreak>=3&&<span> ・ 🔥{curStreak}日</span>}</div>
+          </div>
+          {(data.secretCompanion||{})[child.id]
+            ? <SecretMageHero size={76} onOpen={()=>setShowSecretMage(true)}/>
+            : <Buddy child={child} data={data} size={76} update={update} compact={true} light noChange/>}
+        </div>
+        <div style={{display:"flex",padding:"0 10px 8px"}}>
+          {act("💸","おくる",()=>setShowTransfer(true))}
+          {act("🎁","こうかん",()=>goMoney("rewards"))}
+          {tcOn(data,child.id)?act("🌱","タネ貯金",()=>goMoney("chokin")):act("🎯","もくひょう",()=>goMoney("goals"))}
+          {act("📢","おしらせ",openNews,hasNews)}
+        </div>
+        {agL&&(()=>{const pct=Math.min(100,Math.round(myBal/agL.target*100));const rem=Math.max(0,agL.target-myBal);return(
+          <div style={{padding:"0 16px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:TEXTS,marginBottom:4,fontWeight:700}}><span>🎯 {agL.label}</span><span>{rem>0?`あと ${rem.toLocaleString()}pt（${yenText(rem)}）`:"たっせい！🎉"}</span></div>
+            <div style={{height:6,borderRadius:999,background:LINE_LINE,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,borderRadius:999,background:G,transition:"width .4s"}}/></div>
+          </div>);})()}
+      </div>
+        );
+      })() : isJunior ? (()=>{
         const h=new Date().getHours();
         const bgAuto=h>=7&&h<11
           ?"linear-gradient(180deg,#1a0a00 0%,#7c2d00 25%,#c2612a 50%,#e8a06a 70%,#2d6a3a 100%)"
@@ -5012,6 +5083,25 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       </div>
         );
       })()}
+      {lineUI && (
+        <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:110,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
+          <div style={{pointerEvents:"auto",width:"100%",maxWidth:480,display:"flex",background:"#fff",borderTop:`1px solid ${LINE_LINE}`,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+            {MAIN_TABS.map(([v,l])=>{
+              const tabDot = ((v==="activity"||v==="tasks") && !todayTaskDone) || (v==="daily" && showGacha && !todayDone);
+              const isActive = effectiveTab===(tabAlias[v]||v);
+              return (
+              <button key={v} onClick={()=>setTab(v)} style={{position:"relative",flex:1,padding:"8px 2px 7px",border:"none",background:"none",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:2,color:isActive?GP:MUTED,fontWeight:isActive?800:600,fontSize:10.5}}>
+                <span style={{position:"relative",display:"inline-flex"}}>
+                  <img src={`/assets/tab_${v}.png`} alt="" style={{width:24,height:24,objectFit:"contain",opacity:isActive?1:0.45,transition:"opacity .15s"}} onError={e=>{const sp=document.createElement("span");sp.textContent=TAB_FB[v]||"🌱";sp.style.fontSize="21px";sp.style.opacity=isActive?"1":"0.5";e.target.replaceWith(sp);}}/>
+                  {tabDot && <span style={{position:"absolute",top:-2,right:-6,width:9,height:9,borderRadius:"50%",background:R,border:"1.5px solid #fff"}}/>}
+                </span>
+                {l.replace(/^\S+\s+/,"")}
+              </button>);
+            })}
+          </div>
+        </div>
+      )}
+      {!lineUI && (<>
       {/* タブナビゲーション（iOS 26 リキッドグラス：半透明＋backdrop-blur） */}
       <div style={{display:"flex",background:isJunior?"rgba(255,255,255,0.72)":"rgba(15,26,46,0.66)",backdropFilter:"saturate(180%) blur(20px)",WebkitBackdropFilter:"saturate(180%) blur(20px)",borderBottom:isJunior?"1px solid rgba(24,35,29,0.06)":"1px solid rgba(255,255,255,0.08)",overflowX:"auto",scrollbarWidth:"none",position:"sticky",top:0,zIndex:100,boxShadow:isJunior?"0 1px 14px rgba(24,35,29,0.05)":"0 1px 18px rgba(0,0,0,0.35)"}}>
         {MAIN_TABS.map(([v,l])=>{
@@ -5033,12 +5123,13 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           );
         })}
       </div>
+      </>)}
 
       {/* iOS 26風 大きいタイトル：タブバー直下・スクロールで縮んで消える */}
       {(()=>{
         const titleMap={daily:"きょう",activity:"かつどう",tasks:"やること",money:"ためる",goals:"ためる",learn:"まなぶ",more:"きろく"};
         const title=titleMap[effectiveTab];
-        if(!title) return null;
+        if(!title||lineUI) return null;
         const p=Math.min(1,scrollY/56);          // 0=上, 1=スクロール済み
         const h=Math.round(44*(1-p));
         return (
@@ -5050,6 +5141,9 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
       {/* 育成RPG(そだてるFAB)・投資ワールド全画面(まちFAB)は廃止。投資はmoneyタブ内「推し株」に統合。 */}
 
+      {lineUI && effectiveTab==="daily" && !(data.secretCompanion||{})[child.id] && (
+        <div style={{padding:"12px 16px 0",textAlign:"center"}}><Buddy child={child} data={data} size={110} update={update} light pickerOnly/></div>
+      )}
       {/* 📢 おしらせ(新機能の告知) */}
       {effectiveTab==="daily" && (
         <div style={{padding:"10px 16px 0"}}>
@@ -5220,7 +5314,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         {/* フローティング・まいにちのタネ ボタン(1日1回・ログインボーナス) */}
         {(()=>{ const ft=getMonthTheme(); return (
           <button onClick={()=>{ if(!todayDone) doGacha(); }} disabled={todayDone} aria-label="まいにちのタネ"
-            style={{position:"fixed",right:16,bottom:24,zIndex:120,width:66,height:66,borderRadius:"50%",
+            style={{position:"fixed",right:16,bottom:lineUI?84:24,zIndex:120,width:66,height:66,borderRadius:"50%",
               border:todayDone?`2px solid ${BORDER}`:"3px solid #fff",
               background:todayDone?"radial-gradient(circle at 35% 35%,#d2d2d2,#a8a8a8)":`radial-gradient(circle at 35% 35%,${ft.bg},${ft.color})`,
               boxShadow:todayDone?"0 4px 12px rgba(0,0,0,0.25)":`0 6px 22px ${ft.color}95`,
@@ -5312,7 +5406,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         })()}
         {/* タスクを先に表示（ガチャより優先）— Junior/Teen共通 */}
         {!isJunior && <>
-          <div style={{color:"rgba(255,255,255,0.6)",fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
+          <div style={{color:darkBG?"rgba(255,255,255,0.6)":MUTED,fontSize:11,fontWeight:700,letterSpacing:1.5,padding:"14px 16px 0"}}>きょうの やること</div>
           <TabHint id="daily" text="今日のタスクをやってポイントをゲット！連続記録でボーナスも🌟" data={data} update={update} cid={child.id}/>
           <DailyTasks child={child} data={data} update={update}/>
         </>}
@@ -5369,7 +5463,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
 
         {/* ── デイリーガチャ（タスクの下＝ごほうび。Junior/Teen共通）。money モードでは非表示 ── */}
         {showGacha && <div style={{padding:"12px 16px 4px"}}>
-          {!isJunior&&<div style={{color:"rgba(255,255,255,0.58)",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🌱 まいにちのタネ</div>}
+          {!isJunior&&<div style={{color:darkBG?"rgba(255,255,255,0.58)":MUTED,fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8}}>🌱 まいにちのタネ</div>}
           {(()=>{
             const mTheme=getMonthTheme();
             const bonusLabel=curStreak>=30?"+15pt":curStreak>=14?"+10pt":curStreak>=7?"+5pt":curStreak>=3?"+3pt":null;
@@ -5582,7 +5676,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{padding:"12px 16px 0"}}>
           <TabHint id="money" text="目標をきめてコツコツためよう！たまったら「こうかん」でごほうびとチェンジ🎁" data={data} update={update} cid={child.id}/>
           {/* iOS 26 セグメントコントロール */}
-          <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:isJunior?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+          <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:lightUI?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
           {(isJunior
             ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
             :[["goals","🎯 目標"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
@@ -5591,10 +5685,10 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             return (
             <button key={k} onClick={()=>{ taneHaptic("tap"); setMonTab(k); }}
               style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,
-                background:on?(isJunior?"#fff":"rgba(255,255,255,0.18)"):"transparent",
-                color:on?(isJunior?GP:"#fff"):(isJunior?MUTED:"rgba(255,255,255,0.55)"),
+                background:on?(lightUI?"#fff":"rgba(255,255,255,0.18)"):"transparent",
+                color:on?(lightUI?GP:"#fff"):(lightUI?MUTED:"rgba(255,255,255,0.55)"),
                 fontWeight:on?800:600,fontSize:12,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",
-                boxShadow:on&&isJunior?"0 1px 3px rgba(0,0,0,0.16),0 1px 1px rgba(0,0,0,0.06)":"none",transition:"background .18s,color .18s"}}>
+                boxShadow:on&&lightUI?"0 1px 3px rgba(0,0,0,0.16),0 1px 1px rgba(0,0,0,0.06)":"none",transition:"background .18s,color .18s"}}>
               {l}
             </button>
             );
@@ -8090,7 +8184,7 @@ const BUDDY_ORDER = ["tame","nobi","tsukai","wake"];
 const BUDDY_HINT = { tame:"コツコツ ためる子", nobi:"チャレンジで ふやす子", tsukai:"かしこく つかう子", wake:"やさしく わける子" };
 const BUDDY_TALK = ["わ〜い！","えへへ♪","うれしい！","なでなで ありがと","きょうも がんばろ！","だいすき♡","ぷにぷに〜","いっしょに いこ！"];
 // 🐣 相棒タネモン：選んだ子を状態に応じた表情＋呼吸/タップ跳ね＋吹き出しで表示（絵は1枚をコードで動かす）
-function Buddy({ child, data, update, size=110, compact=false }) {
+function Buddy({ child, data, update, size=110, compact=false, light=false, noChange=false, pickerOnly=false }) {
   const [bounce, setBounce] = useState(false);
   const [picking, setPicking] = useState(false);
   const [speech, setSpeech] = useState(null);
@@ -8111,9 +8205,9 @@ function Buddy({ child, data, update, size=110, compact=false }) {
     // 未選択の大きな選択カードは「まいにち」タブだけに出す（他タブでは内容を押し下げないよう非表示）
     if(compact && !picking) return null;
     return (
-      <div style={{width:"100%",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:18,padding:"14px 12px"}}>
-        <div style={{textAlign:"center",fontSize:14,fontWeight:900,color:"#fff",marginBottom:2}}>🌱 あいぼうの タネを えらぼう</div>
-        <div style={{textAlign:"center",fontSize:10.5,fontWeight:800,color:"rgba(255,255,255,.7)",marginBottom:10}}>すきな子を えらんでね（あとで かえられるよ）</div>
+      <div style={{width:"100%",background:light?"#fff":"rgba(255,255,255,0.12)",border:light?"1.5px solid #E5E7EB":"1px solid rgba(255,255,255,0.2)",borderRadius:18,padding:"14px 12px"}}>
+        <div style={{textAlign:"center",fontSize:14,fontWeight:900,color:light?TEXT:"#fff",marginBottom:2}}>🌱 あいぼうの タネを えらぼう</div>
+        <div style={{textAlign:"center",fontSize:10.5,fontWeight:800,color:light?MUTED:"rgba(255,255,255,.7)",marginBottom:10}}>すきな子を えらんでね（あとで かえられるよ）</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
           {BUDDY_ORDER.map((id,i)=>{const d=BUDDY_DEF[id];const sel=buddy===id;return(
             <button key={id} onClick={()=>pick(id)} style={{background:"rgba(255,255,255,0.95)",border:`2.5px solid ${sel?G:"transparent"}`,borderRadius:16,padding:"10px 6px 8px",cursor:"pointer",fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:3,boxShadow:SHADOW_SM}}>
@@ -8124,11 +8218,12 @@ function Buddy({ child, data, update, size=110, compact=false }) {
             </button>
           );})}
         </div>
-        {buddy&&<button onClick={()=>setPicking(false)} style={{marginTop:10,width:"100%",background:"none",border:"none",color:"rgba(255,255,255,.7)",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>やめる</button>}
+        {buddy&&<button onClick={()=>setPicking(false)} style={{marginTop:10,width:"100%",background:"none",border:"none",color:light?MUTED:"rgba(255,255,255,.7)",fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F}}>やめる</button>}
         <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}`}</style>
       </div>
     );
   }
+  if(pickerOnly) return <button onClick={()=>setPicking(true)} style={{background:"none",border:"none",color:MUTED,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:F,padding:"2px 6px"}}>🔄 あいぼうを かえる</button>;
   const onPat = ()=>{ taneHaptic("tap"); setBounce(true); setTimeout(()=>setBounce(false),480);
     setSpeech(BUDDY_TALK[Math.floor(Math.random()*BUDDY_TALK.length)]); setTimeout(()=>setSpeech(null),1300); };
   return (
@@ -8140,7 +8235,7 @@ function Buddy({ child, data, update, size=110, compact=false }) {
           style={{width:"100%",height:"100%",objectFit:"contain",imageRendering:"pixelated",transformOrigin:"bottom center",animation:bounce?"buddyBounce .48s cubic-bezier(.34,1.56,.64,1)":"buddyBreath 2.8s ease-in-out infinite"}}
           onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{textContent:BUDDY_DEF[buddy]?.e||"🌱",style:`font-size:${Math.round(size*0.6)}px`}));}}/>
       </div>
-      <button onClick={()=>setPicking(true)} style={{background:"none",border:"none",color:"rgba(255,255,255,.55)",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F,padding:"2px 6px"}}>🔄 かえる</button>
+      {!noChange&&<button onClick={()=>setPicking(true)} style={{background:"none",border:"none",color:light?MUTED:"rgba(255,255,255,.55)",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:F,padding:"2px 6px"}}>🔄 かえる</button>}
       <style>{`@keyframes buddyBreath{0%,100%{transform:translateY(0) scaleX(1) scaleY(1)}50%{transform:translateY(-3px) scaleX(.98) scaleY(1.04)}}@keyframes buddyBounce{0%{transform:translateY(0) scale(1)}30%{transform:translateY(-16px) scale(1.07)}62%{transform:translateY(0) scale(.93)}100%{transform:translateY(0) scale(1)}}@keyframes buddyPop{0%{transform:translateX(-50%) scale(0);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}`}</style>
     </div>
   );
