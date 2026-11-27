@@ -1379,7 +1379,6 @@ const INIT = {
   pendingRedemptions: [],
   yakusokuDone: {},   // {childId:['YYYY-M-D',...]} ⭐やくそく全達成した日(直近2日・翌日にごほうび解放)。旧形式は文字列1つ
 };
-INIT.goodTasks = INIT.goodTasks.map(t=>PD_LIMITS[t.id]?{...PD_LIMITS[t.id],...t}:t);   // 新しい家族は1日の回数の上限つきで始める(自分で決めた上限があればそれを優先)
 
 function migrate(d) {
   if (!d) return {...INIT};
@@ -2949,6 +2948,7 @@ function pdLimitsRestore(d){
   const good=(rest.goodTasks||[]).map(t=>{ if(!(t.id in b)) return t; const o=b[t.id]; const n={...t}; ["dailyMax","weeklyMax","monthlyMax","grp"].forEach(k=>{ if(o[k]===undefined) delete n[k]; else n[k]=o[k]; }); return n; });
   return {...rest,goodTasks:good};
 }
+INIT.goodTasks = INIT.goodTasks.map(t=>PD_LIMITS[t.id]?{...PD_LIMITS[t.id],...t}:t);   // 新しい家族は1日の回数の上限つきで始める(自分で決めた上限があればそれを優先)
 // ── データの整理(2026-11-27): 古い「大会 一勝」(新しい大会の項目と重複)・存在しない項目番号を片づける ──
 const PD_CLEAN_TASK_IDS = ["7zsbjcz5"];   // 兄の「大会 一勝 1000pt」。新しい「県大会で1勝ごと(1000pt)」と重複
 function pdCleanupPreview(d){
