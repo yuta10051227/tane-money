@@ -1388,6 +1388,8 @@ function migrate(d) {
   if (!d.gachaDate)    d.gachaDate={};
   if (!d.streak)       d.streak={};
   if (!d.yakusokuStreak) d.yakusokuStreak={};
+  // 現金交換(500円交換)は 3pt=1円 に固定。古い端末の保存・「適用前に戻す」で 2000pt に戻っても、読み込み時に 1500pt へそろえる
+  if (Array.isArray(d.rewards)) d.rewards = d.rewards.map(r=>{ const yen=(r&&r.cashYen)||(r&&r.id==="r07"?500:0); if(!yen) return r; const want=yen*3; return (r.cost===want&&r.cashYen===yen)?r:{...r,cost:want,cashYen:yen}; });
   if (!d.taneChokin) d.taneChokin={enabled:{},accounts:{},threshold:{},srev:0};
   if (!d.dailyTasks)   d.dailyTasks=INIT.dailyTasks;
   if(d.dailyBonus===undefined) d.dailyBonus=50;
@@ -2263,8 +2265,9 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
-  {id:"n33", e:"💬", t:"画面が LINE のような 見た目に なりました", b:"【なにが かわった？】\nアプリの 見た目を、LINEのように 明るくて さわりやすい 形に しました。\n・いちばん 上に、じぶんの 名前と ポイントと「≒○円」が 大きく 出ます。\n・その下の まるい ボタンで、「おくる」「こうかん」「タネ貯金（もくひょう）」「おしらせ」に すぐ 行けます。\n・ページを かえる ボタンは、画面の いちばん下に 固定されました（毎日・活動・ためる・記録）。\n・ページの なまえは、上の まんなかに 出ます。\n\n【なんのために？】\n・毎日 ひらく アプリは、ふだん つかう LINEと おなじ ような 形の ほうが まよいません。\n・ポイントと お金（円）を、いちばん 目に 入る ところに おいて、いくら あるか すぐ わかるように するため です。\n\n【おうちの人へ】\n・内容（ポイント・日課・タネ貯金など）は 何も かわりません。見た目だけの 変更です。\n・もとの 暗い ゲーム風の 見た目に 戻したい ときは、⚙ →「見た目」で 切りかえられます（家族みんなに 反映）。"},
-  {id:"n32", e:"🌟", t:"「推し株」は おしまい（買った分は ポイントに もどります）", b:"【なにが かわる？】\n「ためる」の中の「🌟 推し株」は、おしまいに なります。（おうちの人が きりかえると、「ためる」から きえます）\n\n【もっていた 株は どうなる？】\n・いま もっている 株は、買った ときの ねだん で ポイントに もどります。\n　れい：100pt で 2かぶ ＋ 55pt で 1かぶ 買っていた → 255pt（約85円）が もどる\n・ねあがり・ねさがりは 出しません。「買った ぶん」だけ ぜんぶ かえってきます。\n・もどった ポイントは、そのまま ごほうびや タネ貯金に つかえます。\n\n【なんのために？】\n・タネ貯金の ほうが、ふえるしくみが かんたんで、わかりやすいから。\n・ねさがりで ポイントが へって、ガッカリする ことを なくすため。\n\n【おうちの人へ】\n設定「お手伝い項目」の新ポイント設計カードに「推し株をおわりにして払い戻す」があります。押す前に、子どもごとの払い戻し額が表示されます。押すと元には戻せません。"},
+  {id:"n34", e:"🎁", t:"ごほうびの ねだんが 3pt＝1円に そろいました", b:"【なにが かわった？】\nごほうびの ねだん（ポイント）が、3pt＝1円に あわせて かわりました。\n\n【れい】\n・スマホ 30分：200pt → 150pt\n・Netflix 30分・YouTube 30分・ゲーム 30分：200pt → 150pt\n・好きなお菓子 いっこ：200pt → 150pt\n・スイッチオンライン代：200pt → 150pt\n・送迎（片道）：100pt → 75pt\n・500円こうかん：2,000pt → 1,500pt（さきに かわっています）\n\n【なんのために？】\n・前は 4pt＝1円 でした。3pt＝1円に かわって、ポイントの 価値が 上がったので、ごほうびの ねだんも おなじ「円ぶん」に そろえました。\n・そろえないと、お金に かえる ほうが とくに なってしまい、ごほうびを えらびにくく なるからです。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「ごほうびの値段を 3pt＝1円に そろえる」で 反映します。「値段を元に戻す」で 戻せます。500円交換は 変わりません。"},
+  {id:"n33", e:"💬", t:"画面が LINE のような 見た目に なりました", b:"【なにが かわった？】\nアプリの 見た目を、LINEのように 明るくて さわりやすい 形に しました。\n・いちばん 上に、じぶんの 名前と ポイントと「≒○円」が 大きく 出ます。\n・その下の まるい ボタンで、「やくそく（あと ○こ）」「おてつだい」「こうかん」「タネ貯金（もくひょう）」に すぐ 行けます。まいにち つかうものを、いちばん 近くに おきました。\n・「おしらせ」は 上の 🔔（あたらしい おしらせが あると 赤い点）に 引っこしました。\n・「おくる」は ふだん 使わないので、ふだんは かくしています（おうちの人が ⚙ →「見た目」で 出せます）。\n・ページを かえる ボタンは、画面の いちばん下に 固定されました（毎日・活動・ためる・記録）。\n・ページの なまえは、上の まんなかに 出ます。\n\n【なんのために？】\n・毎日 ひらく アプリは、ふだん つかう LINEと おなじ ような 形の ほうが まよいません。\n・ポイントと お金（円）を、いちばん 目に 入る ところに おいて、いくら あるか すぐ わかるように するため です。\n\n【おうちの人へ】\n・内容（ポイント・日課・タネ貯金など）は 何も かわりません。見た目だけの 変更です。\n・もとの 暗い ゲーム風の 見た目に 戻したい ときは、⚙ →「見た目」で 切りかえられます（家族みんなに 反映）。"},
+  {id:"n32", e:"🌟", t:"「推し株」は おしまい（買った分は ポイントに もどりました）", b:"【なにが かわった？】\n「ためる」の中の「🌟 推し株」は、おしまいに なりました。\n\n【もっていた 株は どうなった？】\n・もっていた 株は、買った ときの ねだん で、アプリを ひらいた ときに 自動で ポイントに もどりました。\n　れい：100pt で 2かぶ ＋ 55pt で 1かぶ 買っていた → 255pt（約85円）が もどる\n・ねあがり・ねさがりは 出していません。「買った ぶん」だけ ぜんぶ かえってきます。\n・もどった ポイントは、そのまま ごほうびや タネ貯金に つかえます。\n\n【なんのために？】\n・タネ貯金の ほうが、ふえるしくみが かんたんで、わかりやすいから。\n・ねさがりで ポイントが へって、ガッカリする ことを なくすため。\n\n【おうちの人へ】\n・払い戻しは、このアップデート後に 最初に 子どもの画面を ひらいた ときに、1回だけ 自動で 行われます（二重には 戻りません）。\n・内容は 設定「お手伝い項目」の新ポイント設計カードの「推し株」の欄で 確認できます。"},
   {id:"n31", e:"🕒", t:"きょうの ぶんは きょう（タイムカードの ルール）", b:"【ルール】\nきょうの ぶんの ポイントは、きょう の うちに つけます。きのうの ぶんを きょう つける ことは できません。\n（「まいにち」の ページの 上に「きょうの ぶんは きょうの 24時まで」と 出ます）\n\n【れい】\n・月曜に おてつだいを したのに 記録を わすれた → 火曜に なったら、月曜ぶんは つけられません。\n・100pt以上の おてつだいを 月曜の 夜に おして「しんせい中」に した → おうちの人が 火曜に OKしても、記録は「月曜」の ぶんに なります。\n\n【なんのために？】\n・タイムカードと おなじです。しゃかいに 出ると、会社では タイムカードを その日の うちに おさないと、はたらいた ことに ならない ことが あります。その日の うちに おす くせを つけます。\n・「1週間 前の ぶんを あとから いれる」を はじめると、きりが ありません。何が ほんとうか わからなくなり、うそも まぎれこみやすく なります。\n・毎日 すこしずつ つづける ことが、いちばん 大切 だからです。わすれた 日が あっても、つぎの日 また がんばれば だいじょうぶ（わすれた 日の ばつは ありません）。\n\n【おうちの人へ】\n・どうしても 特別な ときだけ、おうちの人が ⚙ →「ポイント付与」で わたせます（ふつうの 記録とは わけて 考えてください）。\n・承認が 翌日に なっても、記録の 日付は 子どもが 押した 日に なります。"},
   {id:"n30", fig:"streak", e:"🔥", t:"やくそく 7日れんぞくで +100pt！", b:"【なにが できるように なった？】\nその日の「⭐やくそく」を ぜんぶ できた日が 7日つづくと、ごほうびに +100pt もらえます！\n\n【れい】\n・月曜〜日曜の 7日間、まいにち やくそくを ぜんぶ できた → 7日目に +100pt\n・そのまま つづけて 14日目にも +100pt、21日目にも +100pt…（7日ごとに もらえる）\n・水曜に できなかった日が あると、つぎの日は「1日目」から やりなおし\n\n【どこで見られる？】\n「まいにち」の ページに「🔥 やくそく 3日れんぞく ・ あと4日で +100pt」のように 出ます。きのうまで つづいている ときだけ 出ます。\n\n【なんのために？】\n1日だけ がんばるより、毎日 すこしずつ つづける ほうが、自分のためになるからです。つづける力を おうえんする ボーナスです。\n\n【おうちの人へ】\n・「やくそく」は、日課の中の ⭐やくそく に なっている 項目です（日課セットを入れると、食洗機などが ⭐に なります）。\n・ボーナスは 7日ごとに 100pt（1か月で 約400pt＝約133円）。他の端末で開いても 二重には 付きません。"},
   {id:"n29", fig:"chokin", e:"🌱", t:"「タネ貯金」ができました（あずけて、ふやす）", b:"【なにが できる？】\nポイントを「タネ貯金」に あずけておくと、毎月、ふえた分（利息）が もらえます。ぎんこうの ちょきんと おなじ ですね。「ためる」タブの「🌱 タネ貯金」から つかいます（おうちの人が はじめると 出ます）。\n\n【れい（10,000pt を あずけた とき）】\n・12月1日に 10,000pt を あずける\n・1月1日に、12月ぶんの 利息が 入る → 4%なら +400pt、5%なら +500pt\n・「ふやす」を えらんだら、あずけた分が 10,400pt（5%なら 10,500pt）に なる → つぎの月は、その ふえた分にも 利息が つく\n・「手元に うけとる」を えらんだら、400pt が すぐ つかえる ポイントに 入る\n・1年 つづけると、「ふやす」で 約 +7,952pt（5%の とき）。「手元」だと +6,000pt（5%の とき）。\n\n【ルール】\n・あずけられるのは、ぜんぶで 10,000pt 〜 30,000pt。1,000pt ずつ えらびます。\n・あずける・出すのは、毎月 1日〜3日 だけ。思いつきで 出し入れしないための ルールです。\n・利息は、月が かわった 最初の日に、先月ぶんが 入ります。いつもは 月4%。\n・その月の「おてつだいポイント」が 目標に とどくと、+1% で 月5%！ 目標は、妹 10,000pt／兄 8,000pt です。\n　（れい：妹が その月 おてつだいで 10,000pt ためた → 利息が 5%）\n・おてつだいポイントに 数えるのは、1つが 100pt みまんの おてつだい・日課だけ。大会・テスト・検定などの 大きいポイントは 数えません。\n・利息が つくのは、あずけた額（ふやした分も ふくめて）3万pt まで。3万pt あずけると、5%で 毎月 1,500pt（1年で 18,000pt）です。\n・あずけた ポイントは「手元」から へります。出すまで、ごほうびや げんきん交換には つかえません。\n\n【なんのために？】\n・ためると ふえる、を 体験して ほしいから。すこしの ポイントでも、じっと 待つと 大きく そだちます（タネと おなじ！）。\n・毎日の おてつだいが、利息の 5% にも つながるように するため。\n・つかいすぎを ふせぐため。月の はじめの 3日だけ 出し入れ できるので、「いま つかう」か「あとで ふやす」かを おちついて えらべます。\n\n【画面の見かた】\n・あずけた ポイント／今日までに 育った分／今月末に もらえる分 の 3つが 見られます。\n・「みらいシミュレーター」で、あずける額を うごかして、3か月後・6か月後・1年後に どれくらい ふえるか 見られます。\n\n【おうちの人へ】\n・設定「お手伝い項目」の 新ポイント設計カードの「タネ貯金を始める」を押すと、妹と兄で使えるようになり、これまでの「週次利子（残高×1%）」はOFFになります（元の設定は保存。設定の「利子」から戻せます）。\n・預けているポイントがある子は、画面からタネ貯金を外せません。\n・利息は 月に1回だけ付き、複数の端末で開いても二重には付きません。アプリを開かない月があっても、次に開いたときに順に付きます。"},
@@ -2903,6 +2906,39 @@ function oshiClose(d){
     familySettings:{...(d.familySettings||{}), investOff:true},
     oshiClosed:{...(d.oshiClosed||{}), at:(d.oshiClosed||{}).at||new Date().toISOString(), refunds:{...((d.oshiClosed||{}).refunds||{}),...refunds}, prevHoldings:{...((d.oshiClosed||{}).prevHoldings||{}),...prev}}};
 }
+// ── データの整理(2026-11-27): 古い「大会 一勝」(新しい大会の項目と重複)・存在しない項目番号を片づける ──
+const PD_CLEAN_TASK_IDS = ["7zsbjcz5"];   // 兄の「大会 一勝 1000pt」。新しい「県大会で1勝ごと(1000pt)」と重複
+function pdCleanupPreview(d){
+  const tasks=(d.goodTasks||[]).filter(t=>PD_CLEAN_TASK_IDS.includes(t.id));
+  const left=new Set([...(d.goodTasks||[]).filter(t=>!PD_CLEAN_TASK_IDS.includes(t.id)).map(t=>t.id),...(d.badTasks||[]).map(t=>t.id)]);
+  const orphans=[...new Set(Object.values(d.myTaskIds||{}).flat().filter(i=>!left.has(i)&&!PD_CLEAN_TASK_IDS.includes(i)))];
+  return {tasks,orphans};
+}
+function pdCleanup(d){
+  const bak=d.pointDesign2026CleanupBackup||{goodTasks:d.goodTasks,myTaskIds:d.myTaskIds||{}};
+  const good=(d.goodTasks||[]).filter(t=>!PD_CLEAN_TASK_IDS.includes(t.id));
+  const ids=new Set([...good.map(t=>t.id),...(d.badTasks||[]).map(t=>t.id)]);
+  const my={}; Object.entries(d.myTaskIds||{}).forEach(([k,v])=>{ my[k]=(v||[]).filter(i=>ids.has(i)); });
+  return {...d,goodTasks:good,myTaskIds:my,pointDesign2026CleanupBackup:bak};
+}
+function pdCleanupRestore(d){
+  const b=d.pointDesign2026CleanupBackup; if(!b) return d;
+  const {pointDesign2026CleanupBackup,...rest}=d;
+  return {...rest,goodTasks:b.goodTasks,myTaskIds:b.myTaskIds||{}};
+}
+// ── ごほうびの値段を3pt=1円にそろえる(2026-11-27): 前は4pt=1円(500円=2000pt)。同じ円ぶんを保つため×0.75(5pt単位) ──
+const PD_REWARD_RATIO = 0.75;
+const pdRewardNew = c => Math.max(5, Math.round(c*PD_REWARD_RATIO/5)*5);   // 200→150, 100→75
+function pdRewardRescale(d){
+  const bak=d.pointDesign2026RewardsBackup||Object.fromEntries((d.rewards||[]).map(r=>[r.id,r.cost]));
+  const rewards=(d.rewards||[]).map(r=>r.cashYen?r:(bak[r.id]!==undefined?{...r,cost:pdRewardNew(bak[r.id])}:r));
+  return {...d,rewards,pointDesign2026RewardsBackup:bak};
+}
+function pdRewardRestore(d){
+  const b=d.pointDesign2026RewardsBackup; if(!b) return d;
+  const {pointDesign2026RewardsBackup,...rest}=d;
+  return {...rest,rewards:(rest.rewards||[]).map(r=>(b[r.id]!==undefined&&!r.cashYen)?{...r,cost:b[r.id]}:r)};
+}
 // 親の画面: タネ貯金を始める(妹・兄をON・基準ptを入れ・既存の週次利子をOFF。元の利子設定は保存)
 function tcStart(d){
   const pd=d.pointDesign2026||{}; const t=d.taneChokin||{};
@@ -3074,9 +3110,33 @@ function PointDesignSection({data, update}){
             ):btn(GP,"タネ貯金を始める",()=>{ if(window.confirm("妹と兄でタネ貯金を始めます。いまの週次利子はOFFになります。よろしいですか？")){ update(tcStart); } })}
           </div>
           <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
+            <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🧹 データの整理</p>
+            {(()=>{ const pv=pdCleanupPreview(data); const done=!!data.pointDesign2026CleanupBackup; return (
+              <div style={{marginBottom:10}}>
+                <p style={{margin:"0 0 4px",fontSize:11,color:TEXTS,lineHeight:1.7}}>新しい大会の項目と重複する古い項目を消し、存在しない項目番号を片づけます（子どもの画面は変わりません）。</p>
+                <ul style={{margin:"0 0 6px",paddingLeft:18,fontSize:11,color:TEXT,lineHeight:1.7}}>
+                  <li>{pv.tasks.length?`消す項目: ${pv.tasks.map(t=>`${t.label}（${t.pts}pt）`).join("、")}`:"消す項目: なし"}</li>
+                  <li>{pv.orphans.length?`片づける番号: ${pv.orphans.join("、")}`:"片づける番号: なし"}</li>
+                </ul>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {btn(GP,"整理する",()=>{ if(window.confirm("古い項目を消し、存在しない番号を片づけます。いまの内容は保存され、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdCleanup); } },(!pv.tasks.length&&!pv.orphans.length))}
+                  {done&&btn(R,"整理を元に戻す",()=>{ if(window.confirm("整理の前の状態に戻します。戻しますか？")){ markLocalDefEdit(); update(pdCleanupRestore); } })}
+                </div>
+              </div>); })()}
+            <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🎁 ごほうびの値段を 3pt＝1円に そろえる</p>
+            <p style={{margin:"0 0 4px",fontSize:11,color:TEXTS,lineHeight:1.7}}>前は4pt＝1円（500円＝2,000pt）でした。同じ「円ぶん」を保つため、現金以外のごほうびを×0.75にします（5pt単位）。500円交換は設定ずみ（1,500pt）です。</p>
+            <ul style={{margin:"0 0 6px",paddingLeft:18,fontSize:11,color:TEXT,lineHeight:1.7}}>
+              {(data.rewards||[]).filter(r=>!r.cashYen).map(r=>{ const base=(data.pointDesign2026RewardsBackup||{})[r.id]; const from=base!==undefined?base:r.cost; const to=pdRewardNew(from); return <li key={r.id}>{r.label}: {from}pt → {to}pt（{yenText(to)}）{r.cost===to&&base!==undefined?" ✓":""}</li>; })}
+            </ul>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {btn(GP,data.pointDesign2026RewardsBackup?"値段を入れ直す":"値段をそろえる",()=>{ if(window.confirm("ごほうびの値段を×0.75にします（500円交換は変えません）。いまの値段は保存され、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdRewardRescale); } })}
+              {data.pointDesign2026RewardsBackup&&btn(R,"値段を元に戻す",()=>{ if(window.confirm("ごほうびの値段をそろえる前に戻します。戻しますか？")){ markLocalDefEdit(); update(pdRewardRestore); } })}
+            </div>
+          </div>
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
             <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🌟 推し株を おわりにする</p>
             {data.oshiClosed?(
-              <p style={{margin:0,fontSize:11,color:TEXTS,lineHeight:1.7}}>おわりにしました（{String(data.oshiClosed.at||"").slice(0,10)}）。払い戻し: {Object.entries(data.oshiClosed.refunds||{}).map(([cid,v])=>`${nameOf(cid)} ${Number(v).toLocaleString()}pt（${yenText(v)}）`).join(" ／ ")||"なし"}</p>
+              <p style={{margin:0,fontSize:11,color:TEXTS,lineHeight:1.7}}>おわりになりました（{String(data.oshiClosed.at||"").slice(0,10)}・アプリを開いたときに自動で実行）。払い戻し: {Object.entries(data.oshiClosed.refunds||{}).map(([cid,v])=>`${nameOf(cid)} ${Number(v).toLocaleString()}pt（${yenText(v)}）`).join(" ／ ")||"なし"}</p>
             ):(
               <div>
                 <p style={{margin:"0 0 6px",fontSize:11,color:TEXTS,lineHeight:1.7}}>「ためる」の「🌟推し株」をなくします。いま持っている株は、<b>買ったときの値段</b>でポイントに戻します（値上がり・値下がりは出しません）。配当は今後つきません。</p>
@@ -3507,6 +3567,12 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
                 ))}
               </div>
               <p style={{margin:"10px 0 0",fontSize:11,color:MUTED,lineHeight:1.7}}>家族みんなに反映されます。いつでも切りかえられます。</p>
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"16px 0 8px"}}>子どもの画面のボタン</p>
+              <button onClick={()=>update(d=>({...d,familySettings:{...(d.familySettings||{}),showTransfer:!(d.familySettings||{}).showTransfer}}))} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:14,border:`2px solid ${(data.familySettings||{}).showTransfer?G:BORDER}`,background:(data.familySettings||{}).showTransfer?GS:CARD,cursor:"pointer",fontFamily:F,textAlign:"left"}}>
+                <span style={{fontSize:20}}>💸</span>
+                <span style={{flex:1}}><span style={{display:"block",fontWeight:800,fontSize:13,color:TEXT}}>「おくる」ボタンを 出す</span><span style={{display:"block",fontSize:11,color:MUTED,lineHeight:1.5}}>きょうだいへ ポイントを おくる機能。ふだんは 使わないので 初期は かくしています。</span></span>
+                <span style={{fontWeight:900,color:(data.familySettings||{}).showTransfer?GP:MUTED}}>{(data.familySettings||{}).showTransfer?"ON":"OFF"}</span>
+              </button>
             </div>);
           })()}
           {settingsTab==="help"&&(
@@ -4639,7 +4705,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // 「ためる」タブのセグメントが非表示化(投資OFF/junior/young)されたのにmonTabがそれを指したままだと
   // コンテンツが1つも描画されず真っ白になる。表示可能な先頭"goals"へフォールバックする。
   useEffect(()=>{
-    if(monTab==="oshi" && data.familySettings?.investOff) setMonTab("goals");
+    if(monTab==="oshi") setMonTab("goals");
     else if(monTab==="chokin" && !tcOn(data,child.id)) setMonTab("goals");
     else if(monTab==="kakeibo" && isJunior) setMonTab("goals");   // kakeibo非表示はjuniorのみ。youngは使い道タブを使える(バウンスさせない)
   },[data.familySettings?.investOff, monTab, isJunior]);
@@ -4678,7 +4744,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
   // Apply interest on open
-  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); update(d=>tcRoll(d,child.id)); },[]);
+  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); update(d=>tcRoll(d,child.id)); markLocalUserDataEdit('holdings'); update(d=>d.oshiClosed?d:oshiClose(d)); },[]);
 
   const showFlash = (pts, emoji) => {
     taneHaptic(pts>=0?"success":"warn");
@@ -4870,6 +4936,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         const pendN=(data.pendingApprovals||[]).length+(data.pendingRedemptions||[]).length;
         const agL=myGoals.find(g=>!g.done&&g.target>0);
         const goMoney=(sub)=>{ setTab(isJunior?"goals":"money"); setMonTab(sub); };
+        const yk=getYakusokuInfo(data,child.id); const ykLeft=Math.max(0,(yk.reqTasks||[]).length-(yk.done||0));
         const act=(emoji,label,fn,dot)=>(
           <button key={label} onClick={fn} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",fontFamily:F,padding:"6px 0 2px"}}>
             <span style={{position:"relative",width:48,height:48,borderRadius:"50%",background:GS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{emoji}
@@ -4882,10 +4949,16 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"max(env(safe-area-inset-top,0px),44px) 14px 6px"}}>
           <button onClick={onBack} style={{width:36,height:36,border:"none",background:"none",fontSize:26,color:TEXT,cursor:"pointer",lineHeight:1}}>‹</button>
           <div style={{fontWeight:900,fontSize:17,color:TEXT}}>{titleL}</div>
+          <div style={{display:"flex",alignItems:"center"}}>
+          <button onClick={openNews} aria-label="おしらせ" style={{width:36,height:36,border:"none",background:"none",fontSize:19,cursor:"pointer",position:"relative"}}>
+            🔔
+            {hasNews&&(<span style={{position:"absolute",top:5,right:4,width:9,height:9,borderRadius:"50%",background:R,border:"1.5px solid #fff"}}/>)}
+          </button>
           <button onClick={()=>setShowSettings(true)} style={{width:36,height:36,border:"none",background:"none",fontSize:20,color:TEXTS,cursor:"pointer",position:"relative"}}>
             ⚙
             {pendN>0&&(<span style={{position:"absolute",top:2,right:0,minWidth:16,height:16,borderRadius:999,background:R,color:"#fff",fontSize:10,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",lineHeight:1}}>{pendN}</span>)}
           </button>
+          </div>
         </div>
         <div style={{padding:"6px 16px 12px",display:"flex",alignItems:"center",gap:12}}>
           <ChildAvatar child={child} size={54}/>
@@ -4903,10 +4976,11 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             : <Buddy child={child} data={data} size={76} update={update} compact={true} light noChange/>}
         </div>
         <div style={{display:"flex",padding:"0 10px 8px"}}>
-          {act("💸","おくる",()=>setShowTransfer(true))}
+          {act("📋",ykLeft>0?`やくそく あと${ykLeft}`:"やくそく",()=>setTab("daily"),ykLeft>0)}
+          {act("✅","おてつだい",()=>setTab(isJunior?"tasks":"activity"))}
           {act("🎁","こうかん",()=>goMoney("rewards"))}
           {tcOn(data,child.id)?act("🌱","タネ貯金",()=>goMoney("chokin")):act("🎯","もくひょう",()=>goMoney("goals"))}
-          {act("📢","おしらせ",openNews,hasNews)}
+          {(data.familySettings||{}).showTransfer&&act("💸","おくる",()=>setShowTransfer(true))}
         </div>
         {agL&&(()=>{const pct=Math.min(100,Math.round(myBal/agL.target*100));const rem=Math.max(0,agL.target-myBal);return(
           <div style={{padding:"0 16px 14px"}}>
@@ -5678,8 +5752,8 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
           {/* iOS 26 セグメントコントロール */}
           <div style={{display:"flex",gap:3,padding:3,borderRadius:13,background:lightUI?"rgba(120,120,128,0.14)":"rgba(255,255,255,0.08)",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
           {(isJunior
-            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),...(!data.familySettings?.investOff?[["oshi","🌟 推し株"]]:[])]
-            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),["kakeibo","📊 使い道"],...(!data.familySettings?.investOff&&!young?[["oshi","🌟 推し株"]]:[])]
+            ?[["goals","🎯 もくひょう"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[])]
+            :[["goals","🎯 目標"],["rewards","🎁 こうかん"],...(tcOn(data,child.id)?[["chokin","🌱 タネ貯金"]]:[]),["kakeibo","📊 使い道"]]
           ).map(([k,l])=>{
             const on=monTab===k;
             return (
@@ -5698,7 +5772,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
       )}
       {/* 🌟 推し株：moneyタブ内にインライン表示（街づくり・全画面ワールドは廃止） */}
       {effectiveTab==="money" && monTab==="chokin" && tcOn(data,child.id) && <TaneChokin child={child} data={data} update={update}/>}
-      {effectiveTab==="money" && monTab==="oshi" && !data.familySettings?.investOff && <OshiKabu child={child} data={data} update={update}/>}
+      {/* 🌟推し株は2026-11-27に終了(持っていた株は買った値段で払い戻し)。画面の入口は無し */}
       {effectiveTab==="money" && monTab==="kakeibo" && (()=>{
         // 手入力ナシ：ごほうび交換のログから「使い道」を自動集計。
         const _spend=(data.logs||[]).filter(l=>l.cid===child.id&&l.type==="reward"&&(l.pts||0)<0);
