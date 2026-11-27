@@ -59,13 +59,13 @@ check.py が検出するもの：
 ### カラー定数一覧（現在の正式定義）
 
 ```
-BG="#F7F5EF"  CARD="#FFFFFF"  CARDS="#F2EFE7"
+BG="#F2F3F5"  CARD="#FFFFFF"  CARDS="#EDEFF2"
 GP="#187A4E"  G="#34C77B"     GS="#DDF3E7"
 GOLD="#E8B83E" GOLDS="#FFF1CB"
 R="#D95C55"   RS="#FCE6E4"
 B="#3478D4"   BS="#E5F0FF"
 P="#7B61C9"   PS="#EFEAFE"
-TEXT="#18231D" TEXTS="#59645E" MUTED="#929B95" BORDER="#E8E3D8"
+TEXT="#18231D" TEXTS="#59645E" MUTED="#929B95" BORDER="#E5E7EB"
 ```
 
 **削除済み（使用禁止）:** `Y`（旧gold）, `O`（旧orange）, `SHADOW`（旧shadow）
