@@ -52,9 +52,9 @@ TANE_MONEY_RULES.md     ← 開発ルール
 ### カラー定数（変更してよい。手順は CLAUDE.md の「3. カラー定数」を参照・2026-11-27改定）
 
 ```javascript
-const BG    = "#F7F5EF";   // 背景（アイボリー）
+const BG    = "#F2F3F5";   // 背景（明るいグレー・2026-11-27改定）
 const CARD  = "#FFFFFF";   // カード背景
-const CARDS = "#F2EFE7";   // サブカード背景
+const CARDS = "#EDEFF2";   // サブカード背景
 const GP    = "#187A4E";   // メイングリーン（ヘッダー・強調）
 const G     = "#34C77B";   // ブライトグリーン（CTA・プラスpt）
 const GS    = "#DDF3E7";   // グリーン薄（バッジ背景）
@@ -69,7 +69,7 @@ const PS    = "#EFEAFE";   // パープル薄
 const TEXT  = "#18231D";   // メインテキスト
 const TEXTS = "#59645E";   // サブテキスト
 const MUTED = "#929B95";   // ミュートテキスト
-const BORDER= "#E8E3D8";   // ボーダー
+const BORDER= "#E5E7EB";   // ボーダー
 ```
 
 **削除済み（使用禁止）:** `O`（旧orange）, `Y`（旧gold）, `SHADOW`（旧shadow定数）

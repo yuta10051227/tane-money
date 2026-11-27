@@ -1682,12 +1682,10 @@ const taskPts  = (task, cid) => task.over?.[cid] ?? task.pts;
 // ═══════════════════════════════════════════════════════
 // DESIGN SYSTEM v2 — Tane Money
 // ═══════════════════════════════════════════════════════
-const BG    = "#F7F5EF";
-const BG2   = "#FCFBF8";
+const BG    = "#F2F3F5";   // 2026-11-27: LINE風に合わせて暖色→明るい寒色グレー
+const BG2   = "#F8F9FA";
 const CARD  = "#FFFFFF";
-const CARDS = "#F2EFE7";
-// LINE風の見た目で使う、明るい背景と区切り線の色(色を変えるときはここ)
-const LINE_BG = "#F2F3F5", LINE_LINE = "#E5E7EB";
+const CARDS = "#EDEFF2";
 const GP    = "#187A4E";   // green-primary
 const G     = "#34C77B";   // green-bright（CTA）
 const GS    = "#DDF3E7";   // green-soft
@@ -1702,8 +1700,9 @@ const PS    = "#EFEAFE";
 const TEXT  = "#18231D";
 const TEXTS = "#59645E";
 const MUTED = "#929B95";
-const BORDER= "#E8E3D8";
+const BORDER= "#E5E7EB";
 const Y     = GOLD;        // 後方互換
+const LINE_BG = BG, LINE_LINE = BORDER;   // LINE風の見た目(背景・区切り線)は共通の定数に合わせる
 const SHADOW = "0 4px 16px rgba(24,35,29,0.05)";
 const F  = "'Noto Sans JP','M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
 const FB = "'M PLUS Rounded 1c','Hiragino Maru Gothic ProN',sans-serif";
@@ -8672,7 +8671,7 @@ async function shareCard({ emoji, title, subtitle, color, img, rarity }){
     let im=null;
     if(img){ im=await new Promise(res=>{const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=img;}); }
     // 背景グラデ＋アクセント光彩
-    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,"#F7F5EF"); g.addColorStop(1,"#E3F3E8"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,BG); g.addColorStop(1,"#E3F3E8"); x.fillStyle=g; x.fillRect(0,0,W,H);
     const rg=x.createRadialGradient(W/2,500,40,W/2,500,460); rg.addColorStop(0,accent+"40"); rg.addColorStop(1,accent+"00"); x.fillStyle=rg; x.fillRect(0,0,W,H);
     x.fillStyle=accent; x.fillRect(0,0,W,20);
     x.textAlign="center"; x.textBaseline="middle";
