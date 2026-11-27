@@ -1509,7 +1509,7 @@ function migrate(d) {
   if(!d.parents)       d.parents=INIT.parents;
   if(d.parentMultiplier===undefined) d.parentMultiplier=1.0;
   if(d.interestRate===undefined)     d.interestRate=0.01;
-  if(d.interestEnabled===undefined)  d.interestEnabled=true;
+  d.interestEnabled=false;  // 週次利子は廃止(2026-11-27)。古い端末が true を書き戻しても常にOFFへそろえる
   if(!d.interestLastDate)            d.interestLastDate={};
   if(!d.holdBonusLastDate)           d.holdBonusLastDate={};
   if(!d.weeklyReportSeen)            d.weeklyReportSeen={};
@@ -2293,6 +2293,7 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+   {id:"n36", e:"💹", t:"毎週つく「週次利子」は おしまいに なりました", b:"【なにが かわった？】\n毎週、ぜんぶの ポイントに 1% ふえていた「週次利子」を なくしました。\n\n【れい】\n・前：1,000pt あると、1週間で +10pt\n・いま：なにも ふえません\n\n【ふやしたい ときは？】\n「ためる」の「🌱 タネ貯金」に あずけると、月末に 4% ふえます（毎日の がんばりで +1%）。\n\n【なんのために？】\n・なにもしなくても ふえる しくみは、おてつだいの やる気に つながりにくいため。\n・タネ貯金に まとめて、「あずけて まつ」と「がんばる」の 2つで ふえる かたちに しました。\n\n【きをつけて】\n・これまでの 利子で ふえた ぶんは、そのまま のこります。"},
   {id:"n35", e:"🔁", t:"おなじ おてつだいは 1日に なんども おせません", b:"【なにが かわった？】\n同じ おてつだいを、1日に なんども おせない ように しました。\n\n【れい】\n・学校へ行く・お風呂を洗う・朝 起きる・ベッドメイク・パジャマ・ゴミの日…：1日 1回\n・洗濯物ほし・お米を炊く：1日 2回（休日は 洗濯物ほしを ふたりとも 2回ずつ）\n・テーブルふき・ゴミ袋セット：1日 3回まで\n・一部屋 掃除機：1日 5回まで\n・ルンバのゴミ・自分で 起きる：1日 1回\n・ゴミ袋（大・小）・ゴミひろい・猫の うんち取り と はいたものの 片づけ・靴ならべ・皿あらい（食洗機）・自分の かわいた 洗濯物の かたづけ は、やった 回数だけ 何回でも OK（体を 動かした ぶんだけ おして ください）\n・お風呂洗い と お風呂を洗う は「同じ お風呂」なので 2つ あわせて 1日 1回\n・日課と、同じ 家事の おてつだい項目は、あわせて 数えます（上限が ある 項目だけ）。\n・おしすぎると「きょうは ○回まで だよ」と 出ます。\n\n【なんのために？】\n・毎日 その日の うちに 1回ずつ つける 習慣を つけるため（タイムカードと おなじ です）。\n・おしすぎて ポイントが ふえすぎたり、「前の日の ぶん」を あとから まとめて 入れたり する ことを ふせぐため。\n・じっさいの 記録では、「学校へ行く」を 1日に 20回、「お風呂を洗う」を 1日に 20回 おしている 日が ありました。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「1日の回数の上限をそろえる」で 反映します。表で 項目ごとの 上限を 確認できます。「上限を元に戻す」で 戻せます。\n・自分で 決めた 上限が ある 項目は 変えません。上限は 項目の ✏ 編集 からも 変えられます。"},
   {id:"n34", e:"🎁", t:"ごほうびの ねだんが 3pt＝1円に そろいました", b:"【なにが かわった？】\nごほうびの ねだん（ポイント）が、3pt＝1円に あわせて かわりました。\n\n【れい】\n・スマホ 30分：200pt → 150pt\n・Netflix 30分・YouTube 30分・ゲーム 30分：200pt → 150pt\n・好きなお菓子 いっこ：200pt → 150pt\n・スイッチオンライン代：200pt → 150pt\n・送迎（片道）：100pt → 75pt\n・500円こうかん：2,000pt → 1,500pt（さきに かわっています）\n\n【なんのために？】\n・前は 4pt＝1円 でした。3pt＝1円に かわって、ポイントの 価値が 上がったので、ごほうびの ねだんも おなじ「円ぶん」に そろえました。\n・そろえないと、お金に かえる ほうが とくに なってしまい、ごほうびを えらびにくく なるからです。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「ごほうびの値段を 3pt＝1円に そろえる」で 反映します。「値段を元に戻す」で 戻せます。500円交換は 変わりません。"},
   {id:"n33", e:"💬", t:"画面が LINE のような 見た目に なりました", b:"【なにが かわった？】\nアプリの 見た目を、LINEのように 明るくて さわりやすい 形に しました。\n・いちばん 上に、じぶんの 名前と ポイントと「≒○円」が 大きく 出ます。\n・その下の まるい ボタンで、「やくそく（あと ○こ）」「おてつだい」「こうかん」「タネ貯金（もくひょう）」に すぐ 行けます。まいにち つかうものを、いちばん 近くに おきました。\n・「おしらせ」は 上の 🔔（あたらしい おしらせが あると 赤い点）に 引っこしました。\n・「おくる」は ふだん 使わないので、ふだんは かくしています（おうちの人が ⚙ →「見た目」で 出せます）。\n・ページを かえる ボタンは、画面の いちばん下に 固定されました（毎日・活動・ためる・記録）。\n・ページの なまえは、上の まんなかに 出ます。\n\n【なんのために？】\n・毎日 ひらく アプリは、ふだん つかう LINEと おなじ ような 形の ほうが まよいません。\n・ポイントと お金（円）を、いちばん 目に 入る ところに おいて、いくら あるか すぐ わかるように するため です。\n\n【おうちの人へ】\n・内容（ポイント・日課・タネ貯金など）は 何も かわりません。見た目だけの 変更です。\n・もとの 暗い ゲーム風の 見た目に 戻したい ときは、⚙ →「見た目」で 切りかえられます（家族みんなに 反映）。"},
@@ -3978,53 +3979,10 @@ function SettingsModal({data, update, onClose, currentMemberId}) {
           {/* ── メンバー管理タブ ── */}
           {settingsTab==="interest"&&(
             <div>
-              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 16px"}}>週次利子の設定</p>
-              {/* 利子ON/OFF */}
-              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:800,fontSize:14,color:TEXT}}>利子システム</div>
-                  <div style={{color:MUTED,fontSize:11,marginTop:2}}>週1回、残高に利子を付与</div>
-                </div>
-                <button onClick={()=>update(d=>({...d,interestEnabled:!d.interestEnabled}))}
-                  style={{position:"relative",width:48,height:26,borderRadius:13,background:data.interestEnabled?G:BORDER,border:"none",cursor:"pointer",transition:"background .2s"}}>
-                  <div style={{position:"absolute",top:3,left:data.interestEnabled?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
-                </button>
-              </div>
-              {/* 利率設定 */}
-              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
-                <div style={{fontWeight:800,fontSize:14,color:TEXT,marginBottom:8}}>利率</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-                  {[1,2,3,5,10].map(r=>(
-                    <button key={r} onClick={()=>update(d=>({...d,interestRate:r/100}))}
-                      style={{padding:"6px 14px",border:`1.5px solid ${Math.round((data.interestRate||0.01)*100)===r?G:BORDER}`,
-                        borderRadius:10,background:Math.round((data.interestRate||0.01)*100)===r?`${G}20`:"transparent",
-                        color:Math.round((data.interestRate||0.01)*100)===r?G:MUTED,
-                        fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:F}}>
-                      {r}%
-                    </button>
-                  ))}
-                </div>
-                <div style={{fontSize:12,color:MUTED}}>
-                  現在の利率：<span style={{fontWeight:800,color:G}}>{Math.round((data.interestRate||0.01)*100)}%</span>
-                </div>
-              </div>
-              {/* 対象メンバー別残高と予想利子 */}
-              <div style={{background:BG,borderRadius:14,padding:"12px 14px",border:`1.5px solid ${BORDER}`}}>
-                <p style={{color:MUTED,fontSize:11,fontWeight:700,margin:"0 0 8px"}}>次回付与予定（参考）</p>
-                {[...data.children,...(data.parents||[])].map(m=>{
-                  const b=bal(data.logs,m.id);
-                  const interest=data.interestEnabled&&b>0?Math.floor(b*(data.interestRate||0.01)):0;
-                  return(
-                    <div key={m.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                      <Emo e={m.emoji} size={18}/>
-                      <div style={{flex:1,fontWeight:700,fontSize:12,color:TEXT}}>{m.name}</div>
-                      <div style={{fontSize:12,color:MUTED}}>{b.toLocaleString()}pt<YenNote pts={b} sz={10.5}/></div>
-                      <div style={{fontSize:12,fontWeight:700,color:interest>0?G:MUTED}}>
-                        {interest>0?`+${interest}pt`:"−"}
-                      </div>
-                    </div>
-                  );
-                })}
+              <p style={{color:MUTED,fontSize:12,fontWeight:800,margin:"0 0 16px"}}>週次利子（廃止しました）</p>
+              <div style={{background:CARD,border:`1.5px solid ${BORDER}`,borderRadius:14,padding:"14px 16px",fontSize:12.5,color:TEXT,lineHeight:1.8}}>
+                毎週、残高に付く「週次利子」は なくしました。<br/>
+                ふやしたいときは「🌱 タネ貯金」を つかいます（月末に 4%、がんばると +1%）。
               </div>
             </div>
           )}
@@ -8091,6 +8049,7 @@ function SortBar({options,value,onChange}){
 
 // ── Interest System ───────────────────────────────────
 function applyInterest(data,update,cid){
+  return; // 週次利子は廃止(2026-11-27)。タネ貯金の月利だけが残る
   if(!data.interestEnabled||!data.interestRate) return;
   const today=todayKey();
   // 付与判定・残高計算・付与日記録をすべて update の中(最新のd)で原子的に行う＝
