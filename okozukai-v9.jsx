@@ -1686,6 +1686,8 @@ const BG    = "#F7F5EF";
 const BG2   = "#FCFBF8";
 const CARD  = "#FFFFFF";
 const CARDS = "#F2EFE7";
+// LINE風の見た目で使う、明るい背景と区切り線の色(色を変えるときはここ)
+const LINE_BG = "#F2F3F5", LINE_LINE = "#E5E7EB";
 const GP    = "#187A4E";   // green-primary
 const G     = "#34C77B";   // green-bright（CTA）
 const GS    = "#DDF3E7";   // green-soft
@@ -4855,7 +4857,6 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   // タブ画像の事故時フォールバック（全タブ🐣化＝IA崩壊を防ぐ・タブごとに個別の絵文字）
   const TAB_FB = {daily:"☀",activity:"✅",money:"🌱",learn:"📖",more:"🏅",tasks:"✅",goals:"🎯"};
   const lineUI = (data.familySettings||{}).uiStyle !== "classic";   // LINE風の見た目(設定でもとに戻せる)
-  const LINE_BG = "#F2F3F5", LINE_LINE = "#E5E7EB";
   const lightUI = isJunior || lineUI;
   const darkBG = !isJunior && !lineUI; // teen/adultはダークモード(LINE風のときは明るい)
 
