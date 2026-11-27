@@ -3152,6 +3152,11 @@ function PointDesignSection({data, update}){
   return(
     <div style={{background:CARD,border:`2px solid ${GOLD}`,borderRadius:14,padding:"12px 14px",marginBottom:16}}>
       <p style={{margin:"0 0 6px",fontWeight:900,fontSize:13,color:TEXT}}>🌱 新ポイント設計の適用（2026-11-26）</p>
+      {(()=>{ const kb=Math.round((_saveHealth.bytes||0)/1024); const pct=Math.round((_saveHealth.bytes||0)/900000*100); const bad=!_saveHealth.ok||_saveHealth.failStreak>0; const ver=(()=>{try{return document.querySelector('meta[name="tane-version"]').content;}catch(e){return "?";}})(); return (
+        <div style={{background:bad?RS:GS,border:`1.5px solid ${bad?R:G}`,borderRadius:12,padding:"8px 11px",margin:"0 0 10px",fontSize:11.5,lineHeight:1.7,color:TEXT}}>
+          <div style={{fontWeight:900}}>☁️ 保存の状態: {bad?"⚠️ 保存に失敗しています（設定が他の端末に届かない状態）":"ふつう"}</div>
+          <div style={{color:TEXTS}}>データ量 {kb.toLocaleString()}KB（上限の約{pct}%）{_saveHealth.near&&!bad?" ⚠️ 上限に近づいています":""} ／ アプリの版 {ver}</div>
+        </div>); })()}
       {applied&&!needV2?(
         <div>
           <p style={{margin:"0 0 8px",fontSize:12,color:TEXTS,lineHeight:1.7}}>適用ずみ（{String(applied.appliedAt||"").slice(0,10)}）。兄={nameOf(applied.broId)} / 妹={nameOf(applied.sisId)}</p>
@@ -3176,12 +3181,6 @@ function PointDesignSection({data, update}){
                 <p style={{margin:"6px 0 0",fontSize:10.5,color:MUTED}}>預けているポイントがあるため、子どもの画面からは外せません。</p>
               </div>
             ):btn(GP,"タネ貯金を始める",()=>{ if(window.confirm("妹と兄でタネ貯金を始めます。いまの週次利子はOFFになります。よろしいですか？")){ update(tcStart); } })}
-          </div>
-          <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
-            {(()=>{ const kb=Math.round((_saveHealth.bytes||0)/1024); const pct=Math.round((_saveHealth.bytes||0)/900000*100); const bad=!_saveHealth.ok||_saveHealth.failStreak>0; return (
-              <p style={{margin:0,fontSize:11,lineHeight:1.7,color:bad?R:(_saveHealth.near?"#9a7000":MUTED),fontWeight:bad||_saveHealth.near?800:600}}>
-                ☁️ 保存の状態: {bad?"⚠️ 保存に失敗しています（設定が他の端末に届かない状態）":"ふつう"}／ データ量 {kb.toLocaleString()}KB（上限の約{pct}%）{_saveHealth.near&&!bad?" ⚠️ 上限に近づいています":""}
-              </p>); })()}
           </div>
           <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
             <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🔁 1日の回数の上限をそろえる</p>
