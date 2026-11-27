@@ -303,7 +303,7 @@ function _slimForCloud(d){
 }
 function _cloudPersist(d) {
   const code = getFamilyCode()||"default";
-  const saveD = _slimForCloud(d);
+  const saveD = {..._slimForCloud(d), _meta:{ver:(()=>{try{return document.querySelector('meta[name="tane-version"]').content;}catch(e){return "?";}})(), dev:(()=>{try{return (/iPhone|iPad|Android|Macintosh|Windows/.exec(navigator.userAgent)||["?"])[0];}catch(e){return "?";}})()}};   // 最後に保存した端末の版(古い端末の書き戻しを見つけるため。時刻は入れない=同じ内容なら再保存しない)
   const json = JSON.stringify(saveD);
   // 1. コード固有のローカルストレージ（他コードと分離）。両方失敗＝この端末に保存できない＝健全性へ通知。
   let localOk=false;
@@ -1559,6 +1559,7 @@ function migrate(d) {
     d.pinChanged=changed;
   }
   d = pdHeal(d);   // お手伝い項目が古い端末の保存で元に戻っていたら、新ポイント設計を入れ直す
+  d = oshiAutoClose(d);   // 推し株(買った株)が残っていれば、買った値段のポイントに払い戻して終了(株のデータが後から届いても働く)
   return d;
 }
 
@@ -2922,6 +2923,8 @@ function tcMove(d,cid,kind,amt,eid,now){
 const tcSetMode = (d,cid,mode) => { const a=tcAcct(d,cid); return a.mode===mode?d:tcSave(d,cid,{...a,mode}); };
 // ── 🌟推し株を おわりにして、いま持っている分を「買った値段」で払い戻す ──
 function oshiHoldingsCost(d,cid){ return ((d.holdings||{})[cid]||[]).reduce((a,h)=>a+Math.round((+h.avgPrice||0)*(+h.qty||0)),0); }
+function oshiPending(d){ return (d.children||[]).some(c=>(((d.holdings||{})[c.id])||[]).length>0); }
+function oshiAutoClose(d){ return oshiPending(d)?oshiClose(d):d; }
 function oshiClose(d){
   const refunds={}; const adds=[]; const holdings={...(d.holdings||{})}; const prev={};
   (d.children||[]).forEach(c=>{
@@ -3135,7 +3138,7 @@ function PointDesignSection({data, update}){
   const nameOf = id=>(kids.find(c=>c.id===id)||{}).name||"未選択";
   const download = ()=>{
     try{
-      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{},_state:{saveHealth:{ok:_saveHealth.ok,near:_saveHealth.near,bytes:_saveHealth.bytes,failStreak:_saveHealth.failStreak},pointDesign2026:data.pointDesign2026||null,pointDesign2026Daily:data.pointDesign2026Daily||null,pointDesign2026LimitsBackup:data.pointDesign2026LimitsBackup?"あり":null,pointDesign2026RewardsBackup:data.pointDesign2026RewardsBackup?"あり":null,pointDesign2026CleanupBackup:data.pointDesign2026CleanupBackup?"あり":null,oshiClosed:data.oshiClosed||null,pdHealedAt:data.pdHealedAt||null,taneChokin:data.taneChokin||null,familySettings:data.familySettings||{},dailyTaskSets:data.dailyTaskSets||[],activeSetIds:data.activeSetIds||[],interestEnabled:data.interestEnabled,exportedAt:new Date().toISOString()}},null,2)],{type:"application/json"});
+      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{},_state:{saveHealth:{ok:_saveHealth.ok,near:_saveHealth.near,bytes:_saveHealth.bytes,failStreak:_saveHealth.failStreak},pointDesign2026:data.pointDesign2026||null,pointDesign2026Daily:data.pointDesign2026Daily||null,pointDesign2026LimitsBackup:data.pointDesign2026LimitsBackup?"あり":null,pointDesign2026RewardsBackup:data.pointDesign2026RewardsBackup?"あり":null,pointDesign2026CleanupBackup:data.pointDesign2026CleanupBackup?"あり":null,oshiClosed:data.oshiClosed||null,pdHealedAt:data.pdHealedAt||null,taneChokin:data.taneChokin||null,familySettings:data.familySettings||{},dailyTaskSets:data.dailyTaskSets||[],activeSetIds:data.activeSetIds||[],interestEnabled:data.interestEnabled,lastWriter:data._meta||null,exportedAt:new Date().toISOString()}},null,2)],{type:"application/json"});
       const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`tane-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
     }catch(e){ alert("書き出しに失敗しました"); }
   };
@@ -3156,6 +3159,7 @@ function PointDesignSection({data, update}){
         <div style={{background:bad?RS:GS,border:`1.5px solid ${bad?R:G}`,borderRadius:12,padding:"8px 11px",margin:"0 0 10px",fontSize:11.5,lineHeight:1.7,color:TEXT}}>
           <div style={{fontWeight:900}}>☁️ 保存の状態: {bad?"⚠️ 保存に失敗しています（設定が他の端末に届かない状態）":"ふつう"}</div>
           <div style={{color:TEXTS}}>データ量 {kb.toLocaleString()}KB（上限の約{pct}%）{_saveHealth.near&&!bad?" ⚠️ 上限に近づいています":""} ／ アプリの版 {ver}</div>
+          <div style={{color:TEXTS}}>最後に保存した端末: {data._meta?`${data._meta.dev}・版 ${data._meta.ver}${data._meta.ver!==ver?"（この画面と違う版）":""}`:"（記録なし＝古い版が最後に保存した可能性）"}</div>
         </div>); })()}
       {applied&&!needV2?(
         <div>
@@ -3168,7 +3172,7 @@ function PointDesignSection({data, update}){
             <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>📅 毎日の日課に「平日用／休日用」を入れる</p>
             <p style={{margin:"0 0 8px",fontSize:11,color:TEXTS,lineHeight:1.7}}>平日用は 妹: 食洗機(夕食後)・テーブルかお風呂・洗濯干し／兄: 食洗機(帰宅後)・猫のうんち。兄が「今日は部活なし」を押すと妹と同じ分担になります。休日用は 洗濯干しと食洗機を ふたりとも2回ずつ、お風呂・掃除機・猫のうんちは兄。祝日は休日用になります。いまの日課セットは保存され、あとで戻せます。</p>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {btn(GP,data.pointDesign2026Daily?"日課セットを入れ直す":"日課セットを入れる",()=>{ if(window.confirm("毎日の日課を「平日用／休日用」に切り替えます。いまのセットは残り、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdDailyApply); } })}
+              {btn(GP,(data.pointDesign2026Daily||(data.dailyTaskSets||[]).some(x=>x.id==="pd_wd"))?"日課セットを入れ直す":"日課セットを入れる",()=>{ if(window.confirm("毎日の日課を「平日用／休日用」に切り替えます。いまのセットは残り、あとで戻せます。よろしいですか？")){ markLocalDefEdit(); update(pdDailyApply); } })}
               {data.pointDesign2026Daily&&btn(R,"日課を元に戻す",()=>{ if(window.confirm("日課を切り替え前に戻します。戻しますか？")){ markLocalDefEdit(); update(pdDailyRestore); } })}
             </div>
           </div>
@@ -4828,7 +4832,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const todayTaskDone = myLogs.some(l=>l.type==="good"&&isTodayLocal(l.date));
 
   // Apply interest on open
-  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); update(d=>tcRoll(d,child.id)); markLocalUserDataEdit('holdings'); update(d=>d.oshiClosed?d:oshiClose(d)); },[]);
+  useEffect(()=>{ applyInterest(data,update,child.id); applyHoldingBonus(data,update,child.id); fetchRealStockPrices(data,update); update(d=>tcRoll(d,child.id)); },[]);
 
   const showFlash = (pts, emoji) => {
     taneHaptic(pts>=0?"success":"warn");
