@@ -77,7 +77,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
   <button class="print" onclick="window.print()">🖨 印刷する</button>
 </header>
 <nav><div class="in">
-  <a href="#s1">1 ポイント</a><a href="#s2">2 まいにち</a><a href="#s3">3 ふやす</a><a href="#s4">4 れんぞく</a><a href="#s5">5 こうかん</a><a href="#s6">6 タネ貯金</a><a href="#s7">7 画面</a><a href="#how">8 やりかた</a><a href="#s9">9 Q&amp;A</a><a href="#s8">おうちの人へ</a>
+  <a href="#s1">1 ポイント</a><a href="#s2">2 まいにち</a><a href="#s3">3 ふやす</a><a href="#s4">4 れんぞく</a><a href="#s5">5 こうかん</a><a href="#s6">6 タネ貯金</a><a href="#s7">7 画面</a><a href="#timecard">🕒 タイムカード</a><a href="#how">8 やりかた</a><a href="#s9">9 Q&amp;A</a><a href="#s8">おうちの人へ</a>
 </div></nav>
 <div class="wrap">
 
@@ -133,7 +133,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
     </table>
     <div class="t" style="margin-top:10px">休日・祝日</div>
     <table>
-      <tr><td style="width:84px"><b>ふたり</b></td><td>🍽 食洗機 1人 1回 ／ 👔 洗濯物ほし 1人 1回ぶん</td></tr>
+      <tr><td style="width:84px"><b>ふたり</b></td><td>🍽 食洗機 <b>1人 2回</b> ／ 👔 洗濯物ほし <b>1人 2回</b>（ふたりとも 2回ずつ）</td></tr>
       <tr><td><b>🏓 兄</b></td><td>🛁 お風呂あらい ／ 🧹 そうじき（1部屋）／ 🐱 猫の うんち（2回）</td></tr>
       <tr><td><b>🌸 妹</b></td><td>🧻 テーブルふき</td></tr>
     </table>
@@ -344,9 +344,33 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
     <tr><th>どこ？</th><th>何が 見える？</th></tr>
     <tr><td>📋 まいにち</td><td>今日の 日課・やくそく・🔥れんぞく・🏓部活なしボタン</td></tr>
     <tr><td>✅ やること／活動</td><td>おてつだいを タップして 記録</td></tr>
-    <tr><td>🌱 ためる</td><td>🎯もくひょう・🎁こうかん・🌱タネ貯金・🌟推し株</td></tr>
+    <tr><td>🌱 ためる</td><td>🎯もくひょう・🎁こうかん・🌱タネ貯金<small>（🌟推し株は おしまい）</small></td></tr>
     <tr><td>📢 おしらせ</td><td>あたらしい 機能の 図つき せつめい</td></tr>
   </table>
+</section>
+
+<!-- タイムカード -->
+<section id="timecard">
+  <h2><span class="no">🕒</span>きょうの ぶんは きょう（タイムカード）</h2>
+  <p class="lead">ポイントは、<b>その日の うちに</b> つけます。きのうの ぶんを あとから つけることは できません。</p>
+  <div class="fig">
+    <div class="t">🕒 まいにちの ながれ</div>
+    <div class="row">
+      <div class="box">月曜 0:00<small>きょうの 記録 スタート</small></div>
+      <div class="arrowr">⇨</div>
+      <div class="box gold">月曜 24:00<small>タイムカード しめきり</small></div>
+      <div class="arrowr">⇨</div>
+      <div class="box gray">火曜<small>月曜ぶんは つけられない</small></div>
+    </div>
+  </div>
+  <h3>なんのために？</h3>
+  <table>
+    <tr><td style="width:28px">①</td><td><b>しゃかいの ルールと おなじ。</b>会社では、タイムカードを その日の うちに おさないと、はたらいた ことに ならない ことが あります。</td></tr>
+    <tr><td>②</td><td><b>きりが なくなるから。</b>「1週間 前の ぶんを あとから いれる」を はじめると、何が ほんとうか わからなく なります。</td></tr>
+    <tr><td>③</td><td><b>毎日 つづける ほうが 大切。</b>わすれた 日が あっても ばつは ありません。つぎの日 また がんばれば だいじょうぶ。</td></tr>
+  </table>
+  <div class="note">🙋 100pt以上の「しんせい中」は、おうちの人が 翌日に OKしても、記録は 子どもが 押した日の ぶんに なります。</div>
+  <div class="ok">🤝 どうしても 特別な ときは、おうちの人が「ポイント付与」で わたす ことが できます（ふつうの 記録とは べつ）。</div>
 </section>
 
 <!-- 操作ガイド -->
@@ -456,6 +480,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
     <h4>🔒 げんきんの 月の 上限・承認の しきい値を 変える</h4>
     <div class="path"><span class="p">⚙</span><i>›</i><span class="p">✅ 承認まち</span><i>›</i><span class="p">下へ スクロール</span></div>
     <ol><li>「大きいポイントだけ承認」で、何pt 以上を 承認に するか（初期 100pt）。</li><li>子どもごとの「げんきん 月の上限（円）」と「今月のこり」。</li></ol>
+  </div>
+  <div class="guide">
+    <h4>🌟 推し株を おわりにして 払い戻す</h4>
+    <div class="path"><span class="p">⚙</span><i>›</i><span class="p">📝 お手伝い項目</span><i>›</i><span class="p">「推し株をおわりにして払い戻す」</span></div>
+    <ol><li>押す前に、子どもごとの 払い戻し額が 出ます。</li><li>持っている株は <b>買ったときの値段</b> で ポイントに もどり、「ためる」から 推し株が きえます。</li><li><b>元には 戻せません</b>（払い戻しの ログが 残ります）。</li></ol>
   </div>
   <div class="guide">
     <h4>🎁 ポイントを あげる／お手伝い項目・ごほうびを 変える</h4>
