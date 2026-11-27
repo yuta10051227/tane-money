@@ -145,6 +145,13 @@ const SAVE_BYTE_WARN = 820000;          // 約820KBで警告(900KBの安全弁�
 let _saveHealth = {ok:true, near:false, bytes:0, failStreak:0};
 let _saveHealthCb = null;
 function setSaveHealthCb(cb){ _saveHealthCb=cb; if(cb) cb(_saveHealth); }
+// 新ポイント設計などの「適用ずみ」の印(フラグ)。同期(起動時・受信時)で、片方にしか無いときは消さずに残す＝ボタンが何度も出直さない
+const PD_FLAG_KEYS = ["pointDesign2026","pointDesign2026Backup","pointDesign2026Daily","pointDesign2026CleanupBackup","pointDesign2026LimitsBackup","pointDesign2026RewardsBackup","oshiClosed","pdHealedAt"];
+function keepPdFlags(target, other){
+  if(!target||!other) return target;
+  PD_FLAG_KEYS.forEach(k=>{ if(target[k]===undefined && other[k]!==undefined) target[k]=other[k]; });
+  return target;
+}
 function reportSaveHealth(patch){ _saveHealth={..._saveHealth,...patch}; if(_saveHealthCb) _saveHealthCb(_saveHealth); }
 function byteLen(str){ try{ return (typeof Blob!=="undefined")?new Blob([str]).size:Math.round((str||"").length*1.4); }catch(e){ return (str||"").length; } }
 const _processedApprovalIds=new Set(); // 承認/却下済みIDをセッション中保持（同期で復活を防ぐ）
@@ -531,6 +538,7 @@ function startRealtimeSync(updateFn){
             // 1日のバトル回数: 今日の分は多い方を採用＝同期巻き戻しで上限を超えられないように
             if(prev.battleCountDay){merged.battleCountDay={...(merged.battleCountDay||{})};const _td=todayKey();Object.keys(prev.battleCountDay).forEach(cid=>{const p=prev.battleCountDay[cid]||{},m=merged.battleCountDay[cid]||{};const pT=p.date===_td,mT=m.date===_td;if(pT&&mT)merged.battleCountDay[cid]={date:_td,n:Math.max(p.n||0,m.n||0)};else if(pT)merged.battleCountDay[cid]=p;else if(!mT)merged.battleCountDay[cid]=p;});}
             if(prev.streak) merged.streak=prev.streak;
+            keepPdFlags(merged, prev);   // 適用ずみの印が片方にしか無ければ残す
             // タネ貯金: 口座は更新回数(rev)が多い方、設定(ON/基準pt)はsrevが新しい方を採用＝同期の巻き戻しでポイントが増減しない
             if(prev.taneChokin){const pt=prev.taneChokin,mt=merged.taneChokin||{};const ac={...(mt.accounts||{})};Object.keys(pt.accounts||{}).forEach(cid=>{if(((pt.accounts[cid]||{}).rev||0)>=((ac[cid]||{}).rev||0))ac[cid]=pt.accounts[cid];});merged.taneChokin={...((pt.srev||0)>=(mt.srev||0)?pt:mt),accounts:ac};}
             // やくそく連続: lastが新しい方(同日なら連続が多い方)を採用＝同期の巻き戻しでボーナスを二重に出さない
@@ -1145,6 +1153,22 @@ function pdApply(d, sisId, broId){
   return {...d, goodTasks:good, badTasks:bad, rewards, myTaskIds:my, familySettings:fs,
     pointDesign2026:{appliedAt:(d.pointDesign2026||{}).appliedAt||new Date().toISOString(), version:2, sisId, broId}, pointDesign2026Backup:bak};
 }
+// ── 自動復元(2026-11-27): 古い端末の保存でお手伝い項目だけ元に戻っても、割当(myTaskIds)に新しい項目があれば、新ポイント設計を入れ直す ──
+// 原因の想定: 長く開いていない端末が古いデータを書き戻す。「適用前に戻す」を押した場合は割当も戻るので、この処理は働かない
+function pdHeal(d){
+  const have=new Set((d.goodTasks||[]).map(t=>t.id));
+  if(!PD_NEW_TASKS.some(t=>!have.has(t.id))) return d;
+  const my=d.myTaskIds||{};
+  const assigned=new Set(Object.entries(my).filter(([k])=>k!=="_stock").flatMap(([,v])=>v||[]));
+  const signal=PD_NEW_TASKS.filter(t=>assigned.has(t.id)).length>=10;
+  if(!signal) return d;
+  const pd=d.pointDesign2026||{};
+  const keys=Object.keys(my).filter(k=>k!=="_stock");
+  const sis=pd.sisId||keys.find(k=>(my[k]||[]).includes("g40"));
+  const bro=pd.broId||keys.find(k=>(my[k]||[]).includes("g46"));
+  if(!sis||!bro) return d;
+  return {...pdApply(d,sis,bro),pdHealedAt:new Date().toISOString()};
+}
 function pdRestore(d){
   const b = d.pointDesign2026Backup;
   if(!b) return d;
@@ -1534,6 +1558,7 @@ function migrate(d) {
     (d.children||[]).forEach(c=>{changed[c.id]=true;});
     d.pinChanged=changed;
   }
+  d = pdHeal(d);   // お手伝い項目が古い端末の保存で元に戻っていたら、新ポイント設計を入れ直す
   return d;
 }
 
@@ -2267,7 +2292,7 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
-  {id:"n35", e:"🔁", t:"おなじ おてつだいは 1日に なんども おせません", b:"【なにが かわった？】\n同じ おてつだいを、1日に なんども おせない ように しました。\n\n【れい】\n・学校へ行く・お風呂を洗う・朝 起きる・ベッドメイク・パジャマ・ゴミの日…：1日 1回\n・洗濯物ほし・お米を炊く：1日 2回（休日は 洗濯物ほしを ふたりとも 2回ずつ）\n・テーブルふき・掃除機・ゴミ袋セット：1日 3回まで\n・ゴミひろい・猫の うんち取り・靴ならべ・皿あらい（食洗機）は、やった 回数だけ 何回でも OK（体を 動かした ぶんだけ おして ください）\n・お風呂洗い と お風呂を洗う は「同じ お風呂」なので 2つ あわせて 1日 1回\n・日課と、同じ 家事の おてつだい項目は、あわせて 数えます（上限が ある 項目だけ）。\n・おしすぎると「きょうは ○回まで だよ」と 出ます。\n\n【なんのために？】\n・毎日 その日の うちに 1回ずつ つける 習慣を つけるため（タイムカードと おなじ です）。\n・おしすぎて ポイントが ふえすぎたり、「前の日の ぶん」を あとから まとめて 入れたり する ことを ふせぐため。\n・じっさいの 記録では、「学校へ行く」を 1日に 20回、「お風呂を洗う」を 1日に 20回 おしている 日が ありました。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「1日の回数の上限をそろえる」で 反映します。表で 項目ごとの 上限を 確認できます。「上限を元に戻す」で 戻せます。\n・自分で 決めた 上限が ある 項目は 変えません。上限は 項目の ✏ 編集 からも 変えられます。"},
+  {id:"n35", e:"🔁", t:"おなじ おてつだいは 1日に なんども おせません", b:"【なにが かわった？】\n同じ おてつだいを、1日に なんども おせない ように しました。\n\n【れい】\n・学校へ行く・お風呂を洗う・朝 起きる・ベッドメイク・パジャマ・ゴミの日…：1日 1回\n・洗濯物ほし・お米を炊く：1日 2回（休日は 洗濯物ほしを ふたりとも 2回ずつ）\n・テーブルふき・ゴミ袋セット：1日 3回まで\n・一部屋 掃除機：1日 5回まで\n・ルンバのゴミ・自分で 起きる：1日 1回\n・ゴミ袋（大・小）・ゴミひろい・猫の うんち取り と はいたものの 片づけ・靴ならべ・皿あらい（食洗機）・自分の かわいた 洗濯物の かたづけ は、やった 回数だけ 何回でも OK（体を 動かした ぶんだけ おして ください）\n・お風呂洗い と お風呂を洗う は「同じ お風呂」なので 2つ あわせて 1日 1回\n・日課と、同じ 家事の おてつだい項目は、あわせて 数えます（上限が ある 項目だけ）。\n・おしすぎると「きょうは ○回まで だよ」と 出ます。\n\n【なんのために？】\n・毎日 その日の うちに 1回ずつ つける 習慣を つけるため（タイムカードと おなじ です）。\n・おしすぎて ポイントが ふえすぎたり、「前の日の ぶん」を あとから まとめて 入れたり する ことを ふせぐため。\n・じっさいの 記録では、「学校へ行く」を 1日に 20回、「お風呂を洗う」を 1日に 20回 おしている 日が ありました。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「1日の回数の上限をそろえる」で 反映します。表で 項目ごとの 上限を 確認できます。「上限を元に戻す」で 戻せます。\n・自分で 決めた 上限が ある 項目は 変えません。上限は 項目の ✏ 編集 からも 変えられます。"},
   {id:"n34", e:"🎁", t:"ごほうびの ねだんが 3pt＝1円に そろいました", b:"【なにが かわった？】\nごほうびの ねだん（ポイント）が、3pt＝1円に あわせて かわりました。\n\n【れい】\n・スマホ 30分：200pt → 150pt\n・Netflix 30分・YouTube 30分・ゲーム 30分：200pt → 150pt\n・好きなお菓子 いっこ：200pt → 150pt\n・スイッチオンライン代：200pt → 150pt\n・送迎（片道）：100pt → 75pt\n・500円こうかん：2,000pt → 1,500pt（さきに かわっています）\n\n【なんのために？】\n・前は 4pt＝1円 でした。3pt＝1円に かわって、ポイントの 価値が 上がったので、ごほうびの ねだんも おなじ「円ぶん」に そろえました。\n・そろえないと、お金に かえる ほうが とくに なってしまい、ごほうびを えらびにくく なるからです。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「ごほうびの値段を 3pt＝1円に そろえる」で 反映します。「値段を元に戻す」で 戻せます。500円交換は 変わりません。"},
   {id:"n33", e:"💬", t:"画面が LINE のような 見た目に なりました", b:"【なにが かわった？】\nアプリの 見た目を、LINEのように 明るくて さわりやすい 形に しました。\n・いちばん 上に、じぶんの 名前と ポイントと「≒○円」が 大きく 出ます。\n・その下の まるい ボタンで、「やくそく（あと ○こ）」「おてつだい」「こうかん」「タネ貯金（もくひょう）」に すぐ 行けます。まいにち つかうものを、いちばん 近くに おきました。\n・「おしらせ」は 上の 🔔（あたらしい おしらせが あると 赤い点）に 引っこしました。\n・「おくる」は ふだん 使わないので、ふだんは かくしています（おうちの人が ⚙ →「見た目」で 出せます）。\n・ページを かえる ボタンは、画面の いちばん下に 固定されました（毎日・活動・ためる・記録）。\n・ページの なまえは、上の まんなかに 出ます。\n\n【なんのために？】\n・毎日 ひらく アプリは、ふだん つかう LINEと おなじ ような 形の ほうが まよいません。\n・ポイントと お金（円）を、いちばん 目に 入る ところに おいて、いくら あるか すぐ わかるように するため です。\n\n【おうちの人へ】\n・内容（ポイント・日課・タネ貯金など）は 何も かわりません。見た目だけの 変更です。\n・もとの 暗い ゲーム風の 見た目に 戻したい ときは、⚙ →「見た目」で 切りかえられます（家族みんなに 反映）。"},
   {id:"n32", e:"🌟", t:"「推し株」は おしまい（買った分は ポイントに もどりました）", b:"【なにが かわった？】\n「ためる」の中の「🌟 推し株」は、おしまいに なりました。\n\n【もっていた 株は どうなった？】\n・もっていた 株は、買った ときの ねだん で、アプリを ひらいた ときに 自動で ポイントに もどりました。\n　れい：100pt で 2かぶ ＋ 55pt で 1かぶ 買っていた → 255pt（約85円）が もどる\n・ねあがり・ねさがりは 出していません。「買った ぶん」だけ ぜんぶ かえってきます。\n・もどった ポイントは、そのまま ごほうびや タネ貯金に つかえます。\n\n【なんのために？】\n・タネ貯金の ほうが、ふえるしくみが かんたんで、わかりやすいから。\n・ねさがりで ポイントが へって、ガッカリする ことを なくすため。\n\n【おうちの人へ】\n・払い戻しは、このアップデート後に 最初に 子どもの画面を ひらいた ときに、1回だけ 自動で 行われます（二重には 戻りません）。\n・内容は 設定「お手伝い項目」の新ポイント設計カードの「推し株」の欄で 確認できます。"},
@@ -2916,16 +2941,16 @@ function oshiClose(d){
 // ── 1日の回数の上限(2026-11-27): 実記録で、学校へ行く・お風呂洗いなどが1日に20回押されていた(過去ぶんをまとめて入れる使い方)ため ──
 // 自然に「1日1回」の家事は1。実際に複数回ありうるもの(食洗機=休日は2回ずつ、ゴミ袋セット、おむつ等)は現実的な回数。grp=同じ家事の別項目は合算
 const PD_LIMITS = {
-  g02:{dailyMax:1}, g03:{dailyMax:2}, g04:{dailyMax:2}, g06:{dailyMax:1}, g07:{dailyMax:2}, g08:{dailyMax:3},
+  g04:{dailyMax:2}, g06:{dailyMax:1}, g07:{dailyMax:2},
   g09:{dailyMax:1,grp:"bath"}, ykxwxnhs:{dailyMax:1,grp:"bath"},
-  g14:{dailyMax:2}, g15:{dailyMax:1}, g16:{dailyMax:3}, g17:{weeklyMax:1}, g18:{dailyMax:1}, g19:{dailyMax:1},
+  g15:{dailyMax:1}, g16:{dailyMax:5}, g17:{weeklyMax:1}, g18:{dailyMax:1}, g19:{dailyMax:1},
   g20:{dailyMax:2}, g21:{dailyMax:1}, g22:{dailyMax:1}, g23:{dailyMax:1}, g25:{weeklyMax:1}, g26:{dailyMax:1},
   g27:{dailyMax:3,grp:"table"}, undscr7f:{dailyMax:3,grp:"table"},
   g28:{dailyMax:1}, g30:{dailyMax:1}, g31:{dailyMax:1}, g32:{dailyMax:1}, g33:{dailyMax:3}, g35:{dailyMax:5},
   fglteaav:{dailyMax:3}, "4lsrn2y9":{dailyMax:3}, eqrs3id5:{dailyMax:1}, xqh6zmgd:{dailyMax:2}, pw1vpylb:{dailyMax:1},
 };
 // 体を動かした回数だけ何回でもよい家事(2026-11-27 ユーザー判断): ゴミ拾い・猫のうんち・靴を並べる・皿洗い(食洗機)は上限なし
-const PD_UNLIMITED = ["g05","g10","g24","g34"];
+const PD_UNLIMITED = ["g02","g03","g05","g08","g10","g14","g24","g34"];
 const pdLimitText = l => [l.dailyMax?`1日${l.dailyMax}回`:"",l.weeklyMax?`週${l.weeklyMax}回`:"",l.monthlyMax?`月${l.monthlyMax}回`:""].filter(Boolean).join("・")||"上限なし";
 function pdLimitsApply(d){
   const keys=["dailyMax","weeklyMax","monthlyMax","grp"];
@@ -3110,7 +3135,7 @@ function PointDesignSection({data, update}){
   const nameOf = id=>(kids.find(c=>c.id===id)||{}).name||"未選択";
   const download = ()=>{
     try{
-      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{}},null,2)],{type:"application/json"});
+      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{},_state:{saveHealth:{ok:_saveHealth.ok,near:_saveHealth.near,bytes:_saveHealth.bytes,failStreak:_saveHealth.failStreak},pointDesign2026:data.pointDesign2026||null,pointDesign2026Daily:data.pointDesign2026Daily||null,pointDesign2026LimitsBackup:data.pointDesign2026LimitsBackup?"あり":null,pointDesign2026RewardsBackup:data.pointDesign2026RewardsBackup?"あり":null,pointDesign2026CleanupBackup:data.pointDesign2026CleanupBackup?"あり":null,oshiClosed:data.oshiClosed||null,pdHealedAt:data.pdHealedAt||null,taneChokin:data.taneChokin||null,familySettings:data.familySettings||{},dailyTaskSets:data.dailyTaskSets||[],activeSetIds:data.activeSetIds||[],interestEnabled:data.interestEnabled,exportedAt:new Date().toISOString()}},null,2)],{type:"application/json"});
       const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`tane-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
     }catch(e){ alert("書き出しに失敗しました"); }
   };
@@ -3153,8 +3178,14 @@ function PointDesignSection({data, update}){
             ):btn(GP,"タネ貯金を始める",()=>{ if(window.confirm("妹と兄でタネ貯金を始めます。いまの週次利子はOFFになります。よろしいですか？")){ update(tcStart); } })}
           </div>
           <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
+            {(()=>{ const kb=Math.round((_saveHealth.bytes||0)/1024); const pct=Math.round((_saveHealth.bytes||0)/900000*100); const bad=!_saveHealth.ok||_saveHealth.failStreak>0; return (
+              <p style={{margin:0,fontSize:11,lineHeight:1.7,color:bad?R:(_saveHealth.near?"#9a7000":MUTED),fontWeight:bad||_saveHealth.near?800:600}}>
+                ☁️ 保存の状態: {bad?"⚠️ 保存に失敗しています（設定が他の端末に届かない状態）":"ふつう"}／ データ量 {kb.toLocaleString()}KB（上限の約{pct}%）{_saveHealth.near&&!bad?" ⚠️ 上限に近づいています":""}
+              </p>); })()}
+          </div>
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${BORDER}`}}>
             <p style={{margin:"0 0 4px",fontWeight:900,fontSize:12,color:TEXT}}>🔁 1日の回数の上限をそろえる</p>
-            <p style={{margin:"0 0 6px",fontSize:11,color:TEXTS,lineHeight:1.7}}>実際の記録で、「学校へ行く」「お風呂を洗う」などが<b>1日に何回も</b>押されていました（過去ぶんをまとめて入れる使い方）。1日1回の家事は1回までにし、複数回ありうるものは現実的な回数にします。<b>ゴミ拾い・猫のうんち・靴を並べる・皿洗いは、何回でもOK</b>です。自分で決めた上限があるものは変えません。</p>
+            <p style={{margin:"0 0 6px",fontSize:11,color:TEXTS,lineHeight:1.7}}>実際の記録で、「学校へ行く」「お風呂を洗う」などが<b>1日に何回も</b>押されていました（過去ぶんをまとめて入れる使い方）。1日1回の家事は1回までにし、複数回ありうるものは現実的な回数にします。<b>ゴミ袋・ゴミ拾い・猫のうんち・吐いたものの片付け・靴・皿洗い・自分の洗濯物の片付けは、何回でもOK</b>です。自分で決めた上限があるものは変えません。</p>
             <ul style={{margin:"0 0 8px",paddingLeft:18,fontSize:11,color:TEXT,lineHeight:1.7,maxHeight:170,overflowY:"auto"}}>
               {(data.goodTasks||[]).filter(t=>PD_LIMITS[t.id]||PD_UNLIMITED.includes(t.id)).map(t=>{ const was=(data.pointDesign2026LimitsBackup||{})[t.id]; const before=was?pdLimitText(was):pdLimitText(t); const after=PD_UNLIMITED.includes(t.id)?"何回でもOK":pdLimitText(PD_LIMITS[t.id]); return <li key={t.id}>{t.label}: {before} → {after}{(PD_LIMITS[t.id]||{}).grp?"（同じ家事は合算）":""}</li>; })}
             </ul>
@@ -3217,7 +3248,7 @@ function PointDesignSection({data, update}){
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {btn(B,"いまの内容を書き出す",download)}
             {needV2&&btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当・上限の設定を適用前の状態に戻します。戻しますか？")) update(pdRestore); })}
-            {btn(GP,needV2?"追加分を適用する":"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) update(d=>pdApply(d,sis,bro)); },!sis||!bro||sis===bro)}
+            {btn(GP,needV2?"追加分を適用する":"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) { markLocalDefEdit(); update(d=>pdApply(d,sis,bro)); }; },!sis||!bro||sis===bro)}
           </div>
         </div>
       )}
@@ -10677,6 +10708,8 @@ export default function App() {
           if(lm.secretCompanion) migrated.secretCompanion={...(migrated.secretCompanion||{}),...lm.secretCompanion};
           if(lm.dailyTaskSets&&lm.dailyTaskSets.length>(migrated.dailyTaskSets||[]).length) migrated.dailyTaskSets=lm.dailyTaskSets;
           if(lm.dailyTasks&&lm.dailyTasks.length>(migrated.dailyTasks||[]).length) migrated.dailyTasks=lm.dailyTasks;
+          keepPdFlags(migrated, lm);   // 適用ずみの印(日課セット・整理・上限・値段・推し株)がサーバに無ければローカルから残す
+          if(lm.taneChokin&&!migrated.taneChokin) migrated.taneChokin=lm.taneChokin;
         }catch(e){}
       }
       // Firestoreのlogsサブコレクション(全件=唯一の正)へ収束＝端末間の残高ズレを解消
