@@ -2924,7 +2924,16 @@ const tcSetMode = (d,cid,mode) => { const a=tcAcct(d,cid); return a.mode===mode?
 // ── 🌟推し株を おわりにして、いま持っている分を「買った値段」で払い戻す ──
 function oshiHoldingsCost(d,cid){ return ((d.holdings||{})[cid]||[]).reduce((a,h)=>a+Math.round((+h.avgPrice||0)*(+h.qty||0)),0); }
 function oshiPending(d){ return (d.children||[]).some(c=>(((d.holdings||{})[c.id])||[]).length>0); }
-function oshiAutoClose(d){ return oshiPending(d)?oshiClose(d):d; }
+// 株が残っているとき: 「終了ずみ」の印があれば、払い戻しは済んでいる扱い(手動で払い戻した場合を含む)＝保有だけ空にして、二重に払い戻さない。
+// 印が無ければ、買った値段で払い戻して終了する
+function oshiAutoClose(d){
+  if(!oshiPending(d)) return d;
+  if(d.oshiClosed){
+    const holdings={...(d.holdings||{})}; (d.children||[]).forEach(c=>{ if((holdings[c.id]||[]).length) holdings[c.id]=[]; });
+    return {...d,holdings,familySettings:{...(d.familySettings||{}),investOff:true}};
+  }
+  return oshiClose(d);
+}
 function oshiClose(d){
   const refunds={}; const adds=[]; const holdings={...(d.holdings||{})}; const prev={};
   (d.children||[]).forEach(c=>{
