@@ -1145,6 +1145,22 @@ function pdApply(d, sisId, broId){
   return {...d, goodTasks:good, badTasks:bad, rewards, myTaskIds:my, familySettings:fs,
     pointDesign2026:{appliedAt:(d.pointDesign2026||{}).appliedAt||new Date().toISOString(), version:2, sisId, broId}, pointDesign2026Backup:bak};
 }
+// ── 自動復元(2026-11-27): 古い端末の保存でお手伝い項目だけ元に戻っても、割当(myTaskIds)に新しい項目があれば、新ポイント設計を入れ直す ──
+// 原因の想定: 長く開いていない端末が古いデータを書き戻す。「適用前に戻す」を押した場合は割当も戻るので、この処理は働かない
+function pdHeal(d){
+  const have=new Set((d.goodTasks||[]).map(t=>t.id));
+  if(!PD_NEW_TASKS.some(t=>!have.has(t.id))) return d;
+  const my=d.myTaskIds||{};
+  const assigned=new Set(Object.entries(my).filter(([k])=>k!=="_stock").flatMap(([,v])=>v||[]));
+  const signal=PD_NEW_TASKS.filter(t=>assigned.has(t.id)).length>=10;
+  if(!signal) return d;
+  const pd=d.pointDesign2026||{};
+  const keys=Object.keys(my).filter(k=>k!=="_stock");
+  const sis=pd.sisId||keys.find(k=>(my[k]||[]).includes("g40"));
+  const bro=pd.broId||keys.find(k=>(my[k]||[]).includes("g46"));
+  if(!sis||!bro) return d;
+  return {...pdApply(d,sis,bro),pdHealedAt:new Date().toISOString()};
+}
 function pdRestore(d){
   const b = d.pointDesign2026Backup;
   if(!b) return d;
@@ -1534,6 +1550,7 @@ function migrate(d) {
     (d.children||[]).forEach(c=>{changed[c.id]=true;});
     d.pinChanged=changed;
   }
+  d = pdHeal(d);   // お手伝い項目が古い端末の保存で元に戻っていたら、新ポイント設計を入れ直す
   return d;
 }
 
@@ -3110,7 +3127,7 @@ function PointDesignSection({data, update}){
   const nameOf = id=>(kids.find(c=>c.id===id)||{}).name||"未選択";
   const download = ()=>{
     try{
-      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{}},null,2)],{type:"application/json"});
+      const blob=new Blob([JSON.stringify({goodTasks:data.goodTasks,badTasks:data.badTasks,rewards:data.rewards,myTaskIds:data.myTaskIds||{},_state:{pointDesign2026:data.pointDesign2026||null,pointDesign2026Daily:data.pointDesign2026Daily||null,pointDesign2026LimitsBackup:data.pointDesign2026LimitsBackup?"あり":null,pointDesign2026RewardsBackup:data.pointDesign2026RewardsBackup?"あり":null,pointDesign2026CleanupBackup:data.pointDesign2026CleanupBackup?"あり":null,oshiClosed:data.oshiClosed||null,pdHealedAt:data.pdHealedAt||null,taneChokin:data.taneChokin||null,familySettings:data.familySettings||{},dailyTaskSets:data.dailyTaskSets||[],activeSetIds:data.activeSetIds||[],interestEnabled:data.interestEnabled,exportedAt:new Date().toISOString()}},null,2)],{type:"application/json"});
       const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`tane-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
     }catch(e){ alert("書き出しに失敗しました"); }
   };
@@ -3217,7 +3234,7 @@ function PointDesignSection({data, update}){
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {btn(B,"いまの内容を書き出す",download)}
             {needV2&&btn(R,"適用前に戻す",()=>{ if(window.confirm("項目・ポイント・割当・上限の設定を適用前の状態に戻します。戻しますか？")) update(pdRestore); })}
-            {btn(GP,needV2?"追加分を適用する":"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) update(d=>pdApply(d,sis,bro)); },!sis||!bro||sis===bro)}
+            {btn(GP,needV2?"追加分を適用する":"適用する",()=>{ if(window.confirm("新ポイント設計を適用します。いまの内容は保存され、あとで戻せます。よろしいですか？")) { markLocalDefEdit(); update(d=>pdApply(d,sis,bro)); }; },!sis||!bro||sis===bro)}
           </div>
         </div>
       )}
