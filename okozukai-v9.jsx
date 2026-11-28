@@ -146,7 +146,7 @@ let _saveHealth = {ok:true, near:false, bytes:0, failStreak:0};
 let _saveHealthCb = null;
 function setSaveHealthCb(cb){ _saveHealthCb=cb; if(cb) cb(_saveHealth); }
 // 新ポイント設計などの「適用ずみ」の印(フラグ)。同期(起動時・受信時)で、片方にしか無いときは消さずに残す＝ボタンが何度も出直さない
-const PD_FLAG_KEYS = ["pointDesign2026","pointDesign2026Backup","pointDesign2026Daily","pointDesign2026CleanupBackup","pointDesign2026LimitsBackup","pointDesign2026RewardsBackup","oshiClosed","pdHealedAt"];
+const PD_FLAG_KEYS = ["pointDesign2026","pointDesign2026Backup","pointDesign2026Daily","pointDesign2026CleanupBackup","pointDesign2026LimitsBackup","pointDesign2026RewardsBackup","oshiClosed","pdHealedAt","familyChores2026"];
 function keepPdFlags(target, other){
   if(!target||!other) return target;
   PD_FLAG_KEYS.forEach(k=>{ if(target[k]===undefined && other[k]!==undefined) target[k]=other[k]; });
@@ -1000,8 +1000,8 @@ function pdLimitMsg(data, cid, task){
     const from=pdPeriodStart(kind);
     const gids=task.grp?(data.goodTasks||[]).filter(t=>t.grp===task.grp).map(t=>t.id):[task.id];   // grp=同じ家事の別項目(お風呂洗い等)は回数を合算
     if(!gids.includes(task.id)) gids.push(task.id);
-    const done=(data.logs||[]).filter(l=>l.cid===cid&&gids.includes(l.rid)&&l.pts>0&&new Date(l.date).getTime()>=from).length
-      +(data.pendingApprovals||[]).filter(p=>p.cid===cid&&gids.includes(p.taskId)&&new Date(p.date).getTime()>=from).length;
+    const done=(data.logs||[]).filter(l=>(task.fam||l.cid===cid)&&gids.includes(l.rid)&&l.pts>0&&new Date(l.date).getTime()>=from).length   // fam=家族ぜんぶで1つ(2人あわせて)数える
+      +(data.pendingApprovals||[]).filter(p=>(task.fam||p.cid===cid)&&gids.includes(p.taskId)&&new Date(p.date).getTime()>=from).length;
     if(done>=max) return `${word}は ${max}回まで だよ（もう ${done}回 やったよ）`;
   }
   return "";
@@ -1153,9 +1153,28 @@ function pdApply(d, sisId, broId){
 }
 // ── 自動復元(2026-11-27): 古い端末の保存でお手伝い項目だけ元に戻っても、割当(myTaskIds)に新しい項目があれば、新ポイント設計を入れ直す ──
 // 原因の想定: 長く開いていない端末が古いデータを書き戻す。「適用前に戻す」を押した場合は割当も戻るので、この処理は働かない
+// 下の子(アプリを使わない2〜3歳)のお世話と、猫のご飯(2026-11-28)。fam=きょうだい2人あわせて回数を数える
+const PD_FAMILY_CHORES = [
+  {id:"g67",emoji:"🧸",label:"下の子のおもちゃを全部しまう",pts:20,dailyMax:2,fam:true,over:{}},
+  {id:"g68",emoji:"🤝",label:"下の子といっしょに片付けた",pts:10,dailyMax:1,approve:true,over:{}},
+  {id:"g69",emoji:"🐈",label:"猫にご飯をあげる(朝・夜)",pts:20,dailyMax:2,fam:true,over:{}},
+];
+// 既存データにも1回だけ足す(あとで親が消した項目をよみがえらせないよう、フラグで1回きり)。個人リストがある子には足す
+function pdAddFamilyChores(d){
+  if(d.familyChores2026) return d;
+  if(!Array.isArray(d.goodTasks)||d.goodTasks.length===0) return d;   // データ読み込み前は何もしない
+  const have=new Set(d.goodTasks.map(t=>t.id));
+  const add=PD_FAMILY_CHORES.filter(t=>!have.has(t.id));
+  const mt={...(d.myTaskIds||{})};
+  (d.children||[]).forEach(c=>{ if(Array.isArray(mt[c.id])&&mt[c.id].length>0) mt[c.id]=[...mt[c.id],...PD_FAMILY_CHORES.map(t=>t.id).filter(i=>!mt[c.id].includes(i))]; });
+  return {...d,goodTasks:[...d.goodTasks,...add],myTaskIds:mt,familyChores2026:true};
+}
 // 先生を巻き込む項目(ダンス/ピアノの合格)は廃止(2026-11-28)。端末に残っていても migrate のたびに外す。外した項目は retiredTasks に控える
 // お手伝いボタン長押しで出す「もらえる条件」。項目に note があればそちらを優先
 const PD_NOTES = {
+  g67:"下の子(2〜3歳)が出したおもちゃを、ぜんぶ元の場所にしまったとき。夕方と寝る前の1日2回まで。きょうだい2人あわせて数えます。",
+  g68:"下の子に声をかけて、いっしょに片付けたとき(下の子にも1個もたせる)。おうちの人の確認がいります。",
+  g69:"猫に、決まった量のご飯をあげたとき。朝と夜の1日2回まで。きょうだい2人あわせて数えます(ポイント目当てで何回もあげない)。",
   g01:"テストで100点を取ったとき。答案を見せて、親が確認してから。",
   g02:"大きいゴミ袋を、いっぱいになった所から出して捨てたとき。出した数だけ何回でも。",
   g03:"小さいゴミ袋を捨てたとき。出した数だけ何回でも。",
@@ -1309,6 +1328,7 @@ const INIT = {
     {id:"g35",emoji:"👶",label:"おむつを捨てる",pts:5,over:{}},
     {id:"g36",emoji:"📝",label:"テストで満点を取る",pts:1000,over:{}},
     ...PD_NEW_TASKS,
+    ...PD_FAMILY_CHORES,
   ],
   badTasks: [
     {id:"b01",emoji:"📺",label:"勝手にYouTubeを見る",pts:-50,over:{}},
@@ -1638,6 +1658,7 @@ function migrate(d) {
     (d.children||[]).forEach(c=>{changed[c.id]=true;});
     d.pinChanged=changed;
   }
+  d = pdAddFamilyChores(d);   // 下の子のお世話・猫のご飯(1回きり)
   d = pdDropRetired(d);   // 先生を巻き込む項目を外す
   d = pdHeal(d);   // お手伝い項目が古い端末の保存で元に戻っていたら、新ポイント設計を入れ直す
   d = oshiAutoClose(d);   // 推し株(買った株)が残っていれば、買った値段のポイントに払い戻して終了(株のデータが後から届いても働く)
@@ -2374,6 +2395,7 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+   {id:"n38", e:"🧸", t:"「下の子のおもちゃを しまう」と「猫のご飯」の おてつだいが ふえました", b:"【なにが ふえた？】\n・🧸 下の子のおもちゃを 全部しまう：20pt（1日2回まで）\n・🤝 下の子といっしょに 片付けた：10pt（1日1回・おうちの人が 確認）\n・🐈 猫にご飯をあげる（朝・夜）：20pt（1日2回まで）\n\n【きまり】\n・「おもちゃを しまう」と「猫のご飯」は、きょうだい 2人 あわせて 1日2回までです。先に おした人が もらえます。\n・おもちゃは 1個ずつ ではなく、「出ている おもちゃを ぜんぶ しまう」で 1回です。\n・「いっしょに 片付けた」は、下の子にも 1個 もたせて 声をかけたときです。\n\n【れい】\n・夕方に れいかが おもちゃを ぜんぶ しまう → +20pt。寝る前に かなとが しまう → +20pt。そのあとは きょうは もう おせません。\n・朝に 猫のご飯を あげた人が +20pt。夜に あげた人が +20pt。ほかの人が 朝に もう一回 おしても もらえません。\n\n【なんのために？】\n・下の子が 片付けを おぼえるのを、上の子が 手伝う きっかけに するため。\n・猫に ごはんを あげすぎないように、回数を 朝・夜の 2回に そろえるため。\n\n【おうちの人へ】\n・長押しで 「もらえる条件」を 見られます。\n・設定の お手伝い項目から、ポイントや 回数を 変えられます。"},
    {id:"n37", e:"👆", t:"おてつだいボタンを 長押しすると「もらえる条件」が 見られます", b:"【なにが できるように なった？】\n「おてつだい」の ボタンを 0.5秒ほど ながく おすと、そのボタンの くわしい せつめいが 出ます。\n\n【出てくること】\n・どうなったら ポイントが もらえるか（もらえる条件）\n・ポイントと 円ぶん\n・1日に なんかい おせるか\n・おうちの人の 確認が いるか\n\n【れい】\n・「ゴミ袋大」を 長押し → 「大きいゴミ袋を、いっぱいに なった所から 出して 捨てたとき。出した数だけ 何回でも」\n・「ピアノの練習15分」を 長押し → 「タイマーで 15分、集中して 練習したとき」\n\n【なんのために？】\n・どこまで やったら おしていいのか、まよわないように するため。\n・おうちの人に きかなくても、じぶんで たしかめられるように するため。\n\n【きをつけて】\n・みじかく タップすると、いままでどおり 記録されます（長押しでは 記録されません）。\n\n【おうちの人へ】\n・先生に OK をもらう 項目（ダンス「先生OK」・ピアノ「先生の合格まで」）は なくしました。\n・外した 項目は データの中に 控えが 残ります。"},
    {id:"n36", e:"💹", t:"毎週つく「週次利子」は おしまいに なりました", b:"【なにが かわった？】\n毎週、ぜんぶの ポイントに 1% ふえていた「週次利子」を なくしました。\n\n【れい】\n・前：1,000pt あると、1週間で +10pt\n・いま：なにも ふえません\n\n【ふやしたい ときは？】\n「ためる」の「🌱 タネ貯金」に あずけると、月末に 4% ふえます（毎日の がんばりで +1%）。\n\n【なんのために？】\n・なにもしなくても ふえる しくみは、おてつだいの やる気に つながりにくいため。\n・タネ貯金に まとめて、「あずけて まつ」と「がんばる」の 2つで ふえる かたちに しました。\n\n【きをつけて】\n・これまでの 利子で ふえた ぶんは、そのまま のこります。"},
   {id:"n35", e:"🔁", t:"おなじ おてつだいは 1日に なんども おせません", b:"【なにが かわった？】\n同じ おてつだいを、1日に なんども おせない ように しました。\n\n【れい】\n・学校へ行く・お風呂を洗う・朝 起きる・ベッドメイク・パジャマ・ゴミの日…：1日 1回\n・洗濯物ほし・お米を炊く：1日 2回（休日は 洗濯物ほしを ふたりとも 2回ずつ）\n・テーブルふき・ゴミ袋セット：1日 3回まで\n・一部屋 掃除機：1日 5回まで\n・ルンバのゴミ・自分で 起きる：1日 1回\n・ゴミ袋（大・小）・ゴミひろい・猫の うんち取り と はいたものの 片づけ・靴ならべ・皿あらい（食洗機）・自分の かわいた 洗濯物の かたづけ は、やった 回数だけ 何回でも OK（体を 動かした ぶんだけ おして ください）\n・お風呂洗い と お風呂を洗う は「同じ お風呂」なので 2つ あわせて 1日 1回\n・日課と、同じ 家事の おてつだい項目は、あわせて 数えます（上限が ある 項目だけ）。\n・おしすぎると「きょうは ○回まで だよ」と 出ます。\n\n【なんのために？】\n・毎日 その日の うちに 1回ずつ つける 習慣を つけるため（タイムカードと おなじ です）。\n・おしすぎて ポイントが ふえすぎたり、「前の日の ぶん」を あとから まとめて 入れたり する ことを ふせぐため。\n・じっさいの 記録では、「学校へ行く」を 1日に 20回、「お風呂を洗う」を 1日に 20回 おしている 日が ありました。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「1日の回数の上限をそろえる」で 反映します。表で 項目ごとの 上限を 確認できます。「上限を元に戻す」で 戻せます。\n・自分で 決めた 上限が ある 項目は 変えません。上限は 項目の ✏ 編集 からも 変えられます。"},
