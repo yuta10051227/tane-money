@@ -1035,8 +1035,6 @@ const PD_NEW_TASKS = [
   {id:"g51",emoji:"🎯",label:"定期テスト 目標点を達成(教科ごと)",pts:200,approve:true,over:{}},
   {id:"g52",emoji:"📜",label:"検定を受験する(英検・テックス・ピアノ検定など)",pts:200,approve:true,over:{}},
   {id:"g53",emoji:"🎓",label:"検定に合格する",pts:1000,approve:true,over:{}},
-  {id:"g54",emoji:"💃",label:"ダンス: 振付を覚えて先生OK",pts:100,approve:true,over:{}},
-  {id:"g55",emoji:"🎹",label:"ピアノ: 1曲を先生の合格まで",pts:200,approve:true,over:{}},
   {id:"g56",emoji:"🎪",label:"発表会に出る",pts:300,approve:true,over:{}},
   {id:"g57",emoji:"🎼",label:"コンクールに出場する",pts:300,approve:true,over:{}},
   {id:"g58",emoji:"🏆",label:"コンクールで入賞する",pts:500,approve:true,over:{}},
@@ -1058,7 +1056,7 @@ const PD_EDIT_GOOD = {
 };
 const PD_EDIT_BAD = { b11:{pts:-50} };
 const PD_EDIT_REWARD = { r07:{cost:1500,cashYen:500} };
-const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44","g54","g55","g56","g57","g58","g59","g60","g61"]; // 妹だけ（習い事・通知表）
+const PD_ONLY_SISTER = ["g40","g41","g42","g43","g44","g56","g57","g58","g59","g60","g61"]; // 妹だけ（習い事・通知表）
 const PD_ONLY_BROTHER = ["g46","g62","g63","g64","g65","g66"]; // 兄だけ（0時就寝・部活）
 // ── 第2段階(後半): 祝日=休日扱い・日課の担当(who)・部活なし・平日用/休日用セット ──
 const PD_HOLIDAYS = new Set(["2026-01-01","2026-01-12","2026-02-11","2026-02-23","2026-03-20","2026-04-29","2026-05-03","2026-05-04","2026-05-05","2026-05-06","2026-07-20","2026-08-11","2026-09-21","2026-09-22","2026-09-23","2026-10-12","2026-11-03","2026-11-23","2027-01-01","2027-01-11","2027-02-11","2027-02-23","2027-03-21","2027-03-22","2027-04-29","2027-05-03","2027-05-04","2027-05-05","2027-07-19","2027-08-11","2027-09-20","2027-09-23","2027-10-11","2027-11-03","2027-11-23"]); // 2027年まで。以降は土日のみ休日扱い
@@ -1155,6 +1153,88 @@ function pdApply(d, sisId, broId){
 }
 // ── 自動復元(2026-11-27): 古い端末の保存でお手伝い項目だけ元に戻っても、割当(myTaskIds)に新しい項目があれば、新ポイント設計を入れ直す ──
 // 原因の想定: 長く開いていない端末が古いデータを書き戻す。「適用前に戻す」を押した場合は割当も戻るので、この処理は働かない
+// 先生を巻き込む項目(ダンス/ピアノの合格)は廃止(2026-11-28)。端末に残っていても migrate のたびに外す。外した項目は retiredTasks に控える
+// お手伝いボタン長押しで出す「もらえる条件」。項目に note があればそちらを優先
+const PD_NOTES = {
+  g01:"テストで100点を取ったとき。答案を見せて、親が確認してから。",
+  g02:"大きいゴミ袋を、いっぱいになった所から出して捨てたとき。出した数だけ何回でも。",
+  g03:"小さいゴミ袋を捨てたとき。出した数だけ何回でも。",
+  g04:"お米をといで、炊飯器をセットして、スイッチを入れたとき。",
+  g05:"玄関の靴ぜんぶを、そろえて並べたとき。",
+  g06:"ルンバのゴミを捨てて、元の場所にもどしたとき。",
+  g07:"水のボトルに水を入れて、冷蔵庫(または決まった場所)に置いたとき。",
+  g08:"猫が吐いたものを、きれいに片付けて、床も拭いたとき。",
+  g09:"お風呂の浴槽と床をこすって洗い、流したとき。",
+  g10:"猫のトイレのうんちを取って、ゴミに捨てたとき。",
+  g11:"猫のトイレを、親といっしょに丸ごと洗ったとき。",
+  g12:"23時までにベッドに入って寝たとき。",
+  g13:"22時までにベッドに入って寝たとき。",
+  g14:"自分の乾いた洗濯物を、自分の場所にしまったとき。",
+  g15:"朝6時35分までに、自分で起きたとき(起こされたらなし)。",
+  g16:"1部屋ぜんぶに掃除機をかけたとき。",
+  g17:"お菓子コーナーを整理して、期限切れがないか見たとき。",
+  g18:"朝10時までに布団を干して、夕方に取り込んだとき。",
+  g19:"机の上と下のものを、あるべき場所にもどしたとき。",
+  g20:"洗濯物を洗濯機から出して、ぜんぶ干したとき。",
+  g21:"クローゼットの中を、種類ごとにそろえて整えたとき。",
+  g22:"家族の布団を、きれいに整えたとき。",
+  g23:"乾いた洗濯物をたたんだとき。",
+  g24:"食器を食洗機に入れて回し、終わった食器を片付けたとき(入れる〜片付けまでで1回)。",
+  g25:"換気扇のフィルターを、新しいものに替えたとき。",
+  g26:"ゴミの日に、家じゅうのゴミを集めて出したとき。",
+  g27:"3分以内に、テーブルをきれいに拭いたとき。",
+  g28:"朝、ベッドを整えたとき。",
+  g29:"タオルを1枚、畳んで所定の場所にしまったとき。",
+  g30:"シューズを、忘れずに持って帰ってきたとき。",
+  g31:"朝、パジャマを片付けたとき。",
+  g32:"テーブルの周りに、何も置いていない状態にしたとき。",
+  g33:"ゴミ箱に、新しいゴミ袋をセットしたとき。",
+  g34:"落ちているゴミを2個ひろって、捨てたとき。",
+  g35:"使ったおむつを、決まった所に捨てたとき。",
+  g36:"テストで満点を取ったとき。答案を見せて、親が確認してから。",
+  g37:"床・机・服・制服・カバンの5つがぜんぶ片付いた状態にしたとき。",
+  g38:"床だけ片付いたとき。部屋セットと同じ日は、どちらか1つだけ。",
+  g39:"明日の準備を終えて、忘れ物の連絡が来なかったとき。",
+  g40:"ダンスを15分、集中して練習したとき(タイマーで15分)。",
+  g41:"ピアノを15分、集中して練習したとき(タイマーで15分)。",
+  g42:"英語を15分、練習したとき(タイマーで15分)。",
+  g43:"家族の前で、練習の成果を見せたとき(週に1回)。",
+  g44:"英語レッスンの宿題を、期限までに出したとき(週に1回)。",
+  g45:"休日に、自分で決めた勉強を30分したとき。",
+  g46:"0時までに寝たとき。",
+  g47:"部屋の5か所をチェックして、ぜんぶOKだったとき(週に1回)。",
+  g48:"いらないものを10個、または1袋ぶん整理したとき(月に1回)。",
+  g49:"その週の宿題・提出物を、ぜんぶ期限内に出したとき(週に1回)。",
+  g50:"定期テストで、前の点より5点以上上がった教科ごと。",
+  g51:"定期テストで、自分で決めた目標の点を取った教科ごと。",
+  g52:"検定(英検・テックス・ピアノ検定など)を受けたとき。",
+  g53:"検定に合格したとき。合格の紙を見せて、親が確認してから。",
+  g56:"発表会に出たとき。",
+  g57:"コンクールに出場したとき。",
+  g58:"コンクールで入賞したとき。",
+  g59:"通知表の「◎」1個ごと。通知表を見せて、親が確認してから。",
+  g60:"通知表の「○」1個ごと。通知表を見せて、親が確認してから。",
+  g61:"前の通知表より、◎が増えた・△が減った1個ごと。",
+  g62:"県大会で勝った1試合ごと。",
+  g63:"小さい大会で勝った1試合ごと。",
+  g64:"大会に出場したとき。負けても もらえる。",
+  g65:"レギュラーに入ったとき。",
+  g66:"ランキング戦・校内の順位が、前より上がったとき。"
+};
+const PD_RETIRED_IDS = ["g54","g55"];
+function pdDropRetired(d){
+  const has=(d.goodTasks||[]).some(t=>PD_RETIRED_IDS.includes(t.id));
+  const mt=d.myTaskIds||{};
+  const inMy=Object.values(mt).some(a=>Array.isArray(a)&&a.some(i=>PD_RETIRED_IDS.includes(i)));
+  if(!has&&!inMy) return d;
+  const gone=(d.goodTasks||[]).filter(t=>PD_RETIRED_IDS.includes(t.id));
+  const newMy={}; Object.entries(mt).forEach(([k,a])=>{ newMy[k]=Array.isArray(a)?a.filter(i=>!PD_RETIRED_IDS.includes(i)):a; });
+  const kept=(d.retiredTasks||[]);
+  return {...d,
+    goodTasks:(d.goodTasks||[]).filter(t=>!PD_RETIRED_IDS.includes(t.id)),
+    myTaskIds:newMy,
+    retiredTasks:[...kept,...gone.filter(t=>!kept.some(k=>k.id===t.id))]};
+}
 function pdHeal(d){
   const have=new Set((d.goodTasks||[]).map(t=>t.id));
   if(!PD_NEW_TASKS.some(t=>!have.has(t.id))) return d;
@@ -1558,6 +1638,7 @@ function migrate(d) {
     (d.children||[]).forEach(c=>{changed[c.id]=true;});
     d.pinChanged=changed;
   }
+  d = pdDropRetired(d);   // 先生を巻き込む項目を外す
   d = pdHeal(d);   // お手伝い項目が古い端末の保存で元に戻っていたら、新ポイント設計を入れ直す
   d = oshiAutoClose(d);   // 推し株(買った株)が残っていれば、買った値段のポイントに払い戻して終了(株のデータが後から届いても働く)
   return d;
@@ -2293,6 +2374,7 @@ function careCap(d, cid, ratio, rawExp){
 // お知らせ(新機能のおしらせ)。先頭が最新。idは重複しない文字列に
 // ═══════════════════════════════════════════════════════
 const NEWS = [
+   {id:"n37", e:"👆", t:"おてつだいボタンを 長押しすると「もらえる条件」が 見られます", b:"【なにが できるように なった？】\n「おてつだい」の ボタンを 0.5秒ほど ながく おすと、そのボタンの くわしい せつめいが 出ます。\n\n【出てくること】\n・どうなったら ポイントが もらえるか（もらえる条件）\n・ポイントと 円ぶん\n・1日に なんかい おせるか\n・おうちの人の 確認が いるか\n\n【れい】\n・「ゴミ袋大」を 長押し → 「大きいゴミ袋を、いっぱいに なった所から 出して 捨てたとき。出した数だけ 何回でも」\n・「ピアノの練習15分」を 長押し → 「タイマーで 15分、集中して 練習したとき」\n\n【なんのために？】\n・どこまで やったら おしていいのか、まよわないように するため。\n・おうちの人に きかなくても、じぶんで たしかめられるように するため。\n\n【きをつけて】\n・みじかく タップすると、いままでどおり 記録されます（長押しでは 記録されません）。\n\n【おうちの人へ】\n・先生に OK をもらう 項目（ダンス「先生OK」・ピアノ「先生の合格まで」）は なくしました。\n・外した 項目は データの中に 控えが 残ります。"},
    {id:"n36", e:"💹", t:"毎週つく「週次利子」は おしまいに なりました", b:"【なにが かわった？】\n毎週、ぜんぶの ポイントに 1% ふえていた「週次利子」を なくしました。\n\n【れい】\n・前：1,000pt あると、1週間で +10pt\n・いま：なにも ふえません\n\n【ふやしたい ときは？】\n「ためる」の「🌱 タネ貯金」に あずけると、月末に 4% ふえます（毎日の がんばりで +1%）。\n\n【なんのために？】\n・なにもしなくても ふえる しくみは、おてつだいの やる気に つながりにくいため。\n・タネ貯金に まとめて、「あずけて まつ」と「がんばる」の 2つで ふえる かたちに しました。\n\n【きをつけて】\n・これまでの 利子で ふえた ぶんは、そのまま のこります。"},
   {id:"n35", e:"🔁", t:"おなじ おてつだいは 1日に なんども おせません", b:"【なにが かわった？】\n同じ おてつだいを、1日に なんども おせない ように しました。\n\n【れい】\n・学校へ行く・お風呂を洗う・朝 起きる・ベッドメイク・パジャマ・ゴミの日…：1日 1回\n・洗濯物ほし・お米を炊く：1日 2回（休日は 洗濯物ほしを ふたりとも 2回ずつ）\n・テーブルふき・ゴミ袋セット：1日 3回まで\n・一部屋 掃除機：1日 5回まで\n・ルンバのゴミ・自分で 起きる：1日 1回\n・ゴミ袋（大・小）・ゴミひろい・猫の うんち取り と はいたものの 片づけ・靴ならべ・皿あらい（食洗機）・自分の かわいた 洗濯物の かたづけ は、やった 回数だけ 何回でも OK（体を 動かした ぶんだけ おして ください）\n・お風呂洗い と お風呂を洗う は「同じ お風呂」なので 2つ あわせて 1日 1回\n・日課と、同じ 家事の おてつだい項目は、あわせて 数えます（上限が ある 項目だけ）。\n・おしすぎると「きょうは ○回まで だよ」と 出ます。\n\n【なんのために？】\n・毎日 その日の うちに 1回ずつ つける 習慣を つけるため（タイムカードと おなじ です）。\n・おしすぎて ポイントが ふえすぎたり、「前の日の ぶん」を あとから まとめて 入れたり する ことを ふせぐため。\n・じっさいの 記録では、「学校へ行く」を 1日に 20回、「お風呂を洗う」を 1日に 20回 おしている 日が ありました。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「1日の回数の上限をそろえる」で 反映します。表で 項目ごとの 上限を 確認できます。「上限を元に戻す」で 戻せます。\n・自分で 決めた 上限が ある 項目は 変えません。上限は 項目の ✏ 編集 からも 変えられます。"},
   {id:"n34", e:"🎁", t:"ごほうびの ねだんが 3pt＝1円に そろいました", b:"【なにが かわった？】\nごほうびの ねだん（ポイント）が、3pt＝1円に あわせて かわりました。\n\n【れい】\n・スマホ 30分：200pt → 150pt\n・Netflix 30分・YouTube 30分・ゲーム 30分：200pt → 150pt\n・好きなお菓子 いっこ：200pt → 150pt\n・スイッチオンライン代：200pt → 150pt\n・送迎（片道）：100pt → 75pt\n・500円こうかん：2,000pt → 1,500pt（さきに かわっています）\n\n【なんのために？】\n・前は 4pt＝1円 でした。3pt＝1円に かわって、ポイントの 価値が 上がったので、ごほうびの ねだんも おなじ「円ぶん」に そろえました。\n・そろえないと、お金に かえる ほうが とくに なってしまい、ごほうびを えらびにくく なるからです。\n\n【おうちの人へ】\n・設定「お手伝い項目」の新ポイント設計カードの「ごほうびの値段を 3pt＝1円に そろえる」で 反映します。「値段を元に戻す」で 戻せます。500円交換は 変わりません。"},
@@ -4718,6 +4800,18 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
   const heroStars   = _cBgUnlock && _cBgTheme.stars;
   const [flash, setFlash] = useState(null);
   const [pressed, setPressed] = useState({});
+  // お手伝いボタンの長押し(0.5秒)で「もらえる条件」を見せる。長押ししたあとの指はなしでは記録しない
+  const [taskDetail, setTaskDetail] = useState(null);
+  const lpTimer = useRef(null); const lpFired = useRef(false);
+  const lpCancel = () => { if(lpTimer.current){ clearTimeout(lpTimer.current); lpTimer.current=null; } };
+  const lpProps = (t, run) => ({
+    onTouchStart:()=>{ lpFired.current=false; lpCancel(); lpTimer.current=setTimeout(()=>{ lpFired.current=true; setTaskDetail(t); },500); },
+    onTouchEnd:lpCancel, onTouchMove:lpCancel, onTouchCancel:lpCancel,
+    onMouseDown:()=>{ lpFired.current=false; lpCancel(); lpTimer.current=setTimeout(()=>{ lpFired.current=true; setTaskDetail(t); },500); },
+    onMouseUp:lpCancel, onMouseLeave:lpCancel,
+    onContextMenu:e=>e.preventDefault(),
+    onClick:()=>{ if(lpFired.current){ lpFired.current=false; return; } run(); },
+  });
   const [showSecretCode, setShowSecretCode] = useState(false);   // 名前の長押しで開く、ひみつコード入力
   const [showSecretMage, setShowSecretMage] = useState(false);   // ひみつの魔法使い 全画面ビュー
   const secretLongPress = useLongPress(()=>{ taneHaptic("tap"); setShowSecretCode(true); }, 600);
@@ -5771,10 +5865,31 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
               {hasFilter?`✏ ${myIds.length}個選択中`:"✏ リスト編集"}
             </button>
           </div>
+          {taskDetail&&(()=>{
+            const t=taskDetail; const pts=taskPts(t,child.id); const fs=data.familySettings||INIT.familySettings;
+            const lim=pdLimitText(t); const need=pts>0&&(fs.requireApproval||t.approve||(fs.approvalThreshold>0&&pts>=fs.approvalThreshold));
+            const note=t.note||PD_NOTES[t.id]||(pts<0?"やってしまったときに、正直に記録します。":"やったときに押します。");
+            const row=(k,v)=><div style={{display:"flex",gap:8,padding:"8px 0",borderTop:`1px solid ${BORDER}`,fontSize:13,lineHeight:1.6}}><div style={{width:84,flexShrink:0,color:MUTED,fontWeight:800}}>{k}</div><div style={{flex:1,color:TEXT,fontWeight:700}}>{v}</div></div>;
+            return(<div onClick={()=>setTaskDetail(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:9000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+              <div onClick={e=>e.stopPropagation()} style={{background:CARD,width:"100%",maxWidth:480,borderRadius:"20px 20px 0 0",padding:"18px 18px 24px",fontFamily:F}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <span style={{fontSize:34}}>{t.emoji}</span>
+                  <div style={{flex:1,fontWeight:900,fontSize:16,color:TEXT,lineHeight:1.4}}>{t.label}</div>
+                  <button onClick={()=>setTaskDetail(null)} style={{background:"transparent",border:"none",fontSize:22,color:MUTED,cursor:"pointer"}}>✕</button>
+                </div>
+                {row("もらえる条件",note)}
+                {row("ポイント",<span>{pts>0?"+":""}{pts}pt<YenNote pts={Math.abs(pts)} sz={12}/></span>)}
+                {row("1日の回数",lim==="上限なし"?"やった回数だけ、何回でもOK":lim+"まで")}
+                {row("確認",need?"おうちの人の確認がいります(OKが出たらポイントが入ります)":"押すとすぐ入ります")}
+                {row("きまり","きょうの ぶんは、きょうのうちに 押します(あとから まとめては なし)")}
+                <button onClick={()=>setTaskDetail(null)} style={{marginTop:12,width:"100%",padding:"12px",border:"none",borderRadius:12,background:G,color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",fontFamily:F}}>わかった</button>
+              </div>
+            </div>);
+          })()}
           {filtGood.length>0&&<>
-            <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}</p>
+            <p style={{color:MUTED,fontSize:12,fontWeight:700,marginBottom:10}}>✅ {young?"いいこと":"いいこと（プラス）"}<span style={{marginLeft:8,fontSize:11,fontWeight:600}}>👆 長押しで くわしく</span></p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&isTodayLocal(l.date)).length;return(<button key={t.id} onClick={()=>doTask(t)} style={{background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
+              {[...filtGood].sort(sortTaskFn).map(t=>{const pts=taskPts(t,child.id);const on=!!pressed[t.id];const isPending=(data.pendingApprovals||[]).some(p=>p.cid===child.id&&p.taskId===t.id);const cnt=myLogs.filter(l=>l.rid===t.id&&isTodayLocal(l.date)).length;return(<button key={t.id} {...lpProps(t,()=>doTask(t))} style={{WebkitTouchCallout:"none",userSelect:"none",WebkitUserSelect:"none",background:isPending?GOLDS:on?"#e8faf0":CARD,border:`2.5px solid ${isPending?GOLD:on?G:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:isPending?"default":"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F,position:"relative"}}>{isPending?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:GOLD,color:"#fff",borderRadius:999,padding:"1px 5px",fontWeight:700}}>確認待ち</div>:cnt>0?<div style={{position:"absolute",top:4,right:4,fontSize:11,background:G,color:"#fff",borderRadius:999,padding:"1px 6px",fontWeight:700}}>✓{cnt}</div>:null}<span style={{fontSize:young?34:26}}>{t.emoji}</span><span style={{fontSize:young?15:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span>{!young&&<Pt v={pts} sz={12}/>}</button>);})}
             </div>
           </>}
           {!young&&filtBad.length>0&&<>
@@ -5786,7 +5901,7 @@ function ChildScreen({ child, data, update, onBack, onFamily }) {
             <div style={{background:`${R}08`,border:`1.5px dashed ${RS}`,borderRadius:14,padding:"10px 10px 4px",marginBottom:4}}>
               <p style={{margin:"0 0 8px",fontSize:11,color:R,fontWeight:600}}>やってしまったら正直に記録しよう</p>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} onClick={()=>doTask(t)} style={{background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
+                {[...filtBad].sort(sortTaskFn).map(t=>{const on=!!pressed[t.id];return(<button key={t.id} {...lpProps(t,()=>doTask(t))} style={{WebkitTouchCallout:"none",userSelect:"none",WebkitUserSelect:"none",background:on?"#fef0ef":CARD,border:`2.5px solid ${on?R:BORDER}`,borderRadius:18,padding:"13px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,transform:on?"scale(.92)":"scale(1)",transition:"all .2s",fontFamily:F}}><span style={{fontSize:26}}>{t.emoji}</span><span style={{fontSize:12,fontWeight:700,color:TEXT,textAlign:"center"}}>{t.label}</span><Pt v={taskPts(t,child.id)} sz={12}/></button>);})}</div>
             </div>
           </>}
           {filtGood.length===0&&filtBad.length===0&&(
